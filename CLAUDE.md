@@ -9,8 +9,15 @@ This is a TypeScript SDK that provides a unified authentication interface based 
 - **Core Interface**: `src/auth/auth-interface.ts` defines the `AuthClient` interface based on Supabase's AuthClient
 - **Adapter Pattern**: Authentication providers implement the `AuthClient` interface
 - **Adapters**: Located in `src/auth/adapters/`
-  - `stack-auth.ts` - Stack Auth provider adapter (in development)
-- **Entry Point**: `src/index.ts` exports the interface types and adapters
+  - `src/auth/adapters/stack-auth/` - Stack Auth provider adapter directory
+    - `stack-auth-adapter.ts` - Main adapter implementation
+    - `stack-auth-schemas.ts` - Zod schemas for JWT validation
+    - `stack-auth.test.ts` - Unit tests
+- **Client Layer**: `src/client/` contains the unified client
+  - `neon-client.ts` - Main NeonClient class (extends PostgrestClient) and `createClient()` factory
+  - `neon-client.test.ts` - Client tests
+  - `fetch-with-auth.ts` - Auth-aware fetch wrapper for automatic token injection
+- **Entry Point**: `src/index.ts` exports the interface types, adapters, and client
 - **Build Output**: Compiled to `dist/` directory
 
 ## Development Commands
@@ -28,53 +35,88 @@ This is a TypeScript SDK that provides a unified authentication interface based 
 
 ## Stack Auth Session Caching
 
-The Stack Auth adapter optimizes session retrieval by leveraging Stack Auth's built-in tokenStore and internal session caching:
+The Stack Auth adapter optimizes session retrieval by accessing Stack Auth's internal session cache directly:
 
-### How It Works:
-1. **First `getSession()` call**: Reads from Stack Auth's internal session cache or tokenStore (localStorage/cookies)
-2. **Subsequent calls**: Returns in-memory cached session (no network/storage access)
-3. **Token refresh**: Automatically refreshes tokens 90 seconds before expiration
-4. **Persistence**: Sessions persist across page reloads via tokenStore
+### Implementation Details:
+The adapter uses an internal method `_getCachedTokensFromStackAuthInternals()` that:
+1. Accesses Stack Auth's internal `_getOrCreateTokenStore()` method
+2. Retrieves the session from the token store using `_getSessionFromTokenStore()`
+3. Checks if cached tokens are still valid via `getAccessTokenIfNotExpiredYet(0)`
+4. Returns `null` if tokens are expired, forcing a refresh
 
-### Token Handling:
-Stack Auth's `getTokens()` returns objects with a `token` property:
+### How `getSession()` Works:
+1. **Step 1 - Fast Path**: Try to get cached tokens from Stack Auth internals (no network/storage access)
+   - If cached tokens exist and are valid, decode JWT and return session immediately
+2. **Step 2 - Fallback**: If no cached tokens or expired, fetch user via `stackAuth.getUser()`
+   - This makes a network request and automatically refreshes tokens if needed
+   - Extract tokens from user session and construct session object
+
+### Token Format:
+Stack Auth's internal tokens are objects with a `token` property:
 ```typescript
 {
   accessToken: { token: "eyJ..." },
   refreshToken: { token: "d37..." }
 }
 ```
-The adapter extracts these token strings for session management and JWT decoding.
+The adapter extracts these token strings for session management and JWT decoding using Zod schemas.
 
-### tokenStore Configuration:
+### Usage with NeonClient:
 ```typescript
-import { StackAuthAdapter } from '@/auth/adapters/stack-auth';
+import { createClient } from 'neon-js';
 
-// Browser: Use cookie storage (recommended for SSR)
-const adapter = new StackAuthAdapter({
-  projectId: 'your-project-id',
-  publishableClientKey: 'pk_...',
-  tokenStore: 'cookie',
+// Create client with Stack Auth integration
+const client = createClient({
+  url: 'https://your-api.com',
+  auth: {
+    projectId: 'your-project-id',
+    publishableClientKey: 'pk_...',
+    tokenStore: 'cookie', // or 'memory'
+  },
 });
 
-// Browser: Use memory storage (lost on reload)
-const adapter = new StackAuthAdapter({
-  projectId: 'your-project-id',
-  publishableClientKey: 'pk_...',
-  tokenStore: 'memory',
-});
+// Access auth methods
+await client.auth.signInWithPassword({ email, password });
+const { data } = await client.auth.getSession();
+
+// Make authenticated API calls (tokens injected automatically)
+const { data: items } = await client.from('items').select();
 ```
 
 ### Performance Characteristics:
-- **Cached `getSession()`**: <5ms (no network/storage I/O)
-- **First `getSession()` after reload**: <50ms (reads from tokenStore)
-- **Token refresh**: <200ms (network call to Stack Auth)
+- **Cached `getSession()`**: <5ms (reads from Stack Auth internal cache, no I/O)
+- **First `getSession()` after reload**: <50ms (Stack Auth reads from tokenStore)
+- **Token refresh**: <200ms (network call to Stack Auth, happens automatically)
 
 ## Testing
 - Test framework: Vitest
-- Tests located in `tests/` directory
+- Tests located in:
+  - `tests/` directory - Integration tests
+  - `src/auth/adapters/stack-auth/stack-auth.test.ts` - Stack Auth adapter unit tests
+  - `src/client/neon-client.test.ts` - NeonClient unit tests
 - Run tests with `bun test`
 
+## Key Implementation Notes
+
+### Recent Refactoring (October 2025):
+The Stack Auth adapter was refactored to access Stack Auth's internal session cache directly via `_getCachedTokensFromStackAuthInternals()`. This optimization:
+- Eliminates unnecessary network calls on cached `getSession()` invocations
+- Maintains compatibility with Stack Auth's tokenStore persistence (cookie/memory)
+- Uses internal APIs: `_getOrCreateTokenStore()`, `_getSessionFromTokenStore()`, and `getAccessTokenIfNotExpiredYet()`
+
+### Factory Pattern:
+The `createClient()` factory function handles the complex initialization sequence:
+1. Instantiates `StackAuthAdapter` from auth options
+2. Creates a lazy `getAccessToken()` function that calls `auth.getSession()`
+3. Wraps fetch with `fetchWithAuth()` to automatically inject Bearer tokens
+4. Constructs `NeonClient` with the auth-aware fetch
+5. Assigns the auth adapter to `client.auth` for direct access
+
+This pattern ensures all PostgrestClient queries automatically include authentication headers.
+
+## Additional Documentation
+
+- **`stack-auth_supabase-comparison.md`**: Comprehensive feature comparison between Stack Auth and Supabase, demonstrating that Stack Auth implements all required features (refresh deduplication, exponential backoff, session validation, user caching) and in many cases provides superior implementations. This document validates the adapter's reliance on Stack Auth's internal mechanisms.
 
 ## Supabase references
 
