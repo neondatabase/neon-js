@@ -1,7 +1,7 @@
 import type { AuthClient } from '@/auth/auth-interface';
 import { PostgrestClient } from '@supabase/postgrest-js';
 import { fetchWithAuth } from '@/client/fetch-with-auth';
-import { StackAuthAdapter } from '@/auth/adapters/stack-auth';
+import { StackAuthAdapter } from '@/auth/adapters/stack-auth/stack-auth-adapter';
 import type {
   StackClientAppConstructorOptions,
   StackServerAppConstructorOptions,
@@ -56,7 +56,10 @@ export class NeonClient extends PostgrestClient {
 export function createClient<
   HasTokenStore extends boolean = boolean,
   ProjectId extends string = string
->({ url, auth: authOptions }: CreateClientOptions<HasTokenStore, ProjectId>): NeonClient {
+>({
+  url,
+  auth: authOptions,
+}: CreateClientOptions<HasTokenStore, ProjectId>): NeonClient {
   // Step 1: Instantiate auth adapter from options
   const auth = new StackAuthAdapter(authOptions);
 

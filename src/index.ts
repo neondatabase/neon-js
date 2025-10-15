@@ -1,17 +1,7 @@
-export const myFunction = () => {
-  return 'Hello, world!';
-};
-
 // Export auth interface and types
-export type {
-  AuthClient,
-} from './auth/auth-interface';
+export type { AuthClient } from '@/auth/auth-interface';
 
-export {
-  AuthError,
-  AuthApiError,
-  isAuthError,
-} from './auth/auth-interface';
+export { AuthError, AuthApiError, isAuthError } from '@/auth/auth-interface';
 
 // Re-export commonly used types from Supabase
 export type {
@@ -31,8 +21,8 @@ export type {
 } from '@supabase/auth-js';
 
 // Export Stack Auth adapter
-export { StackAuthAdapter } from './auth/adapters/stack-auth';
+export { StackAuthAdapter } from '@/auth/adapters/stack-auth/stack-auth-adapter';
 
 // Export NeonClient and factory
-export { NeonClient, createClient } from './client/neon-client';
-export type { CreateClientOptions } from './client/neon-client';
+export { NeonClient, createClient } from '@/client/neon-client';
+export type { CreateClientOptions } from '@/client/neon-client';

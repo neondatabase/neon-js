@@ -3,7 +3,7 @@ import {
   AuthApiError,
   type AuthClient,
 } from '@/auth/auth-interface';
-import type { Session, AuthChangeEvent } from '@supabase/auth-js';
+import type { Session, AuthChangeEvent, Subscription } from '@supabase/auth-js';
 import {
   StackClientApp,
   StackServerApp,
@@ -12,6 +12,7 @@ import {
 } from '@stackframe/js';
 import type { InternalSession } from '@stackframe/stack-shared/dist/sessions';
 import type { ReadonlyJson } from '@stackframe/stack-shared/dist/utils/json';
+import { accessTokenSchema } from '@/auth/adapters/stack-auth/stack-auth-schemas';
 
 /**
  * Stack Auth User with internal session access
@@ -139,15 +140,6 @@ function normalizeStackAuthError(
   );
 }
 
-type Subscription = {
-  id: string;
-  callback: (
-    event: AuthChangeEvent,
-    session: Session | null
-  ) => void | Promise<void>;
-  unsubscribe: () => void;
-};
-
 type OnAuthStateChangeConfig = {
   enableTokenRefreshDetection?: boolean; // Default: true (matches Supabase)
   tokenRefreshCheckInterval?: number; // Default: 30000 (30s, like Supabase)
@@ -165,7 +157,6 @@ export class StackAuthAdapter<
 
   // Auth state change management
   private stateChangeEmitters = new Map<string, Subscription>();
-  private lastKnownUserId: string | null = null;
   private cachedSession: Session | null = null;
   private broadcastChannel: InstanceType<typeof BroadcastChannel> | null = null;
   private tokenRefreshCheckInterval: NodeJS.Timeout | null = null;
@@ -173,7 +164,6 @@ export class StackAuthAdapter<
     enableTokenRefreshDetection: true, // Enabled by default (matches Supabase)
     tokenRefreshCheckInterval: 30_000, // 30 seconds (matches Supabase)
   };
-
   constructor(
     params: StackServerAppConstructorOptions<HasTokenStore, ProjectId>,
     config?: OnAuthStateChangeConfig
@@ -259,7 +249,6 @@ export class StackAuthAdapter<
 
         // Emit SIGNED_IN event
         if (data.user) {
-          this.lastKnownUserId = data.user.id;
           await this.notifyAllSubscribers(
             'SIGNED_IN',
             sessionResult.data.session
@@ -365,7 +354,6 @@ export class StackAuthAdapter<
         };
 
         // Emit SIGNED_IN event
-        this.lastKnownUserId = data.user.id;
         await this.notifyAllSubscribers(
           'SIGNED_IN',
           sessionResult.data.session
@@ -523,13 +511,9 @@ export class StackAuthAdapter<
   signOut: AuthClient['signOut'] = async () => {
     try {
       const user = await this.stackAuth.getUser();
-
       if (user) {
         await user.signOut();
       }
-
-      // Update last known user ID
-      this.lastKnownUserId = null;
 
       // Emit SIGNED_OUT event
       await this.notifyAllSubscribers('SIGNED_OUT', null);
@@ -545,112 +529,102 @@ export class StackAuthAdapter<
     throw new Error('verifyOtp not implemented yet');
   };
 
+  private async _getCachedTokensFromStackAuthInternals(): Promise<{
+    accessToken: string;
+    refreshToken: string | null;
+  } | null> {
+    try {
+      const appInternal = this.stackAuth as any;
+      const tokenStore = await appInternal._getOrCreateTokenStore(
+        await appInternal._createCookieHelper()
+      );
+      const session = appInternal._getSessionFromTokenStore(tokenStore);
+
+      // Get cached token - returns null if expired
+      const accessToken = session.getAccessTokenIfNotExpiredYet(0);
+      if (!accessToken) return null;
+
+      return {
+        accessToken: accessToken.token,
+        refreshToken: session._refreshToken?.token ?? null,
+      };
+    } catch {
+      return null;
+    }
+  }
+
   // Session management
   getSession: AuthClient['getSession'] = async () => {
     try {
-      // OPTIMIZATION: Return cached session if it exists and is still valid
-      if (this.cachedSession) {
-        const now = Math.floor(Date.now() / 1000);
-        const expiresAt = this.cachedSession.expires_at ?? now;
+      let session: Session | null = null;
 
-        // If token is still valid (not expired), return cached immediately
-        // This matches Supabase's behavior: getSession() reads from cache, not network
-        if (expiresAt > now) {
-          return {
-            data: { session: this.cachedSession },
-            error: null,
-          };
-        }
+      // Step 1: Try to get cached tokens (no network request)
+      const cachedTokens = await this._getCachedTokensFromStackAuthInternals();
+      if (cachedTokens?.accessToken) {
+        const payload = accessTokenSchema.parse(
+          JSON.parse(atob(cachedTokens.accessToken.split('.')[1]))
+        );
 
-        // If cached session is expired, clear it
-        this.cachedSession = null;
-        this.lastKnownUserId = null;
-      }
-
-      // OPTIMIZATION: Try to get user from Stack Auth
-      // Stack Auth may read from tokenStore on first call after page load
-      const user = await this.stackAuth.getUser();
-
-      if (!user) {
-        return { data: { session: null }, error: null };
-      }
-
-      // OPTIMIZATION: Try to access Stack Auth's internal session cache
-      let accessToken: string | null;
-      let refreshToken: string | null;
-
-      if (hasInternalSession(user)) {
-        // Fast path: Use Stack Auth's internal session cache
-        const internalSession = user._internalSession;
-        const tokens = await internalSession.getOrFetchLikelyValidTokens(0);
-
-        if (tokens) {
-          // Use tokens from internal session (may be cached or freshly fetched)
-          accessToken = tokens.accessToken.token;
-          refreshToken = tokens.refreshToken?.token ?? null;
-        } else {
-          // Session is invalid
-          accessToken = null;
-          refreshToken = null;
-        }
+        session = {
+          access_token: cachedTokens.accessToken,
+          // ATTENTION: we allow sessions without refresh token
+          refresh_token: cachedTokens.refreshToken ?? '',
+          expires_at: payload.exp,
+          expires_in: Math.max(0, payload.exp - Math.floor(Date.now() / 1000)),
+          token_type: 'bearer' as const,
+          user: {
+            id: payload.sub,
+            email: payload.email || '',
+            created_at: new Date(payload.iat * 1000).toISOString(),
+            aud: 'authenticated',
+            role: 'authenticated',
+            app_metadata: {},
+            user_metadata: {},
+          },
+        };
       } else {
-        // Fallback: Stack Auth doesn't expose internal session, use public API
-        const tokens = await user.currentSession.getTokens();
-        // Public API returns strings directly
-        accessToken = tokens.accessToken;
-        refreshToken = tokens.refreshToken;
+        // Step 2: Fallback - fetch user (makes network request and auto refreshes tokens)
+        const user = await this.stackAuth.getUser();
+        if (user) {
+          const tokens = await user.currentSession.getTokens();
+          if (tokens.accessToken) {
+            const payload = accessTokenSchema.parse(
+              JSON.parse(atob(tokens.accessToken.split('.')[1]))
+            );
+
+            session = {
+              access_token: tokens.accessToken,
+              // ATTENTION: we allow sessions without refresh token
+              refresh_token: tokens.refreshToken ?? '',
+              expires_at: payload.exp,
+              expires_in: Math.max(
+                0,
+                payload.exp - Math.floor(Date.now() / 1000)
+              ),
+              token_type: 'bearer' as const,
+              user: {
+                id: user.id,
+                email: user.primaryEmail || '',
+                created_at: user.signedUpAt.toISOString(),
+                aud: 'authenticated',
+                role: 'authenticated',
+                app_metadata: user.clientReadOnlyMetadata,
+                user_metadata: user.clientMetadata,
+              },
+            };
+          }
+        }
       }
 
-      if (!accessToken || !refreshToken) {
+      // Return with properly narrowed types
+      if (session) {
+        return { data: { session }, error: null };
+      } else {
         return { data: { session: null }, error: null };
       }
-
-      // Decode JWT to get real expiration
-      let expiresAt: number;
-      try {
-        const tokenParts = accessToken.split('.');
-        if (tokenParts.length !== 3) {
-          throw new Error('Invalid JWT format');
-        }
-        const payload = JSON.parse(atob(tokenParts[1]));
-        expiresAt = payload.exp; // Unix timestamp in seconds
-      } catch {
-        // Fallback to approximation if decode fails
-        expiresAt = Math.floor(Date.now() / 1000) + 3600;
-      }
-
-      const now = Math.floor(Date.now() / 1000);
-      const session = {
-        access_token: accessToken,
-        refresh_token: refreshToken,
-        expires_in: Math.max(0, expiresAt - now),
-        expires_at: expiresAt,
-        token_type: 'bearer' as const,
-        user: {
-          id: user.id,
-          email: user.primaryEmail || '',
-          created_at: user.signedUpAt.toISOString(),
-          aud: 'authenticated',
-          role: 'authenticated',
-          app_metadata: user.clientReadOnlyMetadata,
-          user_metadata: user.clientMetadata,
-        },
-      };
-
-      // Cache session for cheap polling
-      this.cachedSession = session;
-      this.lastKnownUserId = user.id;
-
-      // Convert Stack Auth session to Supabase session format
-      return {
-        data: { session },
-        error: null,
-      };
     } catch (error) {
-      return {
-        data: { session: null },
-        error: normalizeStackAuthError(error),
-      };
+      console.error('Error getting session:', error);
+      return { data: { session: null }, error: normalizeStackAuthError(error) };
     }
   };
 
@@ -845,10 +819,18 @@ export class StackAuthAdapter<
       if (attributes.data) {
         // Handle user metadata - Stack Auth uses clientMetadata
         const data = attributes.data;
-        if (data && 'displayName' in data && typeof data.displayName === 'string') {
+        if (
+          data &&
+          'displayName' in data &&
+          typeof data.displayName === 'string'
+        ) {
           updateData.displayName = data.displayName;
         }
-        if (data && 'profileImageUrl' in data && typeof data.profileImageUrl === 'string') {
+        if (
+          data &&
+          'profileImageUrl' in data &&
+          typeof data.profileImageUrl === 'string'
+        ) {
           updateData.profileImageUrl = data.profileImageUrl;
         }
         // Store other metadata in clientMetadata
@@ -864,7 +846,9 @@ export class StackAuthAdapter<
       // Note: Email updates are not supported in Stack Auth's client API
       // They require server-side setPrimaryEmail method
       if (attributes.email) {
-        console.warn('Email updates require server-side Stack Auth configuration');
+        console.warn(
+          'Email updates require server-side Stack Auth configuration'
+        );
       }
 
       // Get the updated user
@@ -1028,9 +1012,6 @@ export class StackAuthAdapter<
         return;
       }
 
-      // Update last known user ID
-      this.lastKnownUserId = data.session?.user?.id || null;
-
       // Emit initial session
       await callback('INITIAL_SESSION', data.session);
     } catch (error) {
@@ -1142,7 +1123,6 @@ export class StackAuthAdapter<
         if (expiresInSeconds <= 0) {
           // Session expired, clear cache and emit SIGNED_OUT
           this.cachedSession = null;
-          this.lastKnownUserId = null;
           await this.notifyAllSubscribers('SIGNED_OUT', null);
         }
       } catch (error) {
