@@ -23,9 +23,32 @@ TODO: add `dist` to `.gitignore` once we have a release
 
 ```bash
 npm install git+ssh://git@github.com/neondatabase-labs/neon-js.git
-# or
-bun add git+ssh://git@github.com/neondatabase-labs/neon-js.git
 ```
+
+
+## Using neon-js
+
+1. Create a Neon project with Data API enabled
+2. Copy env vars from the Data API page and set them in your environment
+```bash
+VITE_STACK_PROJECT_ID=
+VITE_STACK_PUBLISHABLE_CLIENT_KEY=
+VITE_NEON_DATA_API_URL=
+```
+3. Instantiate `createClient` with the correct parameters
+```typescript
+import { createClient } from 'neon-js';
+
+const client = createClient({
+  url: 'https://your-api.com',
+  auth: {
+    projectId: 'your-project-id',
+    publishableClientKey: 'pk_...',
+    tokenStore: 'cookie', // or 'memory'
+  },
+});
+```
+
 
 ## Quick Start
 
