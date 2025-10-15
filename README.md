@@ -19,10 +19,12 @@ TODO
 
 ### From GitHub
 
+TODO: add `dist` to `.gitignore` once we have a release
+
 ```bash
-npm install github:neondatabase-labs/neon-js
+npm install git+ssh://git@github.com/neondatabase-labs/neon-js.git
 # or
-bun add github:neondatabase-labs/neon-js
+bun add git+ssh://git@github.com/neondatabase-labs/neon-js.git
 ```
 
 ## Quick Start
