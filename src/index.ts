@@ -1,6 +1,5 @@
 // Export auth interface and types
 export type { AuthClient } from '@/auth/auth-interface';
-
 export { AuthError, AuthApiError, isAuthError } from '@/auth/auth-interface';
 
 // Re-export commonly used types from Supabase
@@ -24,5 +23,8 @@ export type {
 export { StackAuthAdapter } from '@/auth/adapters/stack-auth/stack-auth-adapter';
 
 // Export NeonClient and factory
-export { NeonClient, createClient } from '@/client/neon-client';
-export type { CreateClientOptions } from '@/client/neon-client';
+export { NeonClient } from '@/client/neon-client';
+export {
+  createClient,
+  type CreateClientOptions,
+} from '@/client/client-factory';

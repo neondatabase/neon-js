@@ -695,6 +695,15 @@ var StackAuthAdapter = class {
 };
 
 //#endregion
+//#region src/client/neon-client.ts
+var NeonClient = class extends PostgrestClient {
+	auth;
+	constructor({ url, auth, fetch: customFetch }) {
+		super(url, { fetch: customFetch });
+	}
+};
+
+//#endregion
 //#region src/client/fetch-with-auth.ts
 /**
 * Error thrown when authentication is required but no session exists
@@ -730,13 +739,7 @@ function fetchWithAuth(getAccessToken, customFetch) {
 }
 
 //#endregion
-//#region src/client/neon-client.ts
-var NeonClient = class extends PostgrestClient {
-	auth;
-	constructor({ url, auth, fetch: customFetch }) {
-		super(url, { fetch: customFetch });
-	}
-};
+//#region src/client/client-factory.ts
 /**
 * Factory function to create NeonClient with seamless auth integration
 *

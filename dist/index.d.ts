@@ -90,11 +90,7 @@ type NeonClientConstructorOptions<HasTokenStore extends boolean = boolean, Proje
   auth: StackAuthOptions<HasTokenStore, ProjectId>;
   fetch?: typeof fetch;
 };
-type CreateClientOptions<HasTokenStore extends boolean = boolean, ProjectId extends string = string> = {
-  url: string;
-  auth: StackAuthOptions<HasTokenStore, ProjectId>;
-};
-declare class NeonClient extends PostgrestClient {
+declare class NeonClient<Database = any> extends PostgrestClient<Database> {
   auth: AuthClient;
   constructor({
     url,
@@ -102,6 +98,12 @@ declare class NeonClient extends PostgrestClient {
     fetch: customFetch
   }: NeonClientConstructorOptions);
 }
+//#endregion
+//#region src/client/client-factory.d.ts
+type CreateClientOptions = {
+  url: string;
+  auth: StackAuthOptions;
+};
 /**
  * Factory function to create NeonClient with seamless auth integration
  *
@@ -109,9 +111,9 @@ declare class NeonClient extends PostgrestClient {
  * @returns NeonClient instance with auth-aware fetch wrapper
  * @throws AuthRequiredError when making requests without authentication
  */
-declare function createClient<HasTokenStore extends boolean = boolean, ProjectId extends string = string>({
+declare function createClient<Database = any>({
   url,
   auth: authOptions
-}: CreateClientOptions<HasTokenStore, ProjectId>): NeonClient;
+}: CreateClientOptions): NeonClient<Database>;
 //#endregion
 export { type AdminUserAttributes, AuthApiError, type AuthChangeEvent, type AuthClient, AuthError, type AuthResponse, type CreateClientOptions, NeonClient, type OAuthProvider, type Session, type SignInCredentials, type SignInWithOAuthCredentials, type SignUpCredentials, StackAuthAdapter, type Subscription, type User, type UserAttributes, type UserResponse, type VerifyOTPParams, createClient, isAuthError };
