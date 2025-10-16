@@ -124,7 +124,6 @@ export class StackAuthAdapter<
 
   // Auth state change management
   private stateChangeEmitters = new Map<string, Subscription>();
-  private cachedSession: Session | null = null;
   private broadcastChannel: InstanceType<typeof BroadcastChannel> | null = null;
   private tokenRefreshCheckInterval: NodeJS.Timeout | null = null;
   private config: OnAuthStateChangeConfig = {
@@ -188,39 +187,30 @@ export class StackAuthAdapter<
           };
         }
 
-        // Get user and session after sign-up
-        const user = await this.stackAuth.getUser();
+        // Get session after sign-up (includes user from token)
         const sessionResult = await this.getSession();
 
+        if (!sessionResult.data.session?.user) {
+          return {
+            data: { user: null, session: null },
+            error: new AuthError(
+              'Failed to retrieve user session',
+              500,
+              'unexpected_failure'
+            ),
+          };
+        }
+
         const data = {
-          user: user
-            ? {
-                id: user.id,
-                aud: 'authenticated',
-                role: 'authenticated',
-                email: user.primaryEmail || '',
-                email_confirmed_at: user.primaryEmailVerified
-                  ? user.signedUpAt.toISOString()
-                  : undefined,
-                created_at: user.signedUpAt.toISOString(),
-                updated_at: user.signedUpAt.toISOString(),
-                app_metadata: {},
-                user_metadata: {
-                  displayName: user.displayName,
-                },
-                identities: [],
-              }
-            : null,
+          user: sessionResult.data.session.user,
           session: sessionResult.data.session,
         };
 
         // Emit SIGNED_IN event
-        if (data.user) {
-          await this.notifyAllSubscribers(
-            'SIGNED_IN',
-            sessionResult.data.session
-          );
-        }
+        await this.notifyAllSubscribers(
+          'SIGNED_IN',
+          sessionResult.data.session
+        );
 
         return { data, error: null };
       }
@@ -286,13 +276,10 @@ export class StackAuthAdapter<
           };
         }
 
-        // Get user and session
-        const [user, sessionResult] = await Promise.all([
-          this.stackAuth.getUser(),
-          this.getSession(),
-        ]);
+        // Get session (includes user from token)
+        const sessionResult = await this.getSession();
 
-        if (!user || !sessionResult.data.session) {
+        if (!sessionResult.data.session?.user) {
           return {
             data: { user: null, session: null },
             error: new AuthError(
@@ -304,23 +291,7 @@ export class StackAuthAdapter<
         }
 
         const data = {
-          user: {
-            id: user.id,
-            aud: 'authenticated',
-            role: 'authenticated',
-            email: user.primaryEmail || '',
-            email_confirmed_at: user.primaryEmailVerified
-              ? user.signedUpAt.toISOString()
-              : undefined,
-            last_sign_in_at: user.signedUpAt.toISOString(),
-            created_at: user.signedUpAt.toISOString(),
-            updated_at: user.signedUpAt.toISOString(),
-            app_metadata: {},
-            user_metadata: {
-              displayName: user.displayName,
-            },
-            identities: [],
-          },
+          user: sessionResult.data.session.user,
           session: sessionResult.data.session,
         };
 
@@ -482,6 +453,7 @@ export class StackAuthAdapter<
   signOut: AuthClient['signOut'] = async () => {
     try {
       // by using the internal API, we can avoid fetching the user data
+      // the default API is `await user.signOut();`
       const internalSession = await this._getSessionFromStackAuthInternals();
       if (!internalSession) {
         throw new AuthError('No session found', 401, 'session_not_found');
@@ -489,8 +461,6 @@ export class StackAuthAdapter<
 
       // Sign out using internal API
       await this.stackAuth._interface.signOut(internalSession);
-      // Clear your cached session
-      this.cachedSession = null;
       // Emit SIGNED_OUT event
       await this.notifyAllSubscribers('SIGNED_OUT', null);
 
@@ -557,11 +527,21 @@ export class StackAuthAdapter<
               user: {
                 id: user.id,
                 email: user.primaryEmail || '',
+                email_confirmed_at: user.primaryEmailVerified
+                  ? user.signedUpAt.toISOString()
+                  : undefined,
+                last_sign_in_at: user.signedUpAt.toISOString(),
                 created_at: user.signedUpAt.toISOString(),
+                updated_at: user.signedUpAt.toISOString(),
                 aud: 'authenticated',
                 role: 'authenticated',
                 app_metadata: user.clientReadOnlyMetadata,
-                user_metadata: user.clientMetadata,
+                user_metadata: {
+                  displayName: user.displayName,
+                  profileImageUrl: user.profileImageUrl,
+                  ...user.clientMetadata,
+                },
+                identities: [],
               },
             };
           }
@@ -1074,36 +1054,31 @@ export class StackAuthAdapter<
 
     this.tokenRefreshCheckInterval = setInterval(async () => {
       try {
-        // Cheap: Check cached session (no network request)
-        if (!this.cachedSession) {
-          return; // No session to check
+        // Get current session state (optimized to use cached tokens first)
+        const sessionResult = await this.getSession();
+
+        if (!sessionResult.data.session) {
+          // No session available
+          return;
         }
 
+        const session = sessionResult.data.session;
         const now = Math.floor(Date.now() / 1000);
-        const expiresAt = this.cachedSession.expires_at ?? now;
+        const expiresAt = session.expires_at ?? now;
         const expiresInSeconds = expiresAt - now;
-
-        // Like Supabase: Refresh if < 90 seconds to expiry
-        if (expiresInSeconds <= 90 && expiresInSeconds > 0) {
-          // Trigger refresh by calling getSession()
-          // Note: getSession() is optimized to use Stack Auth's cached tokens first
-          // and only makes a network call if tokens are actually expired
-          const sessionResult = await this.getSession();
-
-          if (sessionResult.data.session) {
-            // Session was refreshed (cachedSession updated by getSession)
-            await this.notifyAllSubscribers(
-              'TOKEN_REFRESHED',
-              sessionResult.data.session
-            );
-          }
-        }
 
         // Check if session expired completely
         if (expiresInSeconds <= 0) {
-          // Session expired, clear cache and emit SIGNED_OUT
-          this.cachedSession = null;
+          // Session expired, emit SIGNED_OUT
           await this.notifyAllSubscribers('SIGNED_OUT', null);
+          return;
+        }
+
+        // Like Supabase: Detect if token was refreshed (< 90 seconds to expiry)
+        // Stack Auth auto-refreshes tokens, we just detect and emit the event
+        if (expiresInSeconds <= 90 && expiresInSeconds > 0) {
+          // Token is fresh (was likely just refreshed), emit TOKEN_REFRESHED
+          await this.notifyAllSubscribers('TOKEN_REFRESHED', session);
         }
       } catch (error) {
         console.error('Token refresh detection error:', error);

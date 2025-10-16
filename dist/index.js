@@ -62,7 +62,6 @@ function normalizeStackAuthError(error) {
 var StackAuthAdapter = class {
 	stackAuth;
 	stateChangeEmitters = /* @__PURE__ */ new Map();
-	cachedSession = null;
 	broadcastChannel = null;
 	tokenRefreshCheckInterval = null;
 	config = {
@@ -107,24 +106,19 @@ var StackAuthAdapter = class {
 					},
 					error: normalizeStackAuthError(result)
 				};
-				const user = await this.stackAuth.getUser();
 				const sessionResult = await this.getSession();
+				if (!sessionResult.data.session?.user) return {
+					data: {
+						user: null,
+						session: null
+					},
+					error: new AuthError("Failed to retrieve user session", 500, "unexpected_failure")
+				};
 				const data = {
-					user: user ? {
-						id: user.id,
-						aud: "authenticated",
-						role: "authenticated",
-						email: user.primaryEmail || "",
-						email_confirmed_at: user.primaryEmailVerified ? user.signedUpAt.toISOString() : void 0,
-						created_at: user.signedUpAt.toISOString(),
-						updated_at: user.signedUpAt.toISOString(),
-						app_metadata: {},
-						user_metadata: { displayName: user.displayName },
-						identities: []
-					} : null,
+					user: sessionResult.data.session.user,
 					session: sessionResult.data.session
 				};
-				if (data.user) await this.notifyAllSubscribers("SIGNED_IN", sessionResult.data.session);
+				await this.notifyAllSubscribers("SIGNED_IN", sessionResult.data.session);
 				return {
 					data,
 					error: null
@@ -178,8 +172,8 @@ var StackAuthAdapter = class {
 					},
 					error: normalizeStackAuthError(result)
 				};
-				const [user, sessionResult] = await Promise.all([this.stackAuth.getUser(), this.getSession()]);
-				if (!user || !sessionResult.data.session) return {
+				const sessionResult = await this.getSession();
+				if (!sessionResult.data.session?.user) return {
 					data: {
 						user: null,
 						session: null
@@ -187,19 +181,7 @@ var StackAuthAdapter = class {
 					error: new AuthError("Failed to retrieve user session", 500, "unexpected_failure")
 				};
 				const data = {
-					user: {
-						id: user.id,
-						aud: "authenticated",
-						role: "authenticated",
-						email: user.primaryEmail || "",
-						email_confirmed_at: user.primaryEmailVerified ? user.signedUpAt.toISOString() : void 0,
-						last_sign_in_at: user.signedUpAt.toISOString(),
-						created_at: user.signedUpAt.toISOString(),
-						updated_at: user.signedUpAt.toISOString(),
-						app_metadata: {},
-						user_metadata: { displayName: user.displayName },
-						identities: []
-					},
+					user: sessionResult.data.session.user,
 					session: sessionResult.data.session
 				};
 				await this.notifyAllSubscribers("SIGNED_IN", sessionResult.data.session);
@@ -313,7 +295,6 @@ var StackAuthAdapter = class {
 			const internalSession = await this._getSessionFromStackAuthInternals();
 			if (!internalSession) throw new AuthError("No session found", 401, "session_not_found");
 			await this.stackAuth._interface.signOut(internalSession);
-			this.cachedSession = null;
 			await this.notifyAllSubscribers("SIGNED_OUT", null);
 			return { error: null };
 		} catch (error) {
@@ -360,11 +341,19 @@ var StackAuthAdapter = class {
 							user: {
 								id: user.id,
 								email: user.primaryEmail || "",
+								email_confirmed_at: user.primaryEmailVerified ? user.signedUpAt.toISOString() : void 0,
+								last_sign_in_at: user.signedUpAt.toISOString(),
 								created_at: user.signedUpAt.toISOString(),
+								updated_at: user.signedUpAt.toISOString(),
 								aud: "authenticated",
 								role: "authenticated",
 								app_metadata: user.clientReadOnlyMetadata,
-								user_metadata: user.clientMetadata
+								user_metadata: {
+									displayName: user.displayName,
+									profileImageUrl: user.profileImageUrl,
+									...user.clientMetadata
+								},
+								identities: []
 							}
 						};
 					}
@@ -677,17 +666,16 @@ var StackAuthAdapter = class {
 		if (this.tokenRefreshCheckInterval) return;
 		this.tokenRefreshCheckInterval = setInterval(async () => {
 			try {
-				if (!this.cachedSession) return;
+				const sessionResult = await this.getSession();
+				if (!sessionResult.data.session) return;
+				const session = sessionResult.data.session;
 				const now = Math.floor(Date.now() / 1e3);
-				const expiresInSeconds = (this.cachedSession.expires_at ?? now) - now;
-				if (expiresInSeconds <= 90 && expiresInSeconds > 0) {
-					const sessionResult = await this.getSession();
-					if (sessionResult.data.session) await this.notifyAllSubscribers("TOKEN_REFRESHED", sessionResult.data.session);
-				}
+				const expiresInSeconds = (session.expires_at ?? now) - now;
 				if (expiresInSeconds <= 0) {
-					this.cachedSession = null;
 					await this.notifyAllSubscribers("SIGNED_OUT", null);
+					return;
 				}
+				if (expiresInSeconds <= 90 && expiresInSeconds > 0) await this.notifyAllSubscribers("TOKEN_REFRESHED", session);
 			} catch (error) {
 				console.error("Token refresh detection error:", error);
 			}

@@ -40,7 +40,6 @@ interface OnAuthStateChangeConfig {
 declare class StackAuthAdapter<HasTokenStore extends boolean = boolean, ProjectId extends string = string> implements AuthClient {
   stackAuth: StackAuthClient;
   private stateChangeEmitters;
-  private cachedSession;
   private broadcastChannel;
   private tokenRefreshCheckInterval;
   private config;
