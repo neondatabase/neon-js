@@ -8,44 +8,16 @@ import {
   StackClientApp,
   StackServerApp,
   type StackServerAppConstructorOptions,
-  type CurrentUser,
 } from '@stackframe/js';
 import type { InternalSession } from '@stackframe/stack-shared/dist/sessions';
-import type { ReadonlyJson } from '@stackframe/stack-shared/dist/utils/json';
 import { accessTokenSchema } from '@/auth/adapters/stack-auth/stack-auth-schemas';
-
-/**
- * Stack Auth User with internal session access
- * CurrentUser from Stack Auth has _internalSession property
- * This type extends CurrentUser to include the internal session for type safety
- */
-interface StackAuthUserWithInternalSession extends CurrentUser {
-  _internalSession: InternalSession;
-}
-
-/**
- * Stack Auth error response format
- */
-interface StackAuthErrorResponse {
-  status: 'error';
-  error: {
-    message: string;
-  };
-}
-
-/**
- * Stack Auth user update options
- * Based on UserUpdateOptions from Stack Auth (not exported)
- */
-interface StackAuthUserUpdateOptions {
-  displayName?: string;
-  clientMetadata?: ReadonlyJson;
-  selectedTeamId?: string | null;
-  totpMultiFactorSecret?: Uint8Array | null;
-  profileImageUrl?: string | null;
-  otpAuthEnabled?: boolean;
-  passkeyAuthEnabled?: boolean;
-}
+import type {
+  StackAuthUserWithInternalSession,
+  StackAuthErrorResponse,
+  StackAuthUserUpdateOptions,
+  StackAuthClient,
+  OnAuthStateChangeConfig,
+} from '@/auth/adapters/stack-auth/stack-auth-types';
 
 /**
  * Type guard to check if Stack Auth user has internal session access
@@ -140,11 +112,6 @@ function normalizeStackAuthError(
   );
 }
 
-type OnAuthStateChangeConfig = {
-  enableTokenRefreshDetection?: boolean; // Default: true (matches Supabase)
-  tokenRefreshCheckInterval?: number; // Default: 30000 (30s, like Supabase)
-};
-
 /**
  * Stack Auth adapter implementing the AuthClient interface
  */
@@ -153,7 +120,7 @@ export class StackAuthAdapter<
   ProjectId extends string = string
 > implements AuthClient
 {
-  stackAuth: StackServerApp | StackClientApp;
+  stackAuth: StackAuthClient;
 
   // Auth state change management
   private stateChangeEmitters = new Map<string, Subscription>();
@@ -174,8 +141,8 @@ export class StackAuthAdapter<
     }
 
     this.stackAuth = params.secretServerKey
-      ? new StackServerApp(params)
-      : new StackClientApp(params);
+      ? (new StackServerApp(params) as StackAuthClient)
+      : (new StackClientApp(params) as StackAuthClient);
   }
 
   // Admin API
@@ -310,6 +277,8 @@ export class StackAuthAdapter<
           noRedirect: true,
         });
 
+        console.log('result', result);
+
         if (result.status === 'error') {
           return {
             data: { user: null, session: null },
@@ -318,8 +287,10 @@ export class StackAuthAdapter<
         }
 
         // Get user and session
-        const user = await this.stackAuth.getUser();
-        const sessionResult = await this.getSession();
+        const [user, sessionResult] = await Promise.all([
+          this.stackAuth.getUser(),
+          this.getSession(),
+        ]);
 
         if (!user || !sessionResult.data.session) {
           return {
@@ -510,11 +481,16 @@ export class StackAuthAdapter<
   // Sign out
   signOut: AuthClient['signOut'] = async () => {
     try {
-      const user = await this.stackAuth.getUser();
-      if (user) {
-        await user.signOut();
+      // by using the internal API, we can avoid fetching the user data
+      const internalSession = await this._getSessionFromStackAuthInternals();
+      if (!internalSession) {
+        throw new AuthError('No session found', 401, 'session_not_found');
       }
 
+      // Sign out using internal API
+      await this.stackAuth._interface.signOut(internalSession);
+      // Clear your cached session
+      this.cachedSession = null;
       // Emit SIGNED_OUT event
       await this.notifyAllSubscribers('SIGNED_OUT', null);
 
@@ -528,30 +504,6 @@ export class StackAuthAdapter<
   verifyOtp: AuthClient['verifyOtp'] = async () => {
     throw new Error('verifyOtp not implemented yet');
   };
-
-  private async _getCachedTokensFromStackAuthInternals(): Promise<{
-    accessToken: string;
-    refreshToken: string | null;
-  } | null> {
-    try {
-      const appInternal = this.stackAuth as any;
-      const tokenStore = await appInternal._getOrCreateTokenStore(
-        await appInternal._createCookieHelper()
-      );
-      const session = appInternal._getSessionFromTokenStore(tokenStore);
-
-      // Get cached token - returns null if expired
-      const accessToken = session.getAccessTokenIfNotExpiredYet(0);
-      if (!accessToken) return null;
-
-      return {
-        accessToken: accessToken.token,
-        refreshToken: session._refreshToken?.token ?? null,
-      };
-    } catch {
-      return null;
-    }
-  }
 
   // Session management
   getSession: AuthClient['getSession'] = async () => {
@@ -996,6 +948,34 @@ export class StackAuthAdapter<
       },
     };
   };
+
+  private async _getSessionFromStackAuthInternals(): Promise<InternalSession | null> {
+    const tokenStore = await this.stackAuth._getOrCreateTokenStore(
+      await this.stackAuth._createCookieHelper()
+    );
+    return this.stackAuth._getSessionFromTokenStore(tokenStore);
+  }
+
+  private async _getCachedTokensFromStackAuthInternals(): Promise<{
+    accessToken: string;
+    refreshToken: string | null;
+  } | null> {
+    try {
+      const session = await this._getSessionFromStackAuthInternals();
+
+      // Get cached token - returns null if expired
+      const accessToken = session?.getAccessTokenIfNotExpiredYet(0);
+      if (!accessToken) return null;
+
+      return {
+        accessToken: accessToken.token,
+        // @ts-expect-error - this should be accessible
+        refreshToken: session?._refreshToken?.token ?? null,
+      };
+    } catch {
+      return null;
+    }
+  }
 
   private async emitInitialSession(
     callback: (

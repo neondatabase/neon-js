@@ -170,6 +170,7 @@ var StackAuthAdapter = class {
 					password: credentials.password,
 					noRedirect: true
 				});
+				console.log("result", result);
 				if (result.status === "error") return {
 					data: {
 						user: null,
@@ -177,8 +178,7 @@ var StackAuthAdapter = class {
 					},
 					error: normalizeStackAuthError(result)
 				};
-				const user = await this.stackAuth.getUser();
-				const sessionResult = await this.getSession();
+				const [user, sessionResult] = await Promise.all([this.stackAuth.getUser(), this.getSession()]);
 				if (!user || !sessionResult.data.session) return {
 					data: {
 						user: null,
@@ -310,8 +310,10 @@ var StackAuthAdapter = class {
 	};
 	signOut = async () => {
 		try {
-			const user = await this.stackAuth.getUser();
-			if (user) await user.signOut();
+			const internalSession = await this._getSessionFromStackAuthInternals();
+			if (!internalSession) throw new AuthError("No session found", 401, "session_not_found");
+			await this.stackAuth._interface.signOut(internalSession);
+			this.cachedSession = null;
 			await this.notifyAllSubscribers("SIGNED_OUT", null);
 			return { error: null };
 		} catch (error) {
@@ -321,21 +323,6 @@ var StackAuthAdapter = class {
 	verifyOtp = async () => {
 		throw new Error("verifyOtp not implemented yet");
 	};
-	async _getCachedTokensFromStackAuthInternals() {
-		try {
-			const appInternal = this.stackAuth;
-			const tokenStore = await appInternal._getOrCreateTokenStore(await appInternal._createCookieHelper());
-			const session = appInternal._getSessionFromTokenStore(tokenStore);
-			const accessToken = session.getAccessTokenIfNotExpiredYet(0);
-			if (!accessToken) return null;
-			return {
-				accessToken: accessToken.token,
-				refreshToken: session._refreshToken?.token ?? null
-			};
-		} catch {
-			return null;
-		}
-	}
 	getSession = async () => {
 		try {
 			let session = null;
@@ -620,6 +607,23 @@ var StackAuthAdapter = class {
 			unsubscribe: subscription.unsubscribe
 		} } };
 	};
+	async _getSessionFromStackAuthInternals() {
+		const tokenStore = await this.stackAuth._getOrCreateTokenStore(await this.stackAuth._createCookieHelper());
+		return this.stackAuth._getSessionFromTokenStore(tokenStore);
+	}
+	async _getCachedTokensFromStackAuthInternals() {
+		try {
+			const session = await this._getSessionFromStackAuthInternals();
+			const accessToken = session?.getAccessTokenIfNotExpiredYet(0);
+			if (!accessToken) return null;
+			return {
+				accessToken: accessToken.token,
+				refreshToken: session?._refreshToken?.token ?? null
+			};
+		} catch {
+			return null;
+		}
+	}
 	async emitInitialSession(callback) {
 		try {
 			const { data, error } = await this.getSession();

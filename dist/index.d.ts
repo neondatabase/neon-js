@@ -1,21 +1,44 @@
 import { AdminUserAttributes, AuthApiError, AuthChangeEvent, AuthClient as AuthClient$1, AuthError, AuthResponse, Provider as OAuthProvider, Session, SignInWithOAuthCredentials, SignInWithPasswordCredentials as SignInCredentials, SignUpWithPasswordCredentials as SignUpCredentials, Subscription, User, UserAttributes, UserResponse, VerifyOtpParams as VerifyOTPParams, isAuthError } from "@supabase/auth-js";
 import { StackClientApp, StackClientAppConstructorOptions, StackServerApp, StackServerAppConstructorOptions } from "@stackframe/js";
 import { PostgrestClient } from "@supabase/postgrest-js";
+import { StackClientInterface } from "@stackframe/stack-shared";
+import { InternalSession } from "@stackframe/stack-shared/dist/sessions";
 
 //#region src/auth/auth-interface.d.ts
 type _AuthClientSupabaseInstance = InstanceType<typeof AuthClient$1>;
 type AuthClient = { [K in keyof _AuthClientSupabaseInstance as _AuthClientSupabaseInstance[K] extends never ? never : K]: _AuthClientSupabaseInstance[K] };
 //#endregion
-//#region src/auth/adapters/stack-auth/stack-auth-adapter.d.ts
-type OnAuthStateChangeConfig = {
+//#region src/auth/adapters/stack-auth/stack-auth-types.d.ts
+interface StackAppInternals {
+  _getSession(overrideTokenStoreInit?: any): Promise<InternalSession>;
+  _getSessionFromTokenStore(tokenStore: any): InternalSession;
+  _getOrCreateTokenStore(cookieHelper: any, overrideTokenStoreInit?: any): any;
+  _createCookieHelper(): Promise<any>;
+  _interface: StackClientInterface;
+  redirectToAfterSignOut(): Promise<void>;
+}
+/**
+ * Stack Auth client
+ * This type extends StackServerApp or StackClientApp to include the _interface property
+ * This is a workaround to get the _interface property from the StackAuthAdapter
+ */
+type StackAuthClient = (StackServerApp | StackClientApp) & StackAppInternals;
+/**
+ * OnAuthStateChangeConfig type
+ * This type is used to configure the onAuthStateChange function
+ * It is based on the OnAuthStateChangeConfig type from Stack Auth (not exported)
+ */
+interface OnAuthStateChangeConfig {
   enableTokenRefreshDetection?: boolean;
   tokenRefreshCheckInterval?: number;
-};
+}
+//#endregion
+//#region src/auth/adapters/stack-auth/stack-auth-adapter.d.ts
 /**
  * Stack Auth adapter implementing the AuthClient interface
  */
 declare class StackAuthAdapter<HasTokenStore extends boolean = boolean, ProjectId extends string = string> implements AuthClient {
-  stackAuth: StackServerApp | StackClientApp;
+  stackAuth: StackAuthClient;
   private stateChangeEmitters;
   private cachedSession;
   private broadcastChannel;
@@ -35,7 +58,6 @@ declare class StackAuthAdapter<HasTokenStore extends boolean = boolean, ProjectI
   signInWithWeb3: AuthClient['signInWithWeb3'];
   signOut: AuthClient['signOut'];
   verifyOtp: AuthClient['verifyOtp'];
-  private _getCachedTokensFromStackAuthInternals;
   getSession: AuthClient['getSession'];
   refreshSession: AuthClient['refreshSession'];
   setSession: AuthClient['setSession'];
@@ -49,6 +71,8 @@ declare class StackAuthAdapter<HasTokenStore extends boolean = boolean, ProjectI
   reauthenticate: AuthClient['reauthenticate'];
   resend: AuthClient['resend'];
   onAuthStateChange: AuthClient['onAuthStateChange'];
+  private _getSessionFromStackAuthInternals;
+  private _getCachedTokensFromStackAuthInternals;
   private emitInitialSession;
   private notifyAllSubscribers;
   private initializeBroadcastChannel;
