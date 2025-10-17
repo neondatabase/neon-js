@@ -138,10 +138,66 @@ src/
 │           ├── stack-auth-schemas.ts   # Zod schemas for JWT validation
 │           └── stack-auth.test.ts      # Unit tests
 ├── client/
-│   ├── neon-client.ts             # NeonClient and createClient() factory
+│   ├── neon-client.ts             # NeonClient class (extends PostgrestClient)
+│   ├── client-factory.ts          # createClient() factory function
 │   ├── neon-client.test.ts        # Client tests
 │   └── fetch-with-auth.ts         # Auth-aware fetch wrapper
+├── cli/
+│   ├── index.ts                   # CLI entry point (bin: neon-js)
+│   ├── commands/
+│   │   ├── gen-types.ts           # Type generation command
+│   │   └── generate-types.ts      # Core type generation logic
+│   └── utils/
+│       └── parse-duration.ts      # Duration parsing utility
 └── index.ts                        # Public exports
+```
+
+## CLI Tool: Generate Types
+
+The `neon-js` package includes a CLI tool for generating TypeScript types from your database schema.
+
+### Installation
+
+No installation required! Use via npx:
+
+```bash
+npx neon-js gen-types --db-url "postgresql://..."
+```
+
+### Usage
+
+```bash
+npx neon-js gen-types --db-url <url> [flags]
+```
+
+#### Required Flags
+
+- `--db-url <url>` - Database connection string
+
+#### Optional Flags
+
+- `--output <path>`, `-o <path>` - Output file path (default: `database.types.ts`)
+- `--schema <name>`, `-s <name>` - Schema to include (can be used multiple times, default: `public`)
+- `--postgrest-v9-compat` - Disable one-to-one relationship detection
+- `--query-timeout <duration>` - Query timeout (default: `15s`, format: `30s`, `1m`, `90s`)
+
+#### Examples
+
+```bash
+# Basic usage
+npx neon-js gen-types --db-url "postgresql://user:pass@host:5432/db"
+
+# Custom output path
+npx neon-js gen-types --db-url "postgresql://..." --output src/types/db.ts
+
+# Multiple schemas
+npx neon-js gen-types --db-url "postgresql://..." -s public -s auth
+
+# PostgREST v9 compatibility
+npx neon-js gen-types --db-url "postgresql://..." --postgrest-v9-compat
+
+# Custom timeout
+npx neon-js gen-types --db-url "postgresql://..." --query-timeout 30s
 ```
 
 ## Authentication Methods

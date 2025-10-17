@@ -4,3 +4,4 @@ node_modules
 .serena
 thoughts
 todos.md
+database.types.ts

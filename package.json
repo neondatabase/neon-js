@@ -19,6 +19,9 @@
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "neon-js": "./dist/cli/index.js"
+  },
   "exports": {
     ".": "./dist/index.js",
     "./package.json": "./package.json"
@@ -44,7 +47,9 @@
   "dependencies": {
     "@stackframe/js": "2.8.41",
     "@supabase/auth-js": "2.72.0",
+    "@supabase/postgres-meta": "^0.92.0",
     "@supabase/postgrest-js": "2.75.0",
+    "meow": "^14.0.0",
     "zod": "4.1.12"
   }
 }

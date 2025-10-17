@@ -14,9 +14,15 @@ This is a TypeScript SDK that provides a unified authentication interface based 
     - `stack-auth-schemas.ts` - Zod schemas for JWT validation
     - `stack-auth.test.ts` - Unit tests
 - **Client Layer**: `src/client/` contains the unified client
-  - `neon-client.ts` - Main NeonClient class (extends PostgrestClient) and `createClient()` factory
+  - `neon-client.ts` - Main NeonClient class (extends PostgrestClient)
+  - `client-factory.ts` - Factory function `createClient()` for creating authenticated NeonClient instances
   - `neon-client.test.ts` - Client tests
   - `fetch-with-auth.ts` - Auth-aware fetch wrapper for automatic token injection
+- **CLI Tool**: `src/cli/` contains command-line interface utilities
+  - `index.ts` - CLI entry point (bin: `neon-js`)
+  - `commands/gen-types.ts` - Type generation command with flag parsing
+  - `commands/generate-types.ts` - Core type generation logic using Supabase's postgres-meta
+  - `utils/parse-duration.ts` - Duration parsing utility for query timeouts
 - **Entry Point**: `src/index.ts` exports the interface types, adapters, and client
 - **Build Output**: Compiled to `dist/` directory
 
@@ -27,11 +33,7 @@ This is a TypeScript SDK that provides a unified authentication interface based 
 - `bun typecheck` - Run TypeScript type checking
 - `bun release` - Bump version and publish to npm
 
-## Code Style
-- TypeScript strict mode enabled
-- Use functional patterns where possible
-- AVOID the "I" prefix in interface names
-- Always use absolute imports following the `@/` pattern
+
 
 ## Stack Auth Session Caching
 
@@ -105,7 +107,7 @@ The Stack Auth adapter was refactored to access Stack Auth's internal session ca
 - Uses internal APIs: `_getOrCreateTokenStore()`, `_getSessionFromTokenStore()`, and `getAccessTokenIfNotExpiredYet()`
 
 ### Factory Pattern:
-The `createClient()` factory function handles the complex initialization sequence:
+The `createClient()` factory function (located in `src/client/client-factory.ts`) handles the complex initialization sequence:
 1. Instantiates `StackAuthAdapter` from auth options
 2. Creates a lazy `getAccessToken()` function that calls `auth.getSession()`
 3. Wraps fetch with `fetchWithAuth()` to automatically inject Bearer tokens
@@ -113,6 +115,15 @@ The `createClient()` factory function handles the complex initialization sequenc
 5. Assigns the auth adapter to `client.auth` for direct access
 
 This pattern ensures all PostgrestClient queries automatically include authentication headers.
+
+### CLI Tool:
+The package includes a `neon-js` CLI command for generating TypeScript types from database schemas:
+- **Command**: `npx neon-js gen-types --db-url <url> [options]`
+- **Implementation**: Uses Supabase's `postgres-meta` library to introspect database schema
+- **Features**: Multi-schema support, PostgREST v9 compatibility mode, configurable query timeouts
+- **Output**: Generates TypeScript type definitions compatible with `@supabase/postgrest-js`
+
+
 
 ## Additional Documentation
 
@@ -122,3 +133,11 @@ This pattern ensures all PostgrestClient queries automatically include authentic
 
 - [SupabaseAuthClient.ts](https://github.com/supabase/supabase-js/blob/master/packages/core/auth-js/src/SupabaseAuthClient.ts) - Main implementation
 - [SupabaseClient.ts](https://github.com/supabase/supabase-js/blob/master/packages/core/supabase-js/src/SupabaseClient.ts) - Main implementation
+
+# IMPORTANT
+<code-style>
+  - TypeScript strict mode enabled
+  - Use functional patterns where possible
+  - AVOID the "I" prefix in interface names
+  - ALWAYS use absolute imports following the `@/` pattern
+</code-style>
