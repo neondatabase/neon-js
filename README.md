@@ -46,6 +46,15 @@ const client = createClient({
     publishableClientKey: 'pk_...',
     tokenStore: 'cookie', // or 'memory'
   },
+  options: {
+    // Optional: custom configuration
+    global: {
+      headers: { 'X-Custom-Header': 'value' },
+    },
+    db: {
+      schema: 'public',
+    },
+  },
 });
 ```
 
@@ -62,6 +71,15 @@ const client = createClient({
     projectId: 'your-project-id',
     publishableClientKey: 'pk_...',
     tokenStore: 'cookie', // or 'memory'
+  },
+  options: {
+    // Optional: custom configuration
+    global: {
+      headers: { 'X-Custom-Header': 'value' },
+    },
+    db: {
+      schema: 'public',
+    },
   },
 });
 

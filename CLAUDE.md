@@ -75,6 +75,15 @@ const client = createClient({
     publishableClientKey: 'pk_...',
     tokenStore: 'cookie', // or 'memory'
   },
+  options: {
+    // Optional: custom fetch, headers, schema
+    global: {
+      headers: { 'X-Custom-Header': 'value' },
+    },
+    db: {
+      schema: 'public',
+    },
+  },
 });
 
 // Access auth methods
@@ -111,10 +120,31 @@ The `createClient()` factory function (located in `src/client/client-factory.ts`
 1. Instantiates `StackAuthAdapter` from auth options
 2. Creates a lazy `getAccessToken()` function that calls `auth.getSession()`
 3. Wraps fetch with `fetchWithAuth()` to automatically inject Bearer tokens
-4. Constructs `NeonClient` with the auth-aware fetch
+4. Constructs `NeonClient` with the auth-aware fetch and optional configuration (custom headers, fetch, schema)
 5. Assigns the auth adapter to `client.auth` for direct access
 
 This pattern ensures all PostgrestClient queries automatically include authentication headers.
+
+**Signature:**
+```typescript
+createClient<Database, SchemaName>({
+  url: string,
+  auth: StackAuthOptions,
+  options?: {
+    global?: {
+      fetch?: typeof fetch,
+      headers?: Record<string, string>
+    },
+    db?: {
+      schema?: SchemaName
+    }
+  }
+}): NeonClient<Database, SchemaName>
+```
+
+**Generic Parameters:**
+- `Database`: Database schema type (defaults to `any`)
+- `SchemaName`: Schema name (defaults to `'public'` if present in Database, otherwise string key)
 
 ### CLI Tool:
 The package includes a `neon-js` CLI command for generating TypeScript types from database schemas:
