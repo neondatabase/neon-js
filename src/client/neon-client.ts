@@ -8,7 +8,7 @@ import type {
 // Support both client and server Stack Auth options
 export type StackAuthOptions<
   HasTokenStore extends boolean = boolean,
-  ProjectId extends string = string
+  ProjectId extends string = string,
 > =
   | StackClientAppConstructorOptions<HasTokenStore, ProjectId>
   | StackServerAppConstructorOptions<HasTokenStore, ProjectId>;
@@ -16,14 +16,23 @@ export type StackAuthOptions<
 // Internal constructor options (accepts auth options at runtime)
 type NeonClientConstructorOptions<
   HasTokenStore extends boolean = boolean,
-  ProjectId extends string = string
+  ProjectId extends string = string,
 > = {
   url: string;
   auth: StackAuthOptions<HasTokenStore, ProjectId>;
   fetch?: typeof fetch;
 };
 
-export class NeonClient<Database = any> extends PostgrestClient<Database> {
+export class NeonClient<
+  Database = any,
+  SchemaName extends string & keyof Database = 'public' extends keyof Database
+    ? 'public'
+    : string & keyof Database,
+> extends PostgrestClient<
+  Database,
+  { PostgrestVersion: '12' },
+  Exclude<SchemaName, '__InternalSupabase'>
+> {
   auth!: AuthClient;
 
   constructor({ url, auth, fetch: customFetch }: NeonClientConstructorOptions) {

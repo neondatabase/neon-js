@@ -15,10 +15,15 @@ export type CreateClientOptions = {
  * @returns NeonClient instance with auth-aware fetch wrapper
  * @throws AuthRequiredError when making requests without authentication
  */
-export function createClient<Database = any>({
+export function createClient<
+  Database = any,
+  SchemaName extends string & keyof Database = 'public' extends keyof Database
+    ? 'public'
+    : string & keyof Database,
+>({
   url,
   auth: authOptions,
-}: CreateClientOptions): NeonClient<Database> {
+}: CreateClientOptions): NeonClient<Database, SchemaName> {
   // Step 1: Instantiate auth adapter from options
   const auth = new StackAuthAdapter(authOptions);
 
@@ -38,7 +43,7 @@ export function createClient<Database = any>({
   const authFetch = fetchWithAuth(getAccessToken);
 
   // Step 4: Create client with auth options
-  const client = new NeonClient({
+  const client = new NeonClient<Database, SchemaName>({
     url,
     auth: authOptions,
     fetch: authFetch,
