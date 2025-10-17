@@ -1,5 +1,5 @@
 {
-  "name": "neon-js",
+  "name": "@neondatabase/neon-js",
   "version": "0.0.0",
   "description": "A TypeScript SDK for Neon services.",
   "type": "module",
