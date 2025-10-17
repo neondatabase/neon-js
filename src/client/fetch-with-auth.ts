@@ -10,7 +10,9 @@ type GetAccessToken = () => Promise<string | null>;
  * Error thrown when authentication is required but no session exists
  */
 export class AuthRequiredError extends Error {
-  constructor(message = 'Authentication required. User must be signed in to access Neon database.') {
+  constructor(
+    message = 'Authentication required. User must be signed in to access Neon database.'
+  ) {
     super(message);
     this.name = 'AuthRequiredError';
   }
@@ -32,7 +34,10 @@ export function fetchWithAuth(
 ): Fetch {
   const baseFetch = customFetch ?? fetch;
 
-  return async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+  return async (
+    input: string | URL | Request,
+    init?: RequestInit
+  ): Promise<Response> => {
     // Get current access token (lazy resolution - called on every request)
     const accessToken = await getAccessToken();
 

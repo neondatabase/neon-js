@@ -164,7 +164,6 @@ var StackAuthAdapter = class {
 					password: credentials.password,
 					noRedirect: true
 				});
-				console.log("result", result);
 				if (result.status === "error") return {
 					data: {
 						user: null,
@@ -698,8 +697,12 @@ var StackAuthAdapter = class {
 //#region src/client/neon-client.ts
 var NeonClient = class extends PostgrestClient {
 	auth;
-	constructor({ url, auth, fetch: customFetch }) {
-		super(url, { fetch: customFetch });
+	constructor({ url, options }) {
+		super(url, {
+			headers: options?.global?.headers,
+			fetch: options?.global?.fetch,
+			schema: options?.db?.schema
+		});
 	}
 };
 
@@ -747,17 +750,23 @@ function fetchWithAuth(getAccessToken, customFetch) {
 * @returns NeonClient instance with auth-aware fetch wrapper
 * @throws AuthRequiredError when making requests without authentication
 */
-function createClient({ url, auth: authOptions }) {
+function createClient({ url, auth: authOptions, options }) {
 	const auth = new StackAuthAdapter(authOptions);
 	const getAccessToken = async () => {
 		const { data, error } = await auth.getSession();
 		if (error || !data.session) return null;
 		return data.session.access_token;
 	};
+	const authFetch = fetchWithAuth(getAccessToken, options?.global?.fetch);
 	const client = new NeonClient({
 		url,
-		auth: authOptions,
-		fetch: fetchWithAuth(getAccessToken)
+		options: {
+			...options,
+			global: {
+				...options?.global,
+				fetch: authFetch
+			}
+		}
 	});
 	client.auth = auth;
 	return client;

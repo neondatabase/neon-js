@@ -1,45 +1,39 @@
 import type { AuthClient } from '@/auth/auth-interface';
 import { PostgrestClient } from '@supabase/postgrest-js';
-import type {
-  StackClientAppConstructorOptions,
-  StackServerAppConstructorOptions,
-} from '@stackframe/js';
-
-// Support both client and server Stack Auth options
-export type StackAuthOptions<
-  HasTokenStore extends boolean = boolean,
-  ProjectId extends string = string,
-> =
-  | StackClientAppConstructorOptions<HasTokenStore, ProjectId>
-  | StackServerAppConstructorOptions<HasTokenStore, ProjectId>;
 
 // Internal constructor options (accepts auth options at runtime)
-type NeonClientConstructorOptions<
-  HasTokenStore extends boolean = boolean,
-  ProjectId extends string = string,
-> = {
+export type NeonClientConstructorOptions<SchemaName> = {
   url: string;
-  auth: StackAuthOptions<HasTokenStore, ProjectId>;
-  fetch?: typeof fetch;
+  options?: {
+    db?: {
+      schema?: Exclude<SchemaName, '__InternalSupabase'>;
+    };
+    global?: {
+      fetch: typeof fetch;
+      headers?: Record<string, string>;
+    };
+  };
 };
+
+export type DefaultSchemaName<Database> = 'public' extends keyof Database
+  ? 'public'
+  : string & keyof Database;
 
 export class NeonClient<
   Database = any,
-  SchemaName extends string & keyof Database = 'public' extends keyof Database
-    ? 'public'
-    : string & keyof Database,
+  SchemaName extends string & keyof Database = DefaultSchemaName<Database>,
 > extends PostgrestClient<
   Database,
   { PostgrestVersion: '12' },
   Exclude<SchemaName, '__InternalSupabase'>
 > {
-  auth!: AuthClient;
+  auth?: AuthClient;
 
-  constructor({ url, auth, fetch: customFetch }: NeonClientConstructorOptions) {
+  constructor({ url, options }: NeonClientConstructorOptions<SchemaName>) {
     super(url, {
-      fetch: customFetch,
+      headers: options?.global?.headers,
+      fetch: options?.global?.fetch,
+      schema: options?.db?.schema,
     });
-
-    // Auth will be assigned by factory after construction
   }
 }

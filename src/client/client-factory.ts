@@ -1,12 +1,28 @@
 import { StackAuthAdapter } from '@/auth/adapters/stack-auth/stack-auth-adapter';
 import { fetchWithAuth } from '@/client/fetch-with-auth';
-import { NeonClient, type StackAuthOptions } from '@/client/neon-client';
+import {
+  NeonClient,
+  type DefaultSchemaName,
+  type NeonClientConstructorOptions,
+} from '@/client/neon-client';
+import type {
+  StackClientAppConstructorOptions,
+  StackServerAppConstructorOptions,
+} from '@stackframe/js';
+
+// Support both client and server Stack Auth options
+type StackAuthOptions<
+  HasTokenStore extends boolean = boolean,
+  ProjectId extends string = string,
+> =
+  | StackClientAppConstructorOptions<HasTokenStore, ProjectId>
+  | StackServerAppConstructorOptions<HasTokenStore, ProjectId>;
 
 // Public-facing options for createClient (options only)
-export type CreateClientOptions = {
-  url: string;
-  auth: StackAuthOptions;
-};
+export type CreateClientOptions<SchemaName> =
+  NeonClientConstructorOptions<SchemaName> & {
+    auth: StackAuthOptions;
+  };
 
 /**
  * Factory function to create NeonClient with seamless auth integration
@@ -17,13 +33,12 @@ export type CreateClientOptions = {
  */
 export function createClient<
   Database = any,
-  SchemaName extends string & keyof Database = 'public' extends keyof Database
-    ? 'public'
-    : string & keyof Database,
+  SchemaName extends string & keyof Database = DefaultSchemaName<Database>,
 >({
   url,
   auth: authOptions,
-}: CreateClientOptions): NeonClient<Database, SchemaName> {
+  options,
+}: CreateClientOptions<SchemaName>): NeonClient<Database, SchemaName> {
   // Step 1: Instantiate auth adapter from options
   const auth = new StackAuthAdapter(authOptions);
 
@@ -40,13 +55,18 @@ export function createClient<
   };
 
   // Step 3: Create auth-aware fetch wrapper
-  const authFetch = fetchWithAuth(getAccessToken);
+  const authFetch = fetchWithAuth(getAccessToken, options?.global?.fetch);
 
   // Step 4: Create client with auth options
   const client = new NeonClient<Database, SchemaName>({
     url,
-    auth: authOptions,
-    fetch: authFetch,
+    options: {
+      ...options,
+      global: {
+        ...options?.global,
+        fetch: authFetch,
+      },
+    },
   });
 
   // Step 5: Assign the instantiated auth client

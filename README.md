@@ -73,7 +73,6 @@ await client.auth.signInWithPassword({
 
 // Get current session
 const { data } = await client.auth.getSession();
-console.log(data.session?.user);
 
 // Make authenticated API calls (tokens injected automatically)
 const { data: items } = await client.from('items').select();

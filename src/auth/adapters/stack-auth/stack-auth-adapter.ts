@@ -117,7 +117,7 @@ function normalizeStackAuthError(
  */
 export class StackAuthAdapter<
   HasTokenStore extends boolean = boolean,
-  ProjectId extends string = string
+  ProjectId extends string = string,
 > implements AuthClient
 {
   stackAuth: StackAuthClient;
@@ -266,8 +266,6 @@ export class StackAuthAdapter<
           password: credentials.password,
           noRedirect: true,
         });
-
-        console.log('result', result);
 
         if (result.status === 'error') {
           return {
