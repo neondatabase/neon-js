@@ -300,8 +300,227 @@ var StackAuthAdapter = class {
 			return { error: normalizeStackAuthError(error) };
 		}
 	};
-	verifyOtp = async () => {
-		throw new Error("verifyOtp not implemented yet");
+	verifyOtp = async (params) => {
+		try {
+			if ("email" in params && params.email) {
+				const { token, type } = params;
+				if (type === "magiclink" || type === "email") {
+					let internalSession = await this._getSessionFromStackAuthInternals();
+					if (!internalSession) internalSession = this.stackAuth._interface.createSession({
+						refreshToken: null,
+						accessToken: null
+					});
+					const result = await this.stackAuth._interface.signInWithMagicLink(token, internalSession);
+					if (result.status === "error") return {
+						data: {
+							user: null,
+							session: null
+						},
+						error: normalizeStackAuthError(result)
+					};
+					const sessionResult = await this.getSession();
+					if (!sessionResult.data.session) return {
+						data: {
+							user: null,
+							session: null
+						},
+						error: new AuthError("Failed to retrieve session after OTP verification", 500, "unexpected_failure")
+					};
+					await this.notifyAllSubscribers("SIGNED_IN", sessionResult.data.session);
+					return {
+						data: {
+							user: sessionResult.data.session.user,
+							session: sessionResult.data.session
+						},
+						error: null
+					};
+				}
+				if (type === "signup" || type === "invite") {
+					const result = await this.stackAuth._interface.verifyEmail(token);
+					if (result.status === "error") return {
+						data: {
+							user: null,
+							session: null
+						},
+						error: normalizeStackAuthError(result)
+					};
+					const sessionResult = await this.getSession();
+					return {
+						data: {
+							user: sessionResult.data.session?.user ?? null,
+							session: sessionResult.data.session
+						},
+						error: null
+					};
+				}
+				if (type === "recovery") {
+					const result = await this.stackAuth._interface.resetPassword({
+						code: token,
+						onlyVerifyCode: true
+					});
+					if (result.status === "error") return {
+						data: {
+							user: null,
+							session: null
+						},
+						error: normalizeStackAuthError(result)
+					};
+					return {
+						data: {
+							user: null,
+							session: null
+						},
+						error: null
+					};
+				}
+				if (type === "email_change") {
+					const result = await this.stackAuth._interface.verifyEmail(token);
+					if (result.status === "error") return {
+						data: {
+							user: null,
+							session: null
+						},
+						error: normalizeStackAuthError(result)
+					};
+					const sessionResult = await this.getSession();
+					await this.notifyAllSubscribers("USER_UPDATED", sessionResult.data.session);
+					return {
+						data: {
+							user: sessionResult.data.session?.user ?? null,
+							session: sessionResult.data.session
+						},
+						error: null
+					};
+				}
+				return {
+					data: {
+						user: null,
+						session: null
+					},
+					error: new AuthError(`Unsupported email OTP type: ${type}`, 400, "validation_failed")
+				};
+			}
+			if ("phone" in params && params.phone) return {
+				data: {
+					user: null,
+					session: null
+				},
+				error: new AuthError("Phone OTP verification not supported by Stack Auth", 501, "phone_provider_disabled")
+			};
+			if ("token_hash" in params && params.token_hash) {
+				const { token_hash, type } = params;
+				if (type === "magiclink" || type === "email") {
+					let internalSession = await this._getSessionFromStackAuthInternals();
+					if (!internalSession) internalSession = this.stackAuth._interface.createSession({
+						refreshToken: null,
+						accessToken: null
+					});
+					const result = await this.stackAuth._interface.signInWithMagicLink(token_hash, internalSession);
+					if (result.status === "error") return {
+						data: {
+							user: null,
+							session: null
+						},
+						error: normalizeStackAuthError(result)
+					};
+					const sessionResult = await this.getSession();
+					if (!sessionResult.data.session) return {
+						data: {
+							user: null,
+							session: null
+						},
+						error: new AuthError("Failed to retrieve session after token hash verification", 500, "unexpected_failure")
+					};
+					await this.notifyAllSubscribers("SIGNED_IN", sessionResult.data.session);
+					return {
+						data: {
+							user: sessionResult.data.session.user,
+							session: sessionResult.data.session
+						},
+						error: null
+					};
+				}
+				if (type === "signup" || type === "invite") {
+					const result = await this.stackAuth._interface.verifyEmail(token_hash);
+					if (result.status === "error") return {
+						data: {
+							user: null,
+							session: null
+						},
+						error: normalizeStackAuthError(result)
+					};
+					const sessionResult = await this.getSession();
+					return {
+						data: {
+							user: sessionResult.data.session?.user ?? null,
+							session: sessionResult.data.session
+						},
+						error: null
+					};
+				}
+				if (type === "recovery") {
+					const result = await this.stackAuth._interface.resetPassword({
+						code: token_hash,
+						onlyVerifyCode: true
+					});
+					if (result.status === "error") return {
+						data: {
+							user: null,
+							session: null
+						},
+						error: normalizeStackAuthError(result)
+					};
+					return {
+						data: {
+							user: null,
+							session: null
+						},
+						error: null
+					};
+				}
+				if (type === "email_change") {
+					const result = await this.stackAuth._interface.verifyEmail(token_hash);
+					if (result.status === "error") return {
+						data: {
+							user: null,
+							session: null
+						},
+						error: normalizeStackAuthError(result)
+					};
+					const sessionResult = await this.getSession();
+					await this.notifyAllSubscribers("USER_UPDATED", sessionResult.data.session);
+					return {
+						data: {
+							user: sessionResult.data.session?.user ?? null,
+							session: sessionResult.data.session
+						},
+						error: null
+					};
+				}
+				return {
+					data: {
+						user: null,
+						session: null
+					},
+					error: new AuthError(`Unsupported token hash OTP type: ${type}`, 400, "validation_failed")
+				};
+			}
+			return {
+				data: {
+					user: null,
+					session: null
+				},
+				error: new AuthError("Invalid OTP verification parameters", 400, "validation_failed")
+			};
+		} catch (error) {
+			return {
+				data: {
+					user: null,
+					session: null
+				},
+				error: normalizeStackAuthError(error)
+			};
+		}
 	};
 	getSession = async () => {
 		try {
@@ -538,13 +757,96 @@ var StackAuthAdapter = class {
 		}
 	};
 	getUserIdentities = async () => {
-		throw new Error("getUserIdentities not implemented yet");
+		try {
+			const user = await this.stackAuth.getUser();
+			if (!user) return {
+				data: null,
+				error: new AuthError("No user session found", 401, "session_not_found")
+			};
+			return {
+				data: { identities: (await user.listOAuthProviders()).map((provider) => ({
+					id: provider.id,
+					user_id: user.id,
+					identity_id: provider.id,
+					provider: provider.type,
+					identity_data: {
+						email: provider.email || null,
+						account_id: provider.accountId || null,
+						provider_type: provider.type,
+						user_id: provider.userId,
+						allow_sign_in: provider.allowSignIn,
+						allow_connected_accounts: provider.allowConnectedAccounts
+					},
+					created_at: user.signedUpAt.toISOString(),
+					last_sign_in_at: user.signedUpAt.toISOString(),
+					updated_at: user.signedUpAt.toISOString()
+				})) },
+				error: null
+			};
+		} catch (error) {
+			return {
+				data: null,
+				error: normalizeStackAuthError(error)
+			};
+		}
 	};
-	linkIdentity = async () => {
-		throw new Error("linkIdentity not implemented yet");
+	linkIdentity = async (credentials) => {
+		try {
+			const user = await this.stackAuth.getUser();
+			if (!user) return {
+				data: {
+					provider: credentials.provider,
+					url: null
+				},
+				error: new AuthError("No user session found", 401, "session_not_found")
+			};
+			const scopes = credentials.options?.scopes ? credentials.options.scopes.split(" ") : void 0;
+			await user.getConnectedAccount(credentials.provider, {
+				or: "redirect",
+				scopes
+			});
+			return {
+				data: {
+					provider: credentials.provider,
+					url: credentials.options?.redirectTo || ""
+				},
+				error: null
+			};
+		} catch (error) {
+			return {
+				data: {
+					provider: credentials.provider,
+					url: null
+				},
+				error: normalizeStackAuthError(error)
+			};
+		}
 	};
-	unlinkIdentity = async () => {
-		throw new Error("unlinkIdentity not implemented yet");
+	unlinkIdentity = async (identity) => {
+		try {
+			const user = await this.stackAuth.getUser();
+			if (!user) return {
+				data: null,
+				error: new AuthError("No user session found", 401, "session_not_found")
+			};
+			const provider = await user.getOAuthProvider(identity.identity_id);
+			if (!provider) return {
+				data: null,
+				error: new AuthError(`OAuth provider with ID ${identity.identity_id} not found`, 404, "identity_not_found")
+			};
+			await provider.delete();
+			const sessionResult = await this.getSession();
+			await this.notifyAllSubscribers("USER_UPDATED", sessionResult.data.session);
+			return {
+				data: {},
+				error: null
+			};
+		} catch (error) {
+			return {
+				data: null,
+				error: normalizeStackAuthError(error)
+			};
+		}
 	};
 	resetPasswordForEmail = async (email, options) => {
 		try {
@@ -567,8 +869,88 @@ var StackAuthAdapter = class {
 	reauthenticate = async () => {
 		throw new Error("reauthenticate not implemented yet");
 	};
-	resend = async () => {
-		throw new Error("resend not implemented yet");
+	resend = async (credentials) => {
+		try {
+			if ("email" in credentials) {
+				const { email, type, options } = credentials;
+				if (type === "signup") {
+					const user = await this.stackAuth.getUser();
+					if (user && user.primaryEmail === email) await user.sendVerificationEmail();
+					else {
+						const result = await this.stackAuth.sendMagicLinkEmail(email, { callbackUrl: options?.emailRedirectTo });
+						if (result.status === "error") return {
+							data: {
+								user: null,
+								session: null
+							},
+							error: normalizeStackAuthError(result)
+						};
+					}
+					return {
+						data: {
+							user: null,
+							session: null
+						},
+						error: null
+					};
+				}
+				if (type === "email_change") {
+					const user = await this.stackAuth.getUser();
+					if (!user) return {
+						data: {
+							user: null,
+							session: null
+						},
+						error: new AuthError("No user session found", 401, "session_not_found")
+					};
+					const targetChannel = (await user.listContactChannels()).find((ch) => ch.value === email && ch.type === "email");
+					if (!targetChannel) return {
+						data: {
+							user: null,
+							session: null
+						},
+						error: new AuthError("Email not found in user contact channels", 404, "email_not_found")
+					};
+					await targetChannel.sendVerificationEmail({ callbackUrl: options?.emailRedirectTo });
+					return {
+						data: {
+							user: null,
+							session: null
+						},
+						error: null
+					};
+				}
+				return {
+					data: {
+						user: null,
+						session: null
+					},
+					error: new AuthError(`Unsupported resend type: ${type}`, 400, "validation_failed")
+				};
+			}
+			if ("phone" in credentials) return {
+				data: {
+					user: null,
+					session: null
+				},
+				error: new AuthError("Phone OTP resend not supported by Stack Auth", 501, "phone_provider_disabled")
+			};
+			return {
+				data: {
+					user: null,
+					session: null
+				},
+				error: new AuthError("Invalid credentials format", 400, "validation_failed")
+			};
+		} catch (error) {
+			return {
+				data: {
+					user: null,
+					session: null
+				},
+				error: normalizeStackAuthError(error)
+			};
+		}
 	};
 	onAuthStateChange = (callback) => {
 		const id = crypto.randomUUID();
@@ -686,11 +1068,57 @@ var StackAuthAdapter = class {
 			this.tokenRefreshCheckInterval = null;
 		}
 	}
-	exchangeCodeForSession = async () => {
-		throw new Error("exchangeCodeForSession not implemented yet");
+	/**
+	* Exchange an OAuth authorization code for a session.
+	*
+	* Note: Stack Auth handles OAuth callbacks automatically via callOAuthCallback().
+	* This method delegates to Stack Auth's internal flow which:
+	* - Retrieves the code and state from the current URL
+	* - Retrieves the PKCE verifier from cookies (stored during signInWithOAuth)
+	* - Exchanges the code for access/refresh tokens
+	* - Creates and stores the user session
+	*
+	* @param authCode - The authorization code (Stack Auth reads this from URL automatically)
+	* @returns Session data or error
+	*/
+	exchangeCodeForSession = async (_authCode) => {
+		try {
+			if (await this.stackAuth.callOAuthCallback()) {
+				const sessionResult = await this.getSession();
+				if (sessionResult.data.session) {
+					await this.notifyAllSubscribers("SIGNED_IN", sessionResult.data.session);
+					return {
+						data: {
+							session: sessionResult.data.session,
+							user: sessionResult.data.session.user
+						},
+						error: null
+					};
+				}
+			}
+			return {
+				data: {
+					session: null,
+					user: null
+				},
+				error: new AuthError("OAuth callback completed but no session was created", 500, "oauth_callback_failed")
+			};
+		} catch (error) {
+			return {
+				data: {
+					session: null,
+					user: null
+				},
+				error: normalizeStackAuthError(error)
+			};
+		}
 	};
-	startAutoRefresh = async () => {};
-	stopAutoRefresh = async () => {};
+	startAutoRefresh = async () => {
+		return Promise.resolve();
+	};
+	stopAutoRefresh = async () => {
+		return Promise.resolve();
+	};
 };
 
 //#endregion

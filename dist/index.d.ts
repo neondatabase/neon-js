@@ -78,6 +78,19 @@ declare class StackAuthAdapter<HasTokenStore extends boolean = boolean, ProjectI
   private closeBroadcastChannel;
   private startTokenRefreshDetection;
   private stopTokenRefreshDetection;
+  /**
+   * Exchange an OAuth authorization code for a session.
+   *
+   * Note: Stack Auth handles OAuth callbacks automatically via callOAuthCallback().
+   * This method delegates to Stack Auth's internal flow which:
+   * - Retrieves the code and state from the current URL
+   * - Retrieves the PKCE verifier from cookies (stored during signInWithOAuth)
+   * - Exchanges the code for access/refresh tokens
+   * - Creates and stores the user session
+   *
+   * @param authCode - The authorization code (Stack Auth reads this from URL automatically)
+   * @returns Session data or error
+   */
   exchangeCodeForSession: AuthClient['exchangeCodeForSession'];
   startAutoRefresh: AuthClient['startAutoRefresh'];
   stopAutoRefresh: AuthClient['stopAutoRefresh'];
