@@ -1091,19 +1091,78 @@ export class StackAuthAdapter<
     }
   }
 
-  // Exchange code for session
-  exchangeCodeForSession: AuthClient['exchangeCodeForSession'] = async () => {
-    throw new Error('exchangeCodeForSession not implemented yet');
+  /**
+   * Exchange an OAuth authorization code for a session.
+   *
+   * Note: Stack Auth handles OAuth callbacks automatically via callOAuthCallback().
+   * This method delegates to Stack Auth's internal flow which:
+   * - Retrieves the code and state from the current URL
+   * - Retrieves the PKCE verifier from cookies (stored during signInWithOAuth)
+   * - Exchanges the code for access/refresh tokens
+   * - Creates and stores the user session
+   *
+   * @param authCode - The authorization code (Stack Auth reads this from URL automatically)
+   * @returns Session data or error
+   */
+  exchangeCodeForSession: AuthClient['exchangeCodeForSession'] = async (
+    authCode: string
+  ) => {
+    try {
+      // Stack Auth's callOAuthCallback() automatically:
+      // - Retrieves code and state from URL parameters
+      // - Retrieves code verifier from cookies (stored during signInWithOAuth)
+      // - Exchanges code for tokens
+      // - Updates the session
+      const success = await this.stackAuth.callOAuthCallback();
+
+      if (success) {
+        // Get the newly created session
+        const sessionResult = await this.getSession();
+
+        if (sessionResult.data.session) {
+          // Emit SIGNED_IN event
+          await this.notifyAllSubscribers(
+            'SIGNED_IN',
+            sessionResult.data.session
+          );
+
+          return {
+            data: {
+              session: sessionResult.data.session,
+              user: sessionResult.data.session.user,
+            },
+            error: null,
+          };
+        }
+      }
+
+      // Callback failed
+      return {
+        data: { session: null, user: null },
+        error: new AuthError(
+          'OAuth callback completed but no session was created',
+          500,
+          'oauth_callback_failed'
+        ),
+      };
+    } catch (error) {
+      return {
+        data: { session: null, user: null },
+        error: normalizeStackAuthError(error),
+      };
+    }
   };
 
   // Auto refresh
   startAutoRefresh: AuthClient['startAutoRefresh'] = async () => {
     // Stack Auth handles auto-refresh automatically
     // No explicit start needed
+    return Promise.resolve();
   };
 
   stopAutoRefresh: AuthClient['stopAutoRefresh'] = async () => {
     // Stack Auth handles auto-refresh automatically
     // No explicit stop needed
+    return Promise.resolve();
   };
 }
