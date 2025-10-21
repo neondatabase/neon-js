@@ -10,9 +10,10 @@ This is a TypeScript SDK that provides a unified authentication interface based 
 - **Adapter Pattern**: Authentication providers implement the `AuthClient` interface
 - **Adapters**: Located in `src/auth/adapters/`
   - `src/auth/adapters/stack-auth/` - Stack Auth provider adapter directory
-    - `stack-auth-adapter.ts` - Main adapter implementation
+    - `stack-auth-adapter.ts` - Main adapter implementation (1800+ lines, all methods implemented)
+    - `stack-auth-types.ts` - TypeScript type definitions and interfaces
     - `stack-auth-schemas.ts` - Zod schemas for JWT validation
-    - `stack-auth.test.ts` - Unit tests
+    - `stack-auth.test.ts` - Comprehensive unit tests (40+ test cases)
 - **Client Layer**: `src/client/` contains the unified client
   - `neon-client.ts` - Main NeonClient class (extends PostgrestClient)
   - `client-factory.ts` - Factory function `createClient()` for creating authenticated NeonClient instances
@@ -109,11 +110,37 @@ const { data: items } = await client.from('items').select();
 
 ## Key Implementation Notes
 
-### Recent Refactoring (October 2025):
+### Recent Implementations (October 2025):
+
+#### Complete AuthClient Interface Coverage
+All 25+ authentication methods from the Supabase AuthClient interface are now fully implemented:
+- **Supported methods**: signUp, signInWithPassword, signInWithOAuth, signInWithOtp, verifyOtp, getSession, refreshSession, setSession, getUser, updateUser, getClaims, getUserIdentities, linkIdentity, unlinkIdentity, signOut, resetPasswordForEmail, resend, reauthenticate, exchangeCodeForSession, onAuthStateChange, and internal utilities
+- **Unsupported methods with detailed error responses**: signInWithIdToken, signInWithSSO, signInWithWeb3, signInAnonymously
+  - Each unsupported method returns a comprehensive `AuthError` explaining why Stack Auth doesn't support it and suggesting alternatives
+  - Includes context about what was attempted (provider, chain, etc.) for debugging
+  - Error codes: `id_token_provider_disabled`, `sso_provider_disabled`, `web3_provider_disabled`
+
+#### Session Caching Optimization
 The Stack Auth adapter was refactored to access Stack Auth's internal session cache directly via `_getCachedTokensFromStackAuthInternals()`. This optimization:
 - Eliminates unnecessary network calls on cached `getSession()` invocations
 - Maintains compatibility with Stack Auth's tokenStore persistence (cookie/memory)
 - Uses internal APIs: `_getOrCreateTokenStore()`, `_getSessionFromTokenStore()`, and `getAccessTokenIfNotExpiredYet()`
+
+#### Important Limitations & Unsupported Patterns
+
+**Password Updates**: Stack Auth requires `oldPassword` for password changes, unlike Supabase which uses a nonce-based reauthentication flow. The `updateUser()` method with password attribute will return an error directing users to:
+1. Use the "Forgot Password" flow via `resetPasswordForEmail()`
+2. Reauthenticate using `signInWithPassword()` with their old credentials
+3. Use Stack Auth's native `updatePassword()` method directly
+
+**Anonymous Authentication**: Stack Auth's anonymous sign-in implementation differs from Supabase. Method returns an error with guidance to use explicit email/password or OAuth flows instead.
+
+**Unsupported Enterprise Features**:
+- **SAML SSO** (signInWithSSO): Stack Auth only supports OAuth social providers, not enterprise SAML identity providers
+- **Direct OIDC ID Token** (signInWithIdToken): Stack Auth uses OAuth authorization code flow; redirect-based OAuth is required
+- **Web3/Crypto Wallets** (signInWithWeb3): Stack Auth does not support blockchain-based authentication
+
+All unsupported methods provide detailed error messages with suggested alternatives to guide developers toward working approaches.
 
 ### Factory Pattern:
 The `createClient()` factory function (located in `src/client/client-factory.ts`) handles the complex initialization sequence:

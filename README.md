@@ -151,9 +151,10 @@ src/
 │   ├── auth-interface.ts          # Core AuthClient interface
 │   └── adapters/
 │       └── stack-auth/
-│           ├── stack-auth-adapter.ts   # Stack Auth implementation
+│           ├── stack-auth-adapter.ts   # Stack Auth implementation (1800+ lines)
+│           ├── stack-auth-types.ts     # Type definitions and interfaces
 │           ├── stack-auth-schemas.ts   # Zod schemas for JWT validation
-│           └── stack-auth.test.ts      # Unit tests
+│           └── stack-auth.test.ts      # Comprehensive unit tests
 ├── client/
 │   ├── neon-client.ts             # NeonClient class (extends PostgrestClient)
 │   ├── client-factory.ts          # createClient() factory function
@@ -221,12 +222,24 @@ npx neon-js gen-types --db-url "postgresql://..." --query-timeout 30s
 
 The SDK supports the following authentication methods via the Stack Auth adapter:
 
+### Fully Supported Methods
 - **Email/Password**: `signUp()`, `signInWithPassword()`
 - **OAuth**: `signInWithOAuth()` (supports all Stack Auth OAuth providers)
-- **Magic Link**: `signInWithOtp()` (email-based passwordless authentication)
-- **Session Management**: `getSession()`, `refreshSession()`, `signOut()`
-- **User Management**: `getUser()`, `updateUser()`, `getClaims()`
-- **Password Reset**: `resetPasswordForEmail()`
+- **Magic Link**: `signInWithOtp()`, `verifyOtp()` (email-based passwordless authentication)
+- **Session Management**: `getSession()`, `refreshSession()`, `setSession()`, `signOut()`
+- **User Management**: `getUser()`, `updateUser()`, `getClaims()`, `getUserIdentities()`
+- **Identity Linking**: `linkIdentity()`, `unlinkIdentity()`
+- **Password Reset**: `resetPasswordForEmail()`, `resend()`
+- **OAuth Callback**: `exchangeCodeForSession()`
+- **State Monitoring**: `onAuthStateChange()`
+
+### Unsupported Methods (Return Detailed Errors)
+- **OIDC ID Token**: `signInWithIdToken()` - Stack Auth uses OAuth redirects only
+- **SAML SSO**: `signInWithSSO()` - Stack Auth only supports OAuth social providers
+- **Web3/Crypto**: `signInWithWeb3()` - Stack Auth does not support blockchain authentication
+- **Anonymous**: `signInAnonymously()` - Use OAuth or email/password instead
+
+For unsupported methods, the adapter returns comprehensive error messages explaining the limitation and suggesting alternatives.
 
 ## Performance
 
