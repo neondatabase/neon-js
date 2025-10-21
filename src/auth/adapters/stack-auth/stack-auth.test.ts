@@ -164,6 +164,203 @@ describe('StackAuthAdapter', () => {
     });
   });
 
+  describe('signInWithIdToken', () => {
+    it('should return error when attempting to sign in with Google ID token', async () => {
+      const result = await adapter.signInWithIdToken({
+        provider: 'google',
+        token: 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...',
+      });
+
+      expect(result.error).toBeDefined();
+      expect(result.error?.code).toBe('id_token_provider_disabled');
+      expect(result.error?.message).toContain(
+        'Stack Auth does not support OIDC ID token authentication'
+      );
+      expect(result.error?.message).toContain('provider: google');
+      expect(result.error?.message).toContain('signInWithOAuth');
+      expect(result.data.user).toBeNull();
+      expect(result.data.session).toBeNull();
+    });
+
+    it('should return error when attempting to sign in with Apple ID token', async () => {
+      const result = await adapter.signInWithIdToken({
+        provider: 'apple',
+        token: 'eyJraWQiOiJXNldjT0tCIiwiYWxnIjoiUlMyNTYifQ...',
+      });
+
+      expect(result.error).toBeDefined();
+      expect(result.error?.code).toBe('id_token_provider_disabled');
+      expect(result.error?.message).toContain(
+        'Stack Auth does not support OIDC ID token authentication'
+      );
+      expect(result.error?.message).toContain('provider: apple');
+      expect(result.data.user).toBeNull();
+      expect(result.data.session).toBeNull();
+    });
+
+    it('should return error with access_token indicator', async () => {
+      const result = await adapter.signInWithIdToken({
+        provider: 'azure',
+        token: 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...',
+        access_token: 'ya29.a0AfH6SMBx...',
+      });
+
+      expect(result.error).toBeDefined();
+      expect(result.error?.code).toBe('id_token_provider_disabled');
+      expect(result.error?.message).toContain('provider: azure');
+      expect(result.error?.message).toContain('(with access_token)');
+      expect(result.error?.message).toContain('OAuth authorization code flow');
+      expect(result.data.user).toBeNull();
+      expect(result.data.session).toBeNull();
+    });
+
+    it('should return error with nonce indicator', async () => {
+      const result = await adapter.signInWithIdToken({
+        provider: 'facebook',
+        token: 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...',
+        nonce: 'random-nonce-value',
+      });
+
+      expect(result.error).toBeDefined();
+      expect(result.error?.code).toBe('id_token_provider_disabled');
+      expect(result.error?.message).toContain('provider: facebook');
+      expect(result.error?.message).toContain('(with nonce)');
+      expect(result.data.user).toBeNull();
+      expect(result.data.session).toBeNull();
+    });
+
+    it('should return error with both access_token and nonce indicators', async () => {
+      const result = await adapter.signInWithIdToken({
+        provider: 'kakao',
+        token: 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...',
+        access_token: 'access-token-value',
+        nonce: 'nonce-value',
+      });
+
+      expect(result.error).toBeDefined();
+      expect(result.error?.code).toBe('id_token_provider_disabled');
+      expect(result.error?.message).toContain('provider: kakao');
+      expect(result.error?.message).toContain('(with access_token)');
+      expect(result.error?.message).toContain('(with nonce)');
+      expect(result.data.user).toBeNull();
+      expect(result.data.session).toBeNull();
+    });
+  });
+
+  describe('signInWithSSO', () => {
+    it('should return error when attempting to sign in with provider ID', async () => {
+      const result = await adapter.signInWithSSO({
+        providerId: '21648a9d-8d5a-4555-a9d1-d6375dc14e92',
+        options: {
+          redirectTo: 'https://app.example.com/callback',
+        },
+      });
+
+      expect(result.error).toBeDefined();
+      expect(result.error?.code).toBe('sso_provider_disabled');
+      expect(result.error?.message).toContain(
+        'Stack Auth does not support enterprise SAML SSO'
+      );
+      expect(result.error?.message).toContain(
+        'provider ID: 21648a9d-8d5a-4555-a9d1-d6375dc14e92'
+      );
+      expect(result.error?.message).toContain('signInWithOAuth');
+      expect(result.data).toBeNull();
+    });
+
+    it('should return error when attempting to sign in with domain', async () => {
+      const result = await adapter.signInWithSSO({
+        domain: 'company.com',
+        options: {
+          redirectTo: 'https://app.example.com/callback',
+        },
+      });
+
+      expect(result.error).toBeDefined();
+      expect(result.error?.code).toBe('sso_provider_disabled');
+      expect(result.error?.message).toContain(
+        'Stack Auth does not support enterprise SAML SSO'
+      );
+      expect(result.error?.message).toContain('domain: company.com');
+      expect(result.error?.message).toContain('signInWithOAuth');
+      expect(result.data).toBeNull();
+    });
+
+    it('should return error with appropriate message for OAuth providers', async () => {
+      const result = await adapter.signInWithSSO({
+        providerId: 'google-oauth-provider',
+      });
+
+      expect(result.error).toBeDefined();
+      expect(result.error?.code).toBe('sso_provider_disabled');
+      expect(result.error?.message).toContain('OAuth social providers');
+      expect(result.data).toBeNull();
+    });
+  });
+
+  describe('signInWithWeb3', () => {
+    it('should return error when attempting to sign in with Ethereum', async () => {
+      const result = await adapter.signInWithWeb3({
+        chain: 'ethereum',
+        statement: 'Sign in to Example App',
+        options: {
+          url: 'https://app.example.com',
+        },
+      });
+
+      expect(result.error).toBeDefined();
+      expect(result.error?.code).toBe('web3_provider_disabled');
+      expect(result.error?.message).toContain(
+        'Stack Auth does not support Web3 authentication'
+      );
+      expect(result.error?.message).toContain('chain: ethereum');
+      expect(result.error?.message).toContain('crypto wallet sign-in');
+      expect(result.error?.message).toContain('signInWithOAuth');
+      expect(result.data.user).toBeNull();
+      expect(result.data.session).toBeNull();
+    });
+
+    it('should return error when attempting to sign in with Solana', async () => {
+      const result = await adapter.signInWithWeb3({
+        chain: 'solana',
+        statement: 'Sign in to Example App',
+        options: {
+          url: 'https://app.example.com',
+        },
+      });
+
+      expect(result.error).toBeDefined();
+      expect(result.error?.code).toBe('web3_provider_disabled');
+      expect(result.error?.message).toContain(
+        'Stack Auth does not support Web3 authentication'
+      );
+      expect(result.error?.message).toContain('chain: solana');
+      expect(result.error?.message).toContain('Ethereum, Solana');
+      expect(result.data.user).toBeNull();
+      expect(result.data.session).toBeNull();
+    });
+
+    it('should return error with message/signature format', async () => {
+      const result = await adapter.signInWithWeb3({
+        chain: 'ethereum',
+        message:
+          'Example App wants you to sign in with your Ethereum account...',
+        signature: '0x1234567890abcdef',
+      });
+
+      expect(result.error).toBeDefined();
+      expect(result.error?.code).toBe('web3_provider_disabled');
+      expect(result.error?.message).toContain(
+        'Supported authentication methods'
+      );
+      expect(result.error?.message).toContain(
+        'OAuth, email/password, magic link, passkey'
+      );
+      expect(result.data.user).toBeNull();
+      expect(result.data.session).toBeNull();
+    });
+  });
+
   describe('getSession', () => {
     it('should return current session', async () => {
       const mockSignedUpAt = new Date();
@@ -965,6 +1162,91 @@ describe('StackAuthAdapter', () => {
           'Invalid OTP verification parameters'
         );
       });
+    });
+  });
+
+  describe('reauthenticate', () => {
+    it('should return error indicating feature is not supported', async () => {
+      const result = await adapter.reauthenticate();
+
+      expect(result.data).toEqual({ user: null, session: null });
+      expect(result.error).toBeDefined();
+      expect(result.error?.message).toContain(
+        'Stack Auth does not support nonce-based reauthentication'
+      );
+      expect(result.error?.code).toBe('feature_not_supported');
+    });
+
+    it('should provide guidance on alternative approach', async () => {
+      const result = await adapter.reauthenticate();
+
+      expect(result.error?.message).toContain('password reset flow');
+      expect(result.error?.message).toContain('resetPasswordForEmail');
+    });
+  });
+
+  describe('updateUser with password', () => {
+    it('should return error when attempting to update password', async () => {
+      const mockUser = {
+        id: 'user-123',
+        primaryEmail: 'test@example.com',
+        primaryEmailVerified: true,
+        displayName: 'Test User',
+        profileImageUrl: null,
+        signedUpAt: new Date(),
+        clientMetadata: {},
+        hasPassword: true,
+        setPassword: vi.fn(),
+        update: vi.fn(),
+      };
+
+      vi.spyOn(adapter['stackAuth'], 'getUser').mockResolvedValue(
+        mockUser as any
+      );
+
+      const result = await adapter.updateUser({
+        password: 'newPassword123',
+      });
+
+      expect(result.data.user).toBeNull();
+      expect(result.error).toBeDefined();
+      expect(result.error?.message).toContain(
+        'Password updates require reauthentication'
+      );
+      expect(result.error?.message).toContain('resetPasswordForEmail');
+      expect(result.error?.code).toBe('feature_not_supported');
+      expect(mockUser.setPassword).not.toHaveBeenCalled();
+    });
+
+    it('should allow other user updates without password', async () => {
+      const mockUser = {
+        id: 'user-123',
+        primaryEmail: 'test@example.com',
+        primaryEmailVerified: true,
+        displayName: 'Test User',
+        profileImageUrl: null,
+        signedUpAt: new Date(),
+        clientMetadata: {},
+        clientReadOnlyMetadata: {},
+        hasPassword: true,
+        update: vi.fn().mockResolvedValue(undefined),
+      };
+
+      vi.spyOn(adapter['stackAuth'], 'getUser')
+        .mockResolvedValue(mockUser as any)
+        .mockResolvedValueOnce(mockUser as any) // First call in updateUser
+        .mockResolvedValueOnce({
+          ...mockUser,
+          displayName: 'Updated Name',
+        } as any); // Second call to get updated user
+
+      const result = await adapter.updateUser({
+        data: { displayName: 'Updated Name' },
+      });
+
+      expect(result.error).toBeNull();
+      expect(result.data.user).toBeDefined();
+      expect(mockUser.update).toHaveBeenCalled();
     });
   });
 });

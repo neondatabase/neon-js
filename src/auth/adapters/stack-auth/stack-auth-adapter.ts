@@ -435,16 +435,120 @@ export class StackAuthAdapter<
     }
   };
 
-  signInWithIdToken: AuthClient['signInWithIdToken'] = async () => {
-    throw new Error('signInWithIdToken not implemented yet');
+  signInWithIdToken: AuthClient['signInWithIdToken'] = async (credentials) => {
+    /**
+     * Stack Auth does not support direct OIDC ID token authentication.
+     *
+     * Supabase's signInWithIdToken accepts pre-existing OIDC ID tokens from providers like:
+     * - Google, Apple, Azure, Facebook, Kakao, Keycloak
+     * - Validates the ID token server-side
+     * - Can handle tokens with at_hash (requires access_token) and nonce claims
+     *
+     * Stack Auth uses OAuth authorization code flow with redirects instead:
+     * - Requires redirecting users to the OAuth provider
+     * - Handles the OAuth callback to exchange authorization code for tokens
+     * - Does not accept pre-existing ID tokens directly
+     *
+     * For OAuth providers, use signInWithOAuth instead:
+     * ```
+     * await authAdapter.signInWithOAuth({ provider: 'google', options: { redirectTo: '...' } });
+     * ```
+     */
+
+    // Log what was attempted for debugging
+    const attemptedProvider = credentials.provider;
+    const hasAccessToken = !!credentials.access_token;
+    const hasNonce = !!credentials.nonce;
+
+    return {
+      data: {
+        user: null,
+        session: null,
+      },
+      error: new AuthError(
+        `Stack Auth does not support OIDC ID token authentication. Attempted with provider: ${attemptedProvider}${hasAccessToken ? ' (with access_token)' : ''}${hasNonce ? ' (with nonce)' : ''}. ` +
+          `Stack Auth uses OAuth authorization code flow and does not accept pre-existing ID tokens. ` +
+          `Please use signInWithOAuth() to redirect users to the OAuth provider for authentication.`,
+        501,
+        'id_token_provider_disabled'
+      ),
+    };
   };
 
-  signInWithSSO: AuthClient['signInWithSSO'] = async () => {
-    throw new Error('signInWithSSO not implemented yet');
+  signInWithSSO: AuthClient['signInWithSSO'] = async (params) => {
+    /**
+     * Stack Auth does not support enterprise SAML SSO providers like Supabase does.
+     *
+     * Supabase's signInWithSSO is designed for enterprise identity providers (SAML 2.0)
+     * that can be identified by:
+     * - providerId: UUID of a SAML SSO provider
+     * - domain: Company domain associated with the SAML provider
+     *
+     * Stack Auth only supports OAuth social providers (Google, GitHub, Microsoft, etc.)
+     * via the signInWithOAuth method.
+     *
+     * For OAuth providers, use signInWithOAuth instead:
+     * ```
+     * await authAdapter.signInWithOAuth({ provider: 'google', options: { redirectTo: '...' } });
+     * ```
+     */
+
+    // Log what was attempted for debugging
+    const attemptedWith =
+      'providerId' in params
+        ? `provider ID: ${params.providerId}`
+        : `domain: ${'domain' in params ? params.domain : 'unknown'}`;
+
+    return {
+      data: null,
+      error: new AuthError(
+        `Stack Auth does not support enterprise SAML SSO. Attempted with ${attemptedWith}. ` +
+          `Stack Auth only supports OAuth social providers (Google, GitHub, Microsoft, etc.). ` +
+          `Please use signInWithOAuth() for OAuth providers instead.`,
+        501,
+        'sso_provider_disabled'
+      ),
+    };
   };
 
-  signInWithWeb3: AuthClient['signInWithWeb3'] = async () => {
-    throw new Error('signInWithWeb3 not implemented yet');
+  signInWithWeb3: AuthClient['signInWithWeb3'] = async (credentials) => {
+    /**
+     * Stack Auth does not support Web3/crypto wallet authentication (Ethereum, Solana, etc.)
+     *
+     * Supabase's signInWithWeb3 enables authentication with crypto wallets like:
+     * - Ethereum: MetaMask, WalletConnect, Coinbase Wallet (using EIP-1193)
+     * - Solana: Phantom, Solflare (using Sign-In with Solana standard)
+     *
+     * Stack Auth only supports:
+     * - OAuth social providers (Google, GitHub, Microsoft, etc.)
+     * - Email/Password credentials
+     * - Magic link (passwordless email)
+     * - Passkey/WebAuthn
+     * - Anonymous sign-in
+     *
+     * For OAuth providers, use signInWithOAuth instead:
+     * ```
+     * await authAdapter.signInWithOAuth({ provider: 'google', options: { redirectTo: '...' } });
+     * ```
+     */
+
+    // Log what was attempted for debugging
+    const attemptedChain = credentials.chain;
+
+    return {
+      data: {
+        user: null,
+        session: null,
+      },
+      error: new AuthError(
+        `Stack Auth does not support Web3 authentication. Attempted with chain: ${attemptedChain}. ` +
+          `Stack Auth does not support crypto wallet sign-in (Ethereum, Solana, etc.). ` +
+          `Supported authentication methods: OAuth, email/password, magic link, passkey, or anonymous. ` +
+          `For social authentication, please use signInWithOAuth() instead.`,
+        501,
+        'web3_provider_disabled'
+      ),
+    };
   };
 
   // Sign out
@@ -1058,9 +1162,21 @@ export class StackAuthAdapter<
         };
       }
 
-      // Handle password update separately (Stack Auth uses setPassword method)
+      // Handle password update separately
+      // Note: Supabase requires a nonce from reauthenticate() for password changes
+      // Stack Auth doesn't support nonce-based reauthentication, but requires oldPassword
+      // We cannot safely change passwords without verification
       if (attributes.password) {
-        await user.setPassword({ password: attributes.password });
+        return {
+          data: { user: null },
+          error: new AuthError(
+            'Password updates require reauthentication. Stack Auth does not support the nonce-based reauthentication flow (reauthenticate() method). ' +
+              'For password changes, users must: 1) Sign out, 2) Use "Forgot Password" flow (resetPasswordForEmail), or ' +
+              '3) Use Stack Auth directly with updatePassword({ oldPassword, newPassword }).',
+            400,
+            'feature_not_supported'
+          ),
+        };
       }
 
       // Map Supabase attributes to Stack Auth update format
@@ -1331,9 +1447,25 @@ export class StackAuthAdapter<
     }
   };
 
-  // Reauthentication
   reauthenticate: AuthClient['reauthenticate'] = async () => {
-    throw new Error('reauthenticate not implemented yet');
+    // Stack Auth does not support reauthentication with OTP/nonce flow
+    //
+    // Supabase's reauthenticate() sends an OTP to verify the user still controls
+    // their email/phone and returns a nonce for use with updateUser({ password, nonce }).
+    //
+    // Stack Auth uses a different security model where password updates require
+    // the old password directly via user.updatePassword({ oldPassword, newPassword }).
+    //
+    // Since we cannot implement the nonce-based flow, updateUser({ password }) will
+    // also return an error directing users to use the password reset flow instead.
+    return {
+      data: { user: null, session: null },
+      error: new AuthError(
+        'Stack Auth does not support nonce-based reauthentication. For password changes, use the password reset flow (resetPasswordForEmail) or access Stack Auth directly.',
+        400,
+        'feature_not_supported'
+      ),
+    };
   };
 
   // Resend
