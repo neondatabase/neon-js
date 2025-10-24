@@ -1,6 +1,6 @@
 {
   "name": "@neondatabase/neon-js",
-  "version": "0.0.0",
+  "version": "0.1.0-alpha.1",
   "description": "A TypeScript SDK for Neon services.",
   "type": "module",
   "license": "Apache-2.0",
@@ -14,13 +14,14 @@
   },
   "author": "Pedro Figueiredo <pedro.figueiredo@databricks.com>",
   "files": [
-    "dist"
+    "dist",
+    "CHANGELOG.md"
   ],
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "neon-js": "./dist/cli/index.js"
+    "neon-js": "dist/cli/index.js"
   },
   "exports": {
     ".": "./dist/index.js",
