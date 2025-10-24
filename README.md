@@ -1,30 +1,24 @@
 # neon-js
 
-A TypeScript SDK that provides a unified authentication interface based on Supabase's auth API. The project uses an adapter pattern to support multiple authentication providers while maintaining a consistent API.
+A unified TypeScript SDK for Neon services, providing seamless integration with **Neon Auth** (authentication service) and **Neon Data API** (PostgreSQL database queries). Built with a Supabase-compatible interface for easy migration and familiar developer experience.
 
 ## Features
 
-- **Unified Auth Interface**: Supabase-compatible authentication API
-- **Adapter Pattern**: Pluggable authentication providers
-- **Stack Auth Integration**: Full-featured Stack Auth adapter with session caching
+- **Unified SDK**: Single client for Neon Auth and Neon Data API
+- **Supabase-Compatible**: Drop-in replacement for easy migration from Supabase
+- **Adapter Pattern**: Pluggable authentication providers (Stack Auth included)
 - **Automatic Token Injection**: Auth-aware fetch wrapper for seamless API calls
 - **TypeScript**: Full type safety with strict mode enabled
 - **Performance Optimized**: Leverages Stack Auth's internal session cache for <5ms session reads
+- **CLI Tool**: Generate TypeScript types from your database schema
 
 ## Installation
 
 ### From npm
 
-TODO
-
-### From GitHub
-
-TODO: add `dist` to `.gitignore` once we have a release
-
 ```bash
-npm install git+ssh://git@github.com/neondatabase-labs/neon-js.git
+npm install @neondatabase/neon-js
 ```
-
 
 ## Using neon-js
 
@@ -58,6 +52,83 @@ const client = createClient({
 });
 ```
 
+## Migrating from Supabase
+
+neon-js provides a Supabase-compatible API, making migration straightforward with minimal code changes. Here's a real-world migration example from the [Todo Guardian Pro project](https://github.com/pffigueiredo/todo-guardian-pro/pull/1).
+
+### Migration Steps
+
+**1. Update Dependencies**
+
+Replace `@supabase/supabase-js` with `neon-js` in your `package.json`:
+
+```diff
+- "@supabase/supabase-js": "^2.74.0"
++ "neon-js": "^0.0.0"
+```
+
+**2. Update Environment Variables**
+
+Replace Supabase environment variables with Neon equivalents:
+
+```diff
+- VITE_SUPABASE_PROJECT_ID="..."
+- VITE_SUPABASE_PUBLISHABLE_KEY="..."
+- VITE_SUPABASE_URL="https://xxx.supabase.co"
++ VITE_NEON_DATA_API_URL="https://xxx.apirest.c-2.us-east-1.aws.neon.tech/neondb/rest/v1"
++ VITE_STACK_PROJECT_ID="..."
++ VITE_STACK_PUBLISHABLE_CLIENT_KEY="..."
+```
+
+Get these values from your Neon dashboard:
+- **Data API URL**: Available in the Neon console under "Data API"
+- **Stack Auth credentials**: Project ID and Publishable Client Key from Neon Auth setup
+
+**3. Update Client Initialization**
+
+Update your client configuration to use neon-js:
+
+```diff
+- import { createClient } from '@supabase/supabase-js';
++ import { createClient } from 'neon-js';
+
+- export const supabase = createClient(
+-   import.meta.env.VITE_SUPABASE_URL,
+-   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+- );
++ export const supabase = createClient({
++   url: import.meta.env.VITE_NEON_DATA_API_URL,
++   auth: {
++     tokenStore: 'cookie',
++     projectId: import.meta.env.VITE_STACK_PROJECT_ID,
++     publishableClientKey: import.meta.env.VITE_STACK_PUBLISHABLE_CLIENT_KEY,
++   },
++ });
+```
+
+**4. Done!**
+
+That's it! The rest of your code remains unchanged. All authentication methods (`signInWithPassword`, `signOut`, `getUser`, etc.) and database queries (`from().select()`, etc.) work exactly the same.
+
+### What Stays the Same
+
+- ✅ All authentication method signatures
+- ✅ All database query methods
+- ✅ Session management APIs
+- ✅ User management APIs
+- ✅ OAuth flows
+- ✅ Error handling patterns
+
+### Real-World Example
+
+See the complete migration in this PR: [pffigueiredo/todo-guardian-pro#1](https://github.com/pffigueiredo/todo-guardian-pro/pull/1)
+
+The migration changed only:
+- 1 dependency in `package.json`
+- 3 environment variables in `.env`
+- Client initialization in `src/integrations/supabase/client.ts`
+
+Everything else stayed the same!
 
 ## Quick Start
 
@@ -71,15 +142,6 @@ const client = createClient({
     projectId: 'your-project-id',
     publishableClientKey: 'pk_...',
     tokenStore: 'cookie', // or 'memory'
-  },
-  options: {
-    // Optional: custom configuration
-    global: {
-      headers: { 'X-Custom-Header': 'value' },
-    },
-    db: {
-      schema: 'public',
-    },
   },
 });
 
@@ -149,10 +211,11 @@ const client = createClient({
 
 ## Architecture
 
-- **AuthClient Interface**: Supabase-compatible authentication interface
-- **Stack Auth Adapter**: Production-ready adapter with optimized session caching
-- **NeonClient**: Extends PostgrestClient with integrated authentication
+- **NeonClient**: Unified client for Neon Auth and Data API (extends PostgrestClient)
+- **AuthClient Interface**: Supabase-compatible authentication interface for easy migration
+- **Adapter Pattern**: Pluggable authentication providers (Stack Auth included)
 - **Factory Pattern**: `createClient()` handles initialization and wiring
+- **Performance Optimized**: Session caching, automatic token injection, and retry logic
 
 ## Development
 
@@ -200,12 +263,26 @@ bun release
 src/
 ├── auth/
 │   ├── auth-interface.ts          # Core AuthClient interface
+│   ├── utils.ts                   # Shared utility functions
+│   ├── __tests__/                 # Comprehensive test suite
+│   │   ├── auth-flows.test.ts
+│   │   ├── session-management.test.ts
+│   │   ├── error-handling.test.ts
+│   │   ├── oauth.test.ts
+│   │   ├── oauth.browser.test.ts
+│   │   ├── otp.test.ts
+│   │   ├── user-management.test.ts
+│   │   ├── stack-auth-helpers.test.ts
+│   │   ├── supabase-compatibility.test.ts
+│   │   ├── msw-setup.ts
+│   │   ├── msw-handlers.ts
+│   │   └── README.md
 │   └── adapters/
 │       └── stack-auth/
-│           ├── stack-auth-adapter.ts   # Stack Auth implementation (1800+ lines)
+│           ├── stack-auth-adapter.ts   # Stack Auth implementation (2000+ lines)
 │           ├── stack-auth-types.ts     # Type definitions and interfaces
 │           ├── stack-auth-schemas.ts   # Zod schemas for JWT validation
-│           └── stack-auth.test.ts      # Comprehensive unit tests
+│           └── stack-auth-helpers.ts   # Helper utilities
 ├── client/
 │   ├── neon-client.ts             # NeonClient class (extends PostgrestClient)
 │   ├── client-factory.ts          # createClient() factory function

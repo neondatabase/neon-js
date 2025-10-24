@@ -1,5 +1,5 @@
 {
-  "name": "neon-js",
+  "name": "@neondatabase/neon-js",
   "version": "0.0.0",
   "description": "A TypeScript SDK for Neon services.",
   "type": "module",
@@ -33,6 +33,8 @@
     "build": "tsdown",
     "dev": "tsdown --watch",
     "test": "vitest",
+    "test:node": "node --run test",
+    "test:ci": "vitest run",
     "typecheck": "tsc --noEmit",
     "release": "bumpp && npm publish"
   },
@@ -41,7 +43,7 @@
     "bumpp": "10.1.0",
     "jsdom": "^27.0.1",
     "msw": "^2.6.8",
-    "tsdown": "0.15.7",
+    "tsdown": "0.15.8",
     "typescript": "5.8.3",
     "vite-tsconfig-paths": "5.1.4",
     "vitest": "3.1.3"

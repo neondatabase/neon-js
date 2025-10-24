@@ -3,17 +3,18 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
-This is a TypeScript SDK that provides a unified authentication interface based on Supabase's auth API. The project uses an adapter pattern to support multiple authentication providers while maintaining a consistent API.
+This is a unified TypeScript SDK for Neon services, providing seamless integration with **Neon Auth** (authentication service) and **Neon Data API** (PostgreSQL database queries). The SDK uses an adapter pattern to support multiple authentication providers while maintaining a Supabase-compatible interface for easy migration and familiar developer experience.
 
 ## Architecture
-- **Core Interface**: `src/auth/auth-interface.ts` defines the `AuthClient` interface based on Supabase's AuthClient
+- **Core Interface**: `src/auth/auth-interface.ts` defines the `AuthClient` interface for Neon Auth, maintaining Supabase API compatibility to enable seamless migration from Supabase projects
 - **Adapter Pattern**: Authentication providers implement the `AuthClient` interface
 - **Adapters**: Located in `src/auth/adapters/`
   - `src/auth/adapters/stack-auth/` - Stack Auth provider adapter directory
-    - `stack-auth-adapter.ts` - Main adapter implementation (1800+ lines, all methods implemented)
+    - `stack-auth-adapter.ts` - Main adapter implementation (2000+ lines, all methods implemented)
     - `stack-auth-types.ts` - TypeScript type definitions and interfaces
     - `stack-auth-schemas.ts` - Zod schemas for JWT validation
-    - `stack-auth.test.ts` - Comprehensive unit tests (40+ test cases)
+    - `stack-auth-helpers.ts` - Helper utilities for JWT decoding and error handling
+- **Utilities**: `src/auth/utils.ts` - Shared utility functions (e.g., `toISOString()` for date conversion)
 - **Client Layer**: `src/client/` contains the unified client
   - `neon-client.ts` - Main NeonClient class (extends PostgrestClient)
   - `client-factory.ts` - Factory function `createClient()` for creating authenticated NeonClient instances
@@ -30,9 +31,15 @@ This is a TypeScript SDK that provides a unified authentication interface based 
 ## Development Commands
 - `bun dev` - Start development server with watch mode
 - `bun build` - Build the project for production
-- `bun test` - Run unit tests with vitest
+- `bun test` - Run unit tests with vitest (may have MSW interception issues)
+- `bun test:node` - **Recommended**: Run tests in pure Node.js runtime (reliable MSW mocking)
+- `npx vitest` - Alternative: Direct Vitest execution, bypasses Bun entirely
+- `bun test:ci` - Run tests once without watch mode (for CI/CD)
 - `bun typecheck` - Run TypeScript type checking
 - `bun release` - Bump version and publish to npm
+
+### Testing Notes
+When running tests with `bun test`, MSW (Mock Service Worker) may fail to intercept HTTP requests due to Bun's fetch implementation interfering with Node.js runtime. Use `bun test:node` or `npx vitest` for reliable test execution with proper mocking.
 
 
 
@@ -133,8 +140,11 @@ The adapter uses environment detection helpers (`isBrowser()`, `supportsBroadcas
 # Run tests in Node.js environment (default)
 bun test
 
-# Tests automatically validate both environments
-bun test src/auth/adapters/stack-auth/stack-auth-helpers.test.ts
+# Run specific test files
+bun test src/auth/__tests__/stack-auth-helpers.test.ts
+
+# Browser-specific OAuth tests use jsdom environment
+bun test src/auth/__tests__/oauth.browser.test.ts
 ```
 
 ## Testing Architecture
@@ -161,15 +171,17 @@ By testing against the real Stack Auth SDK:
     - `auth-flows.test.ts` - Core authentication flows
     - `session-management.test.ts` - Session lifecycle and tokens
     - `error-handling.test.ts` - Error scenarios
-    - `oauth.test.ts` - OAuth provider flows
+    - `oauth.test.ts` - OAuth provider flows (Node.js environment)
+    - `oauth.browser.test.ts` - OAuth browser-specific tests (jsdom environment)
     - `otp.test.ts` - OTP/magic link authentication
     - `user-management.test.ts` - User profile operations
     - `stack-auth-helpers.test.ts` - JWT and error utilities
     - `supabase-compatibility.test.ts` - Interface compatibility verification
     - `msw-setup.ts` - MSW server configuration
     - `msw-handlers.ts` - Mock HTTP endpoints
+    - `README.md` - Detailed testing documentation
   - `src/client/` - NeonClient tests (legacy)
-- Run tests with: `bun test`
+- Run tests with: `bun test`, `bun test:node`, or `npx vitest`
 
 ### Adding Tests
 

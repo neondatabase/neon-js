@@ -177,8 +177,6 @@ describe('Supabase AuthClient Compatibility', () => {
     });
 
     it('should use consistent error code format', () => {
-      const adapter = createAdapter();
-
       // Error codes should follow pattern: lowercase with underscores
       // Examples: invalid_credentials, user_not_found, session_not_found
       const errorCodePattern = /^[a-z_]+$/;

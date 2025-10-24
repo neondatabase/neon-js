@@ -204,7 +204,6 @@ export class StackAuthAdapter<
   private stateChangeEmitters = new Map<string, Subscription>();
   private broadcastChannel: InstanceType<typeof BroadcastChannel> | null = null;
   private tokenRefreshCheckInterval: NodeJS.Timeout | null = null;
-  private _forceSlowPath = false; // Force getSession to fetch fresh user data
   private config: OnAuthStateChangeConfig = {
     enableTokenRefreshDetection: true, // Enabled by default (matches Supabase)
     tokenRefreshCheckInterval: 30_000, // 30 seconds (matches Supabase)
@@ -256,8 +255,7 @@ export class StackAuthAdapter<
         // Stack Auth requires verificationCallbackUrl in non-browser environments
         const verificationCallbackUrl =
           credentials.options?.emailRedirectTo ||
-          (this.stackAuth as any).urls?.emailVerification ||
-          'http://localhost:3000/email-verification'; // Fallback for testing
+          this.stackAuth.urls.emailVerification;
 
         const result = await this.stackAuth.signUpWithCredential({
           email: credentials.email,
@@ -284,10 +282,8 @@ export class StackAuthAdapter<
           }
         }
 
-        // Force getSession to fetch fresh user data (not use cached tokens without metadata)
-        this._forceSlowPath = true;
-        const sessionResult = await this.getSession();
-        this._forceSlowPath = false;
+        // Fetch fresh session with full user metadata
+        const sessionResult = await this._fetchFreshSession();
 
         if (!sessionResult.data.session?.user) {
           return {
@@ -373,10 +369,8 @@ export class StackAuthAdapter<
           };
         }
 
-        // Force getSession to fetch fresh user data (not use cached tokens without metadata)
-        this._forceSlowPath = true;
-        const sessionResult = await this.getSession();
-        this._forceSlowPath = false;
+        // Fetch fresh session with full user metadata
+        const sessionResult = await this._fetchFreshSession();
 
         if (!sessionResult.data.session?.user) {
           return {
@@ -469,12 +463,11 @@ export class StackAuthAdapter<
 
       // Handle email OTP/Magic Link
       if ('email' in credentials && credentials.email) {
-        // Stack Auth requires callbackUrl in non-browser environments
-        // Use provided emailRedirectTo or fall back to configured magicLinkCallback URL
+        // Stack Auth provides default callback URLs (e.g., "/handler/magic-link-callback")
+        // Use provided emailRedirectTo or fall back to Stack Auth's configured/default magicLinkCallback
         const callbackUrl =
           credentials.options?.emailRedirectTo ||
-          (this.stackAuth as any).urls?.magicLinkCallback ||
-          'http://localhost:3000/magic-link-callback'; // Final fallback for testing
+          this.stackAuth.urls.magicLinkCallback;
 
         const result = await this.stackAuth.sendMagicLinkEmail(
           credentials.email,
@@ -1006,88 +999,97 @@ export class StackAuthAdapter<
   };
 
   // Session management
-  getSession: AuthClient['getSession'] = async () => {
+  /**
+   * Fetches fresh session data from Stack Auth API.
+   * Always makes a network request to get the latest user metadata.
+   * Used when we need fresh data (after setSession, refreshSession, etc.)
+   */
+  private async _fetchFreshSession(): Promise<
+    ReturnType<AuthClient['getSession']>
+  > {
     try {
-      let session: Session | null = null;
-
-      // Step 1: Try to get cached tokens (unless forced to skip for fresh metadata)
-      if (!this._forceSlowPath) {
-        const cachedTokens = await this._getCachedTokensFromStackAuthInternals();
-        if (cachedTokens?.accessToken) {
+      const user = await this.stackAuth.getUser();
+      if (user) {
+        const tokens = await user.currentSession.getTokens();
+        if (tokens.accessToken) {
           const payload = accessTokenSchema.parse(
-            JSON.parse(atob(cachedTokens.accessToken.split('.')[1]))
+            JSON.parse(atob(tokens.accessToken.split('.')[1]))
           );
 
-          session = {
-            access_token: cachedTokens.accessToken,
+          const session: Session = {
+            access_token: tokens.accessToken,
             // ATTENTION: we allow sessions without refresh token
-            refresh_token: cachedTokens.refreshToken ?? '',
+            refresh_token: tokens.refreshToken ?? '',
             expires_at: payload.exp,
-            expires_in: Math.max(0, payload.exp - Math.floor(Date.now() / 1000)),
+            expires_in: Math.max(
+              0,
+              payload.exp - Math.floor(Date.now() / 1000)
+            ),
             token_type: 'bearer' as const,
             user: {
-              id: payload.sub,
-              email: payload.email || '',
-              created_at: new Date(payload.iat * 1000).toISOString(),
+              id: user.id,
+              email: user.primaryEmail || '',
+              email_confirmed_at: user.primaryEmailVerified
+                ? toISOString(user.signedUpAt)
+                : undefined,
+              last_sign_in_at: toISOString(user.signedUpAt),
+              created_at: toISOString(user.signedUpAt),
+              updated_at: toISOString(user.signedUpAt),
               aud: 'authenticated',
               role: 'authenticated',
-              app_metadata: {},
-              user_metadata: {},
+              app_metadata: user.clientReadOnlyMetadata,
+              user_metadata: {
+                displayName: user.displayName,
+                profileImageUrl: user.profileImageUrl,
+                ...user.clientMetadata,
+              },
+              identities: [],
             },
           };
+
+          return { data: { session }, error: null };
         }
       }
 
-      // Step 2: Fallback - fetch user (makes network request and auto refreshes tokens)
-      if (!session) {
-        const user = await this.stackAuth.getUser();
-        if (user) {
-          const tokens = await user.currentSession.getTokens();
-          if (tokens.accessToken) {
-            const payload = accessTokenSchema.parse(
-              JSON.parse(atob(tokens.accessToken.split('.')[1]))
-            );
+      return { data: { session: null }, error: null };
+    } catch (error) {
+      console.error('Error fetching fresh session:', error);
+      return { data: { session: null }, error: normalizeStackAuthError(error) };
+    }
+  }
 
-            session = {
-              access_token: tokens.accessToken,
-              // ATTENTION: we allow sessions without refresh token
-              refresh_token: tokens.refreshToken ?? '',
-              expires_at: payload.exp,
-              expires_in: Math.max(
-                0,
-                payload.exp - Math.floor(Date.now() / 1000)
-              ),
-              token_type: 'bearer' as const,
-              user: {
-                id: user.id,
-                email: user.primaryEmail || '',
-                email_confirmed_at: user.primaryEmailVerified
-                  ? toISOString(user.signedUpAt)
-                  : undefined,
-                last_sign_in_at: toISOString(user.signedUpAt),
-                created_at: toISOString(user.signedUpAt),
-                updated_at: toISOString(user.signedUpAt),
-                aud: 'authenticated',
-                role: 'authenticated',
-                app_metadata: user.clientReadOnlyMetadata,
-                user_metadata: {
-                  displayName: user.displayName,
-                  profileImageUrl: user.profileImageUrl,
-                  ...user.clientMetadata,
-                },
-                identities: [],
-              },
-            };
-          }
-        }
-      }
+  getSession: AuthClient['getSession'] = async () => {
+    try {
+      // Step 1: Try to get cached tokens (fast path - no network request)
+      const cachedTokens = await this._getCachedTokensFromStackAuthInternals();
+      if (cachedTokens?.accessToken) {
+        const payload = accessTokenSchema.parse(
+          JSON.parse(atob(cachedTokens.accessToken.split('.')[1]))
+        );
 
-      // Return with properly narrowed types
-      if (session) {
+        const session: Session = {
+          access_token: cachedTokens.accessToken,
+          // ATTENTION: we allow sessions without refresh token
+          refresh_token: cachedTokens.refreshToken ?? '',
+          expires_at: payload.exp,
+          expires_in: Math.max(0, payload.exp - Math.floor(Date.now() / 1000)),
+          token_type: 'bearer' as const,
+          user: {
+            id: payload.sub,
+            email: payload.email || '',
+            created_at: new Date(payload.iat * 1000).toISOString(),
+            aud: 'authenticated',
+            role: 'authenticated',
+            app_metadata: {},
+            user_metadata: {},
+          },
+        };
+
         return { data: { session }, error: null };
-      } else {
-        return { data: { session: null }, error: null };
       }
+
+      // Step 2: Fallback - fetch fresh session with full metadata (slow path)
+      return await this._fetchFreshSession();
     } catch (error) {
       console.error('Error getting session:', error);
       return { data: { session: null }, error: normalizeStackAuthError(error) };

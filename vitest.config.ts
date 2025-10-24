@@ -5,6 +5,12 @@ export default defineConfig({
   plugins: [tsconfigPaths()],
   test: {
     environment: 'node', // Use Node environment for MSW compatibility
+    pool: 'forks', // Force process forking for proper isolation
+    poolOptions: {
+      forks: {
+        singleFork: false,
+      },
+    },
     setupFiles: [
       './src/auth/__tests__/msw-setup.ts', // Setup MSW for API mocking
     ],
