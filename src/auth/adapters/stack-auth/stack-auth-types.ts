@@ -49,6 +49,7 @@ export interface StackAuthErrorResponse {
   error: {
     message: string;
   };
+  httpStatus?: number; // Optional HTTP status code from the API
 }
 
 /**

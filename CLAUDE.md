@@ -100,13 +100,98 @@ const { data: items } = await client.from('items').select();
 - **First `getSession()` after reload**: <50ms (Stack Auth reads from tokenStore)
 - **Token refresh**: <200ms (network call to Stack Auth, happens automatically)
 
-## Testing
+## Environment Compatibility
+
+The Stack Auth adapter supports both browser and Node.js environments with graceful feature degradation:
+
+### Browser Environment:
+- Full feature support including cross-tab authentication state synchronization via BroadcastChannel
+- Token refresh detection with automatic state change events
+- Session caching optimizations
+
+### Node.js Environment:
+- All core authentication methods work (signIn, signOut, getSession, etc.)
+- Session management and token refresh (without cross-tab sync)
+- Graceful degradation - browser-only features are automatically disabled
+
+### Implementation Details:
+The adapter uses environment detection helpers (`isBrowser()`, `supportsBroadcastChannel()`) to conditionally enable browser-specific APIs. This follows the same pattern as Supabase's auth-js library.
+
+**Browser-only features:**
+- BroadcastChannel for cross-tab state synchronization
+- Automatically disabled in Node.js without errors
+
+**Universal features (work in both):**
+- All authentication methods (signUp, signIn, signOut)
+- Session management (getSession, refreshSession)
+- User management (getUser, updateUser)
+- OAuth flows (with appropriate redirect handling)
+- State change listeners (onAuthStateChange)
+
+### Testing:
+```bash
+# Run tests in Node.js environment (default)
+bun test
+
+# Tests automatically validate both environments
+bun test src/auth/adapters/stack-auth/stack-auth-helpers.test.ts
+```
+
+## Testing Architecture
+
+Tests use the **real `@stackframe/js` SDK** with **MSW for network mocking only**:
+
+- **SDK**: Real Stack Auth SDK with `tokenStore: 'memory'` for Node.js compatibility
+- **Network**: MSW intercepts HTTP requests to Stack Auth API
+- **Goal**: Verify retrocompatibility with Supabase AuthClient API
+
+### Why Real SDK in Tests?
+
+By testing against the real Stack Auth SDK:
+- ✅ We catch breaking changes in Stack Auth SDK versions
+- ✅ We verify the adapter actually works with Stack Auth (not just our assumptions)
+- ✅ We ensure Supabase API compatibility is maintained
+- ✅ We reduce maintenance burden (single mock layer instead of two)
+
+### Test Files
+
 - Test framework: Vitest
 - Tests located in:
-  - `tests/` directory - Integration tests
-  - `src/auth/adapters/stack-auth/stack-auth.test.ts` - Stack Auth adapter unit tests
-  - `src/client/neon-client.test.ts` - NeonClient unit tests
-- Run tests with `bun test`
+  - `src/auth/__tests__/` - Complete test suite
+    - `auth-flows.test.ts` - Core authentication flows
+    - `session-management.test.ts` - Session lifecycle and tokens
+    - `error-handling.test.ts` - Error scenarios
+    - `oauth.test.ts` - OAuth provider flows
+    - `otp.test.ts` - OTP/magic link authentication
+    - `user-management.test.ts` - User profile operations
+    - `stack-auth-helpers.test.ts` - JWT and error utilities
+    - `supabase-compatibility.test.ts` - Interface compatibility verification
+    - `msw-setup.ts` - MSW server configuration
+    - `msw-handlers.ts` - Mock HTTP endpoints
+  - `src/client/` - NeonClient tests (legacy)
+- Run tests with: `bun test`
+
+### Adding Tests
+
+1. Create adapter with `tokenStore: 'memory'`:
+   ```typescript
+   const adapter = new StackAuthAdapter({
+     projectId: 'test-project',
+     publishableClientKey: 'test-key',
+     tokenStore: 'memory',  // Node.js compatibility
+   });
+   ```
+
+2. Set up test fixtures in `beforeEach()`:
+   ```typescript
+   server.use(...stackAuthHandlers);
+   resetMockDatabase();
+   // Fresh adapter instance = clean session
+   ```
+
+3. Write assertions for Supabase-compatible behavior
+
+See `src/auth/__tests__/README.md` for detailed testing documentation.
 
 ## Key Implementation Notes
 

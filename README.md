@@ -96,6 +96,57 @@ const { data } = await client.auth.getSession();
 const { data: items } = await client.from('items').select();
 ```
 
+## Environment Support
+
+The SDK works in both browser and Node.js environments:
+
+### Browser
+
+```typescript
+// Full feature support including cross-tab sync
+import { createClient } from 'neon-js';
+
+const client = createClient({
+  url: 'https://your-api.com',
+  auth: {
+    projectId: 'your-project-id',
+    publishableClientKey: 'pk_...',
+    tokenStore: 'cookie', // Use cookies in browser
+  },
+});
+```
+
+### Node.js
+
+```typescript
+// All auth methods work, cross-tab features automatically disabled
+import { createClient } from 'neon-js';
+
+const client = createClient({
+  url: 'https://your-api.com',
+  auth: {
+    projectId: 'your-project-id',
+    publishableClientKey: 'pk_...',
+    tokenStore: 'memory', // Use memory storage in Node.js
+  },
+});
+```
+
+### Server-Side (with secret key)
+
+```typescript
+import { createClient } from 'neon-js';
+
+const client = createClient({
+  url: 'https://your-api.com',
+  auth: {
+    projectId: 'your-project-id',
+    secretServerKey: 'sk_...', // Server key for server-side operations
+    tokenStore: 'memory',
+  },
+});
+```
+
 ## Architecture
 
 - **AuthClient Interface**: Supabase-compatible authentication interface

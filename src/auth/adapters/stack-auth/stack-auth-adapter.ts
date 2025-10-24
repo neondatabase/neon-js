@@ -18,6 +18,9 @@ import type {
   StackAuthClient,
   OnAuthStateChangeConfig,
 } from '@/auth/adapters/stack-auth/stack-auth-types';
+import { supportsBroadcastChannel } from '@/auth/adapters/stack-auth/stack-auth-helpers';
+import type { ProviderType } from '@stackframe/stack-shared/dist/utils/oauth';
+import type { ReadonlyJson } from '@stackframe/stack-shared/dist/utils/json';
 
 /**
  * Type guard to check if Stack Auth user has internal session access
@@ -38,6 +41,24 @@ function hasInternalSession(
     typeof user._internalSession.getAccessTokenIfNotExpiredYet === 'function' &&
     '_refreshToken' in user._internalSession
   );
+}
+
+/**
+ * Helper to convert signedUpAt (string or Date) to ISO string
+ * Stack Auth SDK may return dates as strings or Date objects depending on context
+ */
+function toISOString(date: string | Date | number | undefined | null): string {
+  if (!date) {
+    return new Date().toISOString(); // Fallback to current time
+  }
+  if (typeof date === 'string') {
+    return date; // Already ISO string
+  }
+  if (typeof date === 'number') {
+    return new Date(date).toISOString(); // Convert timestamp to ISO string
+  }
+  // Date object
+  return date.toISOString();
 }
 
 /**
@@ -63,45 +84,102 @@ function normalizeStackAuthError(
     const stackError = error as StackAuthErrorResponse;
     const message = stackError.error.message || 'Authentication failed';
 
-    // Map common error messages to Supabase error codes
+    // Use httpStatus from response if available, otherwise infer from message
+    let status = stackError.httpStatus || 400;
     let code = 'unknown_error';
-    let status = 400;
 
-    if (
-      message.includes('Invalid login credentials') ||
-      message.includes('incorrect')
-    ) {
-      code = 'invalid_credentials';
-      status = 400;
-    } else if (
-      message.includes('already exists') ||
-      message.includes('already registered')
-    ) {
-      code = 'user_already_exists';
-      status = 422;
-    } else if (message.includes('not found')) {
-      code = 'user_not_found';
-      status = 404;
-    } else if (message.includes('token') && message.includes('invalid')) {
-      code = 'bad_jwt';
-      status = 401;
-    } else if (message.includes('token') && message.includes('expired')) {
-      code = 'bad_jwt';
-      status = 401;
-    } else if (message.includes('rate limit')) {
+    // Map HTTP status codes to error codes
+    if (status === 429) {
       code = 'over_request_rate_limit';
-      status = 429;
-    } else if (message.includes('email') && message.includes('invalid')) {
-      code = 'email_address_invalid';
-      status = 400;
+    } else if (status === 422) {
+      code = 'user_already_exists';
+    } else if (status === 404) {
+      code = 'user_not_found';
+    } else if (status === 401) {
+      code = 'bad_jwt';
+    } else {
+      // Fall back to message-based detection if no httpStatus or it's generic
+      if (
+        message.includes('Invalid login credentials') ||
+        message.includes('incorrect')
+      ) {
+        code = 'invalid_credentials';
+        status = 400;
+      } else if (
+        message.includes('already exists') ||
+        message.includes('already registered')
+      ) {
+        code = 'user_already_exists';
+        status = 422;
+      } else if (message.includes('not found')) {
+        code = 'user_not_found';
+        status = 404;
+      } else if (message.includes('token') && message.includes('invalid')) {
+        code = 'bad_jwt';
+        status = 401;
+      } else if (message.includes('token') && message.includes('expired')) {
+        code = 'bad_jwt';
+        status = 401;
+      } else if (
+        message.includes('rate limit') ||
+        message.includes('Too many requests')
+      ) {
+        code = 'over_request_rate_limit';
+        status = 429;
+      } else if (message.includes('email') && message.includes('invalid')) {
+        code = 'email_address_invalid';
+        status = 400;
+      }
     }
 
     return new AuthApiError(message, status, code);
   }
 
-  // Handle standard errors
+  // Handle standard Error objects (Stack Auth SDK might throw these)
   if (error instanceof Error) {
-    return new AuthError(error.message, 500, 'unexpected_failure');
+    const message = error.message;
+    let status = 500;
+    let code = 'unexpected_failure';
+
+    // Parse error message to determine status and code
+    if (
+      message.includes('already exists') ||
+      message.includes('already registered')
+    ) {
+      status = 422;
+      code = 'user_already_exists';
+    } else if (
+      message.includes('Invalid login credentials') ||
+      message.includes('incorrect')
+    ) {
+      status = 400;
+      code = 'invalid_credentials';
+    } else if (message.includes('not found')) {
+      status = 404;
+      code = 'user_not_found';
+    } else if (message.includes('token') && message.includes('invalid')) {
+      status = 401;
+      code = 'bad_jwt';
+    } else if (message.includes('token') && message.includes('expired')) {
+      status = 401;
+      code = 'bad_jwt';
+    } else if (
+      message.includes('rate limit') ||
+      message.includes('Too many requests') ||
+      message.includes('too many requests')
+    ) {
+      status = 429;
+      code = 'over_request_rate_limit';
+    } else if (message.includes('email') && message.includes('invalid')) {
+      status = 400;
+      code = 'email_address_invalid';
+    }
+
+    // Use AuthApiError for API-related errors (non-500 status)
+    if (status !== 500) {
+      return new AuthApiError(message, status, code);
+    }
+    return new AuthError(message, status, code);
   }
 
   // Fallback
@@ -126,6 +204,7 @@ export class StackAuthAdapter<
   private stateChangeEmitters = new Map<string, Subscription>();
   private broadcastChannel: InstanceType<typeof BroadcastChannel> | null = null;
   private tokenRefreshCheckInterval: NodeJS.Timeout | null = null;
+  private _forceSlowPath = false; // Force getSession to fetch fresh user data
   private config: OnAuthStateChangeConfig = {
     enableTokenRefreshDetection: true, // Enabled by default (matches Supabase)
     tokenRefreshCheckInterval: 30_000, // 30 seconds (matches Supabase)
@@ -174,10 +253,17 @@ export class StackAuthAdapter<
     try {
       // Handle email/password sign-up
       if ('email' in credentials && credentials.email && credentials.password) {
+        // Stack Auth requires verificationCallbackUrl in non-browser environments
+        const verificationCallbackUrl =
+          credentials.options?.emailRedirectTo ||
+          (this.stackAuth as any).urls?.emailVerification ||
+          'http://localhost:3000/email-verification'; // Fallback for testing
+
         const result = await this.stackAuth.signUpWithCredential({
           email: credentials.email,
           password: credentials.password,
           noRedirect: true,
+          verificationCallbackUrl,
         });
 
         if (result.status === 'error') {
@@ -187,8 +273,21 @@ export class StackAuthAdapter<
           };
         }
 
-        // Get session after sign-up (includes user from token)
+        // Set user metadata after signup if provided
+        // Stack Auth's signUpWithCredential doesn't support metadata parameter
+        if (credentials.options?.data) {
+          const user = await this.stackAuth.getUser();
+          if (user) {
+            await user.update({
+              clientMetadata: credentials.options.data as ReadonlyJson,
+            });
+          }
+        }
+
+        // Force getSession to fetch fresh user data (not use cached tokens without metadata)
+        this._forceSlowPath = true;
         const sessionResult = await this.getSession();
+        this._forceSlowPath = false;
 
         if (!sessionResult.data.session?.user) {
           return {
@@ -274,8 +373,10 @@ export class StackAuthAdapter<
           };
         }
 
-        // Get session (includes user from token)
+        // Force getSession to fetch fresh user data (not use cached tokens without metadata)
+        this._forceSlowPath = true;
         const sessionResult = await this.getSession();
+        this._forceSlowPath = false;
 
         if (!sessionResult.data.session?.user) {
           return {
@@ -368,10 +469,17 @@ export class StackAuthAdapter<
 
       // Handle email OTP/Magic Link
       if ('email' in credentials && credentials.email) {
+        // Stack Auth requires callbackUrl in non-browser environments
+        // Use provided emailRedirectTo or fall back to configured magicLinkCallback URL
+        const callbackUrl =
+          credentials.options?.emailRedirectTo ||
+          (this.stackAuth as any).urls?.magicLinkCallback ||
+          'http://localhost:3000/magic-link-callback'; // Final fallback for testing
+
         const result = await this.stackAuth.sendMagicLinkEmail(
           credentials.email,
           {
-            callbackUrl: credentials.options?.emailRedirectTo,
+            callbackUrl,
           }
         );
 
@@ -902,32 +1010,36 @@ export class StackAuthAdapter<
     try {
       let session: Session | null = null;
 
-      // Step 1: Try to get cached tokens (no network request)
-      const cachedTokens = await this._getCachedTokensFromStackAuthInternals();
-      if (cachedTokens?.accessToken) {
-        const payload = accessTokenSchema.parse(
-          JSON.parse(atob(cachedTokens.accessToken.split('.')[1]))
-        );
+      // Step 1: Try to get cached tokens (unless forced to skip for fresh metadata)
+      if (!this._forceSlowPath) {
+        const cachedTokens = await this._getCachedTokensFromStackAuthInternals();
+        if (cachedTokens?.accessToken) {
+          const payload = accessTokenSchema.parse(
+            JSON.parse(atob(cachedTokens.accessToken.split('.')[1]))
+          );
 
-        session = {
-          access_token: cachedTokens.accessToken,
-          // ATTENTION: we allow sessions without refresh token
-          refresh_token: cachedTokens.refreshToken ?? '',
-          expires_at: payload.exp,
-          expires_in: Math.max(0, payload.exp - Math.floor(Date.now() / 1000)),
-          token_type: 'bearer' as const,
-          user: {
-            id: payload.sub,
-            email: payload.email || '',
-            created_at: new Date(payload.iat * 1000).toISOString(),
-            aud: 'authenticated',
-            role: 'authenticated',
-            app_metadata: {},
-            user_metadata: {},
-          },
-        };
-      } else {
-        // Step 2: Fallback - fetch user (makes network request and auto refreshes tokens)
+          session = {
+            access_token: cachedTokens.accessToken,
+            // ATTENTION: we allow sessions without refresh token
+            refresh_token: cachedTokens.refreshToken ?? '',
+            expires_at: payload.exp,
+            expires_in: Math.max(0, payload.exp - Math.floor(Date.now() / 1000)),
+            token_type: 'bearer' as const,
+            user: {
+              id: payload.sub,
+              email: payload.email || '',
+              created_at: new Date(payload.iat * 1000).toISOString(),
+              aud: 'authenticated',
+              role: 'authenticated',
+              app_metadata: {},
+              user_metadata: {},
+            },
+          };
+        }
+      }
+
+      // Step 2: Fallback - fetch user (makes network request and auto refreshes tokens)
+      if (!session) {
         const user = await this.stackAuth.getUser();
         if (user) {
           const tokens = await user.currentSession.getTokens();
@@ -950,11 +1062,11 @@ export class StackAuthAdapter<
                 id: user.id,
                 email: user.primaryEmail || '',
                 email_confirmed_at: user.primaryEmailVerified
-                  ? user.signedUpAt.toISOString()
+                  ? toISOString(user.signedUpAt)
                   : undefined,
-                last_sign_in_at: user.signedUpAt.toISOString(),
-                created_at: user.signedUpAt.toISOString(),
-                updated_at: user.signedUpAt.toISOString(),
+                last_sign_in_at: toISOString(user.signedUpAt),
+                created_at: toISOString(user.signedUpAt),
+                updated_at: toISOString(user.signedUpAt),
                 aud: 'authenticated',
                 role: 'authenticated',
                 app_metadata: user.clientReadOnlyMetadata,
@@ -1047,22 +1159,24 @@ export class StackAuthAdapter<
             role: 'authenticated',
             email: user.primaryEmail || '',
             email_confirmed_at: user.primaryEmailVerified
-              ? user.signedUpAt.toISOString()
+              ? toISOString(user.signedUpAt)
               : undefined,
             phone: undefined,
             confirmed_at: user.primaryEmailVerified
-              ? user.signedUpAt.toISOString()
+              ? toISOString(user.signedUpAt)
               : undefined,
-            last_sign_in_at: user.signedUpAt.toISOString(),
+            last_sign_in_at: toISOString(user.signedUpAt),
             app_metadata: {},
             user_metadata: {
-              displayName: user.displayName,
-              profileImageUrl: user.profileImageUrl,
               ...user.clientMetadata,
+              ...(user.displayName ? { displayName: user.displayName } : {}),
+              ...(user.profileImageUrl
+                ? { profileImageUrl: user.profileImageUrl }
+                : {}),
             },
             identities: [],
-            created_at: user.signedUpAt.toISOString(),
-            updated_at: user.signedUpAt.toISOString(),
+            created_at: toISOString(user.signedUpAt),
+            updated_at: toISOString(user.signedUpAt),
           },
         },
         error: null,
@@ -1224,6 +1338,16 @@ export class StackAuthAdapter<
         throw new Error('Failed to retrieve updated user');
       }
 
+      const user_metadata = {
+        ...updatedUser.clientMetadata,
+        ...(updatedUser.displayName
+          ? { displayName: updatedUser.displayName }
+          : {}),
+        ...(updatedUser.profileImageUrl
+          ? { profileImageUrl: updatedUser.profileImageUrl }
+          : {}),
+      };
+
       const data = {
         user: {
           id: updatedUser.id,
@@ -1231,22 +1355,18 @@ export class StackAuthAdapter<
           role: 'authenticated',
           email: updatedUser.primaryEmail || '',
           email_confirmed_at: updatedUser.primaryEmailVerified
-            ? updatedUser.signedUpAt.toISOString()
+            ? toISOString(updatedUser.signedUpAt)
             : undefined,
           phone: undefined,
           confirmed_at: updatedUser.primaryEmailVerified
-            ? updatedUser.signedUpAt.toISOString()
+            ? toISOString(updatedUser.signedUpAt)
             : undefined,
-          last_sign_in_at: updatedUser.signedUpAt.toISOString(),
+          last_sign_in_at: toISOString(updatedUser.signedUpAt),
           app_metadata: {},
-          user_metadata: {
-            displayName: updatedUser.displayName,
-            profileImageUrl: updatedUser.profileImageUrl,
-            ...updatedUser.clientMetadata,
-          },
+          user_metadata,
           identities: [],
-          created_at: updatedUser.signedUpAt.toISOString(),
-          updated_at: updatedUser.signedUpAt.toISOString(),
+          created_at: toISOString(updatedUser.signedUpAt),
+          updated_at: toISOString(updatedUser.signedUpAt),
         },
       };
 
@@ -1302,9 +1422,9 @@ export class StackAuthAdapter<
         },
         // Stack Auth doesn't provide timestamps for OAuth connections,
         // so we use the user's sign-up time as a fallback
-        created_at: user.signedUpAt.toISOString(),
-        last_sign_in_at: user.signedUpAt.toISOString(),
-        updated_at: user.signedUpAt.toISOString(),
+        created_at: toISOString(user.signedUpAt),
+        last_sign_in_at: toISOString(user.signedUpAt),
+        updated_at: toISOString(user.signedUpAt),
       }));
 
       return {
@@ -1343,7 +1463,8 @@ export class StackAuthAdapter<
         ? credentials.options.scopes.split(' ')
         : undefined;
 
-      await user.getConnectedAccount(credentials.provider as any, {
+      // requires type assertion, because the Providers supported by Supabase and StackAuth are not 100% the same
+      await user.getConnectedAccount(credentials.provider as ProviderType, {
         or: 'redirect',
         scopes,
       });
@@ -1717,21 +1838,31 @@ export class StackAuthAdapter<
 
   private initializeBroadcastChannel(): void {
     // Check if BroadcastChannel is available (browser only)
-    if (typeof BroadcastChannel === 'undefined') {
+    if (!supportsBroadcastChannel()) {
       return;
     }
 
     // Create channel if not exists
     if (!this.broadcastChannel) {
-      this.broadcastChannel = new BroadcastChannel('stack-auth-state-changes');
+      try {
+        this.broadcastChannel = new BroadcastChannel(
+          'stack-auth-state-changes'
+        );
 
-      // Listen for messages from other tabs
-      this.broadcastChannel.onmessage = async (event: MessageEvent) => {
-        const { event: authEvent, session } = event.data;
+        // Listen for messages from other tabs
+        this.broadcastChannel.onmessage = async (event: MessageEvent) => {
+          const { event: authEvent, session } = event.data;
 
-        // Emit event locally (do not broadcast back)
-        await this.notifyAllSubscribers(authEvent, session, false);
-      };
+          // Emit event locally (do not broadcast back)
+          await this.notifyAllSubscribers(authEvent, session, false);
+        };
+      } catch (error) {
+        // BroadcastChannel creation failed (shouldn't happen if supportsBroadcastChannel() returned true)
+        console.error(
+          'Failed to create BroadcastChannel, cross-tab sync will not be available:',
+          error
+        );
+      }
     }
   }
 
