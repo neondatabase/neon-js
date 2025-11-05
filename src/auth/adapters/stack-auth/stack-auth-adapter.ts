@@ -10,7 +10,11 @@ import {
   type StackServerAppConstructorOptions,
 } from '@stackframe/js';
 import type { InternalSession } from '@stackframe/stack-shared/dist/sessions';
-import { accessTokenSchema } from '@/auth/adapters/stack-auth/stack-auth-schemas';
+import { accessTokenSchema } from '@/auth/adapters/shared-schemas';
+import {
+  supportsBroadcastChannel,
+  toISOString,
+} from '@/auth/adapters/shared-helpers';
 import type {
   StackAuthUserWithInternalSession,
   StackAuthErrorResponse,
@@ -18,7 +22,6 @@ import type {
   StackAuthClient,
   OnAuthStateChangeConfig,
 } from '@/auth/adapters/stack-auth/stack-auth-types';
-import { supportsBroadcastChannel } from '@/auth/adapters/stack-auth/stack-auth-helpers';
 import type { ProviderType } from '@stackframe/stack-shared/dist/utils/oauth';
 import type { ReadonlyJson } from '@stackframe/stack-shared/dist/utils/json';
 
@@ -41,24 +44,6 @@ function hasInternalSession(
     typeof user._internalSession.getAccessTokenIfNotExpiredYet === 'function' &&
     '_refreshToken' in user._internalSession
   );
-}
-
-/**
- * Helper to convert signedUpAt (string or Date) to ISO string
- * Stack Auth SDK may return dates as strings or Date objects depending on context
- */
-function toISOString(date: string | Date | number | undefined | null): string {
-  if (!date) {
-    return new Date().toISOString(); // Fallback to current time
-  }
-  if (typeof date === 'string') {
-    return date; // Already ISO string
-  }
-  if (typeof date === 'number') {
-    return new Date(date).toISOString(); // Convert timestamp to ISO string
-  }
-  // Date object
-  return date.toISOString();
 }
 
 /**
@@ -227,6 +212,9 @@ export class StackAuthAdapter<
 
   // MFA API
   mfa: AuthClient['mfa'] = undefined as never;
+
+  // OAuth API
+  oauth: AuthClient['oauth'] = undefined as never;
 
   // Initialization
   initialize: AuthClient['initialize'] = async () => {
@@ -1986,6 +1974,8 @@ export class StackAuthAdapter<
       };
     }
   };
+
+  isThrowOnErrorEnabled: AuthClient['isThrowOnErrorEnabled'] = () => false;
 
   // Auto refresh
   startAutoRefresh: AuthClient['startAutoRefresh'] = async () => {

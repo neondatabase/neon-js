@@ -19,9 +19,6 @@ export type {
   AdminUserAttributes,
 } from '@supabase/auth-js';
 
-// Export Stack Auth adapter
-export { StackAuthAdapter } from '@/auth/adapters/stack-auth/stack-auth-adapter';
-
 // Export NeonClient and factory
 export { NeonClient } from '@/client/neon-client';
 export {

@@ -1,22 +1,27 @@
-import { BetterAuthAdapter } from '@/auth/adapters/better-auth/better-auth-adapter';
+import { StackAuthAdapter } from '@/auth/adapters/stack-auth/stack-auth-adapter';
 import { fetchWithAuth } from '@/client/fetch-with-auth';
 import {
   NeonClient,
   type DefaultSchemaName,
   type NeonClientConstructorOptions,
 } from '@/client/neon-client';
-import type { BetterAuthClientOptions } from 'better-auth/client';
-import type { OnAuthStateChangeConfig } from '@/auth/adapters/better-auth/better-auth-types';
+import type {
+  StackClientAppConstructorOptions,
+  StackServerAppConstructorOptions,
+} from '@stackframe/js';
 
-// Support Better Auth options with optional configuration
-export type BetterAuthOptions = BetterAuthClientOptions & {
-  config?: OnAuthStateChangeConfig;
-};
+// Support both client and server Stack Auth options
+type StackAuthOptions<
+  HasTokenStore extends boolean = boolean,
+  ProjectId extends string = string,
+> =
+  | StackClientAppConstructorOptions<HasTokenStore, ProjectId>
+  | StackServerAppConstructorOptions<HasTokenStore, ProjectId>;
 
 // Public-facing options for createClient (options only)
 export type CreateClientOptions<SchemaName> =
   NeonClientConstructorOptions<SchemaName> & {
-    auth: BetterAuthOptions;
+    auth: StackAuthOptions;
   };
 
 /**
@@ -34,17 +39,13 @@ export function createClient<
   auth: authOptions,
   options,
 }: CreateClientOptions<SchemaName>): NeonClient<Database, SchemaName> {
-  // Step 1: Extract config if provided
-  const { config, ...betterAuthParams } = authOptions;
+  // Step 1: Instantiate auth adapter from options
+  const auth = new StackAuthAdapter(authOptions);
 
-  // Step 2: Instantiate auth adapter from options
-  const auth = new BetterAuthAdapter(betterAuthParams, config);
-
-  // Step 3: Create lazy token accessor - called on every request
+  // Step 2: Create lazy token accessor - called on every request
   // Returns null if no session (will throw AuthRequiredError in fetchWithAuth)
   const getAccessToken = async (): Promise<string | null> => {
     const { data, error } = await auth.getSession();
-    console.log('data', data);
 
     if (error || !data.session) {
       return null;
@@ -53,10 +54,10 @@ export function createClient<
     return data.session.access_token;
   };
 
-  // Step 4: Create auth-aware fetch wrapper
+  // Step 3: Create auth-aware fetch wrapper
   const authFetch = fetchWithAuth(getAccessToken, options?.global?.fetch);
 
-  // Step 5: Create client with auth options
+  // Step 4: Create client with auth options
   const client = new NeonClient<Database, SchemaName>({
     url,
     options: {
@@ -68,7 +69,7 @@ export function createClient<
     },
   });
 
-  // Step 6: Assign the instantiated auth client
+  // Step 5: Assign the instantiated auth client
   client.auth = auth;
 
   return client;
