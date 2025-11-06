@@ -160,24 +160,16 @@ export function mapBetterAuthSessionToSupabase(
   const now = Math.floor(Date.now() / 1000);
   const expiresIn = Math.max(0, expiresAt - now);
 
-  // Decode JWT to get additional claims if needed
-  let tokenClaims: Record<string, unknown> = {};
-  try {
-    const tokenParts = betterAuthSession.token.split('.');
-    if (tokenParts.length === 3) {
-      tokenClaims = JSON.parse(atob(tokenParts[1]));
-    }
-  } catch {
-    // If token decoding fails, continue with defaults
-  }
-
+  // Note: betterAuthSession.token is an OPAQUE token (random string), not a JWT
+  // We cannot decode it to extract claims. Better Auth stores session data server-side.
+  // The adapter will replace this with the JWT token when available for Supabase compatibility
   const session: Session = {
-    access_token: betterAuthSession.token,
+    access_token: betterAuthSession.token, // Opaque token (will be replaced with JWT by adapter)
     refresh_token: betterAuthSession.refreshToken || '',
     expires_at: expiresAt,
     expires_in: expiresIn,
     token_type: 'bearer' as const,
-    user: mapBetterAuthUserToSupabase(betterAuthUser, tokenClaims),
+    user: mapBetterAuthUserToSupabase(betterAuthUser),
   };
 
   return session;
@@ -187,8 +179,7 @@ export function mapBetterAuthSessionToSupabase(
  * Map Better Auth user to Supabase User format
  */
 export function mapBetterAuthUserToSupabase(
-  betterAuthUser: BetterAuthUser,
-  tokenClaims?: Record<string, unknown>
+  betterAuthUser: BetterAuthUser
 ): User {
   const createdAt = toISOString(betterAuthUser.createdAt);
   const updatedAt = toISOString(betterAuthUser.updatedAt);

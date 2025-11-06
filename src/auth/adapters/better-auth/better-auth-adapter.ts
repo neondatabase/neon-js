@@ -70,6 +70,13 @@ export class BetterAuthAdapter implements AuthClient {
   };
   private lastSessionState: Session | null = null;
 
+  // JWT token caching (short-lived to reduce network calls)
+  private jwtCache = {
+    token: null as string | null,
+    cachedAt: 0,
+    durationMs: 30_000, // 30 seconds
+  };
+
   constructor(
     betterAuthClientOptions: BetterAuthClientOptions,
     config?: OnAuthStateChangeConfig
@@ -86,6 +93,64 @@ export class BetterAuthAdapter implements AuthClient {
 
     // Set up session change listener for Better Auth's reactive system
     this.setupSessionListener();
+  }
+
+  /**
+   * Get session from Better Auth's useSession nanostore atom
+   * This is a synchronous read from the cached atom state (no network request)
+   */
+  private _getSessionFromAtom(): Session | null {
+    try {
+      // Read from useSession atom (synchronous, no network call)
+      const atomValue = this.betterAuth.useSession.get();
+
+      // Check if session data exists in atom
+      if (!atomValue?.data?.session || !atomValue?.data?.user) {
+        return null;
+      }
+
+      // Map Better Auth session to Supabase format
+      const session = mapBetterAuthSessionToSupabase(
+        atomValue.data.session,
+        atomValue.data.user
+      );
+
+      // Replace opaque token with JWT if available in cache
+      // This makes it more Supabase-compatible (their access_token IS a JWT)
+      if (session && this.jwtCache.token) {
+        const now = Date.now();
+        if (now - this.jwtCache.cachedAt < this.jwtCache.durationMs) {
+          session.access_token = this.jwtCache.token;
+        }
+      }
+
+      return session;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Check if a session is expired
+   * Uses the session's expires_at timestamp (not the opaque token)
+   * Note: session.access_token is an OPAQUE token, not a JWT, so we can't decode it
+   */
+  private _isSessionExpired(session: Session | null): boolean {
+    if (!session?.expires_at) return true;
+
+    const now = Math.floor(Date.now() / 1000);
+
+    // 10 second buffer for clock skew
+    return session.expires_at <= now + 10;
+  }
+
+  /**
+   * Clear the cached JWT token
+   * Called when auth state changes (sign-in, sign-out, etc.)
+   */
+  private _clearJwtCache(): void {
+    this.jwtCache.token = null;
+    this.jwtCache.cachedAt = 0;
   }
 
   // Admin API
@@ -116,9 +181,29 @@ export class BetterAuthAdapter implements AuthClient {
 
   getSession: AuthClient['getSession'] = async () => {
     try {
-      console.log('getSession');
-      // Direct 1:1 mapping: Supabase getSession -> Better Auth getSession
-      const response = await this.betterAuth.getSession();
+      // Fast Path: Read from nanostore atom (cached, synchronous)
+      const cachedSession = this._getSessionFromAtom();
+
+      if (cachedSession && !this._isSessionExpired(cachedSession)) {
+        return { data: { session: cachedSession }, error: null };
+      }
+
+      // Slow Path: Fetch fresh session (network request)
+      // This also updates the useSession atom automatically
+      // Note: Better Auth includes JWT in 'set-auth-jwt' header if JWT plugin is enabled
+      const response = await this.betterAuth.getSession({
+        fetchOptions: {
+          onSuccess: (ctx) => {
+            // Extract JWT from response header and cache it
+            // This avoids needing to call /token endpoint separately
+            const jwt = ctx.response.headers.get('set-auth-jwt');
+            if (jwt) {
+              this.jwtCache.token = jwt;
+              this.jwtCache.cachedAt = Date.now();
+            }
+          },
+        },
+      });
 
       if (response.error) {
         return {
@@ -140,21 +225,16 @@ export class BetterAuthAdapter implements AuthClient {
         return { data: { session: null }, error: null };
       }
 
+      // Replace opaque token with JWT if we cached it from the header
+      // This makes the session.access_token a JWT (Supabase-compatible)
+      if (this.jwtCache.token) {
+        session.access_token = this.jwtCache.token;
+      }
+
       return { data: { session }, error: null };
     } catch (error) {
       return {
         data: { session: null },
-        error: normalizeBetterAuthError(error),
-      };
-    }
-  };
-
-  getJwtToken = async () => {
-    try {
-      return await this.betterAuth.token();
-    } catch (error) {
-      return {
-        data: null,
         error: normalizeBetterAuthError(error),
       };
     }
@@ -1380,6 +1460,15 @@ export class BetterAuthAdapter implements AuthClient {
     session: Session | null,
     broadcast = true
   ): Promise<void> {
+    // Clear JWT cache on auth state changes that affect tokens
+    if (
+      event === 'SIGNED_IN' ||
+      event === 'SIGNED_OUT' ||
+      event === 'TOKEN_REFRESHED'
+    ) {
+      this._clearJwtCache();
+    }
+
     // Broadcast to other tabs first
     if (broadcast && this.broadcastChannel) {
       try {

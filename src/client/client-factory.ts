@@ -42,14 +42,15 @@ export function createClient<
 
   // Step 3: Create lazy token accessor - called on every request
   // Returns null if no session (will throw AuthRequiredError in fetchWithAuth)
+  // Note: session.access_token contains the JWT (not opaque token) for API authentication
   const getAccessToken = async (): Promise<string | null> => {
-    const { data, error } = await auth.getJwtToken();
+    const { data, error } = await auth.getSession();
 
-    if (error || !data.token) {
+    if (error || !data.session) {
       return null;
     }
 
-    return data.token;
+    return data.session.access_token; // This is the JWT token
   };
 
   // Step 4: Create auth-aware fetch wrapper
