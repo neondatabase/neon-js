@@ -51,12 +51,14 @@ import {
  * Based on: https://www.better-auth.com/docs/guides/supabase-migration-guide
  */
 
-const authConfig = {
+const defaultBetterAuthClientOptions = {
   plugins: [jwtClient(), adminClient(), organizationClient()],
 } satisfies BetterAuthClientOptions;
 
 export class BetterAuthAdapter implements AuthClient {
-  betterAuth: ReturnType<typeof createAuthClient<typeof authConfig>>;
+  private betterAuth: ReturnType<
+    typeof createAuthClient<typeof defaultBetterAuthClientOptions>
+  >;
 
   // Auth state change management
   private stateChangeEmitters = new Map<string, Subscription>();
@@ -69,7 +71,7 @@ export class BetterAuthAdapter implements AuthClient {
   private lastSessionState: Session | null = null;
 
   constructor(
-    params: BetterAuthClientOptions,
+    betterAuthClientOptions: BetterAuthClientOptions,
     config?: OnAuthStateChangeConfig
   ) {
     // Merge config
@@ -78,11 +80,9 @@ export class BetterAuthAdapter implements AuthClient {
     }
 
     this.betterAuth = createAuthClient({
-      ...params,
-      plugins: [jwtClient(), adminClient(), organizationClient()],
+      ...betterAuthClientOptions,
+      ...defaultBetterAuthClientOptions,
     });
-
-    this.betterAuth.token();
 
     // Set up session change listener for Better Auth's reactive system
     this.setupSessionListener();
@@ -116,6 +116,7 @@ export class BetterAuthAdapter implements AuthClient {
 
   getSession: AuthClient['getSession'] = async () => {
     try {
+      console.log('getSession');
       // Direct 1:1 mapping: Supabase getSession -> Better Auth getSession
       const response = await this.betterAuth.getSession();
 
@@ -141,7 +142,6 @@ export class BetterAuthAdapter implements AuthClient {
 
       return { data: { session }, error: null };
     } catch (error) {
-      console.error('Error getting session:', error);
       return {
         data: { session: null },
         error: normalizeBetterAuthError(error),
@@ -151,10 +151,12 @@ export class BetterAuthAdapter implements AuthClient {
 
   getJwtToken = async () => {
     try {
-      const token = await this.betterAuth.token();
-      return token;
+      return await this.betterAuth.token();
     } catch (error) {
-      return null;
+      return {
+        data: null,
+        error: normalizeBetterAuthError(error),
+      };
     }
   };
 
