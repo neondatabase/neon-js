@@ -5,19 +5,33 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 This is a unified TypeScript SDK for Neon services, providing seamless integration with **Neon Auth** (authentication service) and **Neon Data API** (PostgreSQL database queries). The SDK uses an adapter pattern to support multiple authentication providers while maintaining a Supabase-compatible interface for easy migration and familiar developer experience.
 
+**Current Status**: The project now features a **Better Auth adapter** as the primary authentication provider, alongside the Stack Auth adapter for backward compatibility.
+
 ## Architecture
 - **Core Interface**: `src/auth/auth-interface.ts` defines the `AuthClient` interface for Neon Auth, maintaining Supabase API compatibility to enable seamless migration from Supabase projects
 - **Adapter Pattern**: Authentication providers implement the `AuthClient` interface
 - **Adapters**: Located in `src/auth/adapters/`
-  - `src/auth/adapters/stack-auth/` - Stack Auth provider adapter directory
+  - **Better Auth** (Primary): `src/auth/adapters/better-auth/`
+    - `better-auth-adapter.ts` - Main adapter implementation (46KB, ~1500 lines)
+    - `better-auth-types.ts` - TypeScript type definitions and interfaces
+    - `better-auth-schemas.ts` - Zod schemas for validation
+    - `better-auth-helpers.ts` - Helper utilities for session mapping and error handling
+    - `better-auth-docs.md` - Comprehensive adapter documentation
+    - `better-auth-plugins.md` - Plugin configuration guide
+    - `better-auth-checklist.md` - Implementation checklist
+  - **Stack Auth** (Legacy): `src/auth/adapters/stack-auth/`
     - `stack-auth-adapter.ts` - Main adapter implementation (2000+ lines, all methods implemented)
     - `stack-auth-types.ts` - TypeScript type definitions and interfaces
     - `stack-auth-schemas.ts` - Zod schemas for JWT validation
     - `stack-auth-helpers.ts` - Helper utilities for JWT decoding and error handling
+  - **Shared Utilities**:
+    - `shared-helpers.ts` - Common helper functions across adapters
+    - `shared-schemas.ts` - Shared Zod schemas
 - **Utilities**: `src/auth/utils.ts` - Shared utility functions (e.g., `toISOString()` for date conversion)
 - **Client Layer**: `src/client/` contains the unified client
   - `neon-client.ts` - Main NeonClient class (extends PostgrestClient)
-  - `client-factory.ts` - Factory function `createClient()` for creating authenticated NeonClient instances
+  - `client-factory.ts` - Factory function `createClient()` using Better Auth adapter
+  - `client-factory_stack_auth.ts` - Legacy Stack Auth factory implementation
   - `neon-client.test.ts` - Client tests
   - `fetch-with-auth.ts` - Auth-aware fetch wrapper for automatic token injection
 - **CLI Tool**: `src/cli/` contains command-line interface utilities
@@ -42,6 +56,59 @@ This is a unified TypeScript SDK for Neon services, providing seamless integrati
 When running tests with `bun test`, MSW (Mock Service Worker) may fail to intercept HTTP requests due to Bun's fetch implementation interfering with Node.js runtime. Use `bun test:node` or `npx vitest` for reliable test execution with proper mocking.
 
 
+
+## Better Auth Adapter (Primary)
+
+The Better Auth adapter provides a direct 1:1 mapping from Supabase Auth API to Better Auth, following the [official Better Auth Supabase Migration Guide](https://www.better-auth.com/docs/guides/supabase-migration-guide).
+
+### Key Mappings:
+
+**Authentication:**
+- `signUp` → `betterAuth.signUp.email()`
+- `signInWithPassword` → `betterAuth.signIn.email()`
+- `signInWithOAuth` → `betterAuth.signIn.social()`
+- `signInWithOtp` → `betterAuth.signIn.email()` (magic link)
+- `signOut` → `betterAuth.signOut()`
+
+**Session Management:**
+- `getSession` → `betterAuth.getSession()`
+- `getUser` → `betterAuth.getSession()` (extract user)
+
+**User Management:**
+- `updateUser` → `betterAuth.user.update()`
+- `getUserIdentities` → `betterAuth.account.list()`
+- `linkIdentity` → `betterAuth.linkSocial()`
+- `unlinkIdentity` → `betterAuth.account.unlink()`
+
+**Password Management:**
+- `resetPasswordForEmail` → `betterAuth.forgetPassword()`
+
+### Plugin Configuration:
+
+The adapter uses Better Auth's plugin system with three default plugins:
+- `jwtClient()` - JWT token management
+- `adminClient()` - Admin API access
+- `organizationClient()` - Multi-tenancy support
+
+### Environment Compatibility:
+
+Works in both browser and Node.js with graceful degradation:
+- **Browser**: Full feature support including cross-tab sync via BroadcastChannel
+- **Node.js**: Core auth works, browser-only features auto-disabled
+
+### Implementation Details:
+
+The adapter implements sophisticated state management:
+- **Token refresh detection**: Automatic polling (30s interval) to detect token refreshes
+- **Cross-tab synchronization**: BroadcastChannel for auth state sync across tabs (browser only)
+- **Event system**: `onAuthStateChange()` for monitoring `SIGNED_IN`, `SIGNED_OUT`, `TOKEN_REFRESHED`, `USER_UPDATED` events
+- **Session mapping**: Transforms Better Auth sessions to Supabase-compatible format
+
+See `BETTER_AUTH_SIMPLIFICATION.md` for detailed implementation notes and simplification strategy.
+
+## Stack Auth Adapter (Legacy)
+
+**Note**: The Stack Auth adapter is maintained for backward compatibility but is no longer the primary adapter. New projects should use Better Auth.
 
 ## Stack Auth Session Caching
 
@@ -71,17 +138,20 @@ Stack Auth's internal tokens are objects with a `token` property:
 ```
 The adapter extracts these token strings for session management and JWT decoding using Zod schemas.
 
-### Usage with NeonClient:
+### Usage with NeonClient (Better Auth):
 ```typescript
 import { createClient } from 'neon-js';
 
-// Create client with Stack Auth integration
+// Create client with Better Auth integration
 const client = createClient({
   url: 'https://your-api.com',
   auth: {
-    projectId: 'your-project-id',
-    publishableClientKey: 'pk_...',
-    tokenStore: 'cookie', // or 'memory'
+    baseURL: 'https://your-auth-server.com',
+    // Optional: custom configuration
+    config: {
+      enableTokenRefreshDetection: true,
+      tokenRefreshCheckInterval: 30_000,
+    },
   },
   options: {
     // Optional: custom fetch, headers, schema
@@ -94,13 +164,16 @@ const client = createClient({
   },
 });
 
-// Access auth methods
+// Access auth methods (Supabase-compatible API)
 await client.auth.signInWithPassword({ email, password });
 const { data } = await client.auth.getSession();
 
 // Make authenticated API calls (tokens injected automatically)
 const { data: items } = await client.from('items').select();
 ```
+
+### Usage with Stack Auth (Legacy):
+See `src/client/client-factory_stack_auth.ts` for Stack Auth implementation details.
 
 ### Performance Characteristics:
 - **Cached `getSession()`**: <5ms (reads from Stack Auth internal cache, no I/O)
@@ -241,8 +314,8 @@ All unsupported methods provide detailed error messages with suggested alternati
 
 ### Factory Pattern:
 The `createClient()` factory function (located in `src/client/client-factory.ts`) handles the complex initialization sequence:
-1. Instantiates `StackAuthAdapter` from auth options
-2. Creates a lazy `getAccessToken()` function that calls `auth.getSession()`
+1. Instantiates `BetterAuthAdapter` from auth options
+2. Creates a lazy `getAccessToken()` function that calls `auth.getJwtToken()`
 3. Wraps fetch with `fetchWithAuth()` to automatically inject Bearer tokens
 4. Constructs `NeonClient` with the auth-aware fetch and optional configuration (custom headers, fetch, schema)
 5. Assigns the auth adapter to `client.auth` for direct access
@@ -253,7 +326,7 @@ This pattern ensures all PostgrestClient queries automatically include authentic
 ```typescript
 createClient<Database, SchemaName>({
   url: string,
-  auth: StackAuthOptions,
+  auth: BetterAuthOptions,
   options?: {
     global?: {
       fetch?: typeof fetch,
@@ -270,6 +343,8 @@ createClient<Database, SchemaName>({
 - `Database`: Database schema type (defaults to `any`)
 - `SchemaName`: Schema name (defaults to `'public'` if present in Database, otherwise string key)
 
+**Note**: A legacy Stack Auth factory is available at `src/client/client-factory_stack_auth.ts`
+
 ### CLI Tool:
 The package includes a `neon-js` CLI command for generating TypeScript types from database schemas:
 - **Command**: `npx neon-js gen-types --db-url <url> [options]`
@@ -281,7 +356,12 @@ The package includes a `neon-js` CLI command for generating TypeScript types fro
 
 ## Additional Documentation
 
-- **`stack-auth_supabase-comparison.md`**: Comprehensive feature comparison between Stack Auth and Supabase, demonstrating that Stack Auth implements all required features (refresh deduplication, exponential backoff, session validation, user caching) and in many cases provides superior implementations. This document validates the adapter's reliance on Stack Auth's internal mechanisms.
+- **`BETTER_AUTH_SIMPLIFICATION.md`**: Documents the Better Auth adapter simplification strategy, showing the direct 1:1 mappings from Supabase Auth to Better Auth following the official migration guide
+- **`intelligence/stack-auth_supabase-comparison.md`**: Comprehensive feature comparison between Stack Auth and Supabase, demonstrating that Stack Auth implements all required features (refresh deduplication, exponential backoff, session validation, user caching) and in many cases provides superior implementations
+- **`intelligence/auth-feature-comparison.md`**: Detailed comparison of authentication features across providers
+- **`src/auth/adapters/better-auth/better-auth-docs.md`**: Comprehensive Better Auth adapter documentation
+- **`src/auth/adapters/better-auth/better-auth-plugins.md`**: Better Auth plugin configuration guide
+- **`src/auth/adapters/better-auth/better-auth-checklist.md`**: Implementation checklist for the Better Auth adapter
 
 ## Supabase references
 

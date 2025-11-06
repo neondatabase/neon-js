@@ -6,10 +6,10 @@ A unified TypeScript SDK for Neon services, providing seamless integration with 
 
 - **Unified SDK**: Single client for Neon Auth and Neon Data API
 - **Supabase-Compatible**: Drop-in replacement for easy migration from Supabase
-- **Adapter Pattern**: Pluggable authentication providers (Stack Auth included)
+- **Adapter Pattern**: Pluggable authentication providers (Better Auth & Stack Auth included)
 - **Automatic Token Injection**: Auth-aware fetch wrapper for seamless API calls
 - **TypeScript**: Full type safety with strict mode enabled
-- **Performance Optimized**: Leverages Stack Auth's internal session cache for <5ms session reads
+- **Performance Optimized**: Better Auth adapter with cross-tab sync and automatic token refresh detection
 - **CLI Tool**: Generate TypeScript types from your database schema
 
 ## Installation
@@ -23,22 +23,20 @@ npm install @neondatabase/neon-js
 ## Using neon-js
 
 1. Create a Neon project with Data API enabled
-2. Copy env vars from the Data API page and set them in your environment
+2. Set up your Better Auth server (see [Better Auth docs](https://www.better-auth.com/docs))
+3. Set environment variables:
 ```bash
-VITE_STACK_PROJECT_ID=
-VITE_STACK_PUBLISHABLE_CLIENT_KEY=
-VITE_NEON_DATA_API_URL=
+VITE_BETTER_AUTH_BASE_URL=https://your-auth-server.com
+VITE_NEON_DATA_API_URL=https://your-neon-api.com
 ```
-3. Instantiate `createClient` with the correct parameters
+4. Instantiate `createClient` with the correct parameters:
 ```typescript
 import { createClient } from 'neon-js';
 
 const client = createClient({
-  url: 'https://your-api.com',
+  url: import.meta.env.VITE_NEON_DATA_API_URL,
   auth: {
-    projectId: 'your-project-id',
-    publishableClientKey: 'pk_...',
-    tokenStore: 'cookie', // or 'memory'
+    baseURL: import.meta.env.VITE_BETTER_AUTH_BASE_URL,
   },
   options: {
     // Optional: custom configuration
@@ -72,17 +70,15 @@ Replace `@supabase/supabase-js` with `neon-js` in your `package.json`:
 Replace Supabase environment variables with Neon equivalents:
 
 ```diff
-- VITE_SUPABASE_PROJECT_ID="..."
-- VITE_SUPABASE_PUBLISHABLE_KEY="..."
 - VITE_SUPABASE_URL="https://xxx.supabase.co"
+- VITE_SUPABASE_ANON_KEY="..."
 + VITE_NEON_DATA_API_URL="https://xxx.apirest.c-2.us-east-1.aws.neon.tech/neondb/rest/v1"
-+ VITE_STACK_PROJECT_ID="..."
-+ VITE_STACK_PUBLISHABLE_CLIENT_KEY="..."
++ VITE_BETTER_AUTH_BASE_URL="https://your-auth-server.com"
 ```
 
-Get these values from your Neon dashboard:
+Get these values from:
 - **Data API URL**: Available in the Neon console under "Data API"
-- **Stack Auth credentials**: Project ID and Publishable Client Key from Neon Auth setup
+- **Better Auth Base URL**: Your Better Auth server URL (see [Better Auth docs](https://www.better-auth.com/docs))
 
 **3. Update Client Initialization**
 
@@ -94,14 +90,12 @@ Update your client configuration to use neon-js:
 
 - export const supabase = createClient(
 -   import.meta.env.VITE_SUPABASE_URL,
--   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+-   import.meta.env.VITE_SUPABASE_ANON_KEY
 - );
-+ export const supabase = createClient({
++ export const neon = createClient({
 +   url: import.meta.env.VITE_NEON_DATA_API_URL,
 +   auth: {
-+     tokenStore: 'cookie',
-+     projectId: import.meta.env.VITE_STACK_PROJECT_ID,
-+     publishableClientKey: import.meta.env.VITE_STACK_PUBLISHABLE_CLIENT_KEY,
++     baseURL: import.meta.env.VITE_BETTER_AUTH_BASE_URL,
 +   },
 + });
 ```
@@ -119,33 +113,29 @@ That's it! The rest of your code remains unchanged. All authentication methods (
 - ✅ OAuth flows
 - ✅ Error handling patterns
 
-### Real-World Example
+### Migration Notes
 
-See the complete migration in this PR: [pffigueiredo/todo-guardian-pro#1](https://github.com/pffigueiredo/todo-guardian-pro/pull/1)
+**Note**: The example above shows migrating from Supabase to neon-js with Better Auth. The actual migration requires:
+1. Setting up a Better Auth server (see [Better Auth docs](https://www.better-auth.com/docs))
+2. Updating environment variables
+3. Changing client initialization
 
-The migration changed only:
-- 1 dependency in `package.json`
-- 3 environment variables in `.env`
-- Client initialization in `src/integrations/supabase/client.ts`
-
-Everything else stayed the same!
+All Supabase Auth method signatures remain the same, making the migration seamless for your application code.
 
 ## Quick Start
 
 ```typescript
 import { createClient } from 'neon-js';
 
-// Create client with Stack Auth integration
+// Create client with Better Auth integration
 const client = createClient({
-  url: 'https://your-api.com',
+  url: 'https://your-neon-api.com',
   auth: {
-    projectId: 'your-project-id',
-    publishableClientKey: 'pk_...',
-    tokenStore: 'cookie', // or 'memory'
+    baseURL: 'https://your-auth-server.com',
   },
 });
 
-// Sign in
+// Sign in (Supabase-compatible API)
 await client.auth.signInWithPassword({
   email: 'user@example.com',
   password: 'password123',
@@ -169,11 +159,9 @@ The SDK works in both browser and Node.js environments:
 import { createClient } from 'neon-js';
 
 const client = createClient({
-  url: 'https://your-api.com',
+  url: 'https://your-neon-api.com',
   auth: {
-    projectId: 'your-project-id',
-    publishableClientKey: 'pk_...',
-    tokenStore: 'cookie', // Use cookies in browser
+    baseURL: 'https://your-auth-server.com',
   },
 });
 ```
@@ -185,26 +173,9 @@ const client = createClient({
 import { createClient } from 'neon-js';
 
 const client = createClient({
-  url: 'https://your-api.com',
+  url: 'https://your-neon-api.com',
   auth: {
-    projectId: 'your-project-id',
-    publishableClientKey: 'pk_...',
-    tokenStore: 'memory', // Use memory storage in Node.js
-  },
-});
-```
-
-### Server-Side (with secret key)
-
-```typescript
-import { createClient } from 'neon-js';
-
-const client = createClient({
-  url: 'https://your-api.com',
-  auth: {
-    projectId: 'your-project-id',
-    secretServerKey: 'sk_...', // Server key for server-side operations
-    tokenStore: 'memory',
+    baseURL: 'https://your-auth-server.com',
   },
 });
 ```
@@ -213,9 +184,9 @@ const client = createClient({
 
 - **NeonClient**: Unified client for Neon Auth and Data API (extends PostgrestClient)
 - **AuthClient Interface**: Supabase-compatible authentication interface for easy migration
-- **Adapter Pattern**: Pluggable authentication providers (Stack Auth included)
+- **Adapter Pattern**: Pluggable authentication providers (Better Auth primary, Stack Auth legacy)
 - **Factory Pattern**: `createClient()` handles initialization and wiring
-- **Performance Optimized**: Session caching, automatic token injection, and retry logic
+- **Performance Optimized**: Cross-tab sync, automatic token refresh detection, and seamless token injection
 
 ## Development
 
@@ -278,11 +249,21 @@ src/
 │   │   ├── msw-handlers.ts
 │   │   └── README.md
 │   └── adapters/
-│       └── stack-auth/
-│           ├── stack-auth-adapter.ts   # Stack Auth implementation (2000+ lines)
-│           ├── stack-auth-types.ts     # Type definitions and interfaces
-│           ├── stack-auth-schemas.ts   # Zod schemas for JWT validation
-│           └── stack-auth-helpers.ts   # Helper utilities
+│       ├── better-auth/            # Better Auth adapter (Primary)
+│       │   ├── better-auth-adapter.ts   # Main implementation (46KB)
+│       │   ├── better-auth-types.ts     # Type definitions
+│       │   ├── better-auth-schemas.ts   # Zod schemas
+│       │   ├── better-auth-helpers.ts   # Helper utilities
+│       │   ├── better-auth-docs.md      # Documentation
+│       │   ├── better-auth-plugins.md   # Plugin guide
+│       │   └── better-auth-checklist.md # Implementation checklist
+│       ├── stack-auth/             # Stack Auth adapter (Legacy)
+│       │   ├── stack-auth-adapter.ts    # Implementation (2000+ lines)
+│       │   ├── stack-auth-types.ts      # Type definitions
+│       │   ├── stack-auth-schemas.ts    # Zod schemas
+│       │   └── stack-auth-helpers.ts    # Helper utilities
+│       ├── shared-helpers.ts       # Shared utilities
+│       └── shared-schemas.ts       # Shared Zod schemas
 ├── client/
 │   ├── neon-client.ts             # NeonClient class (extends PostgrestClient)
 │   ├── client-factory.ts          # createClient() factory function
@@ -348,34 +329,28 @@ npx neon-js gen-types --db-url "postgresql://..." --query-timeout 30s
 
 ## Authentication Methods
 
-The SDK supports the following authentication methods via the Stack Auth adapter:
+The SDK supports the following authentication methods via the Better Auth adapter:
 
 ### Fully Supported Methods
 - **Email/Password**: `signUp()`, `signInWithPassword()`
-- **OAuth**: `signInWithOAuth()` (supports all Stack Auth OAuth providers)
-- **Magic Link**: `signInWithOtp()`, `verifyOtp()` (email-based passwordless authentication)
+- **OAuth**: `signInWithOAuth()` (supports Better Auth OAuth providers)
+- **Magic Link/OTP**: `signInWithOtp()`, `verifyOtp()` (email-based passwordless authentication)
 - **Session Management**: `getSession()`, `refreshSession()`, `setSession()`, `signOut()`
 - **User Management**: `getUser()`, `updateUser()`, `getClaims()`, `getUserIdentities()`
 - **Identity Linking**: `linkIdentity()`, `unlinkIdentity()`
 - **Password Reset**: `resetPasswordForEmail()`, `resend()`
-- **OAuth Callback**: `exchangeCodeForSession()`
-- **State Monitoring**: `onAuthStateChange()`
+- **State Monitoring**: `onAuthStateChange()` with cross-tab synchronization
 
-### Unsupported Methods (Return Detailed Errors)
-- **OIDC ID Token**: `signInWithIdToken()` - Stack Auth uses OAuth redirects only
-- **SAML SSO**: `signInWithSSO()` - Stack Auth only supports OAuth social providers
-- **Web3/Crypto**: `signInWithWeb3()` - Stack Auth does not support blockchain authentication
-- **Anonymous**: `signInAnonymously()` - Use OAuth or email/password instead
-
-For unsupported methods, the adapter returns comprehensive error messages explaining the limitation and suggesting alternatives.
+All methods maintain Supabase API compatibility for seamless migration.
 
 ## Performance
 
-The Stack Auth adapter is optimized for performance:
+The Better Auth adapter provides production-ready performance:
 
-- **Cached `getSession()`**: <5ms (reads from Stack Auth internal cache, no I/O)
-- **First `getSession()` after reload**: <50ms (Stack Auth reads from tokenStore)
-- **Token refresh**: <200ms (network call to Stack Auth, happens automatically)
+- **Session retrieval**: Fast session access via Better Auth's built-in caching
+- **Token refresh**: Automatic token refresh with 30-second polling interval
+- **Cross-tab sync**: Real-time authentication state synchronization across browser tabs (browser only)
+- **Zero latency token injection**: Automatic Bearer token injection for all authenticated requests
 
 ## License
 
@@ -383,6 +358,8 @@ MIT
 
 ## Links
 
-- [Stack Auth Documentation](https://docs.stack-auth.com/)
+- [Better Auth Documentation](https://www.better-auth.com/docs)
+- [Better Auth Supabase Migration Guide](https://www.better-auth.com/docs/guides/supabase-migration-guide)
 - [Supabase Auth Documentation](https://supabase.com/docs/guides/auth)
 - [PostgrestClient Documentation](https://github.com/supabase/postgrest-js)
+- [Neon Documentation](https://neon.tech/docs)
