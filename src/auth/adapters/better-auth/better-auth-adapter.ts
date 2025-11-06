@@ -70,12 +70,14 @@ export class BetterAuthAdapter implements AuthClient {
   };
   private lastSessionState: Session | null = null;
 
-  // JWT token caching (short-lived to reduce network calls)
+  // JWT token caching - uses JWT's exp claim for expiration
   private jwtCache = {
     token: null as string | null,
-    cachedAt: 0,
-    durationMs: 30_000, // 30 seconds
+    expiresAt: null as number | null, // Unix timestamp from JWT's exp claim
   };
+
+  // In-flight JWT fetch request (prevents concurrent fetches)
+  private jwtFetchPromise: Promise<string | null> | null = null;
 
   constructor(
     betterAuthClientOptions: BetterAuthClientOptions,
@@ -115,15 +117,6 @@ export class BetterAuthAdapter implements AuthClient {
         atomValue.data.user
       );
 
-      // Replace opaque token with JWT if available in cache
-      // This makes it more Supabase-compatible (their access_token IS a JWT)
-      if (session && this.jwtCache.token) {
-        const now = Date.now();
-        if (now - this.jwtCache.cachedAt < this.jwtCache.durationMs) {
-          session.access_token = this.jwtCache.token;
-        }
-      }
-
       return session;
     } catch {
       return null;
@@ -137,11 +130,55 @@ export class BetterAuthAdapter implements AuthClient {
    */
   private _isSessionExpired(session: Session | null): boolean {
     if (!session?.expires_at) return true;
+    return this._isExpired(session.expires_at);
+  }
 
+  /**
+   * Shared expiration check helper
+   * Checks if a timestamp (Unix seconds) is expired, with 10-second buffer for clock skew
+   */
+  private _isExpired(expiresAt: number | null | undefined): boolean {
+    if (!expiresAt) return true;
     const now = Math.floor(Date.now() / 1000);
-
     // 10 second buffer for clock skew
-    return session.expires_at <= now + 10;
+    return expiresAt <= now + 10;
+  }
+
+  /**
+   * Decode JWT and extract expiration timestamp (exp claim)
+   * Returns null if token is invalid or doesn't have exp
+   */
+  private _getJwtExpiration(jwt: string): number | null {
+    try {
+      const tokenParts = jwt.split('.');
+      if (tokenParts.length !== 3) {
+        return null;
+      }
+      const payload = JSON.parse(atob(tokenParts[1]));
+      const exp = payload.exp;
+      return typeof exp === 'number' ? exp : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Check if cached JWT is still valid (not expired)
+   */
+  private _isJwtCacheValid(): boolean {
+    if (!this.jwtCache.token || !this.jwtCache.expiresAt) {
+      return false;
+    }
+    return !this._isExpired(this.jwtCache.expiresAt);
+  }
+
+  /**
+   * Set JWT token in cache and extract expiration from token
+   */
+  private _setJwtCache(jwt: string): void {
+    const expiresAt = this._getJwtExpiration(jwt);
+    this.jwtCache.token = jwt;
+    this.jwtCache.expiresAt = expiresAt;
   }
 
   /**
@@ -150,7 +187,8 @@ export class BetterAuthAdapter implements AuthClient {
    */
   private _clearJwtCache(): void {
     this.jwtCache.token = null;
-    this.jwtCache.cachedAt = 0;
+    this.jwtCache.expiresAt = null;
+    this.jwtFetchPromise = null;
   }
 
   // Admin API
@@ -185,25 +223,21 @@ export class BetterAuthAdapter implements AuthClient {
       const cachedSession = this._getSessionFromAtom();
 
       if (cachedSession && !this._isSessionExpired(cachedSession)) {
+        // Enrich session with JWT token (from cache or fetch)
+        const jwt = await this.getJwtToken();
+
+        if (jwt) {
+          cachedSession.access_token = jwt;
+          return { data: { session: cachedSession }, error: null };
+        }
+
+        // No JWT available, but session exists - return with opaque token
         return { data: { session: cachedSession }, error: null };
       }
 
       // Slow Path: Fetch fresh session (network request)
       // This also updates the useSession atom automatically
-      // Note: Better Auth includes JWT in 'set-auth-jwt' header if JWT plugin is enabled
-      const response = await this.betterAuth.getSession({
-        fetchOptions: {
-          onSuccess: (ctx) => {
-            // Extract JWT from response header and cache it
-            // This avoids needing to call /token endpoint separately
-            const jwt = ctx.response.headers.get('set-auth-jwt');
-            if (jwt) {
-              this.jwtCache.token = jwt;
-              this.jwtCache.cachedAt = Date.now();
-            }
-          },
-        },
-      });
+      const response = await this.betterAuth.getSession();
 
       if (response.error) {
         return {
@@ -225,11 +259,13 @@ export class BetterAuthAdapter implements AuthClient {
         return { data: { session: null }, error: null };
       }
 
-      // Replace opaque token with JWT if we cached it from the header
-      // This makes the session.access_token a JWT (Supabase-compatible)
-      if (this.jwtCache.token) {
-        session.access_token = this.jwtCache.token;
+      // Enrich session with JWT token
+      const jwt = await this.getJwtToken();
+
+      if (jwt) {
+        session.access_token = jwt;
       }
+      // If no JWT, session.access_token will contain Better Auth's opaque token
 
       return { data: { session }, error: null };
     } catch (error) {
@@ -366,6 +402,70 @@ export class BetterAuthAdapter implements AuthClient {
       };
     }
   };
+
+  /**
+   * Get JWT token for API authentication
+   *
+   * Uses cached JWT if valid, otherwise fetches fresh token from /token endpoint.
+   * This method should be used by client factory instead of getSession() to avoid
+   * unnecessary session fetches on every API request.
+   *
+   * @returns JWT token string, or null if no session exists
+   */
+  getJwtToken: AuthClient['getJwtToken'] = async () => {
+    try {
+      // Step 1: Check cache first
+      if (this._isJwtCacheValid()) {
+        return this.jwtCache.token;
+      }
+
+      // Step 2: Check if fetch already in progress (deduplication)
+      if (this.jwtFetchPromise) {
+        return await this.jwtFetchPromise;
+      }
+
+      // Step 3: Start new fetch (store promise for deduplication)
+      this.jwtFetchPromise = this._fetchJwtToken();
+
+      try {
+        const jwt = await this.jwtFetchPromise;
+        return jwt;
+      } finally {
+        // Clear in-flight promise when done
+        this.jwtFetchPromise = null;
+      }
+    } catch (error) {
+      this._clearJwtCache();
+      this.jwtFetchPromise = null;
+      return null;
+    }
+  };
+
+  /**
+   * Internal method to fetch JWT from /token endpoint
+   * Separated for cleaner deduplication logic
+   */
+  private async _fetchJwtToken(): Promise<string | null> {
+    // Verify we have a session (don't fetch full session, just check atom)
+    const cachedSession = this._getSessionFromAtom();
+    if (!cachedSession || this._isSessionExpired(cachedSession)) {
+      this._clearJwtCache();
+      return null;
+    }
+
+    // Fetch fresh JWT from /token endpoint
+    const tokenResponse = await this.betterAuth.token();
+
+    if (tokenResponse.error || !tokenResponse.data?.token) {
+      this._clearJwtCache();
+      return null;
+    }
+
+    const jwt = tokenResponse.data.token;
+    this._setJwtCache(jwt);
+
+    return jwt;
+  }
 
   // Sign up
   signUp: AuthClient['signUp'] = async (credentials) => {
@@ -1464,7 +1564,8 @@ export class BetterAuthAdapter implements AuthClient {
     if (
       event === 'SIGNED_IN' ||
       event === 'SIGNED_OUT' ||
-      event === 'TOKEN_REFRESHED'
+      event === 'TOKEN_REFRESHED' ||
+      event === 'USER_UPDATED'
     ) {
       this._clearJwtCache();
     }

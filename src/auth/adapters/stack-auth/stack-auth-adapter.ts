@@ -1251,6 +1251,46 @@ export class StackAuthAdapter<
     }
   };
 
+  /**
+   * Get JWT token for API authentication
+   *
+   * Uses cached token if valid, otherwise fetches fresh token.
+   * This method should be used by client factory instead of getSession() to avoid
+   * unnecessary session fetches on every API request.
+   *
+   * @returns JWT token string, or null if no session exists
+   */
+  getJwtToken: AuthClient['getJwtToken'] = async () => {
+    try {
+      const user = await this.stackAuth.getUser();
+
+      if (!user) {
+        return null;
+      }
+
+      // OPTIMIZATION: Try to get cached token first
+      let accessToken: string | null = null;
+
+      if (hasInternalSession(user)) {
+        // Fast path: Use cached token if available
+        const internalSession = user._internalSession;
+        const cachedToken = internalSession.getAccessTokenIfNotExpiredYet(0);
+        accessToken = cachedToken?.token ?? null;
+      }
+
+      if (!accessToken) {
+        // Slow path: Fetch fresh tokens (may trigger refresh)
+        const tokens = await user.currentSession.getTokens();
+        // Public API returns strings directly
+        accessToken = tokens.accessToken;
+      }
+
+      return accessToken;
+    } catch (error) {
+      return null;
+    }
+  };
+
   updateUser: AuthClient['updateUser'] = async (attributes) => {
     try {
       const user = await this.stackAuth.getUser();

@@ -41,16 +41,11 @@ export function createClient<
   const auth = new BetterAuthAdapter(betterAuthParams, config);
 
   // Step 3: Create lazy token accessor - called on every request
+  // Uses optimized getJwtToken() to avoid full session fetch
   // Returns null if no session (will throw AuthRequiredError in fetchWithAuth)
-  // Note: session.access_token contains the JWT (not opaque token) for API authentication
   const getAccessToken = async (): Promise<string | null> => {
-    const { data, error } = await auth.getSession();
-
-    if (error || !data.session) {
-      return null;
-    }
-
-    return data.session.access_token; // This is the JWT token
+    const jwt = await auth.getJwtToken();
+    return jwt;
   };
 
   // Step 4: Create auth-aware fetch wrapper

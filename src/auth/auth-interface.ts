@@ -6,10 +6,18 @@ import {
 } from '@supabase/auth-js';
 
 type _AuthClientSupabaseInstance = InstanceType<typeof AuthClientSupabase>;
-export type AuthClient = {
+type _AuthClientBase = {
   [K in keyof _AuthClientSupabaseInstance as _AuthClientSupabaseInstance[K] extends never
     ? never
     : K]: _AuthClientSupabaseInstance[K]; // This filters out protected/private members by checking if they are accessible
+};
+
+export type AuthClient = _AuthClientBase & {
+  /**
+   * Get JWT token for API authentication
+   * Optimized for high-frequency calls (uses cache)
+   */
+  getJwtToken(): Promise<string | null>;
 };
 
 // Re-export Supabase error types
