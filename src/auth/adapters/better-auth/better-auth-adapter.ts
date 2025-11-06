@@ -237,7 +237,20 @@ export class BetterAuthAdapter implements AuthClient {
 
       // Slow Path: Fetch fresh session (network request)
       // This also updates the useSession atom automatically
-      const response = await this.betterAuth.getSession();
+      // Optimization: Cache JWT if server provides it in response header
+      let headerJwt: string | null = null;
+      const response = await this.betterAuth.getSession({
+        fetchOptions: {
+          onSuccess: (ctx) => {
+            // Try to extract JWT from response header (if server has JWT plugin enabled)
+            const jwt = ctx.response.headers.get('set-auth-jwt');
+            if (jwt) {
+              headerJwt = jwt;
+              this._setJwtCache(jwt);
+            }
+          },
+        },
+      });
 
       if (response.error) {
         return {
@@ -260,7 +273,8 @@ export class BetterAuthAdapter implements AuthClient {
       }
 
       // Enrich session with JWT token
-      const jwt = await this.getJwtToken();
+      // Use headerJwt if available (already cached), otherwise fetch via getJwtToken()
+      const jwt = headerJwt || (await this.getJwtToken());
 
       if (jwt) {
         session.access_token = jwt;
