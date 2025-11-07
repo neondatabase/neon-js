@@ -22,7 +22,7 @@ import {
   adminClient,
   organizationClient,
 } from 'better-auth/client/plugins';
-import pMemoize from 'p-memoize';
+import { SessionCache } from './session-cache';
 
 /**
  * Better Auth adapter implementing the AuthClient interface
@@ -49,12 +49,10 @@ import pMemoize from 'p-memoize';
  * Password Management:
  * - resetPasswordForEmail → betterAuth.forgetPassword()
  *
- * Request Deduplication:
- * - Read methods (getSession, getUser, getClaims, getJwtToken) are wrapped with p-memoize
- * - Concurrent calls to these methods share a single promise/network request
- * - Prevents "thundering herd" during initial page load
- * - Errors are NOT cached, allowing immediate retries
- * - Mutation methods (updateUser, signOut, etc.) execute independently
+ * Session Caching:
+ * - SessionCache provides 60-second TTL for getSession() results
+ * - Reduces network calls during normal operation
+ * - Invalidation flag prevents stale data during sign-out
  *
  * Based on: https://www.better-auth.com/docs/guides/supabase-migration-guide
  */
@@ -84,6 +82,9 @@ export class BetterAuthAdapter implements AuthClient {
     expiresAt: null as number | null, // Unix timestamp from JWT's exp claim
   };
 
+  // Session caching - synchronous in-memory cache with 60-second TTL
+  private sessionCache: SessionCache;
+
   constructor(
     betterAuthClientOptions: BetterAuthClientOptions,
     config?: OnAuthStateChangeConfig
@@ -92,6 +93,9 @@ export class BetterAuthAdapter implements AuthClient {
     if (config) {
       this.config = { ...this.config, ...config };
     }
+
+    // Initialize cache with 60-second TTL
+    this.sessionCache = new SessionCache(60_000);
 
     this.betterAuth = createAuthClient({
       ...betterAuthClientOptions,
@@ -153,7 +157,6 @@ export class BetterAuthAdapter implements AuthClient {
   /**
    * Clear the cached JWT token
    * Called when auth state changes (sign-in, sign-out, etc.)
-   * Note: p-memoize automatically clears the deduplication cache after each promise resolves
    */
   private _clearJwtCache(): void {
     console.debug('[JWT Cache] Clear');
@@ -187,107 +190,109 @@ export class BetterAuthAdapter implements AuthClient {
     }
   };
 
-  getSession: AuthClient['getSession'] = pMemoize(
-    async () => {
-      try {
-        // Step 1: Fast Path - Read from Better Auth's nanostore cache
-        // This is instant (no network/storage I/O) and uses Better Auth's internal cache
-        if (this.betterAuth.useSession) {
-          const cachedState = this.betterAuth.useSession.get?.();
-
-          if (cachedState?.data?.session && cachedState?.data?.user) {
-            const session = mapBetterAuthSessionToSupabase(
-              cachedState.data.session,
-              cachedState.data.user
-            );
-
-            // Validate session hasn't expired
-            if (session && !this._isExpired(session.expires_at)) {
-              // Enrich with JWT token (uses JWT cache if available)
-              const jwt = await this.getJwtToken();
-              if (jwt) {
-                session.access_token = jwt;
-              }
-
-              return { data: { session }, error: null };
-            }
-          }
-        }
-
-        // Step 2: Slow Path - Fetch fresh session (network request)
-        // This also updates the useSession atom automatically
-        // Optimization: Cache JWT if server provides it in response header
-        let headerJwt: string | null = null;
-        const response = await this.betterAuth.getSession({
-          fetchOptions: {
-            onSuccess: (ctx) => {
-              // Try to extract JWT from response header (if server has JWT plugin enabled)
-              const jwt = ctx.response.headers.get('set-auth-jwt');
-              if (jwt) {
-                console.debug(
-                  '[JWT Cache] Extracted from getSession response header'
-                );
-                headerJwt = jwt;
-                this._setJwtCache(jwt);
-              }
-            },
-          },
+  getSession: AuthClient['getSession'] = async () => {
+    console.log('[getSession] Called - checking cache');
+    try {
+      // Step 1: Fast Path - Read from synchronous cache
+      const cachedSession = this.sessionCache.get();
+      if (cachedSession) {
+        console.log('[getSession] Cache hit - returning cached session', {
+          userId: cachedSession.user.id,
+          cacheTTL: this.sessionCache.getRemainingTTL(),
         });
 
-        if (response.error) {
-          return {
-            data: { session: null },
-            error: normalizeBetterAuthError(response.error),
-          };
+        // CRITICAL: Check invalidation flag one more time before returning
+        // This catches the race condition where signOut() was called after we read
+        // from cache but before we return. Without this check, we'd return stale data.
+        if (this.sessionCache.isInvalidated()) {
+          console.log('[getSession] Cache invalidated during execution - returning null');
+          return { data: { session: null }, error: null };
         }
 
-        if (!response.data?.session || !response.data?.user) {
-          return {
-            data: { session: null },
-            error: new AuthError(
-              'Failed to get session',
-              500,
-              'unexpected_failure'
-            ),
-          };
-        }
+        return { data: { session: cachedSession }, error: null };
+      }
 
-        const session = mapBetterAuthSessionToSupabase(
-          response.data.session,
-          response.data.user
-        );
-        if (!session) {
-          return {
-            data: { session: null },
-            error: new AuthError(
-              'Failed to map session',
-              500,
-              'unexpected_failure'
-            ),
-          };
-        }
+      console.log('[getSession] Cache miss - fetching fresh session from Better Auth');
 
-        // Enrich session with JWT token
-        // Use headerJwt if available (already cached), otherwise fetch via getJwtToken()
-        const jwt = headerJwt || (await this.getJwtToken());
-        if (jwt) {
-          session.access_token = jwt;
-        }
+      // Step 2: Slow Path - Fetch fresh session (network request)
+      // Optimization: Cache JWT if server provides it in response header
+      let headerJwt: string | null = null;
+      const response = await this.betterAuth.getSession({
+        fetchOptions: {
+          onSuccess: (ctx) => {
+            // Try to extract JWT from response header
+            const jwt = ctx.response.headers.get('set-auth-jwt');
+            if (jwt) {
+              console.debug('[JWT Cache] Extracted from getSession response header');
+              headerJwt = jwt;
+              this._setJwtCache(jwt);
+            }
+          },
+        },
+      });
 
-        // If no JWT, session.access_token will contain Better Auth's opaque token
-        return { data: { session }, error: null };
-      } catch (error) {
+      console.log('[getSession] Better Auth response:', {
+        hasError: !!response.error,
+        hasSession: !!response.data?.session,
+        hasUser: !!response.data?.user,
+      });
+
+      if (response.error) {
+        console.log('[getSession] Better Auth returned error:', response.error);
         return {
           data: { session: null },
-          error: normalizeBetterAuthError(error),
+          error: normalizeBetterAuthError(response.error),
         };
       }
-    },
-    {
-      // Don't cache errors - allow immediate retries on failure
-      cachePromiseRejection: false,
+
+      if (!response.data?.session || !response.data?.user) {
+        console.log('[getSession] No session/user in Better Auth response');
+        return {
+          data: { session: null },
+          error: new AuthError(
+            'Failed to get session',
+            500,
+            'unexpected_failure'
+          ),
+        };
+      }
+
+      const session = mapBetterAuthSessionToSupabase(
+        response.data.session,
+        response.data.user
+      );
+      if (!session) {
+        console.log('[getSession] Failed to map Better Auth session to Supabase format');
+        return {
+          data: { session: null },
+          error: new AuthError(
+            'Failed to map session',
+            500,
+            'unexpected_failure'
+          ),
+        };
+      }
+
+      // Enrich session with JWT token
+      const jwt = headerJwt || (await this.getJwtToken());
+      if (jwt) {
+        session.access_token = jwt;
+      }
+
+      // Cache the session
+      console.log('[getSession] Caching fresh session', { userId: session.user.id });
+      this.sessionCache.set(session);
+
+      console.log('[getSession] Returning fresh session');
+      return { data: { session }, error: null };
+    } catch (error) {
+      console.log('[getSession] Error caught:', error);
+      return {
+        data: { session: null },
+        error: normalizeBetterAuthError(error),
+      };
     }
-  );
+  };
 
   refreshSession: AuthClient['refreshSession'] = async () => {
     try {
@@ -425,40 +430,34 @@ export class BetterAuthAdapter implements AuthClient {
    *
    * @returns JWT token string, or null if no session exists
    */
-  getJwtToken = pMemoize(
-    async () => {
-      try {
-        // Step 1: Check cache first
-        if (this.jwtCache.token && !this._isExpired(this.jwtCache.expiresAt)) {
-          console.debug('[JWT Cache] Hit');
-          return this.jwtCache.token;
-        }
-        console.debug('[JWT Cache] Miss - fetching fresh token');
+  getJwtToken = async () => {
+    try {
+      // Step 1: Check cache first
+      if (this.jwtCache.token && !this._isExpired(this.jwtCache.expiresAt)) {
+        console.debug('[JWT Cache] Hit');
+        return this.jwtCache.token;
+      }
+      console.debug('[JWT Cache] Miss - fetching fresh token');
 
-        // Step 2: Fetch fresh JWT from /token endpoint
-        console.debug('[JWT Cache] Fetching from /token endpoint');
-        const tokenResponse = await this.betterAuth.token();
+      // Step 2: Fetch fresh JWT from /token endpoint
+      console.debug('[JWT Cache] Fetching from /token endpoint');
+      const tokenResponse = await this.betterAuth.token();
 
-        if (tokenResponse.error || !tokenResponse.data?.token) {
-          console.debug('[JWT Cache] Fetch failed');
-          this._clearJwtCache();
-          return null;
-        }
-
-        const jwt = tokenResponse.data.token;
-        this._setJwtCache(jwt);
-
-        return jwt;
-      } catch (error) {
+      if (tokenResponse.error || !tokenResponse.data?.token) {
+        console.debug('[JWT Cache] Fetch failed');
         this._clearJwtCache();
         return null;
       }
-    },
-    {
-      // Don't cache errors - allow immediate retries
-      cachePromiseRejection: false,
+
+      const jwt = tokenResponse.data.token;
+      this._setJwtCache(jwt);
+
+      return jwt;
+    } catch (error) {
+      this._clearJwtCache();
+      return null;
     }
-  );
+  };
 
   // Sign up
   signUp: AuthClient['signUp'] = async (credentials) => {
@@ -775,7 +774,20 @@ export class BetterAuthAdapter implements AuthClient {
   // Sign out
   signOut: AuthClient['signOut'] = async () => {
     try {
+      console.log('[signOut] Starting signOut process');
+      console.log('[signOut] Current lastSessionState:', this.lastSessionState ? 'exists' : 'null');
+      console.log('[signOut] Session cache has value:', this.sessionCache.has());
+
+      // Clear caches IMMEDIATELY to prevent race conditions with concurrent getSession() calls
+      // Setting invalidation flag ensures any in-flight getSession() calls will see the flag
+      // and return null instead of stale cached data
+      console.log('[signOut] Clearing session and JWT caches');
+      this.sessionCache.clear(); // Sets invalidation flag
+      this._clearJwtCache();
+      console.log('[signOut] Caches cleared - session cache has value:', this.sessionCache.has());
+
       const result = await this.betterAuth.signOut();
+      console.log('[signOut] Better Auth signOut result:', { error: result.error ? 'has error' : 'no error' });
 
       if (result.error) {
         return { error: normalizeBetterAuthError(result.error) };
@@ -784,8 +796,10 @@ export class BetterAuthAdapter implements AuthClient {
       // Better Auth will update the useSession atom, which will trigger setupSessionListener()
       // to emit SIGNED_OUT event automatically
 
+      console.log('[signOut] SignOut completed successfully');
       return { error: null };
     } catch (error) {
+      console.error('[signOut] Error during signOut:', error);
       return { error: normalizeBetterAuthError(error) };
     }
   };
@@ -1454,12 +1468,24 @@ export class BetterAuthAdapter implements AuthClient {
 
   /**
    * Set up listener for Better Auth's reactive session state
+   *
+   * This listener detects external session changes (e.g., from Better Auth's
+   * internal updates) and syncs our cache accordingly. The nanostore is NOT
+   * used as the primary cache source due to its async nature causing race
+   * conditions.
    */
   private setupSessionListener(): void {
     // Better Auth uses nanostores atoms, listen to useSession atom
     if (this.betterAuth.useSession) {
+      console.log('[setupSessionListener] Setting up Better Auth session listener');
       // Subscribe to session changes
       this.betterAuth.useSession.subscribe((sessionState) => {
+        console.log('[setupSessionListener] Session state changed:', {
+          hasSession: !!sessionState?.data?.session,
+          hasUser: !!sessionState?.data?.user,
+          lastSessionState: this.lastSessionState ? 'exists' : 'null',
+        });
+
         // Map Better Auth session state to Supabase session format
         if (sessionState?.data?.session && sessionState?.data?.user) {
           const session = mapBetterAuthSessionToSupabase(
@@ -1470,8 +1496,14 @@ export class BetterAuthAdapter implements AuthClient {
           if (session) {
             // Check if this is a new session (sign in)
             if (!this.lastSessionState) {
+              console.log('[setupSessionListener] New session detected - SIGNED_IN');
+              // Update cache on sign-in
+              this.sessionCache.set(session);
               this.notifyAllSubscribers('SIGNED_IN', session);
             } else if (this.lastSessionState.user.id !== session.user.id) {
+              console.log('[setupSessionListener] User changed - SIGNED_IN');
+              // Update cache on user change
+              this.sessionCache.set(session);
               this.notifyAllSubscribers('SIGNED_IN', session);
             } else {
               // Check if user data changed
@@ -1479,16 +1511,27 @@ export class BetterAuthAdapter implements AuthClient {
                 JSON.stringify(this.lastSessionState.user) !==
                 JSON.stringify(session.user);
               if (userChanged) {
+                console.log('[setupSessionListener] User data updated - USER_UPDATED');
+                // Update cache on user update
+                this.sessionCache.set(session);
                 this.notifyAllSubscribers('USER_UPDATED', session);
+              } else {
+                console.log('[setupSessionListener] Session state unchanged, skipping notification');
               }
             }
 
             this.lastSessionState = session;
           }
         } else {
+          console.log('[setupSessionListener] Session is null - checking for sign out');
           // Session is null (signed out)
           if (this.lastSessionState) {
+            console.log('[setupSessionListener] User was signed in, now signed out - SIGNED_OUT');
+            // Clear cache on sign-out
+            this.sessionCache.clear();
             this.notifyAllSubscribers('SIGNED_OUT', null);
+          } else {
+            console.log('[setupSessionListener] Already signed out, no action needed');
           }
           this.lastSessionState = null;
         }

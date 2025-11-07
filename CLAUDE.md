@@ -96,15 +96,16 @@ Works in both browser and Node.js with graceful degradation:
 - **Browser**: Full feature support including cross-tab sync via BroadcastChannel
 - **Node.js**: Core auth works, browser-only features auto-disabled
 
-### Request Deduplication
+### Session Caching with Invalidation
 
-The Better Auth adapter automatically deduplicates concurrent read-only API calls using `p-memoize`:
-- **Deduplicated methods**: `getSession()`, `getUser()`, `getClaims()`, `getJwtToken()`
-- **Benefit**: Multiple simultaneous calls (e.g., from different components) share a single promise and network request
-- **Error handling**: Errors are NOT cached, allowing immediate retries
-- **Mutation methods**: `signOut()`, `updateUser()`, `signUp()` etc. execute every time (not deduplicated)
-
-This prevents the "thundering herd" problem during initial page load where multiple components try to fetch the session simultaneously.
+The Better Auth adapter uses a two-layer caching strategy:
+- **SessionCache**: 60-second TTL for `getSession()` results, reduces network calls
+- **JWT Cache**: Expiration-based caching for JWT tokens
+- **Invalidation mechanism**: Prevents stale data during sign-out via invalidation flag
+  - When `signOut()` is called, it sets an invalidation flag before clearing caches
+  - Any in-flight `getSession()` calls check this flag before returning cached data
+  - If invalidated, returns null instead of stale session data
+  - Flag is cleared when a new session is set (during sign-in)
 
 ### Implementation Details:
 
@@ -113,7 +114,7 @@ The adapter implements sophisticated state management:
 - **Cross-tab synchronization**: BroadcastChannel for auth state sync across tabs (browser only)
 - **Event system**: `onAuthStateChange()` for monitoring `SIGNED_IN`, `SIGNED_OUT`, `TOKEN_REFRESHED`, `USER_UPDATED` events
 - **Session mapping**: Transforms Better Auth sessions to Supabase-compatible format
-- **Request deduplication**: Uses p-memoize for read method deduplication
+- **Cache invalidation**: Prevents race conditions during sign-out with invalidation flags
 
 See `BETTER_AUTH_SIMPLIFICATION.md` for detailed implementation notes and simplification strategy.
 
