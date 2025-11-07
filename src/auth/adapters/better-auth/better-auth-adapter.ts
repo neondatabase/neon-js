@@ -22,6 +22,7 @@ import {
   adminClient,
   organizationClient,
 } from 'better-auth/client/plugins';
+import pMemoize from 'p-memoize';
 
 /**
  * Better Auth adapter implementing the AuthClient interface
@@ -47,6 +48,13 @@ import {
  *
  * Password Management:
  * - resetPasswordForEmail → betterAuth.forgetPassword()
+ *
+ * Request Deduplication:
+ * - Read methods (getSession, getUser, getClaims, getJwtToken) are wrapped with p-memoize
+ * - Concurrent calls to these methods share a single promise/network request
+ * - Prevents "thundering herd" during initial page load
+ * - Errors are NOT cached, allowing immediate retries
+ * - Mutation methods (updateUser, signOut, etc.) execute independently
  *
  * Based on: https://www.better-auth.com/docs/guides/supabase-migration-guide
  */
@@ -76,9 +84,6 @@ export class BetterAuthAdapter implements AuthClient {
     expiresAt: null as number | null, // Unix timestamp from JWT's exp claim
   };
 
-  // In-flight JWT fetch request (prevents concurrent fetches)
-  private jwtFetchPromise: Promise<string | null> | null = null;
-
   constructor(
     betterAuthClientOptions: BetterAuthClientOptions,
     config?: OnAuthStateChangeConfig
@@ -98,50 +103,20 @@ export class BetterAuthAdapter implements AuthClient {
   }
 
   /**
-   * Get session from Better Auth's useSession nanostore atom
-   * This is a synchronous read from the cached atom state (no network request)
-   */
-  private _getSessionFromAtom(): Session | null {
-    try {
-      // Read from useSession atom (synchronous, no network call)
-      const atomValue = this.betterAuth.useSession.get();
-
-      // Check if session data exists in atom
-      if (!atomValue?.data?.session || !atomValue?.data?.user) {
-        return null;
-      }
-
-      // Map Better Auth session to Supabase format
-      const session = mapBetterAuthSessionToSupabase(
-        atomValue.data.session,
-        atomValue.data.user
-      );
-
-      return session;
-    } catch {
-      return null;
-    }
-  }
-
-  /**
-   * Check if a session is expired
-   * Uses the session's expires_at timestamp (not the opaque token)
-   * Note: session.access_token is an OPAQUE token, not a JWT, so we can't decode it
-   */
-  private _isSessionExpired(session: Session | null): boolean {
-    if (!session?.expires_at) return true;
-    return this._isExpired(session.expires_at);
-  }
-
-  /**
    * Shared expiration check helper
    * Checks if a timestamp (Unix seconds) is expired, with 10-second buffer for clock skew
    */
-  private _isExpired(expiresAt: number | null | undefined): boolean {
+  private _isExpired(expiresAt: Date | number | null | undefined): boolean {
     if (!expiresAt) return true;
     const now = Math.floor(Date.now() / 1000);
+
+    const expiresAtNumber =
+      typeof expiresAt === 'number'
+        ? expiresAt
+        : Math.floor(expiresAt.getTime() / 1000);
+
     // 10 second buffer for clock skew
-    return expiresAt <= now + 10;
+    return expiresAtNumber <= now + 10;
   }
 
   /**
@@ -163,32 +138,27 @@ export class BetterAuthAdapter implements AuthClient {
   }
 
   /**
-   * Check if cached JWT is still valid (not expired)
-   */
-  private _isJwtCacheValid(): boolean {
-    if (!this.jwtCache.token || !this.jwtCache.expiresAt) {
-      return false;
-    }
-    return !this._isExpired(this.jwtCache.expiresAt);
-  }
-
-  /**
    * Set JWT token in cache and extract expiration from token
    */
   private _setJwtCache(jwt: string): void {
     const expiresAt = this._getJwtExpiration(jwt);
     this.jwtCache.token = jwt;
     this.jwtCache.expiresAt = expiresAt;
+    console.debug(
+      '[JWT Cache] Set - expires at',
+      expiresAt ? new Date(expiresAt * 1000).toISOString() : 'unknown'
+    );
   }
 
   /**
    * Clear the cached JWT token
    * Called when auth state changes (sign-in, sign-out, etc.)
+   * Note: p-memoize automatically clears the deduplication cache after each promise resolves
    */
   private _clearJwtCache(): void {
+    console.debug('[JWT Cache] Clear');
     this.jwtCache.token = null;
     this.jwtCache.expiresAt = null;
-    this.jwtFetchPromise = null;
   }
 
   // Admin API
@@ -217,78 +187,107 @@ export class BetterAuthAdapter implements AuthClient {
     }
   };
 
-  getSession: AuthClient['getSession'] = async () => {
-    try {
-      // Fast Path: Read from nanostore atom (cached, synchronous)
-      const cachedSession = this._getSessionFromAtom();
+  getSession: AuthClient['getSession'] = pMemoize(
+    async () => {
+      try {
+        // Step 1: Fast Path - Read from Better Auth's nanostore cache
+        // This is instant (no network/storage I/O) and uses Better Auth's internal cache
+        if (this.betterAuth.useSession) {
+          const cachedState = this.betterAuth.useSession.get?.();
 
-      if (cachedSession && !this._isSessionExpired(cachedSession)) {
-        // Enrich session with JWT token (from cache or fetch)
-        const jwt = await this.getJwtToken();
+          if (cachedState?.data?.session && cachedState?.data?.user) {
+            const session = mapBetterAuthSessionToSupabase(
+              cachedState.data.session,
+              cachedState.data.user
+            );
 
-        if (jwt) {
-          cachedSession.access_token = jwt;
-          return { data: { session: cachedSession }, error: null };
+            // Validate session hasn't expired
+            if (session && !this._isExpired(session.expires_at)) {
+              // Enrich with JWT token (uses JWT cache if available)
+              const jwt = await this.getJwtToken();
+              if (jwt) {
+                session.access_token = jwt;
+              }
+
+              return { data: { session }, error: null };
+            }
+          }
         }
 
-        // No JWT available, but session exists - return with opaque token
-        return { data: { session: cachedSession }, error: null };
-      }
-
-      // Slow Path: Fetch fresh session (network request)
-      // This also updates the useSession atom automatically
-      // Optimization: Cache JWT if server provides it in response header
-      let headerJwt: string | null = null;
-      const response = await this.betterAuth.getSession({
-        fetchOptions: {
-          onSuccess: (ctx) => {
-            // Try to extract JWT from response header (if server has JWT plugin enabled)
-            const jwt = ctx.response.headers.get('set-auth-jwt');
-            if (jwt) {
-              headerJwt = jwt;
-              this._setJwtCache(jwt);
-            }
+        // Step 2: Slow Path - Fetch fresh session (network request)
+        // This also updates the useSession atom automatically
+        // Optimization: Cache JWT if server provides it in response header
+        let headerJwt: string | null = null;
+        const response = await this.betterAuth.getSession({
+          fetchOptions: {
+            onSuccess: (ctx) => {
+              // Try to extract JWT from response header (if server has JWT plugin enabled)
+              const jwt = ctx.response.headers.get('set-auth-jwt');
+              if (jwt) {
+                console.debug(
+                  '[JWT Cache] Extracted from getSession response header'
+                );
+                headerJwt = jwt;
+                this._setJwtCache(jwt);
+              }
+            },
           },
-        },
-      });
+        });
 
-      if (response.error) {
+        if (response.error) {
+          return {
+            data: { session: null },
+            error: normalizeBetterAuthError(response.error),
+          };
+        }
+
+        if (!response.data?.session || !response.data?.user) {
+          return {
+            data: { session: null },
+            error: new AuthError(
+              'Failed to get session',
+              500,
+              'unexpected_failure'
+            ),
+          };
+        }
+
+        const session = mapBetterAuthSessionToSupabase(
+          response.data.session,
+          response.data.user
+        );
+        if (!session) {
+          return {
+            data: { session: null },
+            error: new AuthError(
+              'Failed to map session',
+              500,
+              'unexpected_failure'
+            ),
+          };
+        }
+
+        // Enrich session with JWT token
+        // Use headerJwt if available (already cached), otherwise fetch via getJwtToken()
+        const jwt = headerJwt || (await this.getJwtToken());
+        if (jwt) {
+          session.access_token = jwt;
+        }
+
+        // If no JWT, session.access_token will contain Better Auth's opaque token
+        return { data: { session }, error: null };
+      } catch (error) {
         return {
           data: { session: null },
-          error: normalizeBetterAuthError(response.error),
+          error: normalizeBetterAuthError(error),
         };
       }
-
-      if (!response.data?.session || !response.data?.user) {
-        return { data: { session: null }, error: null };
-      }
-
-      const session = mapBetterAuthSessionToSupabase(
-        response.data.session,
-        response.data.user
-      );
-
-      if (!session) {
-        return { data: { session: null }, error: null };
-      }
-
-      // Enrich session with JWT token
-      // Use headerJwt if available (already cached), otherwise fetch via getJwtToken()
-      const jwt = headerJwt || (await this.getJwtToken());
-
-      if (jwt) {
-        session.access_token = jwt;
-      }
-      // If no JWT, session.access_token will contain Better Auth's opaque token
-
-      return { data: { session }, error: null };
-    } catch (error) {
-      return {
-        data: { session: null },
-        error: normalizeBetterAuthError(error),
-      };
+    },
+    {
+      // Don't cache errors - allow immediate retries on failure
+      cachePromiseRejection: false,
     }
-  };
+  );
 
   refreshSession: AuthClient['refreshSession'] = async () => {
     try {
@@ -426,60 +425,40 @@ export class BetterAuthAdapter implements AuthClient {
    *
    * @returns JWT token string, or null if no session exists
    */
-  getJwtToken: AuthClient['getJwtToken'] = async () => {
-    try {
-      // Step 1: Check cache first
-      if (this._isJwtCacheValid()) {
-        return this.jwtCache.token;
-      }
-
-      // Step 2: Check if fetch already in progress (deduplication)
-      if (this.jwtFetchPromise) {
-        return await this.jwtFetchPromise;
-      }
-
-      // Step 3: Start new fetch (store promise for deduplication)
-      this.jwtFetchPromise = this._fetchJwtToken();
-
+  getJwtToken = pMemoize(
+    async () => {
       try {
-        const jwt = await this.jwtFetchPromise;
+        // Step 1: Check cache first
+        if (this.jwtCache.token && !this._isExpired(this.jwtCache.expiresAt)) {
+          console.debug('[JWT Cache] Hit');
+          return this.jwtCache.token;
+        }
+        console.debug('[JWT Cache] Miss - fetching fresh token');
+
+        // Step 2: Fetch fresh JWT from /token endpoint
+        console.debug('[JWT Cache] Fetching from /token endpoint');
+        const tokenResponse = await this.betterAuth.token();
+
+        if (tokenResponse.error || !tokenResponse.data?.token) {
+          console.debug('[JWT Cache] Fetch failed');
+          this._clearJwtCache();
+          return null;
+        }
+
+        const jwt = tokenResponse.data.token;
+        this._setJwtCache(jwt);
+
         return jwt;
-      } finally {
-        // Clear in-flight promise when done
-        this.jwtFetchPromise = null;
+      } catch (error) {
+        this._clearJwtCache();
+        return null;
       }
-    } catch (error) {
-      this._clearJwtCache();
-      this.jwtFetchPromise = null;
-      return null;
+    },
+    {
+      // Don't cache errors - allow immediate retries
+      cachePromiseRejection: false,
     }
-  };
-
-  /**
-   * Internal method to fetch JWT from /token endpoint
-   * Separated for cleaner deduplication logic
-   */
-  private async _fetchJwtToken(): Promise<string | null> {
-    // Verify we have a session (don't fetch full session, just check atom)
-    const cachedSession = this._getSessionFromAtom();
-    if (!cachedSession || this._isSessionExpired(cachedSession)) {
-      this._clearJwtCache();
-      return null;
-    }
-
-    // Fetch fresh JWT from /token endpoint
-    const tokenResponse = await this.betterAuth.token();
-
-    if (tokenResponse.error || !tokenResponse.data?.token) {
-      this._clearJwtCache();
-      return null;
-    }
-
-    const jwt = tokenResponse.data.token;
-    this._setJwtCache(jwt);
-
-    return jwt;
-  }
+  );
 
   // Sign up
   signUp: AuthClient['signUp'] = async (credentials) => {
@@ -526,11 +505,8 @@ export class BetterAuthAdapter implements AuthClient {
           session: sessionResult.data.session,
         };
 
-        // Emit SIGNED_IN event
-        await this.notifyAllSubscribers(
-          'SIGNED_IN',
-          sessionResult.data.session
-        );
+        // Better Auth will update the useSession atom, which will trigger setupSessionListener()
+        // to emit SIGNED_IN event automatically
 
         return { data, error: null };
       }
@@ -613,11 +589,8 @@ export class BetterAuthAdapter implements AuthClient {
           session: sessionResult.data.session,
         };
 
-        // Emit SIGNED_IN event
-        await this.notifyAllSubscribers(
-          'SIGNED_IN',
-          sessionResult.data.session
-        );
+        // Better Auth will update the useSession atom, which will trigger setupSessionListener()
+        // to emit SIGNED_IN event automatically
 
         return { data, error: null };
       }
@@ -808,8 +781,8 @@ export class BetterAuthAdapter implements AuthClient {
         return { error: normalizeBetterAuthError(result.error) };
       }
 
-      // Emit SIGNED_OUT event
-      await this.notifyAllSubscribers('SIGNED_OUT', null);
+      // Better Auth will update the useSession atom, which will trigger setupSessionListener()
+      // to emit SIGNED_OUT event automatically
 
       return { error: null };
     } catch (error) {
@@ -843,11 +816,8 @@ export class BetterAuthAdapter implements AuthClient {
             };
           }
 
-          // Emit SIGNED_IN event
-          await this.notifyAllSubscribers(
-            'SIGNED_IN',
-            sessionResult.data.session
-          );
+          // Better Auth will update the useSession atom, which will trigger setupSessionListener()
+          // to emit SIGNED_IN event automatically
 
           return {
             data: {
@@ -915,11 +885,8 @@ export class BetterAuthAdapter implements AuthClient {
           // Get updated session
           const sessionResult = await this.getSession();
 
-          // Emit USER_UPDATED event
-          await this.notifyAllSubscribers(
-            'USER_UPDATED',
-            sessionResult.data.session
-          );
+          // Better Auth will update the useSession atom, which will trigger setupSessionListener()
+          // to emit USER_UPDATED event automatically
 
           return {
             data: {
@@ -972,11 +939,8 @@ export class BetterAuthAdapter implements AuthClient {
             };
           }
 
-          // Emit SIGNED_IN event
-          await this.notifyAllSubscribers(
-            'SIGNED_IN',
-            sessionResult.data.session
-          );
+          // Better Auth will update the useSession atom, which will trigger setupSessionListener()
+          // to emit SIGNED_IN event automatically
 
           return {
             data: {
@@ -1035,10 +999,8 @@ export class BetterAuthAdapter implements AuthClient {
 
           const sessionResult = await this.getSession();
 
-          await this.notifyAllSubscribers(
-            'USER_UPDATED',
-            sessionResult.data.session
-          );
+          // Better Auth will update the useSession atom, which will trigger setupSessionListener()
+          // to emit USER_UPDATED event automatically
 
           return {
             data: {
@@ -1146,11 +1108,8 @@ export class BetterAuthAdapter implements AuthClient {
         throw new Error('Failed to retrieve updated user');
       }
 
-      // Emit USER_UPDATED event
-      await this.notifyAllSubscribers(
-        'USER_UPDATED',
-        updatedSessionResult.data.session
-      );
+      // Better Auth will update the useSession atom, which will trigger setupSessionListener()
+      // to emit USER_UPDATED event automatically
 
       return {
         data: { user: updatedSessionResult.data.session.user },
@@ -1308,14 +1267,8 @@ export class BetterAuthAdapter implements AuthClient {
         };
       }
 
-      // Get updated session after unlinking
-      const updatedSessionResult = await this.getSession();
-
-      // Emit USER_UPDATED event
-      await this.notifyAllSubscribers(
-        'USER_UPDATED',
-        updatedSessionResult.data.session
-      );
+      // Better Auth will update the useSession atom after unlinking, which will trigger
+      // setupSessionListener() to emit USER_UPDATED event automatically
 
       return {
         data: {},
@@ -1506,7 +1459,7 @@ export class BetterAuthAdapter implements AuthClient {
     // Better Auth uses nanostores atoms, listen to useSession atom
     if (this.betterAuth.useSession) {
       // Subscribe to session changes
-      this.betterAuth.useSession.subscribe((sessionState: any) => {
+      this.betterAuth.useSession.subscribe((sessionState) => {
         // Map Better Auth session state to Supabase session format
         if (sessionState?.data?.session && sessionState?.data?.user) {
           const session = mapBetterAuthSessionToSupabase(
@@ -1723,11 +1676,8 @@ export class BetterAuthAdapter implements AuthClient {
       const sessionResult = await this.getSession();
 
       if (sessionResult.data.session) {
-        // Emit SIGNED_IN event
-        await this.notifyAllSubscribers(
-          'SIGNED_IN',
-          sessionResult.data.session
-        );
+        // Better Auth will update the useSession atom, which will trigger setupSessionListener()
+        // to emit SIGNED_IN event automatically
 
         return {
           data: {

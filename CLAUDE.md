@@ -96,6 +96,16 @@ Works in both browser and Node.js with graceful degradation:
 - **Browser**: Full feature support including cross-tab sync via BroadcastChannel
 - **Node.js**: Core auth works, browser-only features auto-disabled
 
+### Request Deduplication
+
+The Better Auth adapter automatically deduplicates concurrent read-only API calls using `p-memoize`:
+- **Deduplicated methods**: `getSession()`, `getUser()`, `getClaims()`, `getJwtToken()`
+- **Benefit**: Multiple simultaneous calls (e.g., from different components) share a single promise and network request
+- **Error handling**: Errors are NOT cached, allowing immediate retries
+- **Mutation methods**: `signOut()`, `updateUser()`, `signUp()` etc. execute every time (not deduplicated)
+
+This prevents the "thundering herd" problem during initial page load where multiple components try to fetch the session simultaneously.
+
 ### Implementation Details:
 
 The adapter implements sophisticated state management:
@@ -103,6 +113,7 @@ The adapter implements sophisticated state management:
 - **Cross-tab synchronization**: BroadcastChannel for auth state sync across tabs (browser only)
 - **Event system**: `onAuthStateChange()` for monitoring `SIGNED_IN`, `SIGNED_OUT`, `TOKEN_REFRESHED`, `USER_UPDATED` events
 - **Session mapping**: Transforms Better Auth sessions to Supabase-compatible format
+- **Request deduplication**: Uses p-memoize for read method deduplication
 
 See `BETTER_AUTH_SIMPLIFICATION.md` for detailed implementation notes and simplification strategy.
 

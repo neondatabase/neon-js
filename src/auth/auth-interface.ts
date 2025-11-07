@@ -12,13 +12,7 @@ type _AuthClientBase = {
     : K]: _AuthClientSupabaseInstance[K]; // This filters out protected/private members by checking if they are accessible
 };
 
-export type AuthClient = _AuthClientBase & {
-  /**
-   * Get JWT token for API authentication
-   * Optimized for high-frequency calls (uses cache)
-   */
-  getJwtToken(): Promise<string | null>;
-};
+export type AuthClient = _AuthClientBase;
 
 // Re-export Supabase error types
 export { AuthError, AuthApiError, isAuthError };
