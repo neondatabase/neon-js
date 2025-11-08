@@ -15,6 +15,11 @@ interface CacheEntry {
  * Provides immediate synchronous reads when cache is valid, falling back
  * to async fetch when expired.
  *
+ * Why we need this cache:
+ * - Better Auth's useSession atom is ASYNC (nanostores can return stale data)
+ * - After signOut(), useSession may not immediately return null
+ * - Synchronous cache with invalidation flags solves this race condition
+ *
  * Key characteristics:
  * - Synchronous get/set/clear operations
  * - 60-second TTL (configurable)
@@ -22,11 +27,38 @@ interface CacheEntry {
  * - Per-adapter instance scope
  * - No external dependencies
  * - Invalidation support to prevent returning stale data during sign-out
+ * - JWT token embedded in session object (access_token field)
+ *
+ * Industry comparison:
+ * - Clerk: 60-second synchronous token cache
+ * - Supabase: Uses async storage (localStorage) with expiration
+ * - Better Auth: Async reactive atoms (can lag behind server state)
  */
 export class SessionCache {
   private cache: CacheEntry | null = null;
   private readonly ttlMs: number;
-  private invalidated: boolean = false; // Flag to prevent returning stale data
+  /**
+   * Invalidation flag to prevent returning stale data during sign-out
+   *
+   * Problem this solves:
+   * JavaScript's async nature creates race conditions during sign-out:
+   * 1. Thread A calls getSession() → cache hit, starts returning
+   * 2. Thread B calls signOut() → clears cache before Thread A returns
+   * 3. Without flag: Thread A would return stale cached data
+   *
+   * Solution:
+   * - signOut() sets invalidation flag BEFORE clearing cache
+   * - getSession() checks flag before returning cached data
+   * - If invalidated, returns null instead of stale data
+   * - Flag cleared when new session is set (after sign-in)
+   *
+   * This pattern is similar to:
+   * - Clerk.js: Uses cache invalidation with subscription-based updates
+   * - Auth0: Uses versioned cache entries
+   *
+   * NOT a defensive "impossible state" check - solves real race condition.
+   */
+  private invalidated: boolean = false;
 
   /**
    * @param ttlMs - Time to live in milliseconds (default: 60000 = 60 seconds)

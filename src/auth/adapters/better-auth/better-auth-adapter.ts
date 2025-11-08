@@ -74,15 +74,24 @@ export class BetterAuthAdapter implements AuthClient {
     enableTokenRefreshDetection: true, // Enabled by default (matches Supabase)
     tokenRefreshCheckInterval: 30_000, // 30 seconds (matches Supabase)
   };
+  /**
+   * Last known session state for detecting auth change event types
+   *
+   * Required for Supabase AuthChangeEvent compatibility:
+   * - Better Auth's useSession atom only provides current state (session or null)
+   * - Supabase requires specific event types: SIGNED_IN, SIGNED_OUT, USER_UPDATED
+   * - We must compare previous vs current state to derive event type:
+   *   - null → session = SIGNED_IN
+   *   - session → null = SIGNED_OUT
+   *   - session → different session (user ID changed) = SIGNED_IN
+   *   - session → same session (user data changed) = USER_UPDATED
+   *
+   * Cannot be eliminated without breaking Supabase compatibility.
+   */
   private lastSessionState: Session | null = null;
 
-  // JWT token caching - uses JWT's exp claim for expiration
-  private jwtCache = {
-    token: null as string | null,
-    expiresAt: null as number | null, // Unix timestamp from JWT's exp claim
-  };
-
   // Session caching - synchronous in-memory cache with 60-second TTL
+  // JWT is stored as part of session object (access_token field)
   private sessionCache: SessionCache;
 
   constructor(
@@ -141,28 +150,6 @@ export class BetterAuthAdapter implements AuthClient {
     }
   }
 
-  /**
-   * Set JWT token in cache and extract expiration from token
-   */
-  private _setJwtCache(jwt: string): void {
-    const expiresAt = this._getJwtExpiration(jwt);
-    this.jwtCache.token = jwt;
-    this.jwtCache.expiresAt = expiresAt;
-    console.debug(
-      '[JWT Cache] Set - expires at',
-      expiresAt ? new Date(expiresAt * 1000).toISOString() : 'unknown'
-    );
-  }
-
-  /**
-   * Clear the cached JWT token
-   * Called when auth state changes (sign-in, sign-out, etc.)
-   */
-  private _clearJwtCache(): void {
-    console.debug('[JWT Cache] Clear');
-    this.jwtCache.token = null;
-    this.jwtCache.expiresAt = null;
-  }
 
   // Admin API
   admin: AuthClient['admin'] = undefined as never;
@@ -215,7 +202,7 @@ export class BetterAuthAdapter implements AuthClient {
       console.log('[getSession] Cache miss - fetching fresh session from Better Auth');
 
       // Step 2: Slow Path - Fetch fresh session (network request)
-      // Optimization: Cache JWT if server provides it in response header
+      // Optimization: Extract JWT if server provides it in response header
       let headerJwt: string | null = null;
       const response = await this.betterAuth.getSession({
         fetchOptions: {
@@ -223,9 +210,8 @@ export class BetterAuthAdapter implements AuthClient {
             // Try to extract JWT from response header
             const jwt = ctx.response.headers.get('set-auth-jwt');
             if (jwt) {
-              console.debug('[JWT Cache] Extracted from getSession response header');
+              console.debug('[JWT] Extracted from getSession response header');
               headerJwt = jwt;
-              this._setJwtCache(jwt);
             }
           },
         },
@@ -275,12 +261,13 @@ export class BetterAuthAdapter implements AuthClient {
 
       // Enrich session with JWT token
       const jwt = headerJwt || (await this.getJwtToken());
-      if (jwt) {
-        session.access_token = jwt;
-      }
+      session.access_token = jwt || session.access_token; // Keep opaque token if JWT fetch fails
 
-      // Cache the session
-      console.log('[getSession] Caching fresh session', { userId: session.user.id });
+      // Cache enriched session (single source of truth)
+      console.log('[getSession] Caching enriched session with JWT', {
+        userId: session.user.id,
+        hasJWT: !!jwt,
+      });
       this.sessionCache.set(session);
 
       console.log('[getSession] Returning fresh session');
@@ -432,29 +419,38 @@ export class BetterAuthAdapter implements AuthClient {
    */
   getJwtToken = async () => {
     try {
-      // Step 1: Check cache first
-      if (this.jwtCache.token && !this._isExpired(this.jwtCache.expiresAt)) {
-        console.debug('[JWT Cache] Hit');
-        return this.jwtCache.token;
+      // Step 1: Check if we have cached session with JWT
+      const cachedSession = this.sessionCache.get();
+      if (cachedSession?.access_token) {
+        // Verify JWT hasn't expired
+        const exp = this._getJwtExpiration(cachedSession.access_token);
+        if (exp && !this._isExpired(exp)) {
+          console.debug('[JWT] Cache hit from session cache');
+          return cachedSession.access_token;
+        }
       }
-      console.debug('[JWT Cache] Miss - fetching fresh token');
+      console.debug('[JWT] Cache miss - fetching fresh token');
 
       // Step 2: Fetch fresh JWT from /token endpoint
-      console.debug('[JWT Cache] Fetching from /token endpoint');
       const tokenResponse = await this.betterAuth.token();
 
       if (tokenResponse.error || !tokenResponse.data?.token) {
-        console.debug('[JWT Cache] Fetch failed');
-        this._clearJwtCache();
+        console.debug('[JWT] Fetch failed');
         return null;
       }
 
       const jwt = tokenResponse.data.token;
-      this._setJwtCache(jwt);
+
+      // Step 3: Update session cache with new JWT if we have a session
+      if (cachedSession) {
+        cachedSession.access_token = jwt;
+        this.sessionCache.set(cachedSession);
+        console.debug('[JWT] Updated session cache with fresh JWT');
+      }
 
       return jwt;
     } catch (error) {
-      this._clearJwtCache();
+      console.debug('[JWT] Error fetching token:', error);
       return null;
     }
   };
@@ -570,6 +566,11 @@ export class BetterAuthAdapter implements AuthClient {
         }
 
         // Get fresh session with full user metadata
+        //
+        // Clerk-style defensive pattern: After successful auth operation,
+        // verify session exists before returning to caller. This handles
+        // edge cases where SDK operation succeeds but session isn't immediately
+        // available (network issues, timing issues, etc.)
         const sessionResult = await this.getSession();
 
         if (!sessionResult.data.session?.user) {
@@ -780,11 +781,10 @@ export class BetterAuthAdapter implements AuthClient {
 
       // Clear caches IMMEDIATELY to prevent race conditions with concurrent getSession() calls
       // Setting invalidation flag ensures any in-flight getSession() calls will see the flag
-      // and return null instead of stale cached data
-      console.log('[signOut] Clearing session and JWT caches');
-      this.sessionCache.clear(); // Sets invalidation flag
-      this._clearJwtCache();
-      console.log('[signOut] Caches cleared - session cache has value:', this.sessionCache.has());
+      // and return null instead of stale cached data (both session + JWT)
+      console.log('[signOut] Clearing session cache (includes JWT)');
+      this.sessionCache.clear(); // Sets invalidation flag (clears session + JWT)
+      console.log('[signOut] Cache cleared - session cache has value:', this.sessionCache.has());
 
       const result = await this.betterAuth.signOut();
       console.log('[signOut] Better Auth signOut result:', { error: result.error ? 'has error' : 'no error' });
@@ -845,11 +845,11 @@ export class BetterAuthAdapter implements AuthClient {
         // Email verification (signup confirmation)
         if (type === 'signup' || type === 'invite') {
           // Better Auth uses verifyEmail for email verification
-          const result = (await this.betterAuth.verifyEmail?.({
+          const result = await this.betterAuth.verifyEmail?.({
             query: { token },
-          })) || { error: new Error('verifyEmail is not available') };
+          });
 
-          if (result.error) {
+          if (result?.error) {
             return {
               data: { user: null, session: null },
               error: normalizeBetterAuthError(result.error),
@@ -885,11 +885,11 @@ export class BetterAuthAdapter implements AuthClient {
 
         // Email change verification
         if (type === 'email_change') {
-          const result = (await this.betterAuth.verifyEmail?.({
+          const result = await this.betterAuth.verifyEmail?.({
             query: { token },
-          })) || { error: new Error('verifyEmail is not available') };
+          });
 
-          if (result.error) {
+          if (result?.error) {
             return {
               data: { user: null, session: null },
               error: normalizeBetterAuthError(result.error),
@@ -967,11 +967,11 @@ export class BetterAuthAdapter implements AuthClient {
 
         // For other token hash types, use similar logic as email verification
         if (type === 'signup' || type === 'invite') {
-          const result = (await this.betterAuth.verifyEmail?.({
+          const result = await this.betterAuth.verifyEmail?.({
             query: { token: token_hash },
-          })) || { error: new Error('verifyEmail is not available') };
+          });
 
-          if (result.error) {
+          if (result?.error) {
             return {
               data: { user: null, session: null },
               error: normalizeBetterAuthError(result.error),
@@ -1000,11 +1000,11 @@ export class BetterAuthAdapter implements AuthClient {
         }
 
         if (type === 'email_change') {
-          const result = (await this.betterAuth.verifyEmail?.({
+          const result = await this.betterAuth.verifyEmail?.({
             query: { token: token_hash },
-          })) || { error: new Error('verifyEmail is not available') };
+          });
 
-          if (result.error) {
+          if (result?.error) {
             return {
               data: { user: null, session: null },
               error: normalizeBetterAuthError(result.error),
@@ -1153,7 +1153,18 @@ export class BetterAuthAdapter implements AuthClient {
       // Direct 1:1 mapping: Supabase getUserIdentities -> Better Auth account.list
       const result = await (this.betterAuth as any).account?.list?.();
 
-      if (result?.error) {
+      if (!result) {
+        return {
+          data: null,
+          error: new AuthError(
+            'Failed to list accounts',
+            500,
+            'unexpected_failure'
+          ),
+        };
+      }
+
+      if (result.error) {
         return {
           data: null,
           error: normalizeBetterAuthError(result.error),
@@ -1162,7 +1173,7 @@ export class BetterAuthAdapter implements AuthClient {
 
       // Map Better Auth accounts to Supabase identities format
       const identities =
-        result?.data?.accounts?.map((account: any) => ({
+        result.data?.accounts?.map((account: any) => ({
           id: account.id,
           user_id: account.userId,
           identity_id: account.id,
@@ -1570,15 +1581,7 @@ export class BetterAuthAdapter implements AuthClient {
     session: Session | null,
     broadcast = true
   ): Promise<void> {
-    // Clear JWT cache on auth state changes that affect tokens
-    if (
-      event === 'SIGNED_IN' ||
-      event === 'SIGNED_OUT' ||
-      event === 'TOKEN_REFRESHED' ||
-      event === 'USER_UPDATED'
-    ) {
-      this._clearJwtCache();
-    }
+    // JWT is now part of session cache, no separate cache to clear
 
     // Broadcast to other tabs first
     if (broadcast && this.broadcastChannel) {
@@ -1647,6 +1650,22 @@ export class BetterAuthAdapter implements AuthClient {
     }
   }
 
+  /**
+   * Start token refresh detection via polling
+   *
+   * Industry Standard: Both Supabase and Clerk use polling for token refresh detection:
+   * - Supabase: 30-second interval with 10-second expiry margin
+   * - Clerk: 50-second interval with 60-second token TTL
+   *
+   * Why polling instead of reactive?
+   * - Better Auth's useSession atom only provides current state, not refresh events
+   * - Browser JavaScript cannot receive unsolicited server events (no SSE in this context)
+   * - Polling ensures deterministic behavior across all environments
+   *
+   * Implementation: Check session expiry every 30 seconds (matching Supabase)
+   * - If token expires in <= 90 seconds, assume it was refreshed and emit TOKEN_REFRESHED
+   * - If token expired completely, emit SIGNED_OUT
+   */
   private startTokenRefreshDetection(): void {
     // Only start if explicitly enabled
     if (!this.config.enableTokenRefreshDetection) {
