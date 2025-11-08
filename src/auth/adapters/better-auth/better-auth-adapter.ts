@@ -54,6 +54,14 @@ import { SessionCache } from './session-cache';
  * - Reduces network calls during normal operation
  * - Invalidation flag prevents stale data during sign-out
  *
+ * Event Emission (Supabase-compatible):
+ * - Events are emitted synchronously in auth methods (no reactive subscriptions)
+ * - SIGNED_IN: After successful sign-up, sign-in, OTP verification, OAuth callback
+ * - SIGNED_OUT: After sign-out completes
+ * - USER_UPDATED: After updateUser, unlinkIdentity, email change verification
+ * - TOKEN_REFRESHED: Detected via polling (30-second interval)
+ * - Cross-tab sync via BroadcastChannel (browser only)
+ *
  * Based on: https://www.better-auth.com/docs/guides/supabase-migration-guide
  */
 
@@ -78,13 +86,15 @@ export class BetterAuthAdapter implements AuthClient {
    * Last known session state for detecting auth change event types
    *
    * Required for Supabase AuthChangeEvent compatibility:
-   * - Better Auth's useSession atom only provides current state (session or null)
-   * - Supabase requires specific event types: SIGNED_IN, SIGNED_OUT, USER_UPDATED
-   * - We must compare previous vs current state to derive event type:
-   *   - null → session = SIGNED_IN
-   *   - session → null = SIGNED_OUT
-   *   - session → different session (user ID changed) = SIGNED_IN
-   *   - session → same session (user data changed) = USER_UPDATED
+   * - We track the previous session to determine which event to emit
+   * - Updated synchronously after each auth state change
+   * - Used by notifyAllSubscribers to determine event type if needed
+   *
+   * Event type determination:
+   * - null → session = SIGNED_IN (new session created)
+   * - session → null = SIGNED_OUT (session destroyed)
+   * - session → different session (user ID changed) = SIGNED_IN (switched accounts)
+   * - session → same session (user data changed) = USER_UPDATED (profile update)
    *
    * Cannot be eliminated without breaking Supabase compatibility.
    */
@@ -111,8 +121,7 @@ export class BetterAuthAdapter implements AuthClient {
       ...defaultBetterAuthClientOptions,
     });
 
-    // Set up session change listener for Better Auth's reactive system
-    this.setupSessionListener();
+    // Removed setupSessionListener() - we emit events directly in methods
   }
 
   /**
@@ -500,8 +509,10 @@ export class BetterAuthAdapter implements AuthClient {
           session: sessionResult.data.session,
         };
 
-        // Better Auth will update the useSession atom, which will trigger setupSessionListener()
-        // to emit SIGNED_IN event automatically
+        // Emit SIGNED_IN event synchronously (matches Supabase)
+        // Session is already cached, safe to emit now
+        await this.notifyAllSubscribers('SIGNED_IN', data.session);
+        this.lastSessionState = data.session;
 
         return { data, error: null };
       }
@@ -589,8 +600,10 @@ export class BetterAuthAdapter implements AuthClient {
           session: sessionResult.data.session,
         };
 
-        // Better Auth will update the useSession atom, which will trigger setupSessionListener()
-        // to emit SIGNED_IN event automatically
+        // Emit SIGNED_IN event synchronously (matches Supabase)
+        // Session is already cached, safe to emit now
+        await this.notifyAllSubscribers('SIGNED_IN', data.session);
+        this.lastSessionState = data.session;
 
         return { data, error: null };
       }
@@ -793,8 +806,13 @@ export class BetterAuthAdapter implements AuthClient {
         return { error: normalizeBetterAuthError(result.error) };
       }
 
-      // Better Auth will update the useSession atom, which will trigger setupSessionListener()
-      // to emit SIGNED_OUT event automatically
+      // Emit SIGNED_OUT event immediately (synchronously) before application unmounts components
+      // This prevents race condition where app unsubscribes before useSession detects sign-out
+      if (this.lastSessionState) {
+        console.log('[signOut] Emitting SIGNED_OUT event immediately to', this.stateChangeEmitters.size, 'subscribers');
+        await this.notifyAllSubscribers('SIGNED_OUT', null);
+        this.lastSessionState = null;
+      }
 
       console.log('[signOut] SignOut completed successfully');
       return { error: null };
@@ -830,8 +848,9 @@ export class BetterAuthAdapter implements AuthClient {
             };
           }
 
-          // Better Auth will update the useSession atom, which will trigger setupSessionListener()
-          // to emit SIGNED_IN event automatically
+          // Emit SIGNED_IN event synchronously
+          await this.notifyAllSubscribers('SIGNED_IN', sessionResult.data.session);
+          this.lastSessionState = sessionResult.data.session;
 
           return {
             data: {
@@ -899,8 +918,11 @@ export class BetterAuthAdapter implements AuthClient {
           // Get updated session
           const sessionResult = await this.getSession();
 
-          // Better Auth will update the useSession atom, which will trigger setupSessionListener()
-          // to emit USER_UPDATED event automatically
+          // Emit USER_UPDATED event synchronously (email changed)
+          if (sessionResult.data.session) {
+            await this.notifyAllSubscribers('USER_UPDATED', sessionResult.data.session);
+            this.lastSessionState = sessionResult.data.session;
+          }
 
           return {
             data: {
@@ -953,8 +975,9 @@ export class BetterAuthAdapter implements AuthClient {
             };
           }
 
-          // Better Auth will update the useSession atom, which will trigger setupSessionListener()
-          // to emit SIGNED_IN event automatically
+          // Emit SIGNED_IN event synchronously
+          await this.notifyAllSubscribers('SIGNED_IN', sessionResult.data.session);
+          this.lastSessionState = sessionResult.data.session;
 
           return {
             data: {
@@ -1013,8 +1036,11 @@ export class BetterAuthAdapter implements AuthClient {
 
           const sessionResult = await this.getSession();
 
-          // Better Auth will update the useSession atom, which will trigger setupSessionListener()
-          // to emit USER_UPDATED event automatically
+          // Emit USER_UPDATED event synchronously (email changed)
+          if (sessionResult.data.session) {
+            await this.notifyAllSubscribers('USER_UPDATED', sessionResult.data.session);
+            this.lastSessionState = sessionResult.data.session;
+          }
 
           return {
             data: {
@@ -1122,8 +1148,9 @@ export class BetterAuthAdapter implements AuthClient {
         throw new Error('Failed to retrieve updated user');
       }
 
-      // Better Auth will update the useSession atom, which will trigger setupSessionListener()
-      // to emit USER_UPDATED event automatically
+      // Emit USER_UPDATED event synchronously (matches Supabase)
+      await this.notifyAllSubscribers('USER_UPDATED', updatedSessionResult.data.session);
+      this.lastSessionState = updatedSessionResult.data.session;
 
       return {
         data: { user: updatedSessionResult.data.session.user },
@@ -1292,8 +1319,13 @@ export class BetterAuthAdapter implements AuthClient {
         };
       }
 
-      // Better Auth will update the useSession atom after unlinking, which will trigger
-      // setupSessionListener() to emit USER_UPDATED event automatically
+      // Emit USER_UPDATED event synchronously (identity unlinked)
+      // Get fresh session to reflect unlinked identity
+      const updatedSession = await this.getSession();
+      if (updatedSession.data.session) {
+        await this.notifyAllSubscribers('USER_UPDATED', updatedSession.data.session);
+        this.lastSessionState = updatedSession.data.session;
+      }
 
       return {
         data: {},
@@ -1443,7 +1475,9 @@ export class BetterAuthAdapter implements AuthClient {
       id,
       callback,
       unsubscribe: () => {
+        console.log('[onAuthStateChange] Unsubscribe called for ID:', id);
         this.stateChangeEmitters.delete(id);
+        console.log('[onAuthStateChange] Subscription removed. Remaining subscribers:', this.stateChangeEmitters.size);
 
         // Clean up if no more subscribers
         if (this.stateChangeEmitters.size === 0) {
@@ -1455,6 +1489,7 @@ export class BetterAuthAdapter implements AuthClient {
 
     // Store subscription
     this.stateChangeEmitters.set(id, subscription);
+    console.log('[onAuthStateChange] Subscription added. Total subscribers:', this.stateChangeEmitters.size, 'ID:', id);
 
     // Initialize cross-tab sync and polling if first subscriber
     if (this.stateChangeEmitters.size === 1) {
@@ -1485,72 +1520,7 @@ export class BetterAuthAdapter implements AuthClient {
    * used as the primary cache source due to its async nature causing race
    * conditions.
    */
-  private setupSessionListener(): void {
-    // Better Auth uses nanostores atoms, listen to useSession atom
-    if (this.betterAuth.useSession) {
-      console.log('[setupSessionListener] Setting up Better Auth session listener');
-      // Subscribe to session changes
-      this.betterAuth.useSession.subscribe((sessionState) => {
-        console.log('[setupSessionListener] Session state changed:', {
-          hasSession: !!sessionState?.data?.session,
-          hasUser: !!sessionState?.data?.user,
-          lastSessionState: this.lastSessionState ? 'exists' : 'null',
-        });
-
-        // Map Better Auth session state to Supabase session format
-        if (sessionState?.data?.session && sessionState?.data?.user) {
-          const session = mapBetterAuthSessionToSupabase(
-            sessionState.data.session,
-            sessionState.data.user
-          );
-
-          if (session) {
-            // Check if this is a new session (sign in)
-            if (!this.lastSessionState) {
-              console.log('[setupSessionListener] New session detected - SIGNED_IN');
-              // Update cache on sign-in
-              this.sessionCache.set(session);
-              this.notifyAllSubscribers('SIGNED_IN', session);
-            } else if (this.lastSessionState.user.id !== session.user.id) {
-              console.log('[setupSessionListener] User changed - SIGNED_IN');
-              // Update cache on user change
-              this.sessionCache.set(session);
-              this.notifyAllSubscribers('SIGNED_IN', session);
-            } else {
-              // Check if user data changed
-              const userChanged =
-                JSON.stringify(this.lastSessionState.user) !==
-                JSON.stringify(session.user);
-              if (userChanged) {
-                console.log('[setupSessionListener] User data updated - USER_UPDATED');
-                // Update cache on user update
-                this.sessionCache.set(session);
-                this.notifyAllSubscribers('USER_UPDATED', session);
-              } else {
-                console.log('[setupSessionListener] Session state unchanged, skipping notification');
-              }
-            }
-
-            this.lastSessionState = session;
-          }
-        } else {
-          console.log('[setupSessionListener] Session is null - checking for sign out');
-          // Session is null (signed out)
-          if (this.lastSessionState) {
-            console.log('[setupSessionListener] User was signed in, now signed out - SIGNED_OUT');
-            // Clear cache on sign-out
-            this.sessionCache.clear();
-            this.notifyAllSubscribers('SIGNED_OUT', null);
-          } else {
-            console.log('[setupSessionListener] Already signed out, no action needed');
-          }
-          this.lastSessionState = null;
-        }
-      });
-      // Store unsubscribe function for cleanup if needed
-      // Note: Better Auth manages the subscription lifecycle
-    }
-  }
+  
 
   private async emitInitialSession(
     callback: (
@@ -1738,8 +1708,9 @@ export class BetterAuthAdapter implements AuthClient {
       const sessionResult = await this.getSession();
 
       if (sessionResult.data.session) {
-        // Better Auth will update the useSession atom, which will trigger setupSessionListener()
-        // to emit SIGNED_IN event automatically
+        // Emit SIGNED_IN event synchronously (OAuth callback completed)
+        await this.notifyAllSubscribers('SIGNED_IN', sessionResult.data.session);
+        this.lastSessionState = sessionResult.data.session;
 
         return {
           data: {

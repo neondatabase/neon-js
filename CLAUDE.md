@@ -110,13 +110,14 @@ The Better Auth adapter uses a two-layer caching strategy:
 ### Implementation Details:
 
 The adapter implements sophisticated state management:
-- **Token refresh detection**: Automatic polling (30s interval) to detect token refreshes
+- **Event emission**: Synchronous emission in all state-changing methods (matches Supabase pattern)
 - **Cross-tab synchronization**: BroadcastChannel for auth state sync across tabs (browser only)
+- **Token refresh detection**: Automatic polling (30s interval) to detect token refreshes
 - **Event system**: `onAuthStateChange()` for monitoring `SIGNED_IN`, `SIGNED_OUT`, `TOKEN_REFRESHED`, `USER_UPDATED` events
 - **Session mapping**: Transforms Better Auth sessions to Supabase-compatible format
 - **Cache invalidation**: Prevents race conditions during sign-out with invalidation flags
 
-See `BETTER_AUTH_SIMPLIFICATION.md` for detailed implementation notes and simplification strategy.
+See `REMOVE_BETTER_AUTH_SESSION_LISTENER.md` for detailed implementation notes on the synchronous event model.
 
 ## Stack Auth Adapter (Legacy)
 
