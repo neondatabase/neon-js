@@ -1,4 +1,5 @@
 import type { Session } from '@supabase/auth-js';
+import type { SessionStorage } from './storage-interface';
 
 /**
  * Cache entry with TTL tracking
@@ -34,7 +35,7 @@ interface CacheEntry {
  * - Supabase: Uses async storage (localStorage) with expiration
  * - Better Auth: Async reactive atoms (can lag behind server state)
  */
-export class SessionCache {
+export class SessionCache implements SessionStorage {
   private cache: CacheEntry | null = null;
   private readonly ttlMs: number;
   /**
@@ -147,3 +148,6 @@ export class SessionCache {
     return Math.max(0, remaining);
   }
 }
+
+// Export as InMemoryCache for clarity
+export { SessionCache as InMemoryCache };
