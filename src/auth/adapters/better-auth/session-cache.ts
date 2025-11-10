@@ -1,5 +1,8 @@
 import type { Session } from '@supabase/auth-js';
 import type { SessionStorage } from './storage-interface';
+import { SESSION_CACHE_TTL_MS } from './constants';
+import { cacheEntrySchema } from './storage-schemas';
+import { z } from 'zod';
 
 /**
  * Cache entry with TTL tracking
@@ -10,61 +13,22 @@ interface CacheEntry {
 }
 
 /**
- * Synchronous in-memory session cache with TTL-based expiration
- *
- * Design inspired by Clerk's 60-second session token caching strategy.
- * Provides immediate synchronous reads when cache is valid, falling back
- * to async fetch when expired.
- *
- * Why we need this cache:
- * - Better Auth's useSession atom is ASYNC (nanostores can return stale data)
- * - After signOut(), useSession may not immediately return null
- * - Synchronous cache with invalidation flags solves this race condition
- *
- * Key characteristics:
- * - Synchronous get/set/clear operations
- * - 60-second TTL (configurable)
- * - Lazy expiration (checked on read, not proactively cleaned)
- * - Per-adapter instance scope
- * - No external dependencies
- * - Invalidation support to prevent returning stale data during sign-out
- * - JWT token embedded in session object (access_token field)
- *
- * Industry comparison:
- * - Clerk: 60-second synchronous token cache
- * - Supabase: Uses async storage (localStorage) with expiration
- * - Better Auth: Async reactive atoms (can lag behind server state)
+ * Synchronous in-memory session cache with TTL-based expiration.
+ * Provides immediate reads when valid, with invalidation support to prevent stale data.
  */
 export class SessionCache implements SessionStorage {
   private cache: CacheEntry | null = null;
   private readonly ttlMs: number;
   /**
-   * Invalidation flag to prevent returning stale data during sign-out
-   *
-   * Problem this solves:
-   * JavaScript's async nature creates race conditions during sign-out:
-   * 1. Thread A calls getSession() → cache hit, starts returning
-   * 2. Thread B calls signOut() → clears cache before Thread A returns
-   * 3. Without flag: Thread A would return stale cached data
-   *
-   * Solution:
-   * - signOut() sets invalidation flag BEFORE clearing cache
-   * - getSession() checks flag before returning cached data
-   * - If invalidated, returns null instead of stale data
-   * - Flag cleared when new session is set (after sign-in)
-   *
-   * This pattern is similar to:
-   * - Clerk.js: Uses cache invalidation with subscription-based updates
-   * - Auth0: Uses versioned cache entries
-   *
-   * NOT a defensive "impossible state" check - solves real race condition.
+   * Invalidation flag prevents race conditions during sign-out.
+   * Set before cache clear, checked before returning cached data.
    */
   private invalidated: boolean = false;
 
   /**
    * @param ttlMs - Time to live in milliseconds (default: 60000 = 60 seconds)
    */
-  constructor(ttlMs: number = 60_000) {
+  constructor(ttlMs: number = SESSION_CACHE_TTL_MS) {
     this.ttlMs = ttlMs;
   }
 
@@ -97,17 +61,29 @@ export class SessionCache implements SessionStorage {
   /**
    * Set session in cache (synchronous)
    * Clears invalidation flag to allow new sessions
+   * Validates cache entry using Zod schema
    */
   set(session: Session): void {
-    this.cache = {
+    const cacheEntry = {
       session,
       expiresAt: Date.now() + this.ttlMs,
     };
-    this.invalidated = false; // Clear invalidation flag for new session
-    console.debug(
-      '[Session Cache] Set - expires at',
-      new Date(this.cache.expiresAt).toISOString()
-    );
+
+    // Validate cache entry structure
+    try {
+      cacheEntrySchema.parse(cacheEntry);
+      this.cache = cacheEntry;
+      this.invalidated = false; // Clear invalidation flag for new session
+      console.debug(
+        '[Session Cache] Set - expires at',
+        new Date(this.cache.expiresAt).toISOString()
+      );
+    } catch (error) {
+      console.error('[Session Cache] Validation failed:', error);
+      throw new Error(
+        `Invalid cache entry: ${error instanceof z.ZodError ? error.message : 'Unknown validation error'}`
+      );
+    }
   }
 
   /**

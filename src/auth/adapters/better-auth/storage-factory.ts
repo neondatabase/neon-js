@@ -2,6 +2,7 @@ import type { SessionStorage } from './storage-interface';
 import { LocalStorageCache } from './local-storage-cache';
 import { SessionCache } from './session-cache';
 import { isBrowser } from '@/auth/adapters/shared-helpers';
+import { DEFAULT_STORAGE_KEY_PREFIX, SESSION_CACHE_TTL_MS } from './constants';
 
 /**
  * Create appropriate session storage based on environment
@@ -14,16 +15,14 @@ import { isBrowser } from '@/auth/adapters/shared-helpers';
  * @returns SessionStorage implementation
  */
 export function createSessionStorage(
-  keyPrefix = 'neon-auth',
-  ttl = 60_000
+  keyPrefix = DEFAULT_STORAGE_KEY_PREFIX,
+  ttl = SESSION_CACHE_TTL_MS
 ): SessionStorage {
   // Browser environment with localStorage support
   if (isBrowser() && typeof localStorage !== 'undefined') {
-    console.log('[SessionStorage] Using LocalStorageCache (browser)');
     return new LocalStorageCache(keyPrefix, ttl);
   }
 
   // Node.js or browser without localStorage
-  console.log('[SessionStorage] Using InMemoryCache (Node.js or no localStorage)');
   return new SessionCache(ttl);
 }

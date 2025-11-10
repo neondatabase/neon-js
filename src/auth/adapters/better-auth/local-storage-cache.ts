@@ -1,24 +1,19 @@
 import type { Session } from '@supabase/auth-js';
 import type { SessionStorage } from './storage-interface';
+import { SESSION_CACHE_TTL_MS, DEFAULT_STORAGE_KEY_PREFIX } from './constants';
+import { storedSessionSchema } from './storage-schemas';
 
+/**
+ * Stored session structure for localStorage
+ */
 interface StoredSession {
   session: Session;
   expiresAt: number;
 }
 
 /**
- * LocalStorage-based session cache for browser environments
- *
- * Features:
- * - Automatic multi-tab synchronization (all tabs read same localStorage key)
- * - TTL-based expiration (default 60 seconds)
- * - Invalidation flag prevents race conditions during sign-out
- * - Matches Supabase's storage pattern exactly
- *
- * Security Note:
- * - Stores JWT in localStorage (XSS vulnerable but industry standard)
- * - Same trade-off as Supabase, Firebase, Auth0
- * - Better Auth session cookie remains httpOnly (secure)
+ * LocalStorage-based session cache for browser environments.
+ * Provides automatic multi-tab sync with TTL-based expiration.
  */
 export class LocalStorageCache implements SessionStorage {
   private storageKey: string;
@@ -26,8 +21,8 @@ export class LocalStorageCache implements SessionStorage {
   private defaultTTL: number;
 
   constructor(
-    keyPrefix = 'neon-auth',
-    ttl = 60_000 // 60 seconds (matches Clerk)
+    keyPrefix = DEFAULT_STORAGE_KEY_PREFIX,
+    ttl = SESSION_CACHE_TTL_MS
   ) {
     this.storageKey = `${keyPrefix}:session`;
     this.invalidationKey = `${keyPrefix}:invalidated`;
@@ -47,10 +42,24 @@ export class LocalStorageCache implements SessionStorage {
         return null;
       }
 
-      const parsed: StoredSession = JSON.parse(stored);
+      // Parse and validate JSON data
+      const parsed = JSON.parse(stored);
+      const validationResult = storedSessionSchema.safeParse(parsed);
+
+      if (!validationResult.success) {
+        console.warn(
+          '[LocalStorageCache] Invalid stored session format:',
+          validationResult.error
+        );
+        // Clear invalid data
+        this.clear();
+        return null;
+      }
+
+      const validated = validationResult.data;
 
       // Check expiration
-      if (Date.now() >= parsed.expiresAt) {
+      if (Date.now() >= validated.expiresAt) {
         // Expired - clean up
         console.debug('[LocalStorageCache] Expired - clearing');
         this.clear();
@@ -58,7 +67,8 @@ export class LocalStorageCache implements SessionStorage {
       }
 
       console.debug('[LocalStorageCache] Hit - returning cached session');
-      return parsed.session;
+      // Cast validated data back to Session type (validated structure matches)
+      return validated.session as Session;
     } catch (error) {
       console.warn('[LocalStorageCache] Error reading session:', error);
       return null;
@@ -71,6 +81,18 @@ export class LocalStorageCache implements SessionStorage {
         session,
         expiresAt: Date.now() + ttl,
       };
+
+      // Validate before storing
+      const validationResult = storedSessionSchema.safeParse(stored);
+      if (!validationResult.success) {
+        console.error(
+          '[LocalStorageCache] Validation failed:',
+          validationResult.error
+        );
+        throw new Error(
+          `Invalid session data: ${validationResult.error.message}`
+        );
+      }
 
       localStorage.setItem(this.storageKey, JSON.stringify(stored));
 
@@ -115,8 +137,20 @@ export class LocalStorageCache implements SessionStorage {
         return 0;
       }
 
-      const parsed: StoredSession = JSON.parse(stored);
-      const remaining = parsed.expiresAt - Date.now();
+      // Parse and validate JSON data
+      const parsed = JSON.parse(stored);
+      const validationResult = storedSessionSchema.safeParse(parsed);
+
+      if (!validationResult.success) {
+        console.warn(
+          '[LocalStorageCache] Invalid stored session in getRemainingTTL:',
+          validationResult.error
+        );
+        return 0;
+      }
+
+      const validated = validationResult.data;
+      const remaining = validated.expiresAt - Date.now();
       return Math.max(0, remaining);
     } catch {
       return 0;

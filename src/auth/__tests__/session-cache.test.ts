@@ -152,4 +152,36 @@ describe('SessionCache', () => {
       vi.useRealTimers();
     });
   });
+
+  describe('validation', () => {
+    it('should throw error when setting invalid session data', () => {
+      const invalidSession = {
+        access_token: 'token',
+        // Missing required fields
+      } as unknown as Session;
+
+      expect(() => cache.set(invalidSession)).toThrow(/Invalid cache entry/);
+    });
+
+    it('should throw error when session is missing user', () => {
+      const sessionWithoutUser = {
+        access_token: 'token',
+        refresh_token: 'refresh',
+        token_type: 'bearer',
+        expires_in: 3600,
+        // Missing user field
+      } as unknown as Session;
+
+      expect(() => cache.set(sessionWithoutUser)).toThrow(/Invalid cache entry/);
+    });
+
+    it('should accept valid session with all required fields', () => {
+      const validSession: Session = {
+        ...mockSession,
+      };
+
+      expect(() => cache.set(validSession)).not.toThrow();
+      expect(cache.get()).toEqual(validSession);
+    });
+  });
 });

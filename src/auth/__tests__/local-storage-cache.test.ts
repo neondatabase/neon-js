@@ -159,4 +159,74 @@ describe('LocalStorageCache', () => {
     });
   });
 
+  describe('validation', () => {
+    it('should reject invalid session data when reading from storage', () => {
+      // Store invalid data directly
+      const invalidData = {
+        session: {
+          access_token: 'token',
+          // Missing required fields
+        },
+        expiresAt: Date.now() + 60_000,
+      };
+      localStorageMock.setItem('test-auth:session', JSON.stringify(invalidData));
+
+      // Should return null for invalid data
+      expect(cache.get()).toBeNull();
+      // Should have cleared the invalid data
+      expect(localStorageMock.getItem('test-auth:session')).toBeNull();
+    });
+
+    it('should reject session missing user field', () => {
+      const invalidData = {
+        session: {
+          access_token: 'token',
+          refresh_token: 'refresh',
+          token_type: 'bearer',
+          expires_in: 3600,
+          // Missing user field
+        },
+        expiresAt: Date.now() + 60_000,
+      };
+      localStorageMock.setItem('test-auth:session', JSON.stringify(invalidData));
+
+      expect(cache.get()).toBeNull();
+    });
+
+    it('should return 0 TTL for invalid stored data', () => {
+      const invalidData = {
+        session: { access_token: 'token' },
+        expiresAt: Date.now() + 60_000,
+      };
+      localStorageMock.setItem('test-auth:session', JSON.stringify(invalidData));
+
+      expect(cache.getRemainingTTL()).toBe(0);
+    });
+
+    it('should validate session data before storing', () => {
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const invalidSession = {
+        access_token: 'token',
+        // Missing required fields
+      } as unknown as Session;
+
+      cache.set(invalidSession);
+
+      // Should have logged a warning
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[LocalStorageCache] Error storing session'),
+        expect.anything()
+      );
+
+      consoleWarnSpy.mockRestore();
+    });
+
+    it('should accept and store valid session data', () => {
+      cache.set(mockSession);
+      const retrieved = cache.get();
+      expect(retrieved).toEqual(mockSession);
+    });
+  });
+
 });
