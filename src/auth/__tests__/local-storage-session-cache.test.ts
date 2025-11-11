@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { LocalStorageCache } from '@/auth/adapters/better-auth/local-storage-cache';
+import { LocalStorageCache } from '@/auth/adapters/better-auth/local-storage-session-cache';
 import type { Session } from '@supabase/auth-js';
 
 // Mock localStorage

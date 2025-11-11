@@ -1,21 +1,21 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createSessionStorage } from '@/auth/adapters/better-auth/storage-factory';
-import { LocalStorageCache } from '@/auth/adapters/better-auth/local-storage-cache';
-import { SessionCache } from '@/auth/adapters/better-auth/session-cache';
+import { LocalStorageCache } from '@/auth/adapters/better-auth/local-storage-session-cache';
+import { InMemorySessionCache } from '@/auth/adapters/better-auth/in-memory-session-cache';
 
 describe('createSessionStorage', () => {
   // Note: These tests run in Node.js environment, which means isBrowser() will return false
-  // The factory will always use SessionCache in the test environment
+  // The factory will always use InMemorySessionCache in the test environment
   // We test the logic through the actual implementations
 
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('should create InMemoryCache (SessionCache) in Node.js test environment', () => {
-    // In Node.js environment (where tests run), createSessionStorage returns SessionCache
+  it('should create InMemoryCache (InMemorySessionCache) in Node.js test environment', () => {
+    // In Node.js environment (where tests run), createSessionStorage returns InMemorySessionCache
     const storage = createSessionStorage();
-    expect(storage).toBeInstanceOf(SessionCache);
+    expect(storage).toBeInstanceOf(InMemorySessionCache);
   });
 
   it('should create storage with default parameters', () => {

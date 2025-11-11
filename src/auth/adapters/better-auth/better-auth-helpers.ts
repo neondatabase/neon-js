@@ -7,6 +7,7 @@ import type {
 } from './better-auth-types';
 import type { Session, User } from '@supabase/auth-js';
 import { toISOString } from '../shared-helpers';
+import { DEFAULT_SESSION_EXPIRY_MS } from './constants';
 
 /**
  * Map Better Auth errors to Supabase error format
@@ -155,7 +156,7 @@ export function mapBetterAuthSessionToSupabase(
       : typeof betterAuthSession.expiresAt === 'object' &&
           betterAuthSession.expiresAt instanceof Date
         ? Math.floor(betterAuthSession.expiresAt.getTime() / 1000)
-        : Math.floor(Date.now() / 1000) + 3600; // Default 1 hour if can't parse
+        : Math.floor(Date.now() / 1000) + Math.floor(DEFAULT_SESSION_EXPIRY_MS / 1000); // Default 1 hour if can't parse
 
   const now = Math.floor(Date.now() / 1000);
   const expiresIn = Math.max(0, expiresAt - now);

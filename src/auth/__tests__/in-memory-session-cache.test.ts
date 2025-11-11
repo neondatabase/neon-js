@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SessionCache } from '../adapters/better-auth/session-cache';
+import { InMemorySessionCache } from '../adapters/better-auth/in-memory-session-cache';
 import type { Session } from '@supabase/auth-js';
 
 const mockSession: Session = {
@@ -18,11 +18,11 @@ const mockSession: Session = {
   },
 };
 
-describe('SessionCache', () => {
-  let cache: SessionCache;
+describe('InMemorySessionCache', () => {
+  let cache: InMemorySessionCache;
 
   beforeEach(() => {
-    cache = new SessionCache(60_000); // 60 second TTL
+    cache = new InMemorySessionCache(60_000); // 60 second TTL
   });
 
   describe('get/set', () => {
@@ -138,7 +138,7 @@ describe('SessionCache', () => {
     it('should respect custom TTL', () => {
       vi.useFakeTimers();
 
-      const customCache = new SessionCache(5_000); // 5 seconds
+      const customCache = new InMemorySessionCache(5_000); // 5 seconds
       customCache.set(mockSession);
 
       expect(customCache.get()).toEqual(mockSession);

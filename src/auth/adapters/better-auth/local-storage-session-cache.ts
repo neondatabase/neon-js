@@ -1,15 +1,7 @@
 import type { Session } from '@supabase/auth-js';
 import type { SessionStorage } from './storage-interface';
 import { SESSION_CACHE_TTL_MS, DEFAULT_STORAGE_KEY_PREFIX } from './constants';
-import { storedSessionSchema } from './storage-schemas';
-
-/**
- * Stored session structure for localStorage
- */
-interface StoredSession {
-  session: Session;
-  expiresAt: number;
-}
+import { localStorageCacheEntrySchema, type LocalStorageCacheEntry } from './storage-schemas';
 
 /**
  * LocalStorage-based session cache for browser environments.
@@ -44,7 +36,7 @@ export class LocalStorageCache implements SessionStorage {
 
       // Parse and validate JSON data
       const parsed = JSON.parse(stored);
-      const validationResult = storedSessionSchema.safeParse(parsed);
+      const validationResult = localStorageCacheEntrySchema.safeParse(parsed);
 
       if (!validationResult.success) {
         console.warn(
@@ -77,13 +69,13 @@ export class LocalStorageCache implements SessionStorage {
 
   set(session: Session, ttl = this.defaultTTL): void {
     try {
-      const stored: StoredSession = {
+      const stored: LocalStorageCacheEntry = {
         session,
         expiresAt: Date.now() + ttl,
       };
 
       // Validate before storing
-      const validationResult = storedSessionSchema.safeParse(stored);
+      const validationResult = localStorageCacheEntrySchema.safeParse(stored);
       if (!validationResult.success) {
         console.error(
           '[LocalStorageCache] Validation failed:',
@@ -139,7 +131,7 @@ export class LocalStorageCache implements SessionStorage {
 
       // Parse and validate JSON data
       const parsed = JSON.parse(stored);
-      const validationResult = storedSessionSchema.safeParse(parsed);
+      const validationResult = localStorageCacheEntrySchema.safeParse(parsed);
 
       if (!validationResult.success) {
         console.warn(

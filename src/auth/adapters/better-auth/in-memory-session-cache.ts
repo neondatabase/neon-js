@@ -1,23 +1,15 @@
 import type { Session } from '@supabase/auth-js';
 import type { SessionStorage } from './storage-interface';
 import { SESSION_CACHE_TTL_MS } from './constants';
-import { cacheEntrySchema } from './storage-schemas';
+import { inMemoryCacheEntrySchema, type InMemoryCacheEntry } from './storage-schemas';
 import { z } from 'zod';
-
-/**
- * Cache entry with TTL tracking
- */
-interface CacheEntry {
-  session: Session;
-  expiresAt: number; // Unix timestamp (ms)
-}
 
 /**
  * Synchronous in-memory session cache with TTL-based expiration.
  * Provides immediate reads when valid, with invalidation support to prevent stale data.
  */
-export class SessionCache implements SessionStorage {
-  private cache: CacheEntry | null = null;
+export class InMemorySessionCache implements SessionStorage {
+  private cache: InMemoryCacheEntry | null = null;
   private readonly ttlMs: number;
   /**
    * Invalidation flag prevents race conditions during sign-out.
@@ -71,7 +63,7 @@ export class SessionCache implements SessionStorage {
 
     // Validate cache entry structure
     try {
-      cacheEntrySchema.parse(cacheEntry);
+      inMemoryCacheEntrySchema.parse(cacheEntry);
       this.cache = cacheEntry;
       this.invalidated = false; // Clear invalidation flag for new session
       console.debug(
@@ -125,5 +117,3 @@ export class SessionCache implements SessionStorage {
   }
 }
 
-// Export as InMemoryCache for clarity
-export { SessionCache as InMemoryCache };

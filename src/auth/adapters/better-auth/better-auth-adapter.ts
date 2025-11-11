@@ -27,8 +27,8 @@ import { createSessionStorage } from './storage-factory';
 import {
   SESSION_CACHE_TTL_MS,
   TOKEN_REFRESH_CHECK_INTERVAL_MS,
-  CLOCK_SKEW_BUFFER_SECONDS,
-  TOKEN_REFRESH_THRESHOLD_SECONDS,
+  CLOCK_SKEW_BUFFER_MS,
+  TOKEN_REFRESH_THRESHOLD_MS,
   BROADCAST_CHANNEL_NAME,
   DEFAULT_STORAGE_KEY_PREFIX,
 } from './constants';
@@ -96,7 +96,7 @@ export class BetterAuthAdapter implements AuthClient {
         ? expiresAt
         : Math.floor(expiresAt.getTime() / 1000);
 
-    return expiresAtNumber <= now + CLOCK_SKEW_BUFFER_SECONDS;
+    return expiresAtNumber <= now + Math.floor(CLOCK_SKEW_BUFFER_MS / 1000);
   }
 
   /**
@@ -1586,7 +1586,7 @@ export class BetterAuthAdapter implements AuthClient {
 
         // Like Supabase: Detect if token was refreshed (< threshold seconds to expiry)
         // Better Auth auto-refreshes tokens, we just detect and emit the event
-        if (expiresInSeconds <= TOKEN_REFRESH_THRESHOLD_SECONDS && expiresInSeconds > 0) {
+        if (expiresInSeconds <= Math.floor(TOKEN_REFRESH_THRESHOLD_MS / 1000) && expiresInSeconds > 0) {
           // Token is fresh (was likely just refreshed), emit TOKEN_REFRESHED
           await this.notifyAllSubscribers('TOKEN_REFRESHED', session);
           this.lastSessionState = session;
