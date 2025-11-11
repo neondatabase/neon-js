@@ -10,7 +10,10 @@ import {
   createAuthClient,
   type BetterAuthClientOptions,
 } from 'better-auth/client';
-import type { OnAuthStateChangeConfig, NeonBetterAuthOptions } from './better-auth-types';
+import type {
+  OnAuthStateChangeConfig,
+  NeonBetterAuthOptions,
+} from './better-auth-types';
 import {
   normalizeBetterAuthError,
   mapBetterAuthSessionToSupabase,
@@ -213,11 +216,20 @@ export class BetterAuthAdapter implements AuthClient {
         };
       }
 
-      // Enrich session with JWT token
-      const jwt = headerJwt || (await this.getJwtToken());
-      session.access_token = jwt || session.access_token; // Keep opaque token if JWT fetch fails
+      if (!headerJwt) {
+        return {
+          data: { session: null },
+          error: new AuthError(
+            'Failed to get JWT token from response header. Please check if the server is configured correctly.',
+            500,
+            'unexpected_failure'
+          ),
+        };
+      }
 
-      // Cache enriched session (single source of truth)
+      // Enrich session with JWT token
+      session.access_token = headerJwt;
+      // Cache enriched session
       this.sessionStorage.set(session);
 
       return { data: { session }, error: null };
@@ -379,11 +391,9 @@ export class BetterAuthAdapter implements AuthClient {
 
       // Step 2: Fetch fresh JWT from /token endpoint
       const tokenResponse = await this.betterAuth.token();
-
       if (tokenResponse.error || !tokenResponse.data?.token) {
         return null;
       }
-
       const jwt = tokenResponse.data.token;
 
       // Step 3: Update session cache with new JWT if we have a session
@@ -1593,7 +1603,10 @@ export class BetterAuthAdapter implements AuthClient {
 
         // Like Supabase: Detect if token was refreshed (< threshold seconds to expiry)
         // Better Auth auto-refreshes tokens, we just detect and emit the event
-        if (expiresInSeconds <= Math.floor(TOKEN_REFRESH_THRESHOLD_MS / 1000) && expiresInSeconds > 0) {
+        if (
+          expiresInSeconds <= Math.floor(TOKEN_REFRESH_THRESHOLD_MS / 1000) &&
+          expiresInSeconds > 0
+        ) {
           // Token is fresh (was likely just refreshed), emit TOKEN_REFRESHED
           await this.notifyAllSubscribers('TOKEN_REFRESHED', session);
           this.lastSessionState = session;
