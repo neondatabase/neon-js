@@ -35,7 +35,6 @@ export class LocalStorageCache implements SessionStorage {
     try {
       // Check invalidation flag first (race condition prevention)
       if (this.isInvalidated()) {
-        console.debug('[LocalStorageCache] Invalidated - returning null');
         return null;
       }
 
@@ -63,12 +62,10 @@ export class LocalStorageCache implements SessionStorage {
       // Check expiration
       if (Date.now() >= validated.expiresAt) {
         // Expired - clean up
-        console.debug('[LocalStorageCache] Expired - clearing');
         this.clear();
         return null;
       }
 
-      console.debug('[LocalStorageCache] Hit - returning cached session');
       // Cast validated data back to Session type (validated structure matches)
       return validated.session as Session;
     } catch (error) {
@@ -100,11 +97,6 @@ export class LocalStorageCache implements SessionStorage {
 
       // Clear invalidation flag (new session set)
       localStorage.removeItem(this.invalidationKey);
-
-      console.debug(
-        '[LocalStorageCache] Set - expires at',
-        new Date(stored.expiresAt).toISOString()
-      );
     } catch (error) {
       console.warn('[LocalStorageCache] Error storing session:', error);
     }
@@ -117,8 +109,6 @@ export class LocalStorageCache implements SessionStorage {
 
       // Clear session data
       localStorage.removeItem(this.storageKey);
-
-      console.debug('[LocalStorageCache] Clear');
     } catch (error) {
       console.warn('[LocalStorageCache] Error clearing session:', error);
     }

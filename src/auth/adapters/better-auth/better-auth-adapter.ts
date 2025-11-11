@@ -27,6 +27,7 @@ import {
 } from 'better-auth/client/plugins';
 import type { SessionStorage } from './storage-interface';
 import { createSessionStorage } from './storage-factory';
+import { InFlightRequestManager } from './in-flight-request-manager';
 import {
   SESSION_CACHE_TTL_MS,
   TOKEN_REFRESH_CHECK_INTERVAL_MS,
@@ -67,6 +68,13 @@ export class BetterAuthAdapter implements AuthClient {
   // Session caching - environment-aware storage (localStorage in browser, in-memory in Node.js)
   // JWT is stored as part of session object (access_token field)
   private sessionStorage: SessionStorage;
+
+  // Generic request deduplication
+  /**
+   * Deduplicates in-flight requests by key to prevent thundering herd.
+   * Used by getSession(), getJwtToken(), and potentially other methods.
+   */
+  private inFlightRequests = new InFlightRequestManager();
 
   constructor(
     betterAuthClientOptions: NeonBetterAuthOptions,
@@ -127,6 +135,29 @@ export class BetterAuthAdapter implements AuthClient {
     }
   }
 
+  /**
+   * Calculate TTL for cache based on JWT expiration
+   * Returns milliseconds until JWT expires (minus clock skew buffer)
+   * Falls back to default SESSION_CACHE_TTL_MS if JWT has no expiration
+   */
+  private _calculateCacheTTL(jwt: string | undefined): number {
+    if (!jwt) {
+      return SESSION_CACHE_TTL_MS;
+    }
+
+    const exp = this._getJwtExpiration(jwt);
+    if (!exp) {
+      return SESSION_CACHE_TTL_MS;
+    }
+
+    const now = Date.now();
+    const expiresAtMs = exp * 1000; // Convert seconds to milliseconds
+    const ttl = expiresAtMs - now - CLOCK_SKEW_BUFFER_MS;
+
+    // Ensure positive TTL, minimum 1 second
+    return Math.max(ttl, 1000);
+  }
+
   // Admin API
   admin: AuthClient['admin'] = undefined as never;
   // MFA API
@@ -168,71 +199,75 @@ export class BetterAuthAdapter implements AuthClient {
         return { data: { session: cachedSession }, error: null };
       }
 
-      // Step 2: Slow Path - Fetch fresh session (network request)
-      // Optimization: Extract JWT if server provides it in response header
-      let headerJwt: string | null = null;
-      const response = await this.betterAuth.getSession({
-        fetchOptions: {
-          onSuccess: (ctx) => {
-            // Try to extract JWT from response header
-            const jwt = ctx.response.headers.get('set-auth-jwt');
-            if (jwt) {
-              headerJwt = jwt;
-            }
+      // Step 2: Deduplicate network request
+      return await this.inFlightRequests.deduplicate('getSession', async () => {
+        // Step 3: Slow Path - Fetch fresh session (network request)
+        // Optimization: Extract JWT if server provides it in response header
+        let headerJwt: string | null = null;
+        const response = await this.betterAuth.getSession({
+          fetchOptions: {
+            onSuccess: (ctx) => {
+              // Try to extract JWT from response header
+              const jwt = ctx.response.headers.get('set-auth-jwt');
+              if (jwt) {
+                headerJwt = jwt;
+              }
+            },
           },
-        },
+        });
+
+        if (response.error) {
+          return {
+            data: { session: null },
+            error: normalizeBetterAuthError(response.error),
+          };
+        }
+
+        if (!response.data?.session || !response.data?.user) {
+          return {
+            data: { session: null },
+            error: new AuthError(
+              'Failed to get session',
+              500,
+              'unexpected_failure'
+            ),
+          };
+        }
+
+        const session = mapBetterAuthSessionToSupabase(
+          response.data.session,
+          response.data.user
+        );
+        if (!session) {
+          return {
+            data: { session: null },
+            error: new AuthError(
+              'Failed to map session',
+              500,
+              'unexpected_failure'
+            ),
+          };
+        }
+
+        if (!headerJwt) {
+          return {
+            data: { session: null },
+            error: new AuthError(
+              'Failed to get JWT token from response header. Please check if the server is configured correctly.',
+              500,
+              'unexpected_failure'
+            ),
+          };
+        }
+
+        // Enrich session with JWT token
+        session.access_token = headerJwt;
+        // Cache enriched session with TTL based on JWT expiration
+        const ttl = this._calculateCacheTTL(headerJwt);
+        this.sessionStorage.set(session, ttl);
+
+        return { data: { session }, error: null };
       });
-
-      if (response.error) {
-        return {
-          data: { session: null },
-          error: normalizeBetterAuthError(response.error),
-        };
-      }
-
-      if (!response.data?.session || !response.data?.user) {
-        return {
-          data: { session: null },
-          error: new AuthError(
-            'Failed to get session',
-            500,
-            'unexpected_failure'
-          ),
-        };
-      }
-
-      const session = mapBetterAuthSessionToSupabase(
-        response.data.session,
-        response.data.user
-      );
-      if (!session) {
-        return {
-          data: { session: null },
-          error: new AuthError(
-            'Failed to map session',
-            500,
-            'unexpected_failure'
-          ),
-        };
-      }
-
-      if (!headerJwt) {
-        return {
-          data: { session: null },
-          error: new AuthError(
-            'Failed to get JWT token from response header. Please check if the server is configured correctly.',
-            500,
-            'unexpected_failure'
-          ),
-        };
-      }
-
-      // Enrich session with JWT token
-      session.access_token = headerJwt;
-      // Cache enriched session
-      this.sessionStorage.set(session);
-
-      return { data: { session }, error: null };
     } catch (error) {
       return {
         data: { session: null },
@@ -389,21 +424,27 @@ export class BetterAuthAdapter implements AuthClient {
         }
       }
 
-      // Step 2: Fetch fresh JWT from /token endpoint
-      const tokenResponse = await this.betterAuth.token();
-      if (tokenResponse.error || !tokenResponse.data?.token) {
-        return null;
-      }
-      const jwt = tokenResponse.data.token;
+      // Step 2: Deduplicate JWT fetch
+      return await this.inFlightRequests.deduplicate('getJwtToken', async () => {
+        // Step 3: Fetch fresh JWT from /token endpoint
+        const tokenResponse = await this.betterAuth.token();
+        if (tokenResponse.error || !tokenResponse.data?.token) {
+          return null;
+        }
+        const jwt = tokenResponse.data.token;
 
-      // Step 3: Update session cache with new JWT if we have a session
-      if (cachedSession) {
-        cachedSession.access_token = jwt;
-        this.sessionStorage.set(cachedSession);
-      }
+        // Step 4: Update session cache with new JWT if we have a session
+        const currentSession = this.sessionStorage.get();
+        if (currentSession) {
+          currentSession.access_token = jwt;
+          const ttl = this._calculateCacheTTL(jwt);
+          this.sessionStorage.set(currentSession, ttl);
+        }
 
-      return jwt;
+        return jwt;
+      });
     } catch (error) {
+      console.error('[getJwtToken] Error fetching JWT:', error);
       return null;
     }
   };
@@ -1118,48 +1159,51 @@ export class BetterAuthAdapter implements AuthClient {
         };
       }
 
-      // Direct 1:1 mapping: Supabase getUserIdentities -> Better Auth account.list
-      const result = await (this.betterAuth as any).account?.list?.();
+      // Deduplicate account list fetch to prevent thundering herd
+      return await this.inFlightRequests.deduplicate('getUserIdentities', async () => {
+        // Direct 1:1 mapping: Supabase getUserIdentities -> Better Auth account.list
+        const result = await (this.betterAuth as any).account?.list?.();
 
-      if (!result) {
-        return {
-          data: null,
-          error: new AuthError(
-            'Failed to list accounts',
-            500,
-            'unexpected_failure'
-          ),
-        };
-      }
+        if (!result) {
+          return {
+            data: null,
+            error: new AuthError(
+              'Failed to list accounts',
+              500,
+              'unexpected_failure'
+            ),
+          };
+        }
 
-      if (result.error) {
-        return {
-          data: null,
-          error: normalizeBetterAuthError(result.error),
-        };
-      }
+        if (result.error) {
+          return {
+            data: null,
+            error: normalizeBetterAuthError(result.error),
+          };
+        }
 
-      // Map Better Auth accounts to Supabase identities format
-      const identities =
-        result.data?.accounts?.map((account: any) => ({
-          id: account.id,
-          user_id: account.userId,
-          identity_id: account.id,
-          provider: account.provider,
-          identity_data: {
-            provider_account_id: account.providerAccountId,
-            provider: account.provider,
+        // Map Better Auth accounts to Supabase identities format
+        const identities =
+          result.data?.accounts?.map((account: any) => ({
+            id: account.id,
             user_id: account.userId,
-          },
-          created_at: toISOString(account.createdAt),
-          last_sign_in_at: toISOString(account.createdAt),
-          updated_at: toISOString(account.updatedAt),
-        })) || [];
+            identity_id: account.id,
+            provider: account.provider,
+            identity_data: {
+              provider_account_id: account.providerAccountId,
+              provider: account.provider,
+              user_id: account.userId,
+            },
+            created_at: toISOString(account.createdAt),
+            last_sign_in_at: toISOString(account.createdAt),
+            updated_at: toISOString(account.updatedAt),
+          })) || [];
 
-      return {
-        data: { identities },
-        error: null,
-      };
+        return {
+          data: { identities },
+          error: null,
+        };
+      });
     } catch (error) {
       return {
         data: null,

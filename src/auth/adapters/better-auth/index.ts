@@ -21,3 +21,6 @@ export {
 
 // Constants (for advanced configuration)
 export * from './constants';
+
+// Internal utilities (for testing and advanced use cases)
+export { InFlightRequestManager } from './in-flight-request-manager';
