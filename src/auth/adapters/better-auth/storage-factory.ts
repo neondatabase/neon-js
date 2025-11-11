@@ -12,15 +12,17 @@ import { DEFAULT_STORAGE_KEY_PREFIX, SESSION_CACHE_TTL_MS } from './constants';
  *
  * @param keyPrefix - Storage key prefix (default: 'neon-auth')
  * @param ttl - Time to live in milliseconds (default: 60000)
+ * @param projectIdentifier - Optional project/tenant identifier for multi-tenant isolation
  * @returns SessionStorage implementation
  */
 export function createSessionStorage(
   keyPrefix = DEFAULT_STORAGE_KEY_PREFIX,
-  ttl = SESSION_CACHE_TTL_MS
+  ttl = SESSION_CACHE_TTL_MS,
+  projectIdentifier?: string
 ): SessionStorage {
   // Browser environment with localStorage support
   if (isBrowser() && typeof localStorage !== 'undefined') {
-    return new LocalStorageCache(keyPrefix, ttl);
+    return new LocalStorageCache(keyPrefix, ttl, projectIdentifier);
   }
 
   // Node.js or browser without localStorage

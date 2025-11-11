@@ -7,6 +7,7 @@ export type {
   BetterAuthSession,
   BetterAuthUser,
   OnAuthStateChangeConfig,
+  NeonBetterAuthOptions,
 } from './better-auth-types';
 
 // Re-export BetterAuthClientOptions from better-auth

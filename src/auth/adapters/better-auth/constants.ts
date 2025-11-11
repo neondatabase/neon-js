@@ -26,3 +26,6 @@ export const BROADCAST_CHANNEL_NAME = 'better-auth-state-changes';
 
 /** Default session storage key prefix */
 export const DEFAULT_STORAGE_KEY_PREFIX = 'neon-auth';
+
+/** Storage schema version for localStorage keys */
+export const STORAGE_VERSION = 'v1';

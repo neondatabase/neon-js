@@ -1,11 +1,15 @@
 import type { Session } from '@supabase/auth-js';
 import type { SessionStorage } from './storage-interface';
-import { SESSION_CACHE_TTL_MS, DEFAULT_STORAGE_KEY_PREFIX } from './constants';
+import { SESSION_CACHE_TTL_MS, DEFAULT_STORAGE_KEY_PREFIX, STORAGE_VERSION } from './constants';
 import { localStorageCacheEntrySchema, type LocalStorageCacheEntry } from './storage-schemas';
 
 /**
  * LocalStorage-based session cache for browser environments.
  * Provides automatic multi-tab sync with TTL-based expiration.
+ *
+ * Key pattern:
+ * - With project ID: `neon-auth:{projectId}:v1:session`
+ * - Without project ID: `neon-auth:v1:session`
  */
 export class LocalStorageCache implements SessionStorage {
   private storageKey: string;
@@ -14,10 +18,16 @@ export class LocalStorageCache implements SessionStorage {
 
   constructor(
     keyPrefix = DEFAULT_STORAGE_KEY_PREFIX,
-    ttl = SESSION_CACHE_TTL_MS
+    ttl = SESSION_CACHE_TTL_MS,
+    projectIdentifier?: string
   ) {
-    this.storageKey = `${keyPrefix}:session`;
-    this.invalidationKey = `${keyPrefix}:invalidated`;
+    // Build key with optional project identifier
+    const namespace = projectIdentifier
+      ? `${keyPrefix}:${projectIdentifier}:${STORAGE_VERSION}`
+      : `${keyPrefix}:${STORAGE_VERSION}`;
+
+    this.storageKey = `${namespace}:session`;
+    this.invalidationKey = `${namespace}:invalidated`;
     this.defaultTTL = ttl;
   }
 

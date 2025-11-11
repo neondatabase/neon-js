@@ -10,7 +10,7 @@ import {
   createAuthClient,
   type BetterAuthClientOptions,
 } from 'better-auth/client';
-import type { OnAuthStateChangeConfig } from './better-auth-types';
+import type { OnAuthStateChangeConfig, NeonBetterAuthOptions } from './better-auth-types';
 import {
   normalizeBetterAuthError,
   mapBetterAuthSessionToSupabase,
@@ -66,7 +66,7 @@ export class BetterAuthAdapter implements AuthClient {
   private sessionStorage: SessionStorage;
 
   constructor(
-    betterAuthClientOptions: BetterAuthClientOptions,
+    betterAuthClientOptions: NeonBetterAuthOptions,
     config?: OnAuthStateChangeConfig
   ) {
     // Merge config
@@ -74,11 +74,18 @@ export class BetterAuthAdapter implements AuthClient {
       this.config = { ...this.config, ...config };
     }
 
+    // Extract projectIdentifier from options (Neon-specific)
+    const { projectIdentifier, ...betterAuthOptions } = betterAuthClientOptions;
+
     // Create environment-appropriate session storage (localStorage in browser, in-memory in Node.js)
-    this.sessionStorage = createSessionStorage(DEFAULT_STORAGE_KEY_PREFIX, SESSION_CACHE_TTL_MS);
+    this.sessionStorage = createSessionStorage(
+      DEFAULT_STORAGE_KEY_PREFIX,
+      SESSION_CACHE_TTL_MS,
+      projectIdentifier
+    );
 
     this.betterAuth = createAuthClient({
-      ...betterAuthClientOptions,
+      ...betterAuthOptions,
       ...defaultBetterAuthClientOptions,
     });
   }
