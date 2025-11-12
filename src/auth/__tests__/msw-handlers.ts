@@ -47,7 +47,7 @@ class MockAuthDatabase {
     password: string,
     metadata?: Record<string, any>
   ): MockUser {
-    const userId = `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const userId = `user-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
     const user: MockUser = {
       id: userId,
       email: email.toLowerCase(),
@@ -135,11 +135,11 @@ class MockAuthDatabase {
           sub: userId,
           email: user?.email || email || null,
           iat: Math.floor(Date.now() / 1000),
-          exp: Math.floor(Date.now() / 1000) + 86400,
+          exp: Math.floor(Date.now() / 1000) + 86_400,
           role: 'authenticated',
         })
       );
-      return `${header}.${payload}.mock-signature-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      return `${header}.${payload}.mock-signature-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
     }
 
     // Access tokens need full Stack Auth schema
@@ -161,7 +161,7 @@ class MockAuthDatabase {
         is_anonymous: false,
       })
     );
-    return `${header}.${payload}.mock-signature-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return `${header}.${payload}.mock-signature-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
   }
 
   storeOtpCode(email: string, code: string) {
@@ -604,7 +604,7 @@ export const stackAuthHandlers = [
           token_type: 'Bearer',
           expires_in: 3600,
         });
-      } catch (_error) {
+      } catch {
         return HttpResponse.json(
           {
             error: 'invalid_token',

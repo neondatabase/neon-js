@@ -256,10 +256,10 @@ describe('StackAuthAdapter - Helpers', () => {
           'feature_not_supported',
         ];
 
-        errorCodes.forEach((code) => {
+        for (const code of errorCodes) {
           // All codes should be snake_case (allowing digits)
-          expect(code).toMatch(/^[a-z0-9_]+$/);
-        });
+          expect(code).toMatch(/^[\d_a-z]+$/);
+        }
       });
 
       it('should use consistent HTTP status codes', () => {
@@ -272,9 +272,9 @@ describe('StackAuthAdapter - Helpers', () => {
           email_address_invalid: 400,
         };
 
-        Object.entries(statusCodeMappings).forEach(([_code, status]) => {
+        for (const [_code, status] of Object.entries(statusCodeMappings)) {
           expect([400, 401, 404, 422, 429]).toContain(status);
-        });
+        }
       });
     });
   });
@@ -377,7 +377,7 @@ describe('StackAuthAdapter - Helpers', () => {
         const token =
           'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLTEyMyIsImV4cCI6OTk5OTk5OTk5OSwiaWF0IjoxNjAwMDAwMDAwLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20ifQ.signature';
         const refreshToken = 'refresh-token-456';
-        const expiresAt = 9999999999;
+        const expiresAt = 9_999_999_999;
 
         const session = {
           access_token: token,
@@ -432,7 +432,7 @@ describe('StackAuthAdapter - Helpers', () => {
       const session: Session = {
         access_token: 'token',
         refresh_token: 'refresh',
-        expires_at: 9999999999,
+        expires_at: 9_999_999_999,
         expires_in: 3600,
         token_type: 'Bearer',
       };

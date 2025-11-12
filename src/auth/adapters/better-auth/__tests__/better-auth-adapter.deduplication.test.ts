@@ -22,12 +22,12 @@ describe('BetterAuthAdapter - Request Deduplication Integration', () => {
       // Assert: All calls returned same data (deduplication worked)
       // They should all have the same error or same session
       const firstResult = results[0];
-      results.forEach((result) => {
+      for (const result of results) {
         expect(result.data).toEqual(firstResult.data);
         if (result.error) {
           expect(result.error.message).toEqual(firstResult.error?.message);
         }
-      });
+      }
 
       // Verify that the in-flight request manager was used
       // (If 10 calls didn't deduplicate, we'd see 10 separate result variations)
@@ -60,9 +60,9 @@ describe('BetterAuthAdapter - Request Deduplication Integration', () => {
       const results = await Promise.all(calls);
 
       // Assert: All cache hits returned same data as first call
-      results.forEach((result) => {
+      for (const result of results) {
         expect(result.data).toEqual(result1.data);
-      });
+      }
     });
   });
 
@@ -83,9 +83,9 @@ describe('BetterAuthAdapter - Request Deduplication Integration', () => {
       // Assert: All calls returned same JWT (deduplication worked)
       // They should all have the same value
       const firstJwt = results[0];
-      results.forEach((result) => {
+      for (const result of results) {
         expect(result).toEqual(firstJwt);
-      });
+      }
     });
 
     it('should allow retry after successful request completes', async () => {
@@ -143,12 +143,12 @@ describe('BetterAuthAdapter - Request Deduplication Integration', () => {
 
       // Assert: All calls returned same data (deduplication worked)
       const firstResult = results[0];
-      results.forEach((result) => {
+      for (const result of results) {
         expect(result.data).toEqual(firstResult.data);
         if (result.error) {
           expect(result.error.message).toEqual(firstResult.error?.message);
         }
-      });
+      }
 
       // Verify that all results are consistent
       expect(results.every((r) => r.data === firstResult.data || (r.error && firstResult.error))).toBe(true);

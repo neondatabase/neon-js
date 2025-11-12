@@ -17,9 +17,9 @@ describe('InFlightRequestManager', () => {
     expect(mockFn).toHaveBeenCalledTimes(1);
 
     // Assert: All results are identical
-    results.forEach((result) => {
+    for (const result of results) {
       expect(result).toBe('result');
-    });
+    }
   });
 
   it('should track different keys independently', async () => {

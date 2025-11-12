@@ -3,8 +3,8 @@ import {
   generateTypes,
   type GenerateTypesOptions,
 } from '@/cli/commands/generate-types.js';
-import { writeFileSync, mkdirSync } from 'fs';
-import { dirname } from 'path';
+import { writeFileSync, mkdirSync } from 'node:fs';
+import path from 'node:path';
 
 export interface GenTypesFlags {
   dbUrl?: string;
@@ -48,7 +48,7 @@ export async function genTypes(flags: GenTypesFlags) {
 
   const types = await generateTypes(options);
 
-  const outputDir = dirname(outputPath);
+  const outputDir = path.dirname(outputPath);
   if (outputDir !== '.') {
     mkdirSync(outputDir, { recursive: true });
   }

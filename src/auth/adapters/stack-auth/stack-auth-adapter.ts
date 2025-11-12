@@ -74,15 +74,28 @@ function normalizeStackAuthError(
     let code = 'unknown_error';
 
     // Map HTTP status codes to error codes
-    if (status === 429) {
+    switch (status) {
+    case 429: {
       code = 'over_request_rate_limit';
-    } else if (status === 422) {
+    
+    break;
+    }
+    case 422: {
       code = 'user_already_exists';
-    } else if (status === 404) {
+    
+    break;
+    }
+    case 404: {
       code = 'user_not_found';
-    } else if (status === 401) {
+    
+    break;
+    }
+    case 401: {
       code = 'bad_jwt';
-    } else {
+    
+    break;
+    }
+    default: {
       // Fall back to message-based detection if no httpStatus or it's generic
       if (
         message.includes('Invalid login credentials') ||
@@ -115,6 +128,7 @@ function normalizeStackAuthError(
         code = 'email_address_invalid';
         status = 400;
       }
+    }
     }
 
     return new AuthApiError(message, status, code);
@@ -1239,7 +1253,7 @@ export class StackAuthAdapter<
       }
 
       return accessToken;
-    } catch (_error) {
+    } catch {
       return null;
     }
   };
@@ -1800,13 +1814,13 @@ export class StackAuthAdapter<
   startAutoRefresh: AuthClient['startAutoRefresh'] = async () => {
     // Stack Auth handles auto-refresh automatically
     // No explicit start needed
-    return Promise.resolve();
+    return;
   };
 
   stopAutoRefresh: AuthClient['stopAutoRefresh'] = async () => {
     // Stack Auth handles auto-refresh automatically
     // No explicit stop needed
-    return Promise.resolve();
+    return;
   };
   private async _fetchFreshSession(): Promise<
     ReturnType<AuthClient['getSession']>
@@ -1907,7 +1921,7 @@ export class StackAuthAdapter<
 
       // Emit initial session
       await callback('INITIAL_SESSION', data.session);
-    } catch (_error) {
+    } catch {
       // Emit with null session on exception
       await callback('INITIAL_SESSION', null);
     }
@@ -1933,7 +1947,7 @@ export class StackAuthAdapter<
     }
 
     // Notify all local subscribers
-    const promises = Array.from(this.stateChangeEmitters.values()).map(
+    const promises = [...this.stateChangeEmitters.values()].map(
       (subscription) => {
         try {
           return Promise.resolve(subscription.callback(event, session));
@@ -1961,12 +1975,12 @@ export class StackAuthAdapter<
         );
 
         // Listen for messages from other tabs
-        this.broadcastChannel.onmessage = async (event: MessageEvent) => {
+        this.broadcastChannel.addEventListener('message', async (event: MessageEvent) => {
           const { event: authEvent, session } = event.data;
 
           // Emit event locally (do not broadcast back)
           await this.notifyAllSubscribers(authEvent, session, false);
-        };
+        });
       } catch (error) {
         // BroadcastChannel creation failed (shouldn't happen if supportsBroadcastChannel() returned true)
         console.error(

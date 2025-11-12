@@ -15,6 +15,6 @@ export default defineConfig({
       './src/auth/__tests__/msw-setup.ts', // Setup MSW for API mocking
     ],
     // Increase timeout for tests that make network requests
-    testTimeout: 10000,
+    testTimeout: 10_000,
   },
 });

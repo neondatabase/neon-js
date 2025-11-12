@@ -30,47 +30,64 @@ export function normalizeBetterAuthError(
     let code = 'unknown_error';
 
     // Map HTTP status codes to Supabase error codes
-    if (status === 401) {
-      code = 'bad_jwt';
-    } else if (status === 404) {
-      code = 'user_not_found';
-    } else if (status === 422) {
-      code = 'user_already_exists';
-    } else if (status === 429) {
-      code = 'over_request_rate_limit';
-    } else if (status === 500) {
-      code = 'unexpected_failure';
-    } else {
-      // Fall back to message-based detection
-      const lowerMessage = message.toLowerCase();
-      if (
-        lowerMessage.includes('invalid login') ||
-        lowerMessage.includes('incorrect') ||
-        lowerMessage.includes('wrong password')
-      ) {
-        code = 'invalid_credentials';
-      } else if (
-        lowerMessage.includes('already exists') ||
-        lowerMessage.includes('already registered')
-      ) {
-        code = 'user_already_exists';
-      } else if (lowerMessage.includes('not found')) {
-        code = 'user_not_found';
-      } else if (
-        lowerMessage.includes('token') &&
-        (lowerMessage.includes('invalid') || lowerMessage.includes('expired'))
-      ) {
+    switch (status) {
+      case 401: {
         code = 'bad_jwt';
-      } else if (
-        lowerMessage.includes('rate limit') ||
-        lowerMessage.includes('too many requests')
-      ) {
+
+        break;
+      }
+      case 404: {
+        code = 'user_not_found';
+
+        break;
+      }
+      case 422: {
+        code = 'user_already_exists';
+
+        break;
+      }
+      case 429: {
         code = 'over_request_rate_limit';
-      } else if (
-        lowerMessage.includes('email') &&
-        lowerMessage.includes('invalid')
-      ) {
-        code = 'email_address_invalid';
+
+        break;
+      }
+      case 500: {
+        code = 'unexpected_failure';
+
+        break;
+      }
+      default: {
+        // Fall back to message-based detection
+        const lowerMessage = message.toLowerCase();
+        if (
+          lowerMessage.includes('invalid login') ||
+          lowerMessage.includes('incorrect') ||
+          lowerMessage.includes('wrong password')
+        ) {
+          code = 'invalid_credentials';
+        } else if (
+          lowerMessage.includes('already exists') ||
+          lowerMessage.includes('already registered')
+        ) {
+          code = 'user_already_exists';
+        } else if (lowerMessage.includes('not found')) {
+          code = 'user_not_found';
+        } else if (
+          lowerMessage.includes('token') &&
+          (lowerMessage.includes('invalid') || lowerMessage.includes('expired'))
+        ) {
+          code = 'bad_jwt';
+        } else if (
+          lowerMessage.includes('rate limit') ||
+          lowerMessage.includes('too many requests')
+        ) {
+          code = 'over_request_rate_limit';
+        } else if (
+          lowerMessage.includes('email') &&
+          lowerMessage.includes('invalid')
+        ) {
+          code = 'email_address_invalid';
+        }
       }
     }
 
@@ -153,10 +170,11 @@ export function mapBetterAuthSessionToSupabase(
   const expiresAt =
     typeof betterAuthSession.expiresAt === 'string'
       ? Math.floor(new Date(betterAuthSession.expiresAt).getTime() / 1000)
-      : typeof betterAuthSession.expiresAt === 'object' &&
+      : (typeof betterAuthSession.expiresAt === 'object' &&
           betterAuthSession.expiresAt instanceof Date
         ? Math.floor(betterAuthSession.expiresAt.getTime() / 1000)
-        : Math.floor(Date.now() / 1000) + Math.floor(DEFAULT_SESSION_EXPIRY_MS / 1000); // Default 1 hour if can't parse
+        : Math.floor(Date.now() / 1000) +
+          Math.floor(DEFAULT_SESSION_EXPIRY_MS / 1000)); // Default 1 hour if can't parse
 
   const now = Math.floor(Date.now() / 1000);
   const expiresIn = Math.max(0, expiresAt - now);
@@ -195,7 +213,7 @@ export function mapBetterAuthUserToSupabase(
   }
 
   // Extract any additional metadata from Better Auth user
-  Object.keys(betterAuthUser).forEach((key) => {
+  for (const key of Object.keys(betterAuthUser)) {
     if (
       ![
         'id',
@@ -209,7 +227,7 @@ export function mapBetterAuthUserToSupabase(
     ) {
       userMetadata[key] = betterAuthUser[key];
     }
-  });
+  }
 
   const user: User = {
     id: betterAuthUser.id,

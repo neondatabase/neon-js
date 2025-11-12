@@ -99,7 +99,7 @@ export class BetterAuthAdapter implements AuthClient {
 
       const callbackURL =
         oauthCredentials.options?.redirectTo ||
-        (typeof window !== 'undefined' ? window.location.origin : '');
+        (globalThis.window === undefined ? '' : globalThis.location.origin);
 
       // Convert scopes from Supabase format (space-separated string) to Better Auth format (array)
       const scopes = oauthCredentials.options?.scopes
@@ -605,7 +605,7 @@ export class BetterAuthAdapter implements AuthClient {
         provider,
         callbackURL:
           options?.redirectTo ||
-          (typeof window !== 'undefined' ? window.location.origin : ''),
+          (globalThis.window === undefined ? '' : globalThis.location.origin),
       });
 
       // OAuth redirects the user, so we return success immediately
@@ -615,7 +615,7 @@ export class BetterAuthAdapter implements AuthClient {
           provider,
           url:
             options?.redirectTo ||
-            (typeof window !== 'undefined' ? window.location.origin : ''),
+            (globalThis.window === undefined ? '' : globalThis.location.origin),
         },
         error: null,
       };
@@ -1153,7 +1153,7 @@ export class BetterAuthAdapter implements AuthClient {
         email,
         redirectTo:
           options?.redirectTo ||
-          (typeof window !== 'undefined' ? window.location.origin : ''),
+          (globalThis.window === undefined ? '' : globalThis.location.origin),
       });
 
       if (result?.error) {
@@ -1217,7 +1217,7 @@ export class BetterAuthAdapter implements AuthClient {
             email,
             callbackURL:
               options?.emailRedirectTo ||
-              (typeof window !== 'undefined' ? window.location.origin : ''),
+              (globalThis.window === undefined ? '' : globalThis.location.origin),
           });
 
           if (result?.error) {
@@ -1382,7 +1382,7 @@ export class BetterAuthAdapter implements AuthClient {
   startAutoRefresh: AuthClient['startAutoRefresh'] = async () => {
     // Better Auth handles auto-refresh automatically
     // No explicit start needed
-    return Promise.resolve();
+    return;
   };
 
   /**
@@ -1392,7 +1392,7 @@ export class BetterAuthAdapter implements AuthClient {
   stopAutoRefresh: AuthClient['stopAutoRefresh'] = async () => {
     // Better Auth handles auto-refresh automatically
     // No explicit stop needed
-    return Promise.resolve();
+    return;
   };
   //#endregion
 
@@ -1735,7 +1735,7 @@ export class BetterAuthAdapter implements AuthClient {
 
       await callback('INITIAL_SESSION', data.session);
       this.lastSessionState = data.session;
-    } catch (_error) {
+    } catch {
       await callback('INITIAL_SESSION', null);
     }
   }
@@ -1753,17 +1753,17 @@ export class BetterAuthAdapter implements AuthClient {
           session,
           timestamp: Date.now(),
         });
-      } catch (_error) {
+      } catch {
         // BroadcastChannel may fail in some environments (e.g., Node.js)
       }
     }
 
     // Notify all local subscribers
-    const promises = Array.from(this.stateChangeEmitters.values()).map(
+    const promises = [...this.stateChangeEmitters.values()].map(
       (subscription) => {
         try {
           return Promise.resolve(subscription.callback(event, session));
-        } catch (_error) {
+        } catch {
           // Auth state change callback error - skip this subscriber
           return Promise.resolve();
         }
@@ -1785,7 +1785,7 @@ export class BetterAuthAdapter implements AuthClient {
         this.#broadcastChannel = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
 
         // Listen for messages from other tabs
-        this.#broadcastChannel.onmessage = async (event: MessageEvent) => {
+        this.#broadcastChannel.addEventListener('message', async (event: MessageEvent) => {
           const { event: authEvent, session } = event.data;
 
           // Update in-memory cache when receiving broadcast
@@ -1808,7 +1808,7 @@ export class BetterAuthAdapter implements AuthClient {
           // Emit event locally (do not broadcast back to avoid infinite loop)
           await this.notifyAllSubscribers(authEvent, session, false);
           this.lastSessionState = session;
-        };
+        });
       } catch (error) {
         // BroadcastChannel creation failed - cross-tab sync unavailable
         console.warn('[BroadcastChannel] Failed to initialize:', error);
@@ -1867,7 +1867,7 @@ export class BetterAuthAdapter implements AuthClient {
           await this.notifyAllSubscribers('TOKEN_REFRESHED', session);
           this.lastSessionState = session;
         }
-      } catch (_error) {
+      } catch {
         // Token refresh detection error - skip this check
       }
     }, this.config.tokenRefreshCheckInterval);

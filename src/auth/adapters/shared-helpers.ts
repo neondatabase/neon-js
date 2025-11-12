@@ -8,7 +8,7 @@
  * @returns true if in browser, false otherwise (e.g., Node.js)
  */
 export const isBrowser = (): boolean => {
-  return typeof window !== 'undefined' && typeof document !== 'undefined';
+  return globalThis.window !== undefined && typeof document !== 'undefined';
 };
 
 /**
@@ -17,7 +17,7 @@ export const isBrowser = (): boolean => {
  * @returns true if BroadcastChannel is available (browser only)
  */
 export const supportsBroadcastChannel = (): boolean => {
-  return isBrowser() && typeof globalThis.BroadcastChannel !== 'undefined';
+  return isBrowser() && globalThis.BroadcastChannel !== undefined;
 };
 
 /**
