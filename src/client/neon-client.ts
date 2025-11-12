@@ -3,7 +3,7 @@ import { PostgrestClient } from '@supabase/postgrest-js';
 
 // Internal constructor options (accepts auth options at runtime)
 export type NeonClientConstructorOptions<SchemaName> = {
-  url: string;
+  dataApiUrl: string;
   options?: {
     db?: {
       schema?: Exclude<SchemaName, '__InternalSupabase'>;
@@ -29,8 +29,11 @@ export class NeonClient<
 > {
   auth?: AuthClient;
 
-  constructor({ url, options }: NeonClientConstructorOptions<SchemaName>) {
-    super(url, {
+  constructor({
+    dataApiUrl,
+    options,
+  }: NeonClientConstructorOptions<SchemaName>) {
+    super(dataApiUrl, {
       headers: options?.global?.headers,
       fetch: options?.global?.fetch,
       schema: options?.db?.schema,
