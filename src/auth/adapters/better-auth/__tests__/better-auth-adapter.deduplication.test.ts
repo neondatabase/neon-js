@@ -39,7 +39,7 @@ describe('BetterAuthAdapter - Request Deduplication Integration', () => {
       const result1 = await adapter.getSession();
 
       // Clear cache to force network request
-      adapter['sessionStorage'].clear();
+      adapter['clearSessionCache']();
 
       // Second call (should make new request, not reuse old Promise)
       const result2 = await adapter.getSession();
@@ -72,11 +72,7 @@ describe('BetterAuthAdapter - Request Deduplication Integration', () => {
       await adapter.getSession();
 
       // Clear cached JWT to force fetch
-      const cachedSession = adapter['sessionStorage'].get();
-      if (cachedSession) {
-        const sessionWithoutToken = { ...cachedSession, access_token: '' };
-        adapter['sessionStorage'].set(sessionWithoutToken);
-      }
+      adapter['clearSessionCache']();
 
       // Make 10 concurrent calls
       const calls = Array.from({ length: 10 }, () => adapter.getJwtToken());
@@ -97,21 +93,13 @@ describe('BetterAuthAdapter - Request Deduplication Integration', () => {
       await adapter.getSession();
 
       // Clear cached JWT
-      const cachedSession = adapter['sessionStorage'].get();
-      if (cachedSession) {
-        const sessionWithoutToken = { ...cachedSession, access_token: '' };
-        adapter['sessionStorage'].set(sessionWithoutToken);
-      }
+      adapter['clearSessionCache']();
 
       // First call
       const jwt1 = await adapter.getJwtToken();
 
       // Clear cache to force new fetch
-      const updatedSession = adapter['sessionStorage'].get();
-      if (updatedSession) {
-        const sessionWithoutToken = { ...updatedSession, access_token: '' };
-        adapter['sessionStorage'].set(sessionWithoutToken);
-      }
+      adapter['clearSessionCache']();
 
       // Second call (should make new request)
       const jwt2 = await adapter.getJwtToken();

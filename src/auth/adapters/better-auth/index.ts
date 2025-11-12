@@ -22,5 +22,8 @@ export {
 // Constants (for advanced configuration)
 export * from './constants';
 
+// Session validation schema (for testing and advanced use cases)
+export { sessionSchema } from './storage-schemas';
+
 // Internal utilities (for testing and advanced use cases)
 export { InFlightRequestManager } from './in-flight-request-manager';

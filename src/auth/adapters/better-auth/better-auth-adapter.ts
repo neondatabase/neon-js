@@ -25,8 +25,6 @@ import {
   adminClient,
   organizationClient,
 } from 'better-auth/client/plugins';
-import type { SessionStorage } from './storage-interface';
-import { createSessionStorage } from './storage-factory';
 import { InFlightRequestManager } from './in-flight-request-manager';
 import {
   SESSION_CACHE_TTL_MS,
@@ -34,7 +32,6 @@ import {
   CLOCK_SKEW_BUFFER_MS,
   TOKEN_REFRESH_THRESHOLD_MS,
   BROADCAST_CHANNEL_NAME,
-  DEFAULT_STORAGE_KEY_PREFIX,
 } from './constants';
 
 /**
@@ -65,9 +62,20 @@ export class BetterAuthAdapter implements AuthClient {
    */
   private lastSessionState: Session | null = null;
 
-  // Session caching - environment-aware storage (localStorage in browser, in-memory in Node.js)
-  // JWT is stored as part of session object (access_token field)
-  private sessionStorage: SessionStorage;
+  /**
+   * In-memory session cache with TTL-based expiration.
+   * Provides <1ms synchronous reads for same-page navigation.
+   */
+  private sessionCache: {
+    session: Session;
+    expiresAt: number;
+  } | null = null;
+
+  /**
+   * Invalidation flag prevents race conditions during sign-out.
+   * Set before cache clear, checked before returning cached data.
+   */
+  private sessionCacheInvalidated: boolean = false;
 
   // Generic request deduplication
   /**
@@ -85,20 +93,68 @@ export class BetterAuthAdapter implements AuthClient {
       this.config = { ...this.config, ...config };
     }
 
-    // Extract projectIdentifier from options (Neon-specific)
-    const { projectIdentifier, ...betterAuthOptions } = betterAuthClientOptions;
-
-    // Create environment-appropriate session storage (localStorage in browser, in-memory in Node.js)
-    this.sessionStorage = createSessionStorage(
-      DEFAULT_STORAGE_KEY_PREFIX,
-      SESSION_CACHE_TTL_MS,
-      projectIdentifier
-    );
-
     this.betterAuth = createAuthClient({
-      ...betterAuthOptions,
+      ...betterAuthClientOptions,
       ...defaultBetterAuthClientOptions,
     });
+  }
+
+  /**
+   * Get cached session (synchronous, <1ms)
+   * Returns null if cache is empty, expired, or invalidated
+   */
+  private getCachedSession(): Session | null {
+    // Check invalidation flag first - prevents returning stale data during sign-out
+    if (this.sessionCacheInvalidated) {
+      console.log('[BetterAuth] Cache miss: session invalidated');
+      return null;
+    }
+
+    if (!this.sessionCache) {
+      console.log('[BetterAuth] Cache miss: no cached session');
+      return null;
+    }
+
+    // Lazy expiration check
+    if (Date.now() > this.sessionCache.expiresAt) {
+      console.log('[BetterAuth] Cache miss: session expired');
+      this.sessionCache = null;
+      return null;
+    }
+
+    console.log('[BetterAuth] Cache hit: returning cached session');
+    return this.sessionCache.session;
+  }
+
+  /**
+   * Store session in cache with TTL
+   * @param session - Session to cache
+   * @param ttl - Time to live in milliseconds (default: 60000)
+   */
+  private setCachedSession(session: Session, ttl = SESSION_CACHE_TTL_MS): void {
+    console.log(`[BetterAuth] Setting cached session (TTL: ${ttl}ms)`);
+    this.sessionCache = {
+      session,
+      expiresAt: Date.now() + ttl,
+    };
+    this.sessionCacheInvalidated = false; // Clear invalidation flag for new session
+  }
+
+  /**
+   * Clear session cache immediately
+   * Sets invalidation flag to prevent in-flight reads from returning stale data
+   */
+  private clearSessionCache(): void {
+    this.sessionCache = null;
+    this.sessionCacheInvalidated = true; // Set flag to invalidate any in-flight reads
+  }
+
+  /**
+   * Check if cache has been invalidated
+   * Used by getSession() to detect mid-execution sign-outs
+   */
+  private isSessionCacheInvalidated(): boolean {
+    return this.sessionCacheInvalidated;
   }
 
   /**
@@ -186,13 +242,13 @@ export class BetterAuthAdapter implements AuthClient {
 
   getSession: AuthClient['getSession'] = async () => {
     try {
-      // Step 1: Fast Path - Read from synchronous cache
-      const cachedSession = this.sessionStorage.get();
+      // Step 1: Fast Path - Read from in-memory cache
+      const cachedSession = this.getCachedSession();
       if (cachedSession) {
         // CRITICAL: Check invalidation flag one more time before returning
         // This catches the race condition where signOut() was called after we read
         // from cache but before we return. Without this check, we'd return stale data.
-        if (this.sessionStorage.isInvalidated()) {
+        if (this.isSessionCacheInvalidated()) {
           return { data: { session: null }, error: null };
         }
 
@@ -264,7 +320,7 @@ export class BetterAuthAdapter implements AuthClient {
         session.access_token = headerJwt;
         // Cache enriched session with TTL based on JWT expiration
         const ttl = this._calculateCacheTTL(headerJwt);
-        this.sessionStorage.set(session, ttl);
+        this.setCachedSession(session, ttl);
 
         return { data: { session }, error: null };
       });
@@ -415,34 +471,40 @@ export class BetterAuthAdapter implements AuthClient {
   getJwtToken = async () => {
     try {
       // Step 1: Check if we have cached session with JWT
-      const cachedSession = this.sessionStorage.get();
+      const cachedSession = this.getCachedSession();
       if (cachedSession?.access_token) {
         // Verify JWT hasn't expired
         const exp = this._getJwtExpiration(cachedSession.access_token);
         if (exp && !this._isExpired(exp)) {
+          console.log('[BetterAuth] JWT cache hit: returning cached token');
           return cachedSession.access_token;
         }
+        console.log('[BetterAuth] JWT cache miss: token expired');
       }
 
       // Step 2: Deduplicate JWT fetch
-      return await this.inFlightRequests.deduplicate('getJwtToken', async () => {
-        // Step 3: Fetch fresh JWT from /token endpoint
-        const tokenResponse = await this.betterAuth.token();
-        if (tokenResponse.error || !tokenResponse.data?.token) {
-          return null;
-        }
-        const jwt = tokenResponse.data.token;
+      return await this.inFlightRequests.deduplicate(
+        'getJwtToken',
+        async () => {
+          console.log('[BetterAuth] Fetching fresh JWT from /token endpoint');
+          // Step 3: Fetch fresh JWT from /token endpoint
+          const tokenResponse = await this.betterAuth.token();
+          if (tokenResponse.error || !tokenResponse.data?.token) {
+            return null;
+          }
+          const jwt = tokenResponse.data.token;
 
-        // Step 4: Update session cache with new JWT if we have a session
-        const currentSession = this.sessionStorage.get();
-        if (currentSession) {
-          currentSession.access_token = jwt;
-          const ttl = this._calculateCacheTTL(jwt);
-          this.sessionStorage.set(currentSession, ttl);
-        }
+          // Step 4: Update session cache with new JWT if we have a session
+          const currentSession = this.getCachedSession();
+          if (currentSession) {
+            currentSession.access_token = jwt;
+            const ttl = this._calculateCacheTTL(jwt);
+            this.setCachedSession(currentSession, ttl);
+          }
 
-        return jwt;
-      });
+          return jwt;
+        }
+      );
     } catch (error) {
       console.error('[getJwtToken] Error fetching JWT:', error);
       return null;
@@ -768,10 +830,10 @@ export class BetterAuthAdapter implements AuthClient {
   // Sign out
   signOut: AuthClient['signOut'] = async () => {
     try {
-      // Clear caches IMMEDIATELY to prevent race conditions with concurrent getSession() calls
+      // Clear cache IMMEDIATELY to prevent race conditions with concurrent getSession() calls
       // Setting invalidation flag ensures any in-flight getSession() calls will see the flag
-      // and return null instead of stale cached data (both session + JWT)
-      this.sessionStorage.clear(); // Sets invalidation flag (clears session + JWT)
+      // and return null instead of stale cached data
+      this.clearSessionCache();
 
       const result = await this.betterAuth.signOut();
 
@@ -1160,50 +1222,53 @@ export class BetterAuthAdapter implements AuthClient {
       }
 
       // Deduplicate account list fetch to prevent thundering herd
-      return await this.inFlightRequests.deduplicate('getUserIdentities', async () => {
-        // Direct 1:1 mapping: Supabase getUserIdentities -> Better Auth account.list
-        const result = await (this.betterAuth as any).account?.list?.();
+      return await this.inFlightRequests.deduplicate(
+        'getUserIdentities',
+        async () => {
+          // Direct 1:1 mapping: Supabase getUserIdentities -> Better Auth account.list
+          const result = await (this.betterAuth as any).account?.list?.();
 
-        if (!result) {
-          return {
-            data: null,
-            error: new AuthError(
-              'Failed to list accounts',
-              500,
-              'unexpected_failure'
-            ),
-          };
-        }
+          if (!result) {
+            return {
+              data: null,
+              error: new AuthError(
+                'Failed to list accounts',
+                500,
+                'unexpected_failure'
+              ),
+            };
+          }
 
-        if (result.error) {
-          return {
-            data: null,
-            error: normalizeBetterAuthError(result.error),
-          };
-        }
+          if (result.error) {
+            return {
+              data: null,
+              error: normalizeBetterAuthError(result.error),
+            };
+          }
 
-        // Map Better Auth accounts to Supabase identities format
-        const identities =
-          result.data?.accounts?.map((account: any) => ({
-            id: account.id,
-            user_id: account.userId,
-            identity_id: account.id,
-            provider: account.provider,
-            identity_data: {
-              provider_account_id: account.providerAccountId,
-              provider: account.provider,
+          // Map Better Auth accounts to Supabase identities format
+          const identities =
+            result.data?.accounts?.map((account: any) => ({
+              id: account.id,
               user_id: account.userId,
-            },
-            created_at: toISOString(account.createdAt),
-            last_sign_in_at: toISOString(account.createdAt),
-            updated_at: toISOString(account.updatedAt),
-          })) || [];
+              identity_id: account.id,
+              provider: account.provider,
+              identity_data: {
+                provider_account_id: account.providerAccountId,
+                provider: account.provider,
+                user_id: account.userId,
+              },
+              created_at: toISOString(account.createdAt),
+              last_sign_in_at: toISOString(account.createdAt),
+              updated_at: toISOString(account.updatedAt),
+            })) || [];
 
-        return {
-          data: { identities },
-          error: null,
-        };
-      });
+          return {
+            data: { identities },
+            error: null,
+          };
+        }
+      );
     } catch (error) {
       return {
         data: null,
@@ -1578,12 +1643,30 @@ export class BetterAuthAdapter implements AuthClient {
         this.broadcastChannel.onmessage = async (event: MessageEvent) => {
           const { event: authEvent, session } = event.data;
 
-          // Emit event locally (do not broadcast back)
+          // Update in-memory cache when receiving broadcast
+          // This ensures Tab B's cache stays in sync with Tab A's auth state
+          if (session) {
+            // Tab B receives sign-in from Tab A → cache session in memory
+            const ttl = this._calculateCacheTTL(session.access_token);
+            console.log(
+              '[BroadcastChannel] Setting cached session with TTL:',
+              ttl,
+              'for session:',
+              session.access_token
+            );
+            this.setCachedSession(session, ttl);
+          } else {
+            // Tab B receives sign-out from Tab A → clear in-memory cache
+            this.clearSessionCache();
+          }
+
+          // Emit event locally (do not broadcast back to avoid infinite loop)
           await this.notifyAllSubscribers(authEvent, session, false);
           this.lastSessionState = session;
         };
       } catch (error) {
         // BroadcastChannel creation failed - cross-tab sync unavailable
+        console.warn('[BroadcastChannel] Failed to initialize:', error);
       }
     }
   }

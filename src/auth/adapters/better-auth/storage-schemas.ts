@@ -4,10 +4,8 @@ import type { Session } from '@supabase/auth-js';
 /**
  * Storage validation schemas for Better Auth caches
  *
- * These schemas validate the structure of data being stored/retrieved from cache.
- * They use passthrough() to allow additional fields from Supabase types.
- *
- * Note: We use the original Supabase types from @supabase/auth-js for TypeScript
+ * These schemas validate the structure of session data.
+ * We use the original Supabase types from @supabase/auth-js for TypeScript
  * type definitions. These Zod schemas are only for runtime validation.
  */
 
@@ -32,8 +30,9 @@ const userSchema = z.object({
 }) satisfies z.ZodType<Session['user']>;
 
 /**
- * Supabase cop Session schema
+ * Supabase Session schema
  * Based on @supabase/auth-js Session type
+ * Used for validating session structure from Better Auth responses
  */
 export const sessionSchema = z.object({
   access_token: z.string(),
@@ -43,27 +42,3 @@ export const sessionSchema = z.object({
   token_type: z.literal('bearer'),
   user: userSchema,
 }) satisfies z.ZodType<Session>;
-
-/**
- * In-memory cache entry schema with TTL tracking
- * Used by InMemorySessionCache (in-memory storage)
- */
-export const inMemoryCacheEntrySchema = z.object({
-  session: sessionSchema,
-  expiresAt: z.number(), // Unix timestamp in milliseconds
-});
-
-/**
- * LocalStorage cache entry schema for persistent storage
- * Used by LocalStorageCache (browser localStorage)
- */
-export const localStorageCacheEntrySchema = z.object({
-  session: sessionSchema,
-  expiresAt: z.number(), // Unix timestamp in milliseconds
-});
-
-// excldue unknown keys from the schema
-export type LocalStorageCacheEntry = z.infer<
-  typeof localStorageCacheEntrySchema
->;
-export type InMemoryCacheEntry = z.infer<typeof inMemoryCacheEntrySchema>;

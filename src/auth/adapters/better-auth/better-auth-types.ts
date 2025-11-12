@@ -119,13 +119,6 @@ export interface OnAuthStateChangeConfig {
 
 /**
  * Neon-specific Better Auth configuration
- * Extends Better Auth client options with project/tenant identifier
+ * Extends Better Auth client options
  */
-export interface NeonBetterAuthOptions extends BetterAuthClientOptions {
-  /**
-   * Optional project/tenant identifier for multi-tenant localStorage isolation.
-   * Used to generate unique localStorage keys per project/branch.
-   * Example: 'my-branch-slug' results in key `neon-auth:my-branch-slug:v1:session`
-   */
-  projectIdentifier?: string;
-}
+export interface NeonBetterAuthOptions extends BetterAuthClientOptions {}
