@@ -38,24 +38,115 @@ import {
  * Better Auth adapter implementing the Supabase-compatible AuthClient interface.
  * See CLAUDE.md for architecture details and API mappings.
  */
-
 const defaultBetterAuthClientOptions = {
   plugins: [jwtClient(), adminClient(), organizationClient()],
 } satisfies BetterAuthClientOptions;
 
 export class BetterAuthAdapter implements AuthClient {
+  //#region Public Properties
+  /**
+   * Admin API access (unsupported in Better Auth adapter)
+   * @group Unsupported Features
+   */
+  admin: AuthClient['admin'] = undefined as never;
+
+  /**
+   * MFA management (unsupported in Better Auth adapter)
+   * @group Unsupported Features
+   */
+  mfa: AuthClient['mfa'] = undefined as never;
+
+  /**
+   * OAuth management (unsupported in Better Auth adapter)
+   * @group Unsupported Features
+   */
+  oauth: AuthClient['oauth'] = undefined as never;
+
+  /**
+   * Links a new identity to the current user
+   * @group User Management
+   */
+  linkIdentity: AuthClient['linkIdentity'] = (async (credentials) => {
+    // Handle ID token credentials - Better Auth doesn't support this
+    if ('token' in credentials) {
+      const provider = credentials.provider as Provider;
+      return {
+        data: { provider, url: null },
+        error: new AuthError(
+          'Better Auth does not support linking identities with ID tokens. Use OAuth credentials instead.',
+          501,
+          'id_token_provider_disabled'
+        ),
+      };
+    }
+
+    // Type guard: after checking for id_token/access_token, TypeScript narrows to SignInWithOAuthCredentials
+    // But we need to explicitly narrow it for the options property to work correctly
+    const oauthCredentials = credentials;
+    const provider = oauthCredentials.provider;
+
+    try {
+      const sessionResult = await this.getSession();
+
+      if (sessionResult.error || !sessionResult.data.session) {
+        return {
+          data: { provider, url: null },
+          error:
+            sessionResult.error ||
+            new AuthError('No user session found', 401, 'session_not_found'),
+        };
+      }
+
+      const callbackURL =
+        oauthCredentials.options?.redirectTo ||
+        (typeof window !== 'undefined' ? window.location.origin : '');
+
+      // Convert scopes from Supabase format (space-separated string) to Better Auth format (array)
+      const scopes = oauthCredentials.options?.scopes
+        ? oauthCredentials.options.scopes
+            .split(' ')
+            .filter((s: string) => s.length > 0)
+        : undefined;
+
+      // Better Auth linkSocial initiates OAuth flow to link account
+      // This will redirect the user to the OAuth provider
+      await this.betterAuth.linkSocial({
+        provider,
+        callbackURL,
+        scopes,
+      });
+
+      // OAuth redirects the user, so we return success immediately
+      // The actual linking happens after OAuth callback
+      return {
+        data: {
+          provider,
+          url: callbackURL,
+        },
+        error: null,
+      };
+    } catch (error) {
+      return {
+        data: { provider, url: null },
+        error: normalizeBetterAuthError(error),
+      };
+    }
+  }) as AuthClient['linkIdentity'];
+  //#endregion
+
+  //#region Private Fields
   private betterAuth: ReturnType<
     typeof createAuthClient<typeof defaultBetterAuthClientOptions>
   >;
 
-  // Auth state change management
   private stateChangeEmitters = new Map<string, Subscription>();
-  private broadcastChannel: InstanceType<typeof BroadcastChannel> | null = null;
-  private tokenRefreshCheckInterval: NodeJS.Timeout | null = null;
+  #broadcastChannel: InstanceType<typeof BroadcastChannel> | null = null;
+  #tokenRefreshCheckInterval: NodeJS.Timeout | null = null;
   private config: OnAuthStateChangeConfig = {
-    enableTokenRefreshDetection: true, // Enabled by default (matches Supabase)
+    enableTokenRefreshDetection: true,
     tokenRefreshCheckInterval: TOKEN_REFRESH_CHECK_INTERVAL_MS,
   };
+
   /**
    * Last known session state for detecting auth state change event types.
    * Updated after each auth state change to determine which event to emit.
@@ -66,7 +157,7 @@ export class BetterAuthAdapter implements AuthClient {
    * In-memory session cache with TTL-based expiration.
    * Provides <1ms synchronous reads for same-page navigation.
    */
-  private sessionCache: {
+  #sessionCache: {
     session: Session;
     expiresAt: number;
   } | null = null;
@@ -75,15 +166,16 @@ export class BetterAuthAdapter implements AuthClient {
    * Invalidation flag prevents race conditions during sign-out.
    * Set before cache clear, checked before returning cached data.
    */
-  private sessionCacheInvalidated: boolean = false;
+  #sessionCacheInvalidated: boolean = false;
 
-  // Generic request deduplication
   /**
    * Deduplicates in-flight requests by key to prevent thundering herd.
    * Used by getSession(), getJwtToken(), and potentially other methods.
    */
   private inFlightRequests = new InFlightRequestManager();
+  //#endregion
 
+  //#region Constructor
   constructor(
     betterAuthClientOptions: NeonBetterAuthOptions,
     config?: OnAuthStateChangeConfig
@@ -98,130 +190,13 @@ export class BetterAuthAdapter implements AuthClient {
       ...defaultBetterAuthClientOptions,
     });
   }
+  //#endregion
 
+  //#region PUBLIC API - Initialization
   /**
-   * Get cached session (synchronous, <1ms)
-   * Returns null if cache is empty, expired, or invalidated
+   * Initializes the Better Auth adapter
+   * @group Initialization
    */
-  private getCachedSession(): Session | null {
-    // Check invalidation flag first - prevents returning stale data during sign-out
-    if (this.sessionCacheInvalidated) {
-      console.log('[BetterAuth] Cache miss: session invalidated');
-      return null;
-    }
-
-    if (!this.sessionCache) {
-      console.log('[BetterAuth] Cache miss: no cached session');
-      return null;
-    }
-
-    // Lazy expiration check
-    if (Date.now() > this.sessionCache.expiresAt) {
-      console.log('[BetterAuth] Cache miss: session expired');
-      this.sessionCache = null;
-      return null;
-    }
-
-    console.log('[BetterAuth] Cache hit: returning cached session');
-    return this.sessionCache.session;
-  }
-
-  /**
-   * Store session in cache with TTL
-   * @param session - Session to cache
-   * @param ttl - Time to live in milliseconds (default: 60000)
-   */
-  private setCachedSession(session: Session, ttl = SESSION_CACHE_TTL_MS): void {
-    console.log(`[BetterAuth] Setting cached session (TTL: ${ttl}ms)`);
-    this.sessionCache = {
-      session,
-      expiresAt: Date.now() + ttl,
-    };
-    this.sessionCacheInvalidated = false; // Clear invalidation flag for new session
-  }
-
-  /**
-   * Clear session cache immediately
-   * Sets invalidation flag to prevent in-flight reads from returning stale data
-   */
-  private clearSessionCache(): void {
-    this.sessionCache = null;
-    this.sessionCacheInvalidated = true; // Set flag to invalidate any in-flight reads
-  }
-
-  /**
-   * Check if cache has been invalidated
-   * Used by getSession() to detect mid-execution sign-outs
-   */
-  private isSessionCacheInvalidated(): boolean {
-    return this.sessionCacheInvalidated;
-  }
-
-  /**
-   * Shared expiration check helper
-   * Checks if a timestamp (Unix seconds) is expired, with clock skew buffer
-   */
-  private _isExpired(expiresAt: Date | number | null | undefined): boolean {
-    if (!expiresAt) return true;
-    const now = Math.floor(Date.now() / 1000);
-
-    const expiresAtNumber =
-      typeof expiresAt === 'number'
-        ? expiresAt
-        : Math.floor(expiresAt.getTime() / 1000);
-
-    return expiresAtNumber <= now + Math.floor(CLOCK_SKEW_BUFFER_MS / 1000);
-  }
-
-  /**
-   * Decode JWT and extract expiration timestamp (exp claim)
-   * Returns null if token is invalid or doesn't have exp
-   */
-  private _getJwtExpiration(jwt: string): number | null {
-    try {
-      const tokenParts = jwt.split('.');
-      if (tokenParts.length !== 3) {
-        return null;
-      }
-      const payload = JSON.parse(atob(tokenParts[1]));
-      const exp = payload.exp;
-      return typeof exp === 'number' ? exp : null;
-    } catch {
-      return null;
-    }
-  }
-
-  /**
-   * Calculate TTL for cache based on JWT expiration
-   * Returns milliseconds until JWT expires (minus clock skew buffer)
-   * Falls back to default SESSION_CACHE_TTL_MS if JWT has no expiration
-   */
-  private _calculateCacheTTL(jwt: string | undefined): number {
-    if (!jwt) {
-      return SESSION_CACHE_TTL_MS;
-    }
-
-    const exp = this._getJwtExpiration(jwt);
-    if (!exp) {
-      return SESSION_CACHE_TTL_MS;
-    }
-
-    const now = Date.now();
-    const expiresAtMs = exp * 1000; // Convert seconds to milliseconds
-    const ttl = expiresAtMs - now - CLOCK_SKEW_BUFFER_MS;
-
-    // Ensure positive TTL, minimum 1 second
-    return Math.max(ttl, 1000);
-  }
-
-  // Admin API
-  admin: AuthClient['admin'] = undefined as never;
-  // MFA API
-  mfa: AuthClient['mfa'] = undefined as never;
-  // OAuth API
-  oauth: AuthClient['oauth'] = undefined as never;
-
-  // Initialization
   initialize: AuthClient['initialize'] = async () => {
     try {
       // Better Auth doesn't require explicit initialization
@@ -239,7 +214,13 @@ export class BetterAuthAdapter implements AuthClient {
       };
     }
   };
+  //#endregion
 
+  //#region PUBLIC API - Session Management
+  /**
+   * Retrieves the current user session
+   * @group Session Management
+   */
   getSession: AuthClient['getSession'] = async () => {
     try {
       // Step 1: Fast Path - Read from in-memory cache
@@ -319,7 +300,7 @@ export class BetterAuthAdapter implements AuthClient {
         // Enrich session with JWT token
         session.access_token = headerJwt;
         // Cache enriched session with TTL based on JWT expiration
-        const ttl = this._calculateCacheTTL(headerJwt);
+        const ttl = this.calculateCacheTTL(headerJwt);
         this.setCachedSession(session, ttl);
 
         return { data: { session }, error: null };
@@ -332,6 +313,10 @@ export class BetterAuthAdapter implements AuthClient {
     }
   };
 
+  /**
+   * Refreshes the current user session
+   * @group Session Management
+   */
   refreshSession: AuthClient['refreshSession'] = async () => {
     try {
       // Better Auth handles token refresh automatically
@@ -360,6 +345,10 @@ export class BetterAuthAdapter implements AuthClient {
     }
   };
 
+  /**
+   * Sets a user session
+   * @group Session Management
+   */
   setSession: AuthClient['setSession'] = async () => {
     // Better Auth doesn't support setting sessions from external tokens
     // Sessions are managed internally by Better Auth
@@ -371,92 +360,6 @@ export class BetterAuthAdapter implements AuthClient {
         'not_implemented'
       ),
     };
-  };
-
-  // User management
-  getUser: AuthClient['getUser'] = async () => {
-    try {
-      const sessionResult = await this.getSession();
-
-      if (sessionResult.error || !sessionResult.data.session) {
-        return {
-          data: { user: null },
-          error:
-            sessionResult.error ||
-            new AuthError('No user session found', 401, 'session_not_found'),
-        };
-      }
-
-      return {
-        data: {
-          user: sessionResult.data.session.user,
-        },
-        error: null,
-      };
-    } catch (error) {
-      return {
-        data: { user: null },
-        error: normalizeBetterAuthError(error),
-      };
-    }
-  };
-
-  getClaims: AuthClient['getClaims'] = async (jwt?: string, options?: any) => {
-    try {
-      const sessionResult = await this.getSession();
-
-      if (sessionResult.error || !sessionResult.data.session) {
-        return {
-          data: null,
-          error:
-            sessionResult.error ||
-            new AuthError('No user session found', 401, 'session_not_found'),
-        };
-      }
-
-      const accessToken = jwt || sessionResult.data.session.access_token;
-
-      if (!accessToken) {
-        return {
-          data: null,
-          error: new AuthError(
-            'No access token found',
-            401,
-            'session_not_found'
-          ),
-        };
-      }
-
-      // Decode JWT to get claims
-      const tokenParts = accessToken.split('.');
-      if (tokenParts.length !== 3) {
-        return {
-          data: null,
-          error: new AuthError('Invalid token format', 401, 'bad_jwt'),
-        };
-      }
-
-      try {
-        const payload = accessTokenSchema.parse(
-          JSON.parse(atob(tokenParts[1]))
-        );
-        // Return payload directly
-        return {
-          data: payload as any,
-          error: null,
-        };
-      } catch {
-        return {
-          data: null,
-          error: new AuthError('Failed to decode token', 401, 'bad_jwt'),
-        };
-      }
-    } catch (error) {
-      return {
-        data: null,
-        error: normalizeBetterAuthError(error),
-      };
-    }
   };
 
   /**
@@ -474,8 +377,8 @@ export class BetterAuthAdapter implements AuthClient {
       const cachedSession = this.getCachedSession();
       if (cachedSession?.access_token) {
         // Verify JWT hasn't expired
-        const exp = this._getJwtExpiration(cachedSession.access_token);
-        if (exp && !this._isExpired(exp)) {
+        const exp = this.getJwtExpiration(cachedSession.access_token);
+        if (exp && !this.isExpired(exp)) {
           console.log('[BetterAuth] JWT cache hit: returning cached token');
           return cachedSession.access_token;
         }
@@ -498,7 +401,7 @@ export class BetterAuthAdapter implements AuthClient {
           const currentSession = this.getCachedSession();
           if (currentSession) {
             currentSession.access_token = jwt;
-            const ttl = this._calculateCacheTTL(jwt);
+            const ttl = this.calculateCacheTTL(jwt);
             this.setCachedSession(currentSession, ttl);
           }
 
@@ -510,8 +413,13 @@ export class BetterAuthAdapter implements AuthClient {
       return null;
     }
   };
+  //#endregion
 
-  // Sign up
+  //#region PUBLIC API - Authentication
+  /**
+   * Signs up a new user with email and password
+   * @group Authentication
+   */
   signUp: AuthClient['signUp'] = async (credentials) => {
     try {
       // Handle email/password sign-up
@@ -591,7 +499,10 @@ export class BetterAuthAdapter implements AuthClient {
     }
   };
 
-  // Sign in methods
+  /**
+   * Signs in anonymously
+   * @group Authentication
+   */
   signInAnonymously: AuthClient['signInAnonymously'] = async () => {
     // Better Auth doesn't support anonymous sign-in
     return {
@@ -604,6 +515,10 @@ export class BetterAuthAdapter implements AuthClient {
     };
   };
 
+  /**
+   * Signs in a user with email and password
+   * @group Authentication
+   */
   signInWithPassword: AuthClient['signInWithPassword'] = async (
     credentials
   ) => {
@@ -677,6 +592,10 @@ export class BetterAuthAdapter implements AuthClient {
     }
   };
 
+  /**
+   * Signs in a user with an OAuth provider
+   * @group Authentication
+   */
   signInWithOAuth: AuthClient['signInWithOAuth'] = async (credentials) => {
     try {
       const { provider, options } = credentials;
@@ -711,8 +630,12 @@ export class BetterAuthAdapter implements AuthClient {
     }
   };
 
-  // TODO: add https://www.better-auth.com/docs/plugins/email-otp to server
-  signInWithOtp: AuthClient['signInWithOtp'] = async (credentials) => {
+  /**
+   * Signs in a user with OTP (One-Time Password)
+   * @group Authentication
+   * @todo Add email-otp plugin to server
+   */
+  signInWithOtp: AuthClient['signInWithOtp'] = async () => {
     try {
       return {
         data: { user: null, session: null },
@@ -730,6 +653,11 @@ export class BetterAuthAdapter implements AuthClient {
     }
   };
 
+  /**
+   * Signs in with an ID token
+   * @group Authentication
+   * @deprecated Better Auth does not support direct OIDC ID token authentication.
+   */
   signInWithIdToken: AuthClient['signInWithIdToken'] = async (credentials) => {
     /**
      * Better Auth does not support direct OIDC ID token authentication.
@@ -764,6 +692,11 @@ export class BetterAuthAdapter implements AuthClient {
     };
   };
 
+  /**
+   * Signs in with SSO (Single Sign-On)
+   * @group Authentication
+   * @deprecated Better Auth does not support enterprise SAML SSO.
+   */
   signInWithSSO: AuthClient['signInWithSSO'] = async (params) => {
     /**
      * Better Auth does not support enterprise SAML SSO providers like Supabase does.
@@ -794,6 +727,11 @@ export class BetterAuthAdapter implements AuthClient {
     };
   };
 
+  /**
+   * Signs in with Web3 wallet
+   * @group Authentication
+   * @deprecated Better Auth does not support Web3/crypto wallet authentication.
+   */
   signInWithWeb3: AuthClient['signInWithWeb3'] = async (credentials) => {
     /**
      * Better Auth does not support Web3/crypto wallet authentication (Ethereum, Solana, etc.)
@@ -827,7 +765,10 @@ export class BetterAuthAdapter implements AuthClient {
     };
   };
 
-  // Sign out
+  /**
+   * Signs out the current user
+   * @group Authentication
+   */
   signOut: AuthClient['signOut'] = async () => {
     try {
       // Clear cache IMMEDIATELY to prevent race conditions with concurrent getSession() calls
@@ -853,275 +794,106 @@ export class BetterAuthAdapter implements AuthClient {
       return { error: normalizeBetterAuthError(error) };
     }
   };
+  //#endregion
 
-  // Verification
-  verifyOtp: AuthClient['verifyOtp'] = async (params) => {
+  //#region PUBLIC API - User Management
+  /**
+   * Gets the currently authenticated user
+   * @group User Management
+   */
+  getUser: AuthClient['getUser'] = async () => {
     try {
-      // Handle email OTP verification
-      if ('email' in params && params.email) {
-        const { token, type } = params;
+      const sessionResult = await this.getSession();
 
-        // Magic link verification
-        if (type === 'magiclink' || type === 'email') {
-          // Better Auth handles magic link verification via callback URL
-          // The token should be verified when the user clicks the link
-          // We need to check if Better Auth has a verifyMagicLink method
-          // For now, assume the callback has already been handled
-          const sessionResult = await this.getSession();
-
-          if (!sessionResult.data.session) {
-            return {
-              data: { user: null, session: null },
-              error: new AuthError(
-                'Failed to retrieve session after OTP verification. Make sure the magic link callback has been processed.',
-                500,
-                'unexpected_failure'
-              ),
-            };
-          }
-
-          // Emit SIGNED_IN event synchronously
-          await this.notifyAllSubscribers(
-            'SIGNED_IN',
-            sessionResult.data.session
-          );
-          this.lastSessionState = sessionResult.data.session;
-
-          return {
-            data: {
-              user: sessionResult.data.session.user,
-              session: sessionResult.data.session,
-            },
-            error: null,
-          };
-        }
-
-        // Email verification (signup confirmation)
-        if (type === 'signup' || type === 'invite') {
-          // Better Auth uses verifyEmail for email verification
-          const result = await this.betterAuth.verifyEmail?.({
-            query: { token },
-          });
-
-          if (result?.error) {
-            return {
-              data: { user: null, session: null },
-              error: normalizeBetterAuthError(result.error),
-            };
-          }
-
-          // After email verification, user might be signed in already
-          // Return current session if available
-          const sessionResult = await this.getSession();
-
-          return {
-            data: {
-              user: sessionResult.data.session?.user ?? null,
-              session: sessionResult.data.session,
-            },
-            error: null,
-          };
-        }
-
-        // Password recovery verification
-        if (type === 'recovery') {
-          // Better Auth's resetPassword can verify the code
-          // For recovery, we verify the code but don't create a session yet
-          // The user needs to reset their password first
-          return {
-            data: {
-              user: null,
-              session: null,
-            },
-            error: null,
-          };
-        }
-
-        // Email change verification
-        if (type === 'email_change') {
-          const result = await this.betterAuth.verifyEmail?.({
-            query: { token },
-          });
-
-          if (result?.error) {
-            return {
-              data: { user: null, session: null },
-              error: normalizeBetterAuthError(result.error),
-            };
-          }
-
-          // Get updated session
-          const sessionResult = await this.getSession();
-
-          // Emit USER_UPDATED event synchronously (email changed)
-          if (sessionResult.data.session) {
-            await this.notifyAllSubscribers(
-              'USER_UPDATED',
-              sessionResult.data.session
-            );
-            this.lastSessionState = sessionResult.data.session;
-          }
-
-          return {
-            data: {
-              user: sessionResult.data.session?.user ?? null,
-              session: sessionResult.data.session,
-            },
-            error: null,
-          };
-        }
-
+      if (sessionResult.error || !sessionResult.data.session) {
         return {
-          data: { user: null, session: null },
-          error: new AuthError(
-            `Unsupported email OTP type: ${type}`,
-            400,
-            'validation_failed'
-          ),
+          data: { user: null },
+          error:
+            sessionResult.error ||
+            new AuthError('No user session found', 401, 'session_not_found'),
         };
       }
 
-      // Handle phone OTP verification
-      if ('phone' in params && params.phone) {
-        return {
-          data: { user: null, session: null },
-          error: new AuthError(
-            'Phone OTP verification not supported by Better Auth',
-            501,
-            'phone_provider_disabled'
-          ),
-        };
-      }
-
-      // Handle token hash verification
-      if ('token_hash' in params && params.token_hash) {
-        // Token hash is similar to token, treat it the same way
-        const { token_hash, type } = params;
-
-        // Magic link token hash verification
-        if (type === 'magiclink' || type === 'email') {
-          const sessionResult = await this.getSession();
-
-          if (!sessionResult.data.session) {
-            return {
-              data: { user: null, session: null },
-              error: new AuthError(
-                'Failed to retrieve session after token hash verification',
-                500,
-                'unexpected_failure'
-              ),
-            };
-          }
-
-          // Emit SIGNED_IN event synchronously
-          await this.notifyAllSubscribers(
-            'SIGNED_IN',
-            sessionResult.data.session
-          );
-          this.lastSessionState = sessionResult.data.session;
-
-          return {
-            data: {
-              user: sessionResult.data.session.user,
-              session: sessionResult.data.session,
-            },
-            error: null,
-          };
-        }
-
-        // For other token hash types, use similar logic as email verification
-        if (type === 'signup' || type === 'invite') {
-          const result = await this.betterAuth.verifyEmail?.({
-            query: { token: token_hash },
-          });
-
-          if (result?.error) {
-            return {
-              data: { user: null, session: null },
-              error: normalizeBetterAuthError(result.error),
-            };
-          }
-
-          const sessionResult = await this.getSession();
-
-          return {
-            data: {
-              user: sessionResult.data.session?.user ?? null,
-              session: sessionResult.data.session,
-            },
-            error: null,
-          };
-        }
-
-        if (type === 'recovery') {
-          return {
-            data: {
-              user: null,
-              session: null,
-            },
-            error: null,
-          };
-        }
-
-        if (type === 'email_change') {
-          const result = await this.betterAuth.verifyEmail?.({
-            query: { token: token_hash },
-          });
-
-          if (result?.error) {
-            return {
-              data: { user: null, session: null },
-              error: normalizeBetterAuthError(result.error),
-            };
-          }
-
-          const sessionResult = await this.getSession();
-
-          // Emit USER_UPDATED event synchronously (email changed)
-          if (sessionResult.data.session) {
-            await this.notifyAllSubscribers(
-              'USER_UPDATED',
-              sessionResult.data.session
-            );
-            this.lastSessionState = sessionResult.data.session;
-          }
-
-          return {
-            data: {
-              user: sessionResult.data.session?.user ?? null,
-              session: sessionResult.data.session,
-            },
-            error: null,
-          };
-        }
-
-        return {
-          data: { user: null, session: null },
-          error: new AuthError(
-            `Unsupported token hash OTP type: ${type}`,
-            400,
-            'validation_failed'
-          ),
-        };
-      }
-
-      // Invalid params
       return {
-        data: { user: null, session: null },
-        error: new AuthError(
-          'Invalid OTP verification parameters',
-          400,
-          'validation_failed'
-        ),
+        data: {
+          user: sessionResult.data.session.user,
+        },
+        error: null,
       };
     } catch (error) {
       return {
-        data: { user: null, session: null },
+        data: { user: null },
         error: normalizeBetterAuthError(error),
       };
     }
   };
 
+  /**
+   * Gets the claims from a JWT token
+   * @group User Management
+   */
+  getClaims: AuthClient['getClaims'] = async (jwt?: string) => {
+    try {
+      const sessionResult = await this.getSession();
+
+      if (sessionResult.error || !sessionResult.data.session) {
+        return {
+          data: null,
+          error:
+            sessionResult.error ||
+            new AuthError('No user session found', 401, 'session_not_found'),
+        };
+      }
+
+      const accessToken = jwt || sessionResult.data.session.access_token;
+
+      if (!accessToken) {
+        return {
+          data: null,
+          error: new AuthError(
+            'No access token found',
+            401,
+            'session_not_found'
+          ),
+        };
+      }
+
+      // Decode JWT to get claims
+      const tokenParts = accessToken.split('.');
+      if (tokenParts.length !== 3) {
+        return {
+          data: null,
+          error: new AuthError('Invalid token format', 401, 'bad_jwt'),
+        };
+      }
+
+      try {
+        const payload = accessTokenSchema.parse(
+          JSON.parse(atob(tokenParts[1]))
+        );
+        // Return payload directly
+        return {
+          data: payload as any,
+          error: null,
+        };
+      } catch {
+        return {
+          data: null,
+          error: new AuthError('Failed to decode token', 401, 'bad_jwt'),
+        };
+      }
+    } catch (error) {
+      return {
+        data: null,
+        error: normalizeBetterAuthError(error),
+      };
+    }
+  };
+
+  /**
+   * Updates the current user
+   * @group User Management
+   */
   updateUser: AuthClient['updateUser'] = async (attributes) => {
     try {
       const sessionResult = await this.getSession();
@@ -1208,6 +980,10 @@ export class BetterAuthAdapter implements AuthClient {
     }
   };
 
+  /**
+   * Gets the identities linked to the current user
+   * @group User Management
+   */
   getUserIdentities: AuthClient['getUserIdentities'] = async () => {
     try {
       const sessionResult = await this.getSession();
@@ -1277,73 +1053,10 @@ export class BetterAuthAdapter implements AuthClient {
     }
   };
 
-  linkIdentity: AuthClient['linkIdentity'] = (async (credentials) => {
-    // Handle ID token credentials - Better Auth doesn't support this
-    if ('token' in credentials) {
-      const provider = credentials.provider as Provider;
-      return {
-        data: { provider, url: null },
-        error: new AuthError(
-          'Better Auth does not support linking identities with ID tokens. Use OAuth credentials instead.',
-          501,
-          'id_token_provider_disabled'
-        ),
-      };
-    }
-
-    // Type guard: after checking for id_token/access_token, TypeScript narrows to SignInWithOAuthCredentials
-    // But we need to explicitly narrow it for the options property to work correctly
-    const oauthCredentials = credentials;
-    const provider = oauthCredentials.provider;
-
-    try {
-      const sessionResult = await this.getSession();
-
-      if (sessionResult.error || !sessionResult.data.session) {
-        return {
-          data: { provider, url: null },
-          error:
-            sessionResult.error ||
-            new AuthError('No user session found', 401, 'session_not_found'),
-        };
-      }
-
-      const callbackURL =
-        oauthCredentials.options?.redirectTo ||
-        (typeof window !== 'undefined' ? window.location.origin : '');
-
-      // Convert scopes from Supabase format (space-separated string) to Better Auth format (array)
-      const scopes = oauthCredentials.options?.scopes
-        ? oauthCredentials.options.scopes
-            .split(' ')
-            .filter((s: string) => s.length > 0)
-        : undefined;
-
-      // Better Auth linkSocial initiates OAuth flow to link account
-      // This will redirect the user to the OAuth provider
-      await this.betterAuth.linkSocial({
-        provider,
-        callbackURL,
-        scopes,
-      });
-
-      // OAuth redirects the user, so we return success immediately
-      // The actual linking happens after OAuth callback
-      return {
-        data: {
-          provider,
-          url: callbackURL,
-        },
-        error: null,
-      };
-    } catch (error) {
-      return {
-        data: { provider, url: null },
-        error: normalizeBetterAuthError(error),
-      };
-    }
-  }) as AuthClient['linkIdentity'];
-
+  /**
+   * Unlinks an identity from the current user
+   * @group User Management
+   */
   unlinkIdentity: AuthClient['unlinkIdentity'] = async (identity) => {
     try {
       const sessionResult = await this.getSession();
@@ -1391,8 +1104,44 @@ export class BetterAuthAdapter implements AuthClient {
       };
     }
   };
+  //#endregion
 
-  // Password reset
+  //#region PUBLIC API - Verification & Password Reset
+  /**
+   * Verifies an OTP (One-Time Password)
+   * @group Verification & Password Reset
+   */
+  verifyOtp: AuthClient['verifyOtp'] = async (params) => {
+    try {
+      if ('email' in params && params.email) {
+        return await this.verifyEmailOtp(params);
+      }
+      if ('phone' in params && params.phone) {
+        return await this.verifyPhoneOtp(params);
+      }
+      if ('token_hash' in params && params.token_hash) {
+        return await this.verifyTokenHashOtp(params);
+      }
+      return {
+        data: { user: null, session: null },
+        error: new AuthError(
+          'Invalid OTP verification parameters',
+          400,
+          'validation_failed'
+        ),
+      };
+    } catch (error) {
+      return {
+        data: { user: null, session: null },
+        error: normalizeBetterAuthError(error),
+      };
+    }
+  };
+
+  /**
+   * Resets a user's password by sending a reset email
+   * @group Verification & Password Reset
+   */
   resetPasswordForEmail: AuthClient['resetPasswordForEmail'] = async (
     email,
     options
@@ -1426,7 +1175,10 @@ export class BetterAuthAdapter implements AuthClient {
     }
   };
 
-  // TODO: we need to OTP to reauthenticate
+  /**
+   * Reauthenticates the user
+   * @group Verification & Password Reset
+   */
   reauthenticate: AuthClient['reauthenticate'] = async () => {
     // Better Auth does not support nonce-based reauthentication
     //
@@ -1445,7 +1197,10 @@ export class BetterAuthAdapter implements AuthClient {
     };
   };
 
-  // Resend
+  /**
+   * Resends a verification email
+   * @group Verification & Password Reset
+   */
   resend: AuthClient['resend'] = async (credentials) => {
     try {
       // Handle email resend
@@ -1518,7 +1273,57 @@ export class BetterAuthAdapter implements AuthClient {
     }
   };
 
-  // Auth state change
+  /**
+   * Exchanges an authorization code for a session
+   * @group Verification & Password Reset
+   */
+  exchangeCodeForSession: AuthClient['exchangeCodeForSession'] = async (
+    _authCode: string
+  ) => {
+    try {
+      // Better Auth handles OAuth callbacks automatically
+      // Just check if we have a session now
+      const sessionResult = await this.getSession();
+
+      if (sessionResult.data.session) {
+        // Emit SIGNED_IN event synchronously (OAuth callback completed)
+        await this.notifyAllSubscribers(
+          'SIGNED_IN',
+          sessionResult.data.session
+        );
+        this.lastSessionState = sessionResult.data.session;
+
+        return {
+          data: {
+            session: sessionResult.data.session,
+            user: sessionResult.data.session.user,
+          },
+          error: null,
+        };
+      }
+
+      return {
+        data: { session: null, user: null },
+        error: new AuthError(
+          'OAuth callback completed but no session was created. Make sure the OAuth callback has been processed.',
+          500,
+          'oauth_callback_failed'
+        ),
+      };
+    } catch (error) {
+      return {
+        data: { session: null, user: null },
+        error: normalizeBetterAuthError(error),
+      };
+    }
+  };
+  //#endregion
+
+  //#region PUBLIC API - Event System
+  /**
+   * Listens for authentication state changes
+   * @group Event System
+   */
   onAuthStateChange: AuthClient['onAuthStateChange'] = (callback) => {
     // Generate unique subscription ID
     const id = crypto.randomUUID();
@@ -1561,16 +1366,359 @@ export class BetterAuthAdapter implements AuthClient {
       },
     };
   };
+  //#endregion
+
+  //#region PUBLIC API - Auto Refresh & Configuration
+  /**
+   * Checks if error throwing is enabled
+   * @group Auto Refresh & Configuration
+   */
+  isThrowOnErrorEnabled: AuthClient['isThrowOnErrorEnabled'] = () => false;
 
   /**
-   * Set up listener for Better Auth's reactive session state
-   *
-   * This listener detects external session changes (e.g., from Better Auth's
-   * internal updates) and syncs our cache accordingly. The nanostore is NOT
-   * used as the primary cache source due to its async nature causing race
-   * conditions.
+   * Starts automatic token refresh
+   * @group Auto Refresh & Configuration
    */
+  startAutoRefresh: AuthClient['startAutoRefresh'] = async () => {
+    // Better Auth handles auto-refresh automatically
+    // No explicit start needed
+    return Promise.resolve();
+  };
 
+  /**
+   * Stops automatic token refresh
+   * @group Auto Refresh & Configuration
+   */
+  stopAutoRefresh: AuthClient['stopAutoRefresh'] = async () => {
+    // Better Auth handles auto-refresh automatically
+    // No explicit stop needed
+    return Promise.resolve();
+  };
+  //#endregion
+
+  //#region PRIVATE HELPERS - Session Cache
+  private getCachedSession(): Session | null {
+    // Check invalidation flag first - prevents returning stale data during sign-out
+    if (this.#sessionCacheInvalidated) {
+      console.log('[BetterAuth] Cache miss: session invalidated');
+      return null;
+    }
+
+    if (!this.#sessionCache) {
+      console.log('[BetterAuth] Cache miss: no cached session');
+      return null;
+    }
+
+    // Lazy expiration check
+    if (Date.now() > this.#sessionCache.expiresAt) {
+      console.log('[BetterAuth] Cache miss: session expired');
+      this.#sessionCache = null;
+      return null;
+    }
+
+    console.log('[BetterAuth] Cache hit: returning cached session');
+    return this.#sessionCache.session;
+  }
+
+  private setCachedSession(session: Session, ttl = SESSION_CACHE_TTL_MS): void {
+    console.log(`[BetterAuth] Setting cached session (TTL: ${ttl}ms)`);
+    this.#sessionCache = {
+      session,
+      expiresAt: Date.now() + ttl,
+    };
+    this.#sessionCacheInvalidated = false;
+  }
+
+  private clearSessionCache(): void {
+    this.#sessionCache = null;
+    this.#sessionCacheInvalidated = true;
+  }
+
+  private isSessionCacheInvalidated(): boolean {
+    return this.#sessionCacheInvalidated;
+  }
+  //#endregion
+
+  //#region PRIVATE HELPERS - JWT Utilities
+  private isExpired(expiresAt: Date | number | null | undefined): boolean {
+    if (!expiresAt) return true;
+    const now = Math.floor(Date.now() / 1000);
+
+    const expiresAtNumber =
+      typeof expiresAt === 'number'
+        ? expiresAt
+        : Math.floor(expiresAt.getTime() / 1000);
+
+    return expiresAtNumber <= now + Math.floor(CLOCK_SKEW_BUFFER_MS / 1000);
+  }
+
+  private getJwtExpiration(jwt: string): number | null {
+    try {
+      const tokenParts = jwt.split('.');
+      if (tokenParts.length !== 3) {
+        return null;
+      }
+      const payload = JSON.parse(atob(tokenParts[1]));
+      const exp = payload.exp;
+      return typeof exp === 'number' ? exp : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private calculateCacheTTL(jwt: string | undefined): number {
+    if (!jwt) {
+      return SESSION_CACHE_TTL_MS;
+    }
+
+    const exp = this.getJwtExpiration(jwt);
+    if (!exp) {
+      return SESSION_CACHE_TTL_MS;
+    }
+
+    const now = Date.now();
+    const expiresAtMs = exp * 1000;
+    const ttl = expiresAtMs - now - CLOCK_SKEW_BUFFER_MS;
+
+    return Math.max(ttl, 1000);
+  }
+  //#endregion
+
+  //#region PRIVATE HELPERS - Verification
+  private async verifyEmailOtp(
+    params: Extract<Parameters<AuthClient['verifyOtp']>[0], { email: string }>
+  ) {
+    const { token, type } = params;
+
+    // Magic link verification
+    if (type === 'magiclink' || type === 'email') {
+      const sessionResult = await this.getSession();
+
+      if (!sessionResult.data.session) {
+        return {
+          data: { user: null, session: null },
+          error: new AuthError(
+            'Failed to retrieve session after OTP verification. Make sure the magic link callback has been processed.',
+            500,
+            'unexpected_failure'
+          ),
+        };
+      }
+
+      await this.notifyAllSubscribers('SIGNED_IN', sessionResult.data.session);
+      this.lastSessionState = sessionResult.data.session;
+
+      return {
+        data: {
+          user: sessionResult.data.session.user,
+          session: sessionResult.data.session,
+        },
+        error: null,
+      };
+    }
+
+    // Email verification (signup confirmation)
+    if (type === 'signup' || type === 'invite') {
+      const result = await this.betterAuth.verifyEmail?.({
+        query: { token },
+      });
+
+      if (result?.error) {
+        return {
+          data: { user: null, session: null },
+          error: normalizeBetterAuthError(result.error),
+        };
+      }
+
+      const sessionResult = await this.getSession();
+
+      return {
+        data: {
+          user: sessionResult.data.session?.user ?? null,
+          session: sessionResult.data.session,
+        },
+        error: null,
+      };
+    }
+
+    // Password recovery verification
+    if (type === 'recovery') {
+      return {
+        data: {
+          user: null,
+          session: null,
+        },
+        error: null,
+      };
+    }
+
+    // Email change verification
+    if (type === 'email_change') {
+      const result = await this.betterAuth.verifyEmail?.({
+        query: { token },
+      });
+
+      if (result?.error) {
+        return {
+          data: { user: null, session: null },
+          error: normalizeBetterAuthError(result.error),
+        };
+      }
+
+      const sessionResult = await this.getSession();
+
+      if (sessionResult.data.session) {
+        await this.notifyAllSubscribers(
+          'USER_UPDATED',
+          sessionResult.data.session
+        );
+        this.lastSessionState = sessionResult.data.session;
+      }
+
+      return {
+        data: {
+          user: sessionResult.data.session?.user ?? null,
+          session: sessionResult.data.session,
+        },
+        error: null,
+      };
+    }
+
+    return {
+      data: { user: null, session: null },
+      error: new AuthError(
+        `Unsupported email OTP type: ${type}`,
+        400,
+        'validation_failed'
+      ),
+    };
+  }
+
+  private async verifyPhoneOtp(
+    _params: Extract<Parameters<AuthClient['verifyOtp']>[0], { phone: string }>
+  ) {
+    return {
+      data: { user: null, session: null },
+      error: new AuthError(
+        'Phone OTP verification not supported by Better Auth',
+        501,
+        'phone_provider_disabled'
+      ),
+    };
+  }
+
+  private async verifyTokenHashOtp(
+    params: Extract<
+      Parameters<AuthClient['verifyOtp']>[0],
+      { token_hash: string }
+    >
+  ) {
+    const { token_hash, type } = params;
+
+    // Magic link token hash verification
+    if (type === 'magiclink' || type === 'email') {
+      const sessionResult = await this.getSession();
+
+      if (!sessionResult.data.session) {
+        return {
+          data: { user: null, session: null },
+          error: new AuthError(
+            'Failed to retrieve session after token hash verification',
+            500,
+            'unexpected_failure'
+          ),
+        };
+      }
+
+      await this.notifyAllSubscribers('SIGNED_IN', sessionResult.data.session);
+      this.lastSessionState = sessionResult.data.session;
+
+      return {
+        data: {
+          user: sessionResult.data.session.user,
+          session: sessionResult.data.session,
+        },
+        error: null,
+      };
+    }
+
+    // For other token hash types, use similar logic as email verification
+    if (type === 'signup' || type === 'invite') {
+      const result = await this.betterAuth.verifyEmail?.({
+        query: { token: token_hash },
+      });
+
+      if (result?.error) {
+        return {
+          data: { user: null, session: null },
+          error: normalizeBetterAuthError(result.error),
+        };
+      }
+
+      const sessionResult = await this.getSession();
+
+      return {
+        data: {
+          user: sessionResult.data.session?.user ?? null,
+          session: sessionResult.data.session,
+        },
+        error: null,
+      };
+    }
+
+    if (type === 'recovery') {
+      return {
+        data: {
+          user: null,
+          session: null,
+        },
+        error: null,
+      };
+    }
+
+    if (type === 'email_change') {
+      const result = await this.betterAuth.verifyEmail?.({
+        query: { token: token_hash },
+      });
+
+      if (result?.error) {
+        return {
+          data: { user: null, session: null },
+          error: normalizeBetterAuthError(result.error),
+        };
+      }
+
+      const sessionResult = await this.getSession();
+
+      if (sessionResult.data.session) {
+        await this.notifyAllSubscribers(
+          'USER_UPDATED',
+          sessionResult.data.session
+        );
+        this.lastSessionState = sessionResult.data.session;
+      }
+
+      return {
+        data: {
+          user: sessionResult.data.session?.user ?? null,
+          session: sessionResult.data.session,
+        },
+        error: null,
+      };
+    }
+
+    return {
+      data: { user: null, session: null },
+      error: new AuthError(
+        `Unsupported token hash OTP type: ${type}`,
+        400,
+        'validation_failed'
+      ),
+    };
+  }
+  //#endregion
+
+  //#region PRIVATE HELPERS - Event System
   private async emitInitialSession(
     callback: (
       event: AuthChangeEvent,
@@ -1581,16 +1729,13 @@ export class BetterAuthAdapter implements AuthClient {
       const { data, error } = await this.getSession();
 
       if (error) {
-        // Emit with null session if error
         await callback('INITIAL_SESSION', null);
         return;
       }
 
-      // Emit initial session
       await callback('INITIAL_SESSION', data.session);
       this.lastSessionState = data.session;
-    } catch (error) {
-      // Emit with null session on exception
+    } catch (_error) {
       await callback('INITIAL_SESSION', null);
     }
   }
@@ -1601,14 +1746,14 @@ export class BetterAuthAdapter implements AuthClient {
     broadcast = true
   ): Promise<void> {
     // Broadcast to other tabs first
-    if (broadcast && this.broadcastChannel) {
+    if (broadcast && this.#broadcastChannel) {
       try {
-        this.broadcastChannel.postMessage({
+        this.#broadcastChannel.postMessage({
           event,
           session,
           timestamp: Date.now(),
         });
-      } catch (error) {
+      } catch (_error) {
         // BroadcastChannel may fail in some environments (e.g., Node.js)
       }
     }
@@ -1618,7 +1763,7 @@ export class BetterAuthAdapter implements AuthClient {
       (subscription) => {
         try {
           return Promise.resolve(subscription.callback(event, session));
-        } catch (error) {
+        } catch (_error) {
           // Auth state change callback error - skip this subscriber
           return Promise.resolve();
         }
@@ -1635,19 +1780,19 @@ export class BetterAuthAdapter implements AuthClient {
     }
 
     // Create channel if not exists
-    if (!this.broadcastChannel) {
+    if (!this.#broadcastChannel) {
       try {
-        this.broadcastChannel = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
+        this.#broadcastChannel = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
 
         // Listen for messages from other tabs
-        this.broadcastChannel.onmessage = async (event: MessageEvent) => {
+        this.#broadcastChannel.onmessage = async (event: MessageEvent) => {
           const { event: authEvent, session } = event.data;
 
           // Update in-memory cache when receiving broadcast
           // This ensures Tab B's cache stays in sync with Tab A's auth state
           if (session) {
             // Tab B receives sign-in from Tab A → cache session in memory
-            const ttl = this._calculateCacheTTL(session.access_token);
+            const ttl = this.calculateCacheTTL(session.access_token);
             console.log(
               '[BroadcastChannel] Setting cached session with TTL:',
               ttl,
@@ -1672,28 +1817,12 @@ export class BetterAuthAdapter implements AuthClient {
   }
 
   private closeBroadcastChannel(): void {
-    if (this.broadcastChannel) {
-      this.broadcastChannel.close();
-      this.broadcastChannel = null;
+    if (this.#broadcastChannel) {
+      this.#broadcastChannel.close();
+      this.#broadcastChannel = null;
     }
   }
 
-  /**
-   * Start token refresh detection via polling
-   *
-   * Industry Standard: Both Supabase and Clerk use polling for token refresh detection:
-   * - Supabase: 30-second interval with 10-second expiry margin
-   * - Clerk: 50-second interval with 60-second token TTL
-   *
-   * Why polling instead of reactive?
-   * - Better Auth's useSession atom only provides current state, not refresh events
-   * - Browser JavaScript cannot receive unsolicited server events (no SSE in this context)
-   * - Polling ensures deterministic behavior across all environments
-   *
-   * Implementation: Check session expiry every 30 seconds (matching Supabase)
-   * - If token expires in <= 90 seconds, assume it was refreshed and emit TOKEN_REFRESHED
-   * - If token expired completely, emit SIGNED_OUT
-   */
   private startTokenRefreshDetection(): void {
     // Only start if explicitly enabled
     if (!this.config.enableTokenRefreshDetection) {
@@ -1701,11 +1830,11 @@ export class BetterAuthAdapter implements AuthClient {
     }
 
     // Don't start if already running
-    if (this.tokenRefreshCheckInterval) {
+    if (this.#tokenRefreshCheckInterval) {
       return;
     }
 
-    this.tokenRefreshCheckInterval = setInterval(async () => {
+    this.#tokenRefreshCheckInterval = setInterval(async () => {
       try {
         // Get current session state
         const sessionResult = await this.getSession();
@@ -1738,82 +1867,17 @@ export class BetterAuthAdapter implements AuthClient {
           await this.notifyAllSubscribers('TOKEN_REFRESHED', session);
           this.lastSessionState = session;
         }
-      } catch (error) {
+      } catch (_error) {
         // Token refresh detection error - skip this check
       }
     }, this.config.tokenRefreshCheckInterval);
   }
 
   private stopTokenRefreshDetection(): void {
-    if (this.tokenRefreshCheckInterval) {
-      clearInterval(this.tokenRefreshCheckInterval);
-      this.tokenRefreshCheckInterval = null;
+    if (this.#tokenRefreshCheckInterval) {
+      clearInterval(this.#tokenRefreshCheckInterval);
+      this.#tokenRefreshCheckInterval = null;
     }
   }
-
-  /**
-   * Exchange an OAuth authorization code for a session.
-   *
-   * Note: Better Auth handles OAuth callbacks automatically.
-   * This method checks if there's a session after callback.
-   *
-   * @param _authCode - The authorization code (Better Auth reads this from URL automatically)
-   * @returns Session data or error
-   */
-  exchangeCodeForSession: AuthClient['exchangeCodeForSession'] = async (
-    _authCode: string
-  ) => {
-    try {
-      // Better Auth handles OAuth callbacks automatically
-      // Just check if we have a session now
-      const sessionResult = await this.getSession();
-
-      if (sessionResult.data.session) {
-        // Emit SIGNED_IN event synchronously (OAuth callback completed)
-        await this.notifyAllSubscribers(
-          'SIGNED_IN',
-          sessionResult.data.session
-        );
-        this.lastSessionState = sessionResult.data.session;
-
-        return {
-          data: {
-            session: sessionResult.data.session,
-            user: sessionResult.data.session.user,
-          },
-          error: null,
-        };
-      }
-
-      return {
-        data: { session: null, user: null },
-        error: new AuthError(
-          'OAuth callback completed but no session was created. Make sure the OAuth callback has been processed.',
-          500,
-          'oauth_callback_failed'
-        ),
-      };
-    } catch (error) {
-      return {
-        data: { session: null, user: null },
-        error: normalizeBetterAuthError(error),
-      };
-    }
-  };
-
-  // Better Auth doesn't support error throwing mode
-  isThrowOnErrorEnabled: AuthClient['isThrowOnErrorEnabled'] = () => false;
-
-  // Auto refresh
-  startAutoRefresh: AuthClient['startAutoRefresh'] = async () => {
-    // Better Auth handles auto-refresh automatically
-    // No explicit start needed
-    return Promise.resolve();
-  };
-
-  stopAutoRefresh: AuthClient['stopAutoRefresh'] = async () => {
-    // Better Auth handles auto-refresh automatically
-    // No explicit stop needed
-    return Promise.resolve();
-  };
+  //#endregion
 }

@@ -272,7 +272,7 @@ describe('StackAuthAdapter - Helpers', () => {
           email_address_invalid: 400,
         };
 
-        Object.entries(statusCodeMappings).forEach(([code, status]) => {
+        Object.entries(statusCodeMappings).forEach(([_code, status]) => {
           expect([400, 401, 404, 422, 429]).toContain(status);
         });
       });

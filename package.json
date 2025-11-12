@@ -37,14 +37,18 @@
     "test:node": "node --run test",
     "test:ci": "vitest run",
     "typecheck": "tsc --noEmit",
-    "release": "bumpp && npm publish"
+    "release": "bumpp && npm publish",
+    "lint": "eslint ."
   },
   "devDependencies": {
     "@types/node": "24.7.2",
     "bumpp": "10.1.0",
     "msw": "2.6.8",
     "tsdown": "0.16.0",
-    "typescript": "5.8.3",
+    "typescript": "^5.9.3",
+    "@eslint/js": "^9.39.1",
+    "typescript-eslint": "^8.46.4",
+    "eslint": "^9.39.1",
     "vite-tsconfig-paths": "5.1.4",
     "vitest": "4.0.7"
   },

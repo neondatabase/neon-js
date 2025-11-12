@@ -183,8 +183,20 @@ export class StackAuthAdapter<
   ProjectId extends string = string,
 > implements AuthClient
 {
+  //#region Public Properties
   stackAuth: StackAuthClient;
 
+  // Admin API (unsupported)
+  admin: AuthClient['admin'] = undefined as never;
+
+  // MFA API (unsupported)
+  mfa: AuthClient['mfa'] = undefined as never;
+
+  // OAuth API (unsupported)
+  oauth: AuthClient['oauth'] = undefined as never;
+  //#endregion
+
+  //#region Private Fields
   // Auth state change management
   private stateChangeEmitters = new Map<string, Subscription>();
   private broadcastChannel: InstanceType<typeof BroadcastChannel> | null = null;
@@ -193,6 +205,9 @@ export class StackAuthAdapter<
     enableTokenRefreshDetection: true, // Enabled by default (matches Supabase)
     tokenRefreshCheckInterval: 30_000, // 30 seconds (matches Supabase)
   };
+  //#endregion
+
+  //#region Constructor
   constructor(
     params: StackServerAppConstructorOptions<HasTokenStore, ProjectId>,
     config?: OnAuthStateChangeConfig
@@ -206,15 +221,7 @@ export class StackAuthAdapter<
       ? (new StackServerApp(params) as StackAuthClient)
       : (new StackClientApp(params) as StackAuthClient);
   }
-
-  // Admin API
-  admin: AuthClient['admin'] = undefined as never;
-
-  // MFA API
-  mfa: AuthClient['mfa'] = undefined as never;
-
-  // OAuth API
-  oauth: AuthClient['oauth'] = undefined as never;
+  //#endregion
 
   // Initialization
   initialize: AuthClient['initialize'] = async () => {
@@ -992,60 +999,6 @@ export class StackAuthAdapter<
    * Always makes a network request to get the latest user metadata.
    * Used when we need fresh data (after setSession, refreshSession, etc.)
    */
-  private async _fetchFreshSession(): Promise<
-    ReturnType<AuthClient['getSession']>
-  > {
-    try {
-      const user = await this.stackAuth.getUser();
-      if (user) {
-        const tokens = await user.currentSession.getTokens();
-        if (tokens.accessToken) {
-          const payload = accessTokenSchema.parse(
-            JSON.parse(atob(tokens.accessToken.split('.')[1]))
-          );
-
-          const session: Session = {
-            access_token: tokens.accessToken,
-            // ATTENTION: we allow sessions without refresh token
-            refresh_token: tokens.refreshToken ?? '',
-            expires_at: payload.exp,
-            expires_in: Math.max(
-              0,
-              payload.exp - Math.floor(Date.now() / 1000)
-            ),
-            token_type: 'bearer' as const,
-            user: {
-              id: user.id,
-              email: user.primaryEmail || '',
-              email_confirmed_at: user.primaryEmailVerified
-                ? toISOString(user.signedUpAt)
-                : undefined,
-              last_sign_in_at: toISOString(user.signedUpAt),
-              created_at: toISOString(user.signedUpAt),
-              updated_at: toISOString(user.signedUpAt),
-              aud: 'authenticated',
-              role: 'authenticated',
-              app_metadata: user.clientReadOnlyMetadata,
-              user_metadata: {
-                displayName: user.displayName,
-                profileImageUrl: user.profileImageUrl,
-                ...user.clientMetadata,
-              },
-              identities: [],
-            },
-          };
-
-          return { data: { session }, error: null };
-        }
-      }
-
-      return { data: { session: null }, error: null };
-    } catch (error) {
-      console.error('Error fetching fresh session:', error);
-      return { data: { session: null }, error: normalizeStackAuthError(error) };
-    }
-  }
-
   getSession: AuthClient['getSession'] = async () => {
     try {
       // Step 1: Try to get cached tokens (fast path - no network request)
@@ -1286,7 +1239,7 @@ export class StackAuthAdapter<
       }
 
       return accessToken;
-    } catch (error) {
+    } catch (_error) {
       return null;
     }
   };
@@ -1781,6 +1734,134 @@ export class StackAuthAdapter<
     };
   };
 
+  /**
+   * Exchange an OAuth authorization code for a session.
+   *
+   * Note: Stack Auth handles OAuth callbacks automatically via callOAuthCallback().
+   * This method delegates to Stack Auth's internal flow which:
+   * - Retrieves the code and state from the current URL
+   * - Retrieves the PKCE verifier from cookies (stored during signInWithOAuth)
+   * - Exchanges the code for access/refresh tokens
+   * - Creates and stores the user session
+   *
+   * @param authCode - The authorization code (Stack Auth reads this from URL automatically)
+   * @returns Session data or error
+   */
+  exchangeCodeForSession: AuthClient['exchangeCodeForSession'] = async (
+    _authCode: string
+  ) => {
+    try {
+      // Stack Auth's callOAuthCallback() automatically:
+      // - Retrieves code and state from URL parameters
+      // - Retrieves code verifier from cookies (stored during signInWithOAuth)
+      // - Exchanges code for tokens
+      // - Updates the session
+      const success = await this.stackAuth.callOAuthCallback();
+
+      if (success) {
+        const sessionResult = await this.getSession();
+
+        if (sessionResult.data.session) {
+          // Emit SIGNED_IN event
+          await this.notifyAllSubscribers(
+            'SIGNED_IN',
+            sessionResult.data.session
+          );
+
+          return {
+            data: {
+              session: sessionResult.data.session,
+              user: sessionResult.data.session.user,
+            },
+            error: null,
+          };
+        }
+      }
+
+      return {
+        data: { session: null, user: null },
+        error: new AuthError(
+          'OAuth callback completed but no session was created',
+          500,
+          'oauth_callback_failed'
+        ),
+      };
+    } catch (error) {
+      return {
+        data: { session: null, user: null },
+        error: normalizeStackAuthError(error),
+      };
+    }
+  };
+
+  isThrowOnErrorEnabled: AuthClient['isThrowOnErrorEnabled'] = () => false;
+
+  // Auto refresh
+  startAutoRefresh: AuthClient['startAutoRefresh'] = async () => {
+    // Stack Auth handles auto-refresh automatically
+    // No explicit start needed
+    return Promise.resolve();
+  };
+
+  stopAutoRefresh: AuthClient['stopAutoRefresh'] = async () => {
+    // Stack Auth handles auto-refresh automatically
+    // No explicit stop needed
+    return Promise.resolve();
+  };
+  private async _fetchFreshSession(): Promise<
+    ReturnType<AuthClient['getSession']>
+  > {
+    try {
+      const user = await this.stackAuth.getUser();
+      if (user) {
+        const tokens = await user.currentSession.getTokens();
+        if (tokens.accessToken) {
+          const payload = accessTokenSchema.parse(
+            JSON.parse(atob(tokens.accessToken.split('.')[1]))
+          );
+
+          const session: Session = {
+            access_token: tokens.accessToken,
+            // ATTENTION: we allow sessions without refresh token
+            refresh_token: tokens.refreshToken ?? '',
+            expires_at: payload.exp,
+            expires_in: Math.max(
+              0,
+              payload.exp - Math.floor(Date.now() / 1000)
+            ),
+            token_type: 'bearer' as const,
+            user: {
+              id: user.id,
+              email: user.primaryEmail || '',
+              email_confirmed_at: user.primaryEmailVerified
+                ? toISOString(user.signedUpAt)
+                : undefined,
+              last_sign_in_at: toISOString(user.signedUpAt),
+              created_at: toISOString(user.signedUpAt),
+              updated_at: toISOString(user.signedUpAt),
+              aud: 'authenticated',
+              role: 'authenticated',
+              app_metadata: user.clientReadOnlyMetadata,
+              user_metadata: {
+                displayName: user.displayName,
+                profileImageUrl: user.profileImageUrl,
+                ...user.clientMetadata,
+              },
+              identities: [],
+            },
+          };
+
+          return { data: { session }, error: null };
+        }
+      }
+
+      return { data: { session: null }, error: null };
+    } catch (error) {
+      console.error('Error fetching fresh session:', error);
+      return { data: { session: null }, error: normalizeStackAuthError(error) };
+    }
+  }
+
   private async _getSessionFromStackAuthInternals(): Promise<InternalSession | null> {
     const tokenStore = await this.stackAuth._getOrCreateTokenStore(
       await this.stackAuth._createCookieHelper()
@@ -1826,7 +1907,7 @@ export class StackAuthAdapter<
 
       // Emit initial session
       await callback('INITIAL_SESSION', data.session);
-    } catch (error) {
+    } catch (_error) {
       // Emit with null session on exception
       await callback('INITIAL_SESSION', null);
     }
@@ -1955,78 +2036,4 @@ export class StackAuthAdapter<
     }
   }
 
-  /**
-   * Exchange an OAuth authorization code for a session.
-   *
-   * Note: Stack Auth handles OAuth callbacks automatically via callOAuthCallback().
-   * This method delegates to Stack Auth's internal flow which:
-   * - Retrieves the code and state from the current URL
-   * - Retrieves the PKCE verifier from cookies (stored during signInWithOAuth)
-   * - Exchanges the code for access/refresh tokens
-   * - Creates and stores the user session
-   *
-   * @param authCode - The authorization code (Stack Auth reads this from URL automatically)
-   * @returns Session data or error
-   */
-  exchangeCodeForSession: AuthClient['exchangeCodeForSession'] = async (
-    _authCode: string
-  ) => {
-    try {
-      // Stack Auth's callOAuthCallback() automatically:
-      // - Retrieves code and state from URL parameters
-      // - Retrieves code verifier from cookies (stored during signInWithOAuth)
-      // - Exchanges code for tokens
-      // - Updates the session
-      const success = await this.stackAuth.callOAuthCallback();
-
-      if (success) {
-        const sessionResult = await this.getSession();
-
-        if (sessionResult.data.session) {
-          // Emit SIGNED_IN event
-          await this.notifyAllSubscribers(
-            'SIGNED_IN',
-            sessionResult.data.session
-          );
-
-          return {
-            data: {
-              session: sessionResult.data.session,
-              user: sessionResult.data.session.user,
-            },
-            error: null,
-          };
-        }
-      }
-
-      return {
-        data: { session: null, user: null },
-        error: new AuthError(
-          'OAuth callback completed but no session was created',
-          500,
-          'oauth_callback_failed'
-        ),
-      };
-    } catch (error) {
-      return {
-        data: { session: null, user: null },
-        error: normalizeStackAuthError(error),
-      };
-    }
-  };
-
-  isThrowOnErrorEnabled: AuthClient['isThrowOnErrorEnabled'] = () => false;
-
-  // Auto refresh
-  startAutoRefresh: AuthClient['startAutoRefresh'] = async () => {
-    // Stack Auth handles auto-refresh automatically
-    // No explicit start needed
-    return Promise.resolve();
-  };
-
-  stopAutoRefresh: AuthClient['stopAutoRefresh'] = async () => {
-    // Stack Auth handles auto-refresh automatically
-    // No explicit stop needed
-    return Promise.resolve();
-  };
 }

@@ -604,7 +604,7 @@ export const stackAuthHandlers = [
           token_type: 'Bearer',
           expires_in: 3600,
         });
-      } catch (error) {
+      } catch (_error) {
         return HttpResponse.json(
           {
             error: 'invalid_token',
