@@ -362,16 +362,17 @@ User {
 
 ## Session Caching Strategy
 
-### Better Auth Approach
-- Uses nanostores atoms (`useSession`)
-- Reactive state updates
-- May cache sessions automatically
+### Better Auth Adapter Implementation
+- In-memory session cache with TTL-based expiration
+- TTL calculated from JWT `exp` claim (default: 60 seconds)
+- Synchronous cache reads (<1ms)
+- Invalidation flag prevents race conditions during sign-out
 
-**Implementation Strategy**:
-1. Use Better Auth's `getSession()` for session access
-2. Implement fast path if Better Auth provides caching
-3. Fall back to fresh fetch if needed
-4. Map session format on each access
+**Implementation Details**:
+1. `getSession()` checks in-memory cache first (fast path)
+2. If cache miss, fetches from Better Auth server
+3. Stores session with TTL based on JWT expiration
+4. Maps Better Auth session format to Supabase format
 
 ---
 
@@ -406,7 +407,7 @@ const results = await Promise.all([
 ```typescript
 // getSession() deduplication
 getSession = async () => {
-  const cached = this.sessionStorage.get();
+  const cached = this.getCachedSession();
   if (cached) return { data: { session: cached }, error: null };
 
   // Deduplicate network request
@@ -418,7 +419,7 @@ getSession = async () => {
 
 // getJwtToken() deduplication (independent tracking)
 getJwtToken = async () => {
-  const cached = this.sessionStorage.get();
+  const cached = this.getCachedSession();
   if (cached?.access_token) return cached.access_token;
 
   // Deduplicate JWT fetch
@@ -651,8 +652,8 @@ getUserIdentities = async () => {
 
 2. **Session Management**
    - Better Auth's `getSession()` returns `{ data: { session, user }, error }`
-   - Session caching is handled internally by Better Auth
-   - No fast path needed as Better Auth manages caching internally
+   - Adapter implements in-memory session caching with TTL-based expiration
+   - Fast path checks cache first (<1ms), falls back to network call if cache miss
 
 3. **Reactive State Integration**
    - Better Auth uses nanostores atoms (`useSession`)

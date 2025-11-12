@@ -12,19 +12,15 @@ This is a unified TypeScript SDK for Neon services, providing seamless integrati
 - **Adapter Pattern**: Authentication providers implement the `AuthClient` interface
 - **Adapters**: Located in `src/auth/adapters/`
   - **Better Auth** (Primary): `src/auth/adapters/better-auth/`
-    - `better-auth-adapter.ts` - Main adapter implementation (50KB, ~1600 lines)
+    - `better-auth-adapter.ts` - Main adapter implementation (~1820 lines)
     - `better-auth-types.ts` - TypeScript type definitions and interfaces
     - `better-auth-helpers.ts` - Helper utilities for session mapping and error handling
-    - `in-memory-session-cache.ts` - Synchronous in-memory cache for Node.js
-    - `local-storage-session-cache.ts` - localStorage-based cache for browser with multi-tab sync
-    - `storage-factory.ts` - Environment-aware storage factory
-    - `storage-interface.ts` - SessionStorage interface for cache implementations
-    - `storage-schemas.ts` - Zod validation schemas for cached data
+    - `in-flight-request-manager.ts` - Generic request deduplication utility
+    - `storage-schemas.ts` - Zod validation schemas for JWT tokens
     - `constants.ts` - Configuration constants (TTLs, intervals, buffers)
     - `index.ts` - Public exports (barrel file)
     - `better-auth-docs.md` - Comprehensive adapter documentation
     - `better-auth-plugins.md` - Plugin configuration guide
-    - `better-auth-checklist.md` - Implementation checklist
   - **Stack Auth** (Legacy): `src/auth/adapters/stack-auth/`
     - `stack-auth-adapter.ts` - Main adapter implementation (2000+ lines, all methods implemented)
     - `stack-auth-types.ts` - TypeScript type definitions and interfaces
@@ -102,30 +98,23 @@ Works in both browser and Node.js with graceful degradation:
 - **Browser**: Full feature support including cross-tab sync via BroadcastChannel
 - **Node.js**: Core auth works, browser-only features auto-disabled
 
-### Session Caching with Environment-Aware Storage
+### Session Caching
 
-The Better Auth adapter uses environment-aware session storage with automatic cache selection:
+The Better Auth adapter uses in-memory session caching with TTL-based expiration:
 
-**Storage Strategy**:
-- **Browser Environment**: Uses `LocalStorageCache` for persistent, multi-tab synchronized caching
-  - Stores sessions in localStorage with 60-second TTL
-  - Automatic cross-tab synchronization (updates reflected across browser tabs)
-  - Zod validation for data integrity
-  - Invalidation flags prevent race conditions during sign-out
-- **Node.js Environment**: Uses `InMemorySessionCache` for single-instance caching
-  - Synchronous in-memory cache with 60-second TTL
-  - No persistence (suitable for server-side use cases)
-  - Lazy expiration (checked on read)
-
-**Factory Pattern**: `createSessionStorage()` automatically selects the appropriate implementation based on environment detection
+**Cache Strategy**:
+- Sessions cached in memory with 60-second TTL (or until JWT expires)
+- TTL calculated from JWT `exp` claim minus clock skew buffer
+- Lazy expiration checked on read operations
+- Cache cleared synchronously on sign-out
 
 **Invalidation Mechanism**: Prevents stale data during sign-out via invalidation flag
-  - When `signOut()` is called, it sets an invalidation flag before clearing caches
+  - When `signOut()` is called, it sets an invalidation flag before clearing cache
   - Any in-flight `getSession()` calls check this flag before returning cached data
   - If invalidated, returns null instead of stale session data
   - Flag is cleared when a new session is set (during sign-in)
 
-**JWT Storage**: JWT tokens are embedded in session objects (`access_token` field) and cached alongside session data
+**JWT Storage**: JWT tokens are embedded in session objects (`access_token` field) and cached in memory
 
 ### Request Deduplication
 
@@ -146,8 +135,8 @@ The adapter implements sophisticated state management:
 - **Event system**: `onAuthStateChange()` for monitoring `SIGNED_IN`, `SIGNED_OUT`, `TOKEN_REFRESHED`, `USER_UPDATED` events
 - **Session mapping**: Transforms Better Auth sessions to Supabase-compatible format
 - **Cache invalidation**: Prevents race conditions during sign-out with invalidation flags
-- **Environment-aware caching**: Automatic selection of localStorage (browser) or in-memory (Node.js) cache
-- **Data validation**: Zod schemas validate cached data integrity on read/write operations
+- **In-memory caching**: Fast session cache with TTL-based expiration
+- **Data validation**: Zod schemas validate JWT token structure
 
 See `REMOVE_BETTER_AUTH_SESSION_LISTENER.md` for detailed implementation notes on the synchronous event model.
 
@@ -221,9 +210,9 @@ const { data: items } = await client.from('items').select();
 See `src/client/client-factory_stack_auth.ts` for Stack Auth implementation details.
 
 ### Performance Characteristics (Better Auth):
-- **Browser - Cached `getSession()`**: <5ms (reads from localStorage, no network call)
-- **Browser - First `getSession()` after reload**: <50ms (localStorage read + session validation)
-- **Node.js - Cached `getSession()`**: <1ms (in-memory synchronous read)
+- **Cached `getSession()`**: <1ms (in-memory synchronous read, no I/O)
+- **First `getSession()` (cold start)**: ~200ms (network call to Better Auth + JWT fetch)
+- **Concurrent `getSession()` (cold start)**: ~200ms total (deduplicated to single request)
 - **Token refresh**: <200ms (network call to Better Auth, happens automatically)
 - **Cross-tab sync latency**: <50ms (BroadcastChannel propagation in browser)
 
@@ -413,7 +402,6 @@ The package includes a `neon-js` CLI command for generating TypeScript types fro
 - **`intelligence/auth-feature-comparison.md`**: Detailed comparison of authentication features across providers
 - **`src/auth/adapters/better-auth/better-auth-docs.md`**: Comprehensive Better Auth adapter documentation
 - **`src/auth/adapters/better-auth/better-auth-plugins.md`**: Better Auth plugin configuration guide
-- **`src/auth/adapters/better-auth/better-auth-checklist.md`**: Implementation checklist for the Better Auth adapter
 
 ## Supabase references
 
