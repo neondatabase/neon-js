@@ -18,13 +18,13 @@ export type CreateClientOptions<SchemaName> = Omit<
   NeonClientConstructorOptions<SchemaName>,
   'dataApiUrl'
 > & {
-  baseBranchUrl: string;
   auth?: Omit<BetterAuthOptions, 'baseURL'>;
 };
 
 /**
  * Factory function to create NeonClient with seamless auth integration
  *
+ * @param neonUrl - The Neon URL
  * @param options - Configuration options
  * @returns NeonClient instance with auth-aware fetch wrapper
  * @throws AuthRequiredError when making requests without authentication
@@ -32,19 +32,21 @@ export type CreateClientOptions<SchemaName> = Omit<
 export function createClient<
   Database = any,
   SchemaName extends string & keyof Database = DefaultSchemaName<Database>,
->({
-  baseBranchUrl,
-  auth: authOptions = {},
-  options: neonClientOptions,
-}: CreateClientOptions<SchemaName>): NeonClient<Database, SchemaName> {
-  // Step 1: Extract config if provided
-  const { config, ...betterAuthParams } = authOptions;
-  const { dataApiUrl, authUrl } = getNeonUrls(baseBranchUrl);
+>(
+  neonUrl: string,
+  {
+    auth: authOptions = {},
+    options: neonClientOptions,
+  }: CreateClientOptions<SchemaName> = {}
+): NeonClient<Database, SchemaName> {
+  // Step 1: Extract auth config if provided
+  const { config: authConfig, ...betterAuthParams } = authOptions;
+  const { dataApiUrl, authUrl } = getNeonUrls(neonUrl);
 
   // Step 2: Instantiate auth adapter from options
   const auth = new BetterAuthAdapter(
     { ...betterAuthParams, baseURL: authUrl },
-    config
+    authConfig
   );
 
   // Step 3: Create lazy token accessor - called on every request
