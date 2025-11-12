@@ -19,7 +19,7 @@ export type CreateClientOptions<SchemaName> = Omit<
   'dataApiUrl'
 > & {
   baseBranchUrl: string;
-  auth: Omit<BetterAuthOptions, 'baseURL'>;
+  auth?: Omit<BetterAuthOptions, 'baseURL'>;
 };
 
 /**
@@ -34,7 +34,7 @@ export function createClient<
   SchemaName extends string & keyof Database = DefaultSchemaName<Database>,
 >({
   baseBranchUrl,
-  auth: authOptions,
+  auth: authOptions = {},
   options: neonClientOptions,
 }: CreateClientOptions<SchemaName>): NeonClient<Database, SchemaName> {
   // Step 1: Extract config if provided
