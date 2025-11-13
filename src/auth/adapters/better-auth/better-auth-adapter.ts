@@ -4,6 +4,7 @@ import type {
   AuthChangeEvent,
   Subscription,
   Provider,
+  AuthTokenResponse,
 } from '@supabase/auth-js';
 import { accessTokenSchema } from '@/auth/adapters/shared-schemas';
 import {
@@ -47,65 +48,6 @@ export class BetterAuthAdapter implements AuthClient {
   admin: AuthClient['admin'] = undefined as never;
   mfa: AuthClient['mfa'] = undefined as never;
   oauth: AuthClient['oauth'] = undefined as never;
-
-  linkIdentity: AuthClient['linkIdentity'] = (async (credentials) => {
-    if ('token' in credentials) {
-      const provider = credentials.provider as Provider;
-      return {
-        data: { provider, url: null },
-        error: new AuthError(
-          'Better Auth does not support linking identities with ID tokens. Use OAuth credentials instead.',
-          501,
-          'id_token_provider_disabled'
-        ),
-      };
-    }
-
-    const oauthCredentials = credentials;
-    const provider = oauthCredentials.provider;
-
-    try {
-      const sessionResult = await this.getSession();
-
-      if (sessionResult.error || !sessionResult.data.session) {
-        return {
-          data: { provider, url: null },
-          error:
-            sessionResult.error ||
-            new AuthError('No user session found', 401, 'session_not_found'),
-        };
-      }
-
-      const callbackURL =
-        oauthCredentials.options?.redirectTo ||
-        (globalThis.window === undefined ? '' : globalThis.location.origin);
-
-      const scopes = oauthCredentials.options?.scopes
-        ? oauthCredentials.options.scopes
-            .split(' ')
-            .filter((s: string) => s.length > 0)
-        : undefined;
-
-      await this.betterAuth.linkSocial({
-        provider,
-        callbackURL,
-        scopes,
-      });
-
-      return {
-        data: {
-          provider,
-          url: callbackURL,
-        },
-        error: null,
-      };
-    } catch (error) {
-      return {
-        data: { provider, url: null },
-        error: normalizeBetterAuthError(error),
-      };
-    }
-  }) as AuthClient['linkIdentity'];
   //#endregion
 
   //#region Private Fields
@@ -856,6 +798,65 @@ export class BetterAuthAdapter implements AuthClient {
     }
   };
 
+  // @ts-expect-error - this should infer the overload correctly...
+  linkIdentity: AuthClient['linkIdentity'] = async (credentials) => {
+    if ('token' in credentials) {
+      return {
+        data: { user: null, session: null },
+        error: new AuthError(
+          'Better Auth does not support linking identities with ID tokens. Use OAuth credentials instead.',
+          501,
+          'id_token_provider_disabled'
+        ),
+      };
+    }
+
+    const oauthCredentials = credentials;
+    const provider = oauthCredentials.provider;
+
+    try {
+      const sessionResult = await this.getSession();
+
+      if (sessionResult.error || !sessionResult.data.session) {
+        return {
+          data: { provider, url: null },
+          error:
+            sessionResult.error ||
+            new AuthError('No user session found', 401, 'session_not_found'),
+        };
+      }
+
+      const callbackURL =
+        oauthCredentials.options?.redirectTo ||
+        (globalThis.window === undefined ? '' : globalThis.location.origin);
+
+      const scopes = oauthCredentials.options?.scopes
+        ? oauthCredentials.options.scopes
+            .split(' ')
+            .filter((s: string) => s.length > 0)
+        : undefined;
+
+      await this.betterAuth.linkSocial({
+        provider,
+        callbackURL,
+        scopes,
+      });
+
+      return {
+        data: {
+          provider,
+          url: callbackURL,
+        },
+        error: null,
+      };
+    } catch (error) {
+      return {
+        data: { provider, url: null },
+        error: normalizeBetterAuthError(error),
+      };
+    }
+  };
+
   unlinkIdentity: AuthClient['unlinkIdentity'] = async (identity) => {
     try {
       const sessionResult = await this.getSession();
@@ -986,7 +987,9 @@ export class BetterAuthAdapter implements AuthClient {
             email,
             callbackURL:
               options?.emailRedirectTo ||
-              (globalThis.window === undefined ? '' : globalThis.location.origin),
+              (globalThis.window === undefined
+                ? ''
+                : globalThis.location.origin),
           });
 
           if (result?.error) {
@@ -1492,26 +1495,29 @@ export class BetterAuthAdapter implements AuthClient {
       try {
         this.#broadcastChannel = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
 
-        this.#broadcastChannel.addEventListener('message', async (event: MessageEvent) => {
-          const { event: authEvent, session } = event.data;
+        this.#broadcastChannel.addEventListener(
+          'message',
+          async (event: MessageEvent) => {
+            const { event: authEvent, session } = event.data;
 
-          // Sync in-memory cache with cross-tab auth state
-          if (session) {
-            const ttl = this.calculateCacheTTL(session.access_token);
-            console.log(
-              '[BroadcastChannel] Setting cached session with TTL:',
-              ttl,
-              'for session:',
-              session.access_token
-            );
-            this.setCachedSession(session, ttl);
-          } else {
-            this.clearSessionCache();
+            // Sync in-memory cache with cross-tab auth state
+            if (session) {
+              const ttl = this.calculateCacheTTL(session.access_token);
+              console.log(
+                '[BroadcastChannel] Setting cached session with TTL:',
+                ttl,
+                'for session:',
+                session.access_token
+              );
+              this.setCachedSession(session, ttl);
+            } else {
+              this.clearSessionCache();
+            }
+
+            await this.notifyAllSubscribers(authEvent, session, false);
+            this.lastSessionState = session;
           }
-
-          await this.notifyAllSubscribers(authEvent, session, false);
-          this.lastSessionState = session;
-        });
+        );
       } catch (error) {
         console.warn('[BroadcastChannel] Failed to initialize:', error);
       }
