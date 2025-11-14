@@ -1,6 +1,6 @@
 {
   "name": "@neondatabase/postgrest-js",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha.1",
   "description": "Generic PostgreSQL client for Neon Data API (without authentication)",
   "type": "module",
   "license": "Apache-2.0",
