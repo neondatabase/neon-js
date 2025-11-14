@@ -17,12 +17,12 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "neon-js": "dist/cli/index.js"
+    "neon-js": "dist/cli/index.mjs"
   },
   "exports": {
-    ".": "./dist/index.js",
-    "./client": "./dist/client/index.js",
-    "./cli": "./dist/cli/index.js"
+    ".": "./dist/index.mjs",
+    "./client": "./dist/client/index.mjs",
+    "./cli": "./dist/cli/index.mjs"
   },
   "files": [
     "dist"

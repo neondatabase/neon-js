@@ -1,5 +1,5 @@
 {
-  "name": "@neon-js/auth",
+  "name": "@neondatabase/auth-js",
   "version": "0.1.0",
   "description": "Authentication adapters for Neon services",
   "type": "module",
@@ -8,10 +8,10 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./dist/index.js",
-    "./adapters": "./dist/adapters/index.js",
-    "./better-auth": "./dist/adapters/better-auth/index.js",
-    "./stack-auth": "./dist/adapters/stack-auth/index.js"
+    ".": "./dist/index.mjs",
+    "./adapters": "./dist/adapters/index.mjs",
+    "./better-auth": "./dist/adapters/better-auth/index.mjs",
+    "./stack-auth": "./dist/adapters/stack-auth/index.mjs"
   },
   "files": [
     "dist"

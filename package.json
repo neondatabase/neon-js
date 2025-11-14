@@ -7,14 +7,15 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "bun run --filter '@neon-js/auth' build && bun run --filter '@neondatabase/neon-js' build",
-    "dev": "bun run --filter '@neon-js/auth' dev & bun run --filter '@neondatabase/neon-js' dev",
-    "test": "bun run --filter '@neon-js/auth' test && bun run --filter '@neondatabase/neon-js' test",
-    "test:node": "bun run --filter '@neon-js/auth' test:node && bun run --filter '@neondatabase/neon-js' test:node",
-    "test:ci": "bun run --filter '@neon-js/auth' test:ci && bun run --filter '@neondatabase/neon-js' test:ci",
+    "link:neon-js": "cd packages/auth && bun link && cd ../neon-js && bun link",
+    "build": "bun run --filter '@neondatabase/auth-js' build && bun run --filter '@neondatabase/neon-js' build",
+    "dev": "bun run --filter '@neondatabase/auth-js' dev & bun run --filter '@neondatabase/neon-js' dev",
+    "test": "bun run --filter '@neondatabase/auth-js' test && bun run --filter '@neondatabase/neon-js' test",
+    "test:node": "bun run --filter '@neondatabase/auth-js' test:node && bun run --filter '@neondatabase/neon-js' test:node",
+    "test:ci": "bun run --filter '@neondatabase/auth-js' test:ci && bun run --filter '@neondatabase/neon-js' test:ci",
     "typecheck": "bun run --filter '*' typecheck",
     "lint": "bun run --filter '@neondatabase/neon-js' lint",
-    "release": "bun run build && bun run --filter '@neon-js/auth' release && bun run --filter '@neondatabase/neon-js' release"
+    "release": "bun run build && bun run --filter '@neondatabase/auth-js' release && bun run --filter '@neondatabase/neon-js' release"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

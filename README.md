@@ -190,10 +190,9 @@ const client = createClient({
 
 ## Development
 
-This is a Bun workspaces monorepo with three packages:
+This is a Bun workspaces monorepo with two packages:
 
-- `packages/shared/` - Internal shared utilities (not published)
-- `packages/auth/` - Authentication adapters (`@neon-js/auth`)
+- `packages/auth/` - Authentication adapters (`@neondatabase/auth-js`)
 - `packages/neon-js/` - Main SDK package (`@neondatabase/neon-js`)
 
 Install dependencies:
@@ -217,7 +216,7 @@ bun build
 Build a specific package:
 
 ```bash
-bun run --filter '@neon-js/auth' build
+bun run --filter '@neondatabase/auth-js' build
 ```
 
 Run tests:
@@ -244,18 +243,10 @@ bun release
 
 ```
 packages/
-├── shared/                    # @neon-js/shared (INTERNAL)
-│   └── src/
-│       ├── utils/
-│       │   └── date.ts       # Date utilities
-│       ├── schemas/
-│       │   └── index.ts      # Shared Zod schemas
-│       └── index.ts
-│
-├── auth/                      # @neon-js/auth (PUBLISHED)
+├── auth/                      # @neondatabase/auth-js (PUBLISHED)
 │   └── src/
 │       ├── auth-interface.ts  # Core AuthClient interface
-│       ├── utils.ts           # Shared utility re-exports
+│       ├── utils.ts           # Utility functions
 │       ├── adapters/
 │       │   ├── better-auth/   # Better Auth adapter (Primary)
 │       │   │   ├── better-auth-adapter.ts
@@ -282,6 +273,7 @@ packages/
         ├── client/
         │   ├── neon-client.ts
         │   ├── client-factory.ts
+        │   ├── client-factory-stack-auth.ts
         │   ├── fetch-with-auth.ts
         │   └── index.ts
         ├── cli/
