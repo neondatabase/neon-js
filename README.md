@@ -190,6 +190,12 @@ const client = createClient({
 
 ## Development
 
+This is a Bun workspaces monorepo with three packages:
+
+- `packages/shared/` - Internal shared utilities (not published)
+- `packages/auth/` - Authentication adapters (`@neon-js/auth`)
+- `packages/neon-js/` - Main SDK package (`@neondatabase/neon-js`)
+
 Install dependencies:
 
 ```bash
@@ -202,10 +208,16 @@ Run development server with watch mode:
 bun dev
 ```
 
-Build the library:
+Build all packages:
 
 ```bash
 bun build
+```
+
+Build a specific package:
+
+```bash
+bun run --filter '@neon-js/auth' build
 ```
 
 Run tests:
@@ -214,7 +226,7 @@ Run tests:
 bun test
 ```
 
-Type check:
+Type check all packages:
 
 ```bash
 bun typecheck
@@ -231,52 +243,55 @@ bun release
 ## Project Structure
 
 ```
-src/
-├── auth/
-│   ├── auth-interface.ts          # Core AuthClient interface
-│   ├── utils.ts                   # Shared utility functions
-│   ├── __tests__/                 # Comprehensive test suite
-│   │   ├── auth-flows.test.ts
-│   │   ├── session-management.test.ts
-│   │   ├── error-handling.test.ts
-│   │   ├── oauth.test.ts
-│   │   ├── oauth.browser.test.ts
-│   │   ├── otp.test.ts
-│   │   ├── user-management.test.ts
-│   │   ├── stack-auth-helpers.test.ts
-│   │   ├── supabase-compatibility.test.ts
-│   │   ├── msw-setup.ts
-│   │   ├── msw-handlers.ts
-│   │   └── README.md
-│   └── adapters/
-│       ├── better-auth/            # Better Auth adapter (Primary)
-│       │   ├── better-auth-adapter.ts   # Main implementation (46KB)
-│       │   ├── better-auth-types.ts     # Type definitions
-│       │   ├── better-auth-schemas.ts   # Zod schemas
-│       │   ├── better-auth-helpers.ts   # Helper utilities
-│       │   ├── better-auth-docs.md      # Documentation
-│       │   ├── better-auth-plugins.md   # Plugin guide
-│       │   └── better-auth-checklist.md # Implementation checklist
-│       ├── stack-auth/             # Stack Auth adapter (Legacy)
-│       │   ├── stack-auth-adapter.ts    # Implementation (2000+ lines)
-│       │   ├── stack-auth-types.ts      # Type definitions
-│       │   ├── stack-auth-schemas.ts    # Zod schemas
-│       │   └── stack-auth-helpers.ts    # Helper utilities
-│       ├── shared-helpers.ts       # Shared utilities
-│       └── shared-schemas.ts       # Shared Zod schemas
-├── client/
-│   ├── neon-client.ts             # NeonClient class (extends PostgrestClient)
-│   ├── client-factory.ts          # createClient() factory function
-│   ├── neon-client.test.ts        # Client tests
-│   └── fetch-with-auth.ts         # Auth-aware fetch wrapper
-├── cli/
-│   ├── index.ts                   # CLI entry point (bin: neon-js)
-│   ├── commands/
-│   │   ├── gen-types.ts           # Type generation command
-│   │   └── generate-types.ts      # Core type generation logic
-│   └── utils/
-│       └── parse-duration.ts      # Duration parsing utility
-└── index.ts                        # Public exports
+packages/
+├── shared/                    # @neon-js/shared (INTERNAL)
+│   └── src/
+│       ├── utils/
+│       │   └── date.ts       # Date utilities
+│       ├── schemas/
+│       │   └── index.ts      # Shared Zod schemas
+│       └── index.ts
+│
+├── auth/                      # @neon-js/auth (PUBLISHED)
+│   └── src/
+│       ├── auth-interface.ts  # Core AuthClient interface
+│       ├── utils.ts           # Shared utility re-exports
+│       ├── adapters/
+│       │   ├── better-auth/   # Better Auth adapter (Primary)
+│       │   │   ├── better-auth-adapter.ts
+│       │   │   ├── better-auth-types.ts
+│       │   │   ├── better-auth-helpers.ts
+│       │   │   ├── in-flight-request-manager.ts
+│       │   │   ├── constants.ts
+│       │   │   └── index.ts
+│       │   ├── stack-auth/    # Stack Auth adapter (Legacy)
+│       │   │   ├── stack-auth-adapter.ts
+│       │   │   ├── stack-auth-types.ts
+│       │   │   ├── stack-auth-schemas.ts
+│       │   │   ├── stack-auth-helpers.ts
+│       │   │   └── index.ts
+│       │   ├── shared-helpers.ts
+│       │   ├── shared-schemas.ts
+│       │   └── index.ts
+│       ├── __tests__/         # Comprehensive test suite
+│       │   └── ...
+│       └── index.ts
+│
+└── neon-js/                   # @neondatabase/neon-js (PUBLISHED)
+    └── src/
+        ├── client/
+        │   ├── neon-client.ts
+        │   ├── client-factory.ts
+        │   ├── fetch-with-auth.ts
+        │   └── index.ts
+        ├── cli/
+        │   ├── index.ts
+        │   ├── commands/
+        │   │   ├── gen-types.ts
+        │   │   └── generate-types.ts
+        │   └── utils/
+        │       └── parse-duration.ts
+        └── index.ts
 ```
 
 ## CLI Tool: Generate Types

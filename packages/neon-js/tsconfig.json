@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "composite": true,
+    "paths": {
+      "@neon-js/auth": ["../auth/src"],
+      "@neon-js/auth/better-auth": ["../auth/src/adapters/better-auth/index.ts"],
+      "@neon-js/auth/stack-auth": ["../auth/src/adapters/stack-auth/index.ts"]
+    }
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "../auth" }
+  ]
+}

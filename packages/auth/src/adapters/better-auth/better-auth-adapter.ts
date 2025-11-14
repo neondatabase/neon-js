@@ -1,12 +1,6 @@
-import { AuthError, type AuthClient } from '@/auth/auth-interface';
-import type {
-  Session,
-  AuthChangeEvent,
-  Subscription,
-  Provider,
-  AuthTokenResponse,
-} from '@supabase/auth-js';
-import { accessTokenSchema } from '@/auth/adapters/shared-schemas';
+import { AuthError, type AuthClient } from '../../auth-interface';
+import type { Session, AuthChangeEvent, Subscription } from '@supabase/auth-js';
+import { accessTokenSchema } from '../shared-schemas';
 import {
   createAuthClient,
   type BetterAuthClientOptions,
@@ -29,9 +23,7 @@ import {
 import { InFlightRequestManager } from './in-flight-request-manager';
 import {
   SESSION_CACHE_TTL_MS,
-  TOKEN_REFRESH_CHECK_INTERVAL_MS,
   CLOCK_SKEW_BUFFER_MS,
-  TOKEN_REFRESH_THRESHOLD_MS,
   BROADCAST_CHANNEL_NAME,
 } from './constants';
 
@@ -57,11 +49,7 @@ export class BetterAuthAdapter implements AuthClient {
 
   private stateChangeEmitters = new Map<string, Subscription>();
   #broadcastChannel: InstanceType<typeof BroadcastChannel> | null = null;
-  #tokenRefreshCheckInterval: NodeJS.Timeout | null = null;
-  private config: OnAuthStateChangeConfig = {
-    enableTokenRefreshDetection: true,
-    tokenRefreshCheckInterval: TOKEN_REFRESH_CHECK_INTERVAL_MS,
-  };
+  private config: OnAuthStateChangeConfig = {};
 
   /** Last session state for detecting auth change events */
   private lastSessionState: Session | null = null;
@@ -85,9 +73,81 @@ export class BetterAuthAdapter implements AuthClient {
       this.config = { ...this.config, ...config };
     }
 
+    // Preserve user's onSuccess callback if they provided one
+    const userOnSuccess = betterAuthClientOptions.fetchOptions?.onSuccess;
+
     this.betterAuth = createAuthClient({
       ...betterAuthClientOptions,
       ...defaultBetterAuthClientOptions,
+      fetchOptions: {
+        ...betterAuthClientOptions.fetchOptions,
+        onSuccess: async (ctx) => {
+          const url = ctx.request.url.toString();
+          const responseData = ctx.data;
+
+          // Detect sign-in/sign-up
+          if (url.includes('/sign-in') || url.includes('/sign-up')) {
+            if (responseData?.session && responseData?.user) {
+              const session = mapBetterAuthSessionToSupabase(
+                responseData.session,
+                responseData.user
+              );
+              if (session) {
+                await this.notifyAllSubscribers('SIGNED_IN', session);
+                this.lastSessionState = session;
+              }
+            }
+          }
+
+          // Detect sign-out
+          else if (url.includes('/sign-out')) {
+            await this.notifyAllSubscribers('SIGNED_OUT', null);
+            this.lastSessionState = null;
+          }
+
+          // Detect token refresh in get-session or token endpoints
+          else if (url.includes('/get-session') || url.includes('/token')) {
+            if (responseData?.session && responseData?.user) {
+              const session = mapBetterAuthSessionToSupabase(
+                responseData.session,
+                responseData.user
+              );
+
+              if (session?.access_token) {
+                const oldToken = this.lastSessionState?.access_token;
+
+                // Token refreshed if access_token changed
+                if (oldToken && oldToken !== session.access_token) {
+                  await this.notifyAllSubscribers('TOKEN_REFRESHED', session);
+                }
+
+                this.lastSessionState = session;
+              }
+            }
+          }
+
+          // Detect user updates
+          else if (
+            url.includes('/update-user') &&
+            responseData?.session &&
+            responseData?.user
+          ) {
+            const session = mapBetterAuthSessionToSupabase(
+              responseData.session,
+              responseData.user
+            );
+            if (session) {
+              await this.notifyAllSubscribers('USER_UPDATED', session);
+              this.lastSessionState = session;
+            }
+          }
+
+          // Call user's onSuccess callback if they provided one
+          if (userOnSuccess) {
+            await userOnSuccess(ctx);
+          }
+        },
+      },
     });
   }
   //#endregion
@@ -1092,7 +1152,6 @@ export class BetterAuthAdapter implements AuthClient {
         this.stateChangeEmitters.delete(id);
 
         if (this.stateChangeEmitters.size === 0) {
-          this.stopTokenRefreshDetection();
           this.closeBroadcastChannel();
         }
       },
@@ -1102,7 +1161,6 @@ export class BetterAuthAdapter implements AuthClient {
 
     if (this.stateChangeEmitters.size === 1) {
       this.initializeBroadcastChannel();
-      this.startTokenRefreshDetection();
     }
 
     this.emitInitialSession(callback);
@@ -1531,53 +1589,5 @@ export class BetterAuthAdapter implements AuthClient {
     }
   }
 
-  private startTokenRefreshDetection(): void {
-    if (!this.config.enableTokenRefreshDetection) {
-      return;
-    }
-
-    if (this.#tokenRefreshCheckInterval) {
-      return;
-    }
-
-    this.#tokenRefreshCheckInterval = setInterval(async () => {
-      try {
-        const sessionResult = await this.getSession();
-
-        if (!sessionResult.data.session) {
-          return;
-        }
-
-        const session = sessionResult.data.session;
-        const now = Math.floor(Date.now() / 1000);
-        const expiresAt = session.expires_at ?? now;
-        const expiresInSeconds = expiresAt - now;
-
-        if (expiresInSeconds <= 0) {
-          await this.notifyAllSubscribers('SIGNED_OUT', null);
-          this.lastSessionState = null;
-          return;
-        }
-
-        // Detect token refresh (matches Supabase pattern)
-        if (
-          expiresInSeconds <= Math.floor(TOKEN_REFRESH_THRESHOLD_MS / 1000) &&
-          expiresInSeconds > 0
-        ) {
-          await this.notifyAllSubscribers('TOKEN_REFRESHED', session);
-          this.lastSessionState = session;
-        }
-      } catch {
-        // Token refresh detection error - skip this check
-      }
-    }, this.config.tokenRefreshCheckInterval);
-  }
-
-  private stopTokenRefreshDetection(): void {
-    if (this.#tokenRefreshCheckInterval) {
-      clearInterval(this.#tokenRefreshCheckInterval);
-      this.#tokenRefreshCheckInterval = null;
-    }
-  }
   //#endregion
 }

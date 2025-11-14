@@ -1,44 +1,20 @@
 {
-  "name": "@neondatabase/neon-js",
-  "version": "0.1.0-alpha.1",
-  "description": "A TypeScript SDK for Neon services.",
+  "name": "neon-js-monorepo",
+  "version": "0.1.0",
+  "private": true,
   "type": "module",
-  "license": "Apache-2.0",
-  "homepage": "https://github.com/neondatabase-labs/neon-js/",
-  "bugs": {
-    "url": "https://github.com/neondatabase-labs/neon-js/issues"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/neondatabase-labs/neon-js.git"
-  },
-  "author": "Pedro Figueiredo <pedro.figueiredo@databricks.com>",
-  "files": [
-    "dist",
-    "CHANGELOG.md"
+  "workspaces": [
+    "packages/*"
   ],
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "bin": {
-    "neon-js": "dist/cli/index.js"
-  },
-  "exports": {
-    ".": "./dist/index.js",
-    "./package.json": "./package.json"
-  },
-  "publishConfig": {
-    "access": "public"
-  },
   "scripts": {
-    "build": "tsdown",
-    "dev": "tsdown --watch",
-    "test": "vitest",
-    "test:node": "node --run test",
-    "test:ci": "vitest run",
-    "typecheck": "tsc --noEmit",
-    "release": "bumpp && npm publish",
-    "lint": "eslint ."
+    "build": "bun run --filter '@neon-js/auth' build && bun run --filter '@neondatabase/neon-js' build",
+    "dev": "bun run --filter '@neon-js/auth' dev & bun run --filter '@neondatabase/neon-js' dev",
+    "test": "bun run --filter '@neon-js/auth' test && bun run --filter '@neondatabase/neon-js' test",
+    "test:node": "bun run --filter '@neon-js/auth' test:node && bun run --filter '@neondatabase/neon-js' test:node",
+    "test:ci": "bun run --filter '@neon-js/auth' test:ci && bun run --filter '@neondatabase/neon-js' test:ci",
+    "typecheck": "bun run --filter '*' typecheck",
+    "lint": "bun run --filter '@neondatabase/neon-js' lint",
+    "release": "bun run build && bun run --filter '@neon-js/auth' release && bun run --filter '@neondatabase/neon-js' release"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

@@ -1,0 +1,48 @@
+{
+  "name": "@neon-js/auth",
+  "version": "0.1.0",
+  "description": "Authentication adapters for Neon services",
+  "type": "module",
+  "license": "Apache-2.0",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./adapters": "./dist/adapters/index.js",
+    "./better-auth": "./dist/adapters/better-auth/index.js",
+    "./stack-auth": "./dist/adapters/stack-auth/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "test": "vitest",
+    "test:node": "node --run test",
+    "test:ci": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "release": "bumpp && npm publish dist/"
+  },
+  "devDependencies": {
+    "tsdown": "0.16.0",
+    "typescript": "^5.9.3",
+    "vitest": "4.0.7",
+    "vite-tsconfig-paths": "5.1.4",
+    "msw": "2.6.8"
+  },
+  "dependencies": {
+    "@stackframe/js": "2.8.41",
+    "@supabase/auth-js": "2.79.0",
+    "better-auth": "1.3.34",
+    "zod": "4.1.12"
+  },
+  "peerDependencies": {
+    "better-auth": "^1.3.34",
+    "@stackframe/js": "^2.8.41"
+  }
+}
