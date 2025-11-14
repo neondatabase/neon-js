@@ -1,6 +1,6 @@
 {
   "name": "@neondatabase/neon-js",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha.1",
   "description": "A TypeScript SDK for Neon services",
   "type": "module",
   "license": "Apache-2.0",
@@ -37,7 +37,7 @@
     "test:node": "node --run test",
     "test:ci": "vitest run",
     "typecheck": "tsc --noEmit",
-    "release": "bumpp && npm publish dist/",
+    "release": "bumpp --tag 'neon-js-v%s' && npm publish dist/",
     "lint": "eslint ."
   },
   "devDependencies": {

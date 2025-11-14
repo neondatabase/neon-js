@@ -1,6 +1,6 @@
 {
   "name": "@neondatabase/auth-js",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha.1",
   "description": "Authentication adapters for Neon services",
   "type": "module",
   "license": "Apache-2.0",
@@ -23,7 +23,7 @@
     "test:node": "node --run test",
     "test:ci": "vitest run",
     "typecheck": "tsc --noEmit",
-    "release": "bumpp && npm publish dist/"
+    "release": "bumpp --tag 'auth-js-v%s' && npm publish dist/"
   },
   "devDependencies": {
     "tsdown": "0.16.0",
