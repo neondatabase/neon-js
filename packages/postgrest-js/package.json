@@ -1,7 +1,7 @@
 {
-  "name": "@neondatabase/neon-js",
+  "name": "@neondatabase/postgrest-js",
   "version": "0.1.0",
-  "description": "A TypeScript SDK for Neon services",
+  "description": "Generic PostgreSQL client for Neon Data API (without authentication)",
   "type": "module",
   "license": "Apache-2.0",
   "homepage": "https://github.com/neondatabase-labs/neon-js/",
@@ -16,13 +16,9 @@
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "bin": {
-    "neon-js": "dist/cli/index.mjs"
-  },
   "exports": {
     ".": "./dist/index.mjs",
-    "./client": "./dist/client/index.mjs",
-    "./cli": "./dist/cli/index.mjs"
+    "./client": "./dist/client/index.mjs"
   },
   "files": [
     "dist"
@@ -47,14 +43,9 @@
     "tsdown": "0.16.0",
     "typescript": "^5.9.3",
     "vitest": "4.0.7",
-    "vite-tsconfig-paths": "5.1.4",
-    "msw": "2.6.8"
+    "vite-tsconfig-paths": "5.1.4"
   },
   "dependencies": {
-    "@neondatabase/postgrest-js": "workspace:*",
-    "@neondatabase/auth-js": "workspace:*",
-    "@supabase/postgres-meta": "0.93.1",
-    "meow": "14.0.0",
-    "zod": "4.1.12"
+    "@supabase/postgrest-js": "2.79.0"
   }
 }

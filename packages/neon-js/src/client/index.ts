@@ -1,4 +1,5 @@
 export { NeonClient } from './neon-client';
 export { createClient } from './client-factory';
-export { createClient as createClientStackAuth } from './client-factory-stack-auth';
-export { fetchWithAuth } from './fetch-with-auth';
+
+// Re-export utilities from postgrest-js for convenience
+export { fetchWithToken, AuthRequiredError } from '@neondatabase/postgrest-js';

@@ -8,7 +8,17 @@ A unified TypeScript SDK monorepo for Neon services, providing seamless integrat
 
 ## Monorepo Structure
 
-This is a Bun workspaces monorepo with two published packages:
+This is a Bun workspaces monorepo with three published packages:
+
+### `@neondatabase/postgrest-js` (packages/postgrest-js/)
+Generic PostgreSQL client for Neon Data API without authentication:
+- **NeonPostgrestClient**: Wrapper around Supabase's PostgrestClient with Neon-specific configuration
+- **fetchWithToken()**: Generic utility for adding token-based authentication to requests
+- No auth dependencies - can be used standalone for non-authenticated scenarios
+
+**Exports:**
+- `@neondatabase/postgrest-js` - Main exports (client, utilities)
+- `@neondatabase/postgrest-js/client` - Client components
 
 ### `@neondatabase/auth-js` (packages/auth/)
 Authentication adapters implementing the Supabase-compatible `AuthClient` interface:
@@ -22,14 +32,23 @@ Authentication adapters implementing the Supabase-compatible `AuthClient` interf
 
 ### `@neondatabase/neon-js` (packages/neon-js/)
 Main SDK package that combines authentication with PostgreSQL querying:
-- **NeonClient**: Unified client extending PostgrestClient
+- **NeonClient**: Auth-integrated client extending NeonPostgrestClient
 - **createClient()**: Factory function for Better Auth setup
+- **createClientStackAuth()**: Factory function for Stack Auth (legacy)
 - **CLI Tool**: Database type generation utility
+- Re-exports all postgrest-js utilities for convenience
 
 **Exports:**
-- `@neondatabase/neon-js` - Main exports (client, factory, adapters)
+- `@neondatabase/neon-js` - Main exports (all postgrest-js + auth + client + factories)
 - `@neondatabase/neon-js/client` - Client components
 - `@neondatabase/neon-js/cli` - CLI tool
+
+**Dependencies:**
+```
+@neondatabase/neon-js
+    ├── @neondatabase/auth-js
+    └── @neondatabase/postgrest-js
+```
 
 ## Development Commands
 
@@ -57,10 +76,19 @@ bun test:ci           # CI mode (no watch)
 bun typecheck
 
 # Publishing
-bun release           # Bump version and publish both packages
+bun release           # Bump version and publish all three packages
 ```
 
 ## Architecture
+
+### PostgreSQL Client Layer (`packages/postgrest-js/`)
+
+**Client**: `src/client/`
+- `postgrest-client.ts` - NeonPostgrestClient class (extends Supabase's PostgrestClient)
+- `fetch-with-token.ts` - Generic token-based fetch wrapper
+- `index.ts` - Client exports
+
+**No Dependencies on Auth**: This package is completely independent and can be used for scenarios where authentication is handled externally or not required.
 
 ### Authentication Layer (`packages/auth/`)
 
@@ -92,13 +120,13 @@ bun release           # Bump version and publish both packages
 - Uses real Stack/Better Auth SDKs with MSW for network mocking
 - Run with `bun test:node` for reliable MSW interception
 
-### Client Layer (`packages/neon-js/`)
+### Auth-Integrated Client Layer (`packages/neon-js/`)
 
 **Client**: `src/client/`
-- `neon-client.ts` - NeonClient class (extends PostgrestClient)
+- `neon-client.ts` - NeonClient class (extends NeonPostgrestClient, adds required auth)
 - `client-factory.ts` - Better Auth factory: `createClient()`
 - `client-factory-stack-auth.ts` - Legacy Stack Auth factory
-- `fetch-with-auth.ts` - Auth-aware fetch wrapper
+- `index.ts` - Re-exports fetchWithToken from postgrest-js
 
 **CLI Tool**: `src/cli/`
 - `index.ts` - CLI entry point (bin: `neon-js`)
@@ -106,15 +134,50 @@ bun release           # Bump version and publish both packages
 - `commands/generate-types.ts` - Core logic using postgres-meta
 - `utils/parse-duration.ts` - Duration parsing
 
+**Dependencies**: Imports from `@neondatabase/postgrest-js` and `@neondatabase/auth-js`
+
 ## Usage
 
-### Basic Setup (Better Auth)
+### Using PostgrestClient (No Auth)
+
+For scenarios where authentication is handled externally or not required:
+
+```typescript
+import { NeonPostgrestClient, fetchWithToken } from '@neondatabase/postgrest-js';
+
+// Option 1: Basic usage without authentication
+const client = new NeonPostgrestClient({
+  dataApiUrl: 'https://your-data-api.com/rest/v1',
+  options: {
+    global: {
+      headers: { 'Authorization': 'Bearer YOUR_TOKEN' },
+    },
+  },
+});
+
+// Option 2: With custom token provider
+const client = new NeonPostgrestClient({
+  dataApiUrl: 'https://your-data-api.com/rest/v1',
+  options: {
+    global: {
+      fetch: fetchWithToken(async () => 'YOUR_TOKEN'),
+    },
+  },
+});
+
+// Query database
+const { data: items } = await client.from('items').select();
+```
+
+### Using NeonClient (With Auth) - Better Auth
+
+For full auth integration with Better Auth:
 
 ```typescript
 import { createClient } from '@neondatabase/neon-js';
 
 const client = createClient({
-  url: 'https://your-neon-api.com',
+  url: 'https://your-neon-branch-url.com/neondb',
   auth: {
     baseURL: 'https://your-auth-server.com',
   },
@@ -202,7 +265,8 @@ bun test         # May have MSW issues with Bun's fetch
 // TypeScript strict mode enabled
 // Functional patterns preferred
 // NO "I" prefix in interface names
-// Absolute imports using workspace protocol: '@neon-js/auth'
+// Absolute imports using workspace protocol
+// Package naming: @neondatabase/package-name
 ```
 
 ## Key Mappings (Better Auth)

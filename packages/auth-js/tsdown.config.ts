@@ -3,7 +3,11 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 export default defineConfig({
-  entry: ['src/index.ts', 'src/cli/index.ts'],
+  entry: [
+    'src/index.ts',
+    'src/adapters/better-auth/index.ts',
+    'src/adapters/stack-auth/index.ts',
+  ],
   format: ['esm'],
   clean: true,
   dts: {
@@ -21,7 +25,7 @@ export default defineConfig({
       if (pkg.dependencies) {
         for (const [name, version] of Object.entries(pkg.dependencies)) {
           if (typeof version === 'string' && version.startsWith('workspace:')) {
-            // Extract workspace package name (e.g., 'auth-js' from '@neondatabase/auth-js')
+            // Extract workspace package name (e.g., 'postgrest-js' from '@neondatabase/postgrest-js')
             const workspaceName = name.split('/').pop();
             const workspacePkgPath = path.resolve(
               import.meta.dirname,

@@ -1,42 +1,36 @@
-import type { AuthClient } from '@neon-js/auth';
-import { PostgrestClient } from '@supabase/postgrest-js';
+import type { NeonAuthClient } from '@neondatabase/auth-js';
+import {
+  NeonPostgrestClient,
+  type NeonPostgrestClientConstructorOptions,
+  type DefaultSchemaName,
+} from '@neondatabase/postgrest-js';
 
-// Internal constructor options (accepts auth options at runtime)
-export type NeonClientConstructorOptions<SchemaName> = {
-  dataApiUrl: string;
-  options?: {
-    db?: {
-      schema?: Exclude<SchemaName, '__InternalSupabase'>;
-    };
-    global?: {
-      fetch: typeof fetch;
-      headers?: Record<string, string>;
-    };
+// Constructor options for NeonClient with required auth
+export type NeonClientConstructorOptions<SchemaName> =
+  NeonPostgrestClientConstructorOptions<SchemaName> & {
+    authClient: NeonAuthClient;
   };
-};
 
-export type DefaultSchemaName<Database> = 'public' extends keyof Database
-  ? 'public'
-  : string & keyof Database;
-
+/**
+ * Neon client with integrated authentication
+ *
+ * Extends NeonPostgrestClient with Neon Auth integration.
+ * For auth-free clients, use @neondatabase/postgrest-js instead.
+ */
 export class NeonClient<
   Database = any,
   SchemaName extends string & keyof Database = DefaultSchemaName<Database>,
-> extends PostgrestClient<
-  Database,
-  { PostgrestVersion: '12' },
-  Exclude<SchemaName, '__InternalSupabase'>
-> {
-  auth?: AuthClient;
+> extends NeonPostgrestClient<Database, SchemaName> {
+  auth: NeonAuthClient;
 
   constructor({
     dataApiUrl,
     options,
+    authClient,
   }: NeonClientConstructorOptions<SchemaName>) {
-    super(dataApiUrl, {
-      headers: options?.global?.headers,
-      fetch: options?.global?.fetch,
-      schema: options?.db?.schema,
-    });
+    super({ dataApiUrl, options });
+    this.auth = authClient;
   }
 }
+
+export { type DefaultSchemaName } from '@neondatabase/postgrest-js';

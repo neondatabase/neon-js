@@ -1,24 +1,21 @@
-import { BetterAuthAdapter } from '@neon-js/auth/better-auth';
-import { fetchWithAuth } from './fetch-with-auth';
+import {
+  NeonAuthClient,
+  type NeonAuthClientOptions,
+} from '@neondatabase/auth-js';
+import { fetchWithToken } from '@neondatabase/postgrest-js';
 import {
   NeonClient,
   type DefaultSchemaName,
   type NeonClientConstructorOptions,
 } from './neon-client';
-import type { BetterAuthClientOptions } from 'better-auth/client';
-import type { OnAuthStateChangeConfig } from '@neon-js/auth/better-auth';
-
-// Support Better Auth options with optional configuration
-export type BetterAuthOptions = BetterAuthClientOptions & {
-  config?: OnAuthStateChangeConfig;
-};
 
 // Public-facing options for createClient (options only)
-export type CreateClientOptions<SchemaName> = Omit<
-  NeonClientConstructorOptions<SchemaName>,
-  'dataApiUrl'
-> & {
-  auth?: Omit<BetterAuthOptions, 'baseURL'>;
+export type CreateClientOptions<SchemaName> = {
+  clientOptions?: Omit<
+    NeonClientConstructorOptions<SchemaName>,
+    'dataApiUrl' | 'authClient'
+  >;
+  authOptions?: NeonAuthClientOptions;
 };
 
 /**
@@ -35,22 +32,17 @@ export function createClient<
 >(
   neonUrl: string,
   {
-    auth: authOptions = {},
-    options: neonClientOptions,
+    clientOptions: neonClientOptions,
+    authOptions,
   }: CreateClientOptions<SchemaName> = {}
 ): NeonClient<Database, SchemaName> {
-  // Step 1: Extract auth config if provided
-  const { config: authConfig, ...betterAuthParams } = authOptions;
   const { dataApiUrl, authUrl } = getNeonUrls(neonUrl);
 
   // Step 2: Instantiate auth adapter from options
-  const auth = new BetterAuthAdapter(
-    { ...betterAuthParams, baseURL: authUrl },
-    authConfig
-  );
+  const auth = new NeonAuthClient({ baseURL: authUrl, ...authOptions });
 
   // Step 3: Create lazy token accessor - called on every request
-  // Returns null if no session (will throw AuthRequiredError in fetchWithAuth)
+  // Returns null if no session (will throw AuthRequiredError in fetchWithToken)
   // Note: session.access_token contains the JWT (not opaque token) for API authentication
   const getAccessToken = async (): Promise<string | null> => {
     const { data, error } = await auth.getSession();
@@ -63,25 +55,23 @@ export function createClient<
   };
 
   // Step 4: Create auth-aware fetch wrapper
-  const authFetch = fetchWithAuth(
+  const authFetch = fetchWithToken(
     getAccessToken,
-    neonClientOptions?.global?.fetch
+    neonClientOptions?.options?.global?.fetch
   );
 
-  // Step 5: Create client with auth options
+  // Step 5: Create client with auth integrated
   const client = new NeonClient<Database, SchemaName>({
     dataApiUrl,
+    authClient: auth,
     options: {
-      ...neonClientOptions,
+      ...neonClientOptions?.options,
       global: {
-        ...neonClientOptions?.global,
+        ...neonClientOptions?.options?.global,
         fetch: authFetch,
       },
     },
   });
-
-  // Step 6: Assign the instantiated auth client
-  client.auth = auth;
 
   return client;
 }
