@@ -9,10 +9,10 @@ The official TypeScript SDK for Neon, combining authentication and database quer
 **Key Features:**
 
 - = **Integrated Authentication** - Built on Better Auth with Supabase API compatibility
-- =Ä **PostgreSQL Querying** - Full PostgREST client with type-safe queries
-- ¡ **High Performance** - Session caching, request deduplication, and cross-tab sync
+- =ï¿½ **PostgreSQL Querying** - Full PostgREST client with type-safe queries
+- ï¿½ **High Performance** - Session caching, request deduplication, and cross-tab sync
 - = **Automatic Token Management** - Seamless token injection for database queries
-- =æ **TypeScript First** - Fully typed with strict type checking
+- =ï¿½ **TypeScript First** - Fully typed with strict type checking
 - < **Universal** - Works in Node.js, browsers, and edge runtimes
 
 ## Installation
@@ -29,12 +29,7 @@ bun add @neondatabase/neon-js
 import { createClient } from '@neondatabase/neon-js';
 
 // Create client with auth and database configuration
-const client = createClient({
-  url: 'https://your-neon-branch.neon.tech/dbname',
-  auth: {
-    baseURL: 'https://your-auth-server.com',
-  },
-});
+const client = createClient<Database>(import.meta.env.VITE_NEON_URL);
 
 // Authenticate
 await client.auth.signInWithPassword({
