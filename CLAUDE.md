@@ -20,15 +20,15 @@ Generic PostgreSQL client for Neon Data API without authentication:
 - `@neondatabase/postgrest-js` - Main exports (client, utilities)
 - `@neondatabase/postgrest-js/client` - Client components
 
-### `@neondatabase/auth-js` (packages/auth/)
+### `@neondatabase/auth` (packages/auth/)
 Authentication adapters implementing the Supabase-compatible `AuthClient` interface:
 - **Better Auth Adapter** (Primary): Full-featured adapter with session caching, request deduplication, and cross-tab sync
 - **Stack Auth Adapter** (Legacy): Maintained for backward compatibility
 
 **Exports:**
-- `@neondatabase/auth-js` - Main exports (AuthClient interface, adapters, utilities)
-- `@neondatabase/auth-js/better-auth` - Better Auth adapter
-- `@neondatabase/auth-js/stack-auth` - Stack Auth adapter
+- `@neondatabase/auth` - Main exports (AuthClient interface, adapters, utilities)
+- `@neondatabase/auth/better-auth` - Better Auth adapter
+- `@neondatabase/auth/stack-auth` - Stack Auth adapter
 
 ### `@neondatabase/neon-js` (packages/neon-js/)
 Main SDK package that combines authentication with PostgreSQL querying:
@@ -46,7 +46,7 @@ Main SDK package that combines authentication with PostgreSQL querying:
 **Dependencies:**
 ```
 @neondatabase/neon-js
-    ├── @neondatabase/auth-js
+    ├── @neondatabase/auth
     └── @neondatabase/postgrest-js
 ```
 
@@ -65,7 +65,7 @@ bun dev
 bun build
 
 # Build specific package
-bun run --filter '@neondatabase/auth-js' build
+bun run --filter '@neondatabase/auth' build
 
 # Run tests
 bun test              # Run all tests
@@ -202,7 +202,7 @@ const { data: items } = await client.from('items').select();
 ### Using Auth Adapters Directly
 
 ```typescript
-import { BetterAuthAdapter } from '@neondatabase/auth-js/better-auth';
+import { BetterAuthAdapter } from '@neondatabase/auth/better-auth';
 
 const auth = new BetterAuthAdapter({
   baseURL: 'https://your-auth-server.com',

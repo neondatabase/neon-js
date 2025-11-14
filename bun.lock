@@ -26,9 +26,9 @@
         "vitest": "4.0.7",
       },
     },
-    "packages/auth-js": {
-      "name": "@neondatabase/auth-js",
-      "version": "0.1.0",
+    "packages/auth": {
+      "name": "@neondatabase/auth",
+      "version": "0.1.0-alpha.1",
       "dependencies": {
         "@stackframe/js": "2.8.41",
         "@supabase/auth-js": "2.79.0",
@@ -49,12 +49,12 @@
     },
     "packages/neon-js": {
       "name": "@neondatabase/neon-js",
-      "version": "0.1.0",
+      "version": "0.1.0-alpha.1",
       "bin": {
         "neon-js": "dist/cli/index.mjs",
       },
       "dependencies": {
-        "@neondatabase/auth-js": "workspace:*",
+        "@neondatabase/auth": "workspace:*",
         "@neondatabase/postgrest-js": "workspace:*",
         "@supabase/postgres-meta": "0.93.1",
         "meow": "14.0.0",
@@ -315,7 +315,7 @@
 
     "@napi-rs/wasm-runtime": ["@napi-rs/wasm-runtime@1.0.7", "", { "dependencies": { "@emnapi/core": "^1.5.0", "@emnapi/runtime": "^1.5.0", "@tybys/wasm-util": "^0.10.1" } }, "sha512-SeDnOO0Tk7Okiq6DbXmmBODgOAb9dp9gjlphokTUxmt8U3liIP1ZsozBahH69j/RJv+Rfs6IwUKHTgQYJ/HBAw=="],
 
-    "@neondatabase/auth-js": ["@neondatabase/auth-js@workspace:packages/auth-js"],
+    "@neondatabase/auth": ["@neondatabase/auth@workspace:packages/auth"],
 
     "@neondatabase/neon-js": ["@neondatabase/neon-js@workspace:packages/neon-js"],
 

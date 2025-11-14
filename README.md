@@ -1,354 +1,282 @@
 # neon-js
 
-A unified TypeScript SDK for Neon services, providing seamless integration with **Neon Auth** (authentication service) and **Neon Data API** (PostgreSQL database queries). Built with a Supabase-compatible interface for easy migration and familiar developer experience.
+A unified TypeScript SDK for Neon services, providing seamless integration with authentication and PostgreSQL database queries. Offers a familiar, type-safe API for building modern applications with Neon.
+
+## Table of Contents
+
+- [neon-js](#neon-js)
+  - [Table of Contents](#table-of-contents)
+  - [Features](#features)
+  - [Installation](#installation)
+  - [Prerequisites](#prerequisites)
+  - [Which Package Should I Use?](#which-package-should-i-use)
+  - [Quick Start](#quick-start)
+  - [CLI Tool: Generate Types](#cli-tool-generate-types)
+    - [Basic Usage](#basic-usage)
+    - [Flags](#flags)
+  - [Usage Examples](#usage-examples)
+    - [Using @neondatabase/neon-js (Recommended)](#using-neondatabaseneon-js-recommended)
+    - [Using @neondatabase/postgrest-js (No Auth)](#using-neondatabasepostgrest-js-no-auth)
+    - [Using @neondatabase/auth-js (Custom Integrations)](#using-neondatabaseauth-js-custom-integrations)
+  - [Supabase Migration Guide](#supabase-migration-guide)
+    - [Quick Migration Steps](#quick-migration-steps)
+  - [Authentication Methods](#authentication-methods)
+    - [Core Methods](#core-methods)
+  - [Environment Support](#environment-support)
+  - [Architecture](#architecture)
+  - [Performance](#performance)
+  - [Development](#development)
+  - [License](#license)
+  - [Links](#links)
 
 ## Features
 
-- **Unified SDK**: Single client for Neon Auth and Neon Data API
-- **Supabase-Compatible**: Drop-in replacement for easy migration from Supabase
-- **Adapter Pattern**: Pluggable authentication providers (Better Auth & Stack Auth included)
-- **Automatic Token Injection**: Auth-aware fetch wrapper for seamless API calls
+- **Unified SDK**: Single client for authentication and database queries
+- **Familiar API**: Drop-in replacement with minimal code changes for migration
+- **Adapter Pattern**: Pluggable authentication providers (Better Auth & Stack Auth)
+- **Automatic Token Injection**: Seamless authentication for all database calls
 - **TypeScript**: Full type safety with strict mode enabled
-- **Performance Optimized**: Better Auth adapter with cross-tab sync and automatic token refresh detection
+- **Performance Optimized**: Cross-tab sync and automatic token refresh
 - **CLI Tool**: Generate TypeScript types from your database schema
 
 ## Installation
-
-### From npm
 
 ```bash
 npm install @neondatabase/neon-js
 ```
 
-## Using neon-js
+## Prerequisites
 
-1. Create a Neon project with Data API enabled
-2. Set up your Better Auth server (see [Better Auth docs](https://www.better-auth.com/docs))
-3. Set environment variables:
+Before using neon-js, you'll need:
+
+1. **A Neon account and project**
+   - Sign up at [neon.tech](https://neon.tech)
+   - Create a new project in the Neon Console
+
+2. **Enable the Data API** (for database queries)
+   - Go to your project settings in Neon Console
+   - Enable the Data API feature
+   - Copy your Data API URL (format: `https://ep-withered-pond-w4e43v69.c-2.us-east-2.aws.neon.build/neondb/`)
+
+3. **Configure environment variables**
+
+Create a `.env` file in your project:
+
 ```bash
-VITE_BETTER_AUTH_BASE_URL=https://your-auth-server.com
-VITE_NEON_DATA_API_URL=https://your-neon-api.com
-```
-4. Instantiate `createClient` with the correct parameters:
-```typescript
-import { createClient } from 'neon-js';
-
-const client = createClient({
-  url: import.meta.env.VITE_NEON_DATA_API_URL,
-  auth: {
-    baseURL: import.meta.env.VITE_BETTER_AUTH_BASE_URL,
-  },
-  options: {
-    // Optional: custom configuration
-    global: {
-      headers: { 'X-Custom-Header': 'value' },
-    },
-    db: {
-      schema: 'public',
-    },
-  },
-});
+# Your Neon Data API endpoint
+VITE_NEON_URL=https://ep-withered-pond-w4e43v69.c-2.us-east-2.aws.neon.build/neondb/
 ```
 
-## Migrating from Supabase
+## Which Package Should I Use?
 
-neon-js provides a Supabase-compatible API, making migration straightforward with minimal code changes. Here's a real-world migration example from the [Todo Guardian Pro project](https://github.com/pffigueiredo/todo-guardian-pro/pull/1).
+This monorepo contains three packages. Choose based on your needs:
 
-### Migration Steps
-
-**1. Update Dependencies**
-
-Replace `@supabase/supabase-js` with `neon-js` in your `package.json`:
-
-```diff
-- "@supabase/supabase-js": "^2.74.0"
-+ "neon-js": "^0.0.0"
-```
-
-**2. Update Environment Variables**
-
-Replace Supabase environment variables with Neon equivalents:
-
-```diff
-- VITE_SUPABASE_URL="https://xxx.supabase.co"
-- VITE_SUPABASE_ANON_KEY="..."
-+ VITE_NEON_DATA_API_URL="https://xxx.apirest.c-2.us-east-1.aws.neon.tech/neondb/rest/v1"
-+ VITE_BETTER_AUTH_BASE_URL="https://your-auth-server.com"
-```
-
-Get these values from:
-- **Data API URL**: Available in the Neon console under "Data API"
-- **Better Auth Base URL**: Your Better Auth server URL (see [Better Auth docs](https://www.better-auth.com/docs))
-
-**3. Update Client Initialization**
-
-Update your client configuration to use neon-js:
-
-```diff
-- import { createClient } from '@supabase/supabase-js';
-+ import { createClient } from 'neon-js';
-
-- export const supabase = createClient(
--   import.meta.env.VITE_SUPABASE_URL,
--   import.meta.env.VITE_SUPABASE_ANON_KEY
-- );
-+ export const neon = createClient({
-+   url: import.meta.env.VITE_NEON_DATA_API_URL,
-+   auth: {
-+     baseURL: import.meta.env.VITE_BETTER_AUTH_BASE_URL,
-+   },
-+ });
-```
-
-**4. Done!**
-
-That's it! The rest of your code remains unchanged. All authentication methods (`signInWithPassword`, `signOut`, `getUser`, etc.) and database queries (`from().select()`, etc.) work exactly the same.
-
-### What Stays the Same
-
-- ✅ All authentication method signatures
-- ✅ All database query methods
-- ✅ Session management APIs
-- ✅ User management APIs
-- ✅ OAuth flows
-- ✅ Error handling patterns
-
-### Migration Notes
-
-**Note**: The example above shows migrating from Supabase to neon-js with Better Auth. The actual migration requires:
-1. Setting up a Better Auth server (see [Better Auth docs](https://www.better-auth.com/docs))
-2. Updating environment variables
-3. Changing client initialization
-
-All Supabase Auth method signatures remain the same, making the migration seamless for your application code.
-
+- **`@neondatabase/neon-js`** (Recommended): Full-featured SDK with auth + Neon Data API. Use this for most applications.
+- **`@neondatabase/postgrest-js`**: Database queries only. Use when you handle authentication externally or don't need auth.
+- **`@neondatabase/auth-js`**: Authentication only. Use when you want to use Neon Auth for authentication and don't need to use the Neon Data API.
+- 
 ## Quick Start
 
+Here's a complete example showing authentication and database queries:
+
 ```typescript
-import { createClient } from 'neon-js';
+import { createClient } from '@neondatabase/neon-js';
+
+// OPTIONAL: generate these types file with the CLI tool bellow
+import type { Database } from './types/database.types';
 
 // Create client with Better Auth integration
-const client = createClient({
-  url: 'https://your-neon-api.com',
-  auth: {
-    baseURL: 'https://your-auth-server.com',
-  },
-});
+const client = createClient<Database>(import.meta.env.VITE_NEON_URL);
 
-// Sign in (Supabase-compatible API)
+// Sign in
 await client.auth.signInWithPassword({
   email: 'user@example.com',
   password: 'password123',
 });
 
 // Get current session
-const { data } = await client.auth.getSession();
+const { data: session } = await client.auth.getSession();
+console.log('User:', session?.user);
 
-// Make authenticated API calls (tokens injected automatically)
+// Query database (tokens injected automatically)
 const { data: items } = await client.from('items').select();
-```
 
-## Environment Support
+// Insert data
+await client.from('items').insert({ name: 'New Item', status: 'active' });
 
-The SDK works in both browser and Node.js environments:
+// Update data
+await client.from('items').update({ status: 'completed' }).eq('id', 1);
 
-### Browser
-
-```typescript
-// Full feature support including cross-tab sync
-import { createClient } from 'neon-js';
-
-const client = createClient({
-  url: 'https://your-neon-api.com',
-  auth: {
-    baseURL: 'https://your-auth-server.com',
-  },
-});
-```
-
-### Node.js
-
-```typescript
-// All auth methods work, cross-tab features automatically disabled
-import { createClient } from 'neon-js';
-
-const client = createClient({
-  url: 'https://your-neon-api.com',
-  auth: {
-    baseURL: 'https://your-auth-server.com',
-  },
-});
-```
-
-## Architecture
-
-- **NeonClient**: Unified client for Neon Auth and Data API (extends PostgrestClient)
-- **AuthClient Interface**: Supabase-compatible authentication interface for easy migration
-- **Adapter Pattern**: Pluggable authentication providers (Better Auth primary, Stack Auth legacy)
-- **Factory Pattern**: `createClient()` handles initialization and wiring
-- **Performance Optimized**: Cross-tab sync, automatic token refresh detection, and seamless token injection
-
-## Development
-
-This is a Bun workspaces monorepo with two packages:
-
-- `packages/auth/` - Authentication adapters (`@neondatabase/auth-js`)
-- `packages/neon-js/` - Main SDK package (`@neondatabase/neon-js`)
-
-Install dependencies:
-
-```bash
-bun install
-```
-
-Run development server with watch mode:
-
-```bash
-bun dev
-```
-
-Build all packages:
-
-```bash
-bun build
-```
-
-Build a specific package:
-
-```bash
-bun run --filter '@neondatabase/auth-js' build
-```
-
-Run tests:
-
-```bash
-bun test
-```
-
-Type check all packages:
-
-```bash
-bun typecheck
-```
-
-## Publishing
-
-Bump version and publish to npm:
-
-```bash
-bun release
-```
-
-## Project Structure
-
-```
-packages/
-├── auth/                      # @neondatabase/auth-js (PUBLISHED)
-│   └── src/
-│       ├── auth-interface.ts  # Core AuthClient interface
-│       ├── utils.ts           # Utility functions
-│       ├── adapters/
-│       │   ├── better-auth/   # Better Auth adapter (Primary)
-│       │   │   ├── better-auth-adapter.ts
-│       │   │   ├── better-auth-types.ts
-│       │   │   ├── better-auth-helpers.ts
-│       │   │   ├── in-flight-request-manager.ts
-│       │   │   ├── constants.ts
-│       │   │   └── index.ts
-│       │   ├── stack-auth/    # Stack Auth adapter (Legacy)
-│       │   │   ├── stack-auth-adapter.ts
-│       │   │   ├── stack-auth-types.ts
-│       │   │   ├── stack-auth-schemas.ts
-│       │   │   ├── stack-auth-helpers.ts
-│       │   │   └── index.ts
-│       │   ├── shared-helpers.ts
-│       │   ├── shared-schemas.ts
-│       │   └── index.ts
-│       ├── __tests__/         # Comprehensive test suite
-│       │   └── ...
-│       └── index.ts
-│
-└── neon-js/                   # @neondatabase/neon-js (PUBLISHED)
-    └── src/
-        ├── client/
-        │   ├── neon-client.ts
-        │   ├── client-factory.ts
-        │   ├── client-factory-stack-auth.ts
-        │   ├── fetch-with-auth.ts
-        │   └── index.ts
-        ├── cli/
-        │   ├── index.ts
-        │   ├── commands/
-        │   │   ├── gen-types.ts
-        │   │   └── generate-types.ts
-        │   └── utils/
-        │       └── parse-duration.ts
-        └── index.ts
+// Delete data
+await client.from('items').delete().eq('id', 1);
 ```
 
 ## CLI Tool: Generate Types
 
-The `neon-js` package includes a CLI tool for generating TypeScript types from your database schema.
+The `@neondatabase/neon-js` package includes a CLI tool for generating TypeScript types from your database schema. This ensures type safety for your database queries.
 
-### Installation
+### Basic Usage
 
 No installation required! Use via npx:
 
 ```bash
-npx neon-js gen-types --db-url "postgresql://..."
+# Generate types from your database
+npx @neondatabase/neon-js gen-types --db-url "postgresql://user:pass@host:5432/db"
+
+# Custom output path
+npx @neondatabase/neon-js gen-types --db-url "postgresql://..." --output src/types/database.ts
+
+# Multiple schemas
+npx @neondatabase/neon-js gen-types --db-url "postgresql://..." -s public -s auth
+
+# Custom timeout
+npx @neondatabase/neon-js gen-types --db-url "postgresql://..." --query-timeout 30s
 ```
 
-### Usage
+### Flags
 
-```bash
-npx neon-js gen-types --db-url <url> [flags]
-```
-
-#### Required Flags
-
-- `--db-url <url>` - Database connection string
-
-#### Optional Flags
-
+- `--db-url <url>` - Database connection string (required)
 - `--output <path>`, `-o <path>` - Output file path (default: `database.types.ts`)
 - `--schema <name>`, `-s <name>` - Schema to include (can be used multiple times, default: `public`)
 - `--postgrest-v9-compat` - Disable one-to-one relationship detection
 - `--query-timeout <duration>` - Query timeout (default: `15s`, format: `30s`, `1m`, `90s`)
 
-#### Examples
+## Usage Examples
 
-```bash
-# Basic usage
-npx neon-js gen-types --db-url "postgresql://user:pass@host:5432/db"
+### Using @neondatabase/neon-js (Recommended)
 
-# Custom output path
-npx neon-js gen-types --db-url "postgresql://..." --output src/types/db.ts
+Full-featured SDK with authentication and database queries:
 
-# Multiple schemas
-npx neon-js gen-types --db-url "postgresql://..." -s public -s auth
+```typescript
+import { createClient } from '@neondatabase/neon-js';
 
-# PostgREST v9 compatibility
-npx neon-js gen-types --db-url "postgresql://..." --postgrest-v9-compat
+  const client = createClient<Database>(import.meta.env.VITE_NEON_URL);
 
-# Custom timeout
-npx neon-js gen-types --db-url "postgresql://..." --query-timeout 30s
+// All auth methods available
+await client.auth.signInWithPassword({ email, password });
+const { data: session } = await client.auth.getSession();
+
+// Database queries with automatic token injection
+const { data } = await client.from('items').select();
 ```
+
+### Using @neondatabase/postgrest-js (No Auth)
+
+For scenarios where authentication is handled externally:
+
+```typescript
+import { NeonPostgrestClient, fetchWithToken } from '@neondatabase/postgrest-js';
+
+// Option 1: Manual token in headers
+const client = new NeonPostgrestClient({
+  dataApiUrl: 'https://your-data-api.com/rest/v1',
+  options: {
+    global: {
+      headers: { 'Authorization': 'Bearer YOUR_TOKEN' },
+    },
+  },
+});
+
+// Option 2: Custom token provider
+const client = new NeonPostgrestClient({
+  dataApiUrl: 'https://your-data-api.com/rest/v1',
+  options: {
+    global: {
+      fetch: fetchWithToken(async () => {
+        // Your custom token logic
+        return 'YOUR_TOKEN';
+      }),
+    },
+  },
+});
+
+// Database queries
+const { data } = await client.from('items').select();
+```
+
+### Using @neondatabase/auth-js (Custom Integrations)
+
+For building custom clients or integrations:
+
+```typescript
+import { NeonAuthClient } from '@neondatabase/auth-js';
+
+const auth = new NeonAuthClient({
+  baseURL: import.meta.env.VITE_NEON_AUTH_URL,
+});
+
+// Use auth methods directly
+await auth.signInWithPassword({ email, password });
+const { data: session } = await auth.getSession();
+```
+
+## Supabase Migration Guide
+
+neon-js provides a Supabase compatible API, making migration straightforward with minimal code changes.
+
+### Quick Migration Steps
+
+**1. Update Dependencies**
+
+```diff
+- "@supabase/supabase-js": "^2.74.0"
++ "@neondatabase/neon-js": "^0.1.0"
+```
+
+**2. Update Environment Variables**
+
+```diff
+- VITE_SUPABASE_URL="https://xxx.supabase.co"
+- VITE_SUPABASE_ANON_KEY="..."
++ VITE_NEON_DATA_API_URL="https://xxx.neon.tech/neondb/rest/v1"
++ VITE_BETTER_AUTH_BASE_URL="https://your-auth-server.com"
+```
+
+**3. Update Client Initialization**
+
+```diff
+- import { createClient } from '@supabase/supabase-js';
++ import { createClient } from '@neondatabase/neon-js';
+
+- export const client = createClient(
+-   import.meta.env.VITE_SUPABASE_URL,
+-   import.meta.env.VITE_SUPABASE_ANON_KEY
+- );
++ export const client = createClient<Database>(import.meta.env.VITE_NEON_URL);
+```
+
+**4. Done!**
+
+All authentication methods (`signInWithPassword`, `signOut`, `getUser`, etc.) and database queries (`from().select()`, etc.) work the same. See the [real-world migration example](https://github.com/pffigueiredo/todo-guardian-pro/pull/1) for more details.
 
 ## Authentication Methods
 
-The SDK supports the following authentication methods via the Better Auth adapter:
+The SDK supports comprehensive authentication methods via the Better Auth adapter:
 
-### Fully Supported Methods
+### Core Methods
 - **Email/Password**: `signUp()`, `signInWithPassword()`
 - **OAuth**: `signInWithOAuth()` (supports Better Auth OAuth providers)
-- **Magic Link/OTP**: `signInWithOtp()`, `verifyOtp()` (email-based passwordless authentication)
+- **Magic Link/OTP**: `signInWithOtp()`, `verifyOtp()`
 - **Session Management**: `getSession()`, `refreshSession()`, `setSession()`, `signOut()`
 - **User Management**: `getUser()`, `updateUser()`, `getClaims()`, `getUserIdentities()`
 - **Identity Linking**: `linkIdentity()`, `unlinkIdentity()`
 - **Password Reset**: `resetPasswordForEmail()`, `resend()`
 - **State Monitoring**: `onAuthStateChange()` with cross-tab synchronization
 
-All methods maintain Supabase API compatibility for seamless migration.
+## Environment Support
+
+The SDK works in both browser and Node.js environments:
+
+- **Browser**: Full feature support including cross-tab sync
+- **Node.js**: Core auth works, browser-only features automatically disabled
+
+## Architecture
+
+- **NeonClient**: Unified client for authentication and database queries
+- **AuthClient Interface**: Compatible authentication interface for easy adoption
+- **Adapter Pattern**: Pluggable authentication providers (Better Auth primary, Stack Auth legacy)
+- **Factory Pattern**: `createClient()` handles initialization and wiring
+- **Performance Optimized**: Cross-tab sync, automatic token refresh detection, and seamless token injection
 
 ## Performance
 
@@ -359,14 +287,26 @@ The Better Auth adapter provides production-ready performance:
 - **Cross-tab sync**: Real-time authentication state synchronization across browser tabs (browser only)
 - **Zero latency token injection**: Automatic Bearer token injection for all authenticated requests
 
+## Development
+
+This is a Bun workspaces monorepo with three packages. For detailed development instructions, see [CLAUDE.md](./CLAUDE.md).
+
+**Quick start:**
+
+```bash
+bun install          # Install dependencies
+bun dev              # Watch mode for all packages
+bun build            # Build all packages
+bun test             # Run tests
+bun typecheck        # Type check all packages
+```
+
 ## License
 
 MIT
 
 ## Links
 
-- [Better Auth Documentation](https://www.better-auth.com/docs)
-- [Better Auth Supabase Migration Guide](https://www.better-auth.com/docs/guides/supabase-migration-guide)
-- [Supabase Auth Documentation](https://supabase.com/docs/guides/auth)
-- [PostgrestClient Documentation](https://github.com/supabase/postgrest-js)
 - [Neon Documentation](https://neon.tech/docs)
+- [Better Auth Documentation](https://www.better-auth.com/docs)
+- [GitHub Repository](https://github.com/neondatabase-labs/neon-js)
