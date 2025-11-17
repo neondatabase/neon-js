@@ -64,7 +64,10 @@ Create a `.env` file in your project:
 
 ```bash
 # Your Neon Data API endpoint
-VITE_NEON_URL=https://ep-withered-pond-w4e43v69.c-2.us-east-2.aws.neon.build/neondb/
+VITE_NEON_DATA_API_URL=https://ep-withered-pond-w4e43v69.apirest.c-2.us-east-2.aws.neon.build/neondb/rest/v1
+
+# Your Neon Auth endpoint
+VITE_NEON_AUTH_URL=https://ep-withered-pond-w4e43v69.neonauth.c-2.us-east-2.aws.neon.build/neondb/auth
 ```
 
 ## Which Package Should I Use?
@@ -86,7 +89,10 @@ import { createClient } from '@neondatabase/neon-js';
 import type { Database } from './types/database.types';
 
 // Create client with Better Auth integration
-const client = createClient<Database>(import.meta.env.VITE_NEON_URL);
+const client = createClient<Database>({
+  dataApiUrl: import.meta.env.VITE_NEON_DATA_API_URL,
+  authUrl: import.meta.env.VITE_NEON_AUTH_URL,
+});
 
 // Sign in
 await client.auth.signInWithPassword({
@@ -150,7 +156,10 @@ Full-featured SDK with authentication and database queries:
 ```typescript
 import { createClient } from '@neondatabase/neon-js';
 
-  const client = createClient<Database>(import.meta.env.VITE_NEON_URL);
+const client = createClient<Database>({
+  dataApiUrl: import.meta.env.VITE_NEON_DATA_API_URL,
+  authUrl: import.meta.env.VITE_NEON_AUTH_URL,
+});
 
 // All auth methods available
 await client.auth.signInWithPassword({ email, password });
@@ -229,7 +238,7 @@ neon-js provides a Supabase compatible API, making migration straightforward wit
 - VITE_SUPABASE_URL="https://xxx.supabase.co"
 - VITE_SUPABASE_ANON_KEY="..."
 + VITE_NEON_DATA_API_URL="https://xxx.neon.tech/neondb/rest/v1"
-+ VITE_BETTER_AUTH_BASE_URL="https://your-auth-server.com"
++ VITE_NEON_AUTH_URL="https://your-auth-server.com"
 ```
 
 **3. Update Client Initialization**
@@ -242,7 +251,10 @@ neon-js provides a Supabase compatible API, making migration straightforward wit
 -   import.meta.env.VITE_SUPABASE_URL,
 -   import.meta.env.VITE_SUPABASE_ANON_KEY
 - );
-+ export const client = createClient<Database>(import.meta.env.VITE_NEON_URL);
++ export const client = createClient<Database>({
++   dataApiUrl: import.meta.env.VITE_NEON_DATA_API_URL,
++   authUrl: import.meta.env.VITE_NEON_AUTH_URL,
++ });
 ```
 
 **4. Done!**

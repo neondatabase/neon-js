@@ -29,7 +29,10 @@ bun add @neondatabase/neon-js
 import { createClient } from '@neondatabase/neon-js';
 
 // Create client with auth and database configuration
-const client = createClient<Database>(import.meta.env.VITE_NEON_URL);
+const client = createClient<Database>({
+  dataApiUrl: import.meta.env.VITE_NEON_DATA_API_URL,
+  authUrl: import.meta.env.VITE_NEON_AUTH_URL,
+});
 
 // Authenticate
 await client.auth.signInWithPassword({
@@ -203,27 +206,32 @@ const { data } = await client
 import { createClient } from '@neondatabase/neon-js';
 
 const client = createClient({
-  // Required: Database URL
-  url: 'https://your-neon-branch.neon.tech/dbname',
+  // Required: Data API URL
+  dataApiUrl: 'https://your-data-api.neon.tech/rest/v1',
 
-  // Required: Auth configuration
-  auth: {
-    baseURL: 'https://your-auth-server.com',
-  },
+  // Required: Auth URL
+  authUrl: 'https://your-auth-server.neon.tech/auth',
 
   // Optional: Client options
-  options: {
-    // Database options
-    db: {
-      schema: 'public', // Default schema
-    },
+  clientOptions: {
+    options: {
+      // Database options
+      db: {
+        schema: 'public', // Default schema
+      },
 
-    // Global options for all requests
-    global: {
-      headers: {
-        'X-Custom-Header': 'value',
+      // Global options for all requests
+      global: {
+        headers: {
+          'X-Custom-Header': 'value',
+        },
       },
     },
+  },
+
+  // Optional: Auth options
+  authOptions: {
+    // Additional Better Auth options
   },
 });
 ```
@@ -231,19 +239,17 @@ const client = createClient({
 ### Environment Variables
 
 ```bash
-# Database URL
-DATABASE_URL=https://your-neon-branch.neon.tech/dbname
+# Data API URL
+NEON_DATA_API_URL=https://your-data-api.neon.tech/rest/v1
 
-# Auth server URL
-AUTH_BASE_URL=https://your-auth-server.com
+# Auth URL
+NEON_AUTH_URL=https://your-auth-server.neon.tech/auth
 ```
 
 ```typescript
 const client = createClient({
-  url: process.env.DATABASE_URL!,
-  auth: {
-    baseURL: process.env.AUTH_BASE_URL!,
-  },
+  dataApiUrl: process.env.NEON_DATA_API_URL!,
+  authUrl: process.env.NEON_AUTH_URL!,
 });
 ```
 
@@ -262,10 +268,8 @@ import type { Database } from './types/database';
 import { createClient } from '@neondatabase/neon-js';
 
 const client = createClient<Database>({
-  url: process.env.DATABASE_URL!,
-  auth: {
-    baseURL: process.env.AUTH_BASE_URL!,
-  },
+  dataApiUrl: process.env.NEON_DATA_API_URL!,
+  authUrl: process.env.NEON_AUTH_URL!,
 });
 
 // Fully typed queries!
@@ -360,10 +364,8 @@ if (error) {
 import { createClient } from '@neondatabase/neon-js';
 
 export const neon = createClient({
-  url: process.env.DATABASE_URL!,
-  auth: {
-    baseURL: process.env.AUTH_BASE_URL!,
-  },
+  dataApiUrl: process.env.NEON_DATA_API_URL!,
+  authUrl: process.env.NEON_AUTH_URL!,
 });
 
 // app/api/users/route.ts
@@ -382,10 +384,8 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@neondatabase/neon-js';
 
 const client = createClient({
-  url: process.env.NEXT_PUBLIC_DATABASE_URL!,
-  auth: {
-    baseURL: process.env.NEXT_PUBLIC_AUTH_BASE_URL!,
-  },
+  dataApiUrl: process.env.NEXT_PUBLIC_NEON_DATA_API_URL!,
+  authUrl: process.env.NEXT_PUBLIC_NEON_AUTH_URL!,
 });
 
 export function useAuth() {
@@ -435,8 +435,8 @@ const supabase = createClient(url, anonKey);
 // After (Neon)
 import { createClient } from '@neondatabase/neon-js';
 const neon = createClient({
-  url,
-  auth: { baseURL: authUrl },
+  dataApiUrl,
+  authUrl,
 });
 
 // Same API for queries and auth!

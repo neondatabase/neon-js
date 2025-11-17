@@ -171,31 +171,70 @@ const { data: items } = await client.from('items').select();
 
 ### Using NeonClient (With Auth) - Better Auth
 
-For full auth integration with Better Auth:
+#### Single URL Mode (Standard)
+
+For full auth integration with Better Auth using a single Neon branch URL:
 
 ```typescript
 import { createClient } from '@neondatabase/neon-js';
 
-const client = createClient({
-  url: 'https://your-neon-branch-url.com/neondb',
-  auth: {
-    baseURL: 'https://your-auth-server.com',
-  },
-  options: {
-    global: {
-      headers: { 'X-Custom-Header': 'value' },
+// Single URL - automatically derives dataApiUrl and authUrl
+const client = createClient(
+  'https://ep-xxx.neon.build/neondb',
+  {
+    clientOptions: {
+      options: {
+        global: {
+          headers: { 'X-Custom-Header': 'value' },
+        },
+        db: {
+          schema: 'public',
+        },
+      },
     },
-    db: {
-      schema: 'public',
+    authOptions: {
+      // baseURL is automatically derived from the Neon URL
+      // Additional Better Auth options can be passed here
     },
-  },
-});
+  }
+);
 
 // Auth methods (Supabase-compatible)
 await client.auth.signInWithPassword({ email, password });
 const { data } = await client.auth.getSession();
 
 // Database queries (automatic token injection)
+const { data: items } = await client.from('items').select();
+```
+
+#### Dual URL Mode (Explicit URLs)
+
+For scenarios where you need explicit control over data API and auth URLs:
+
+```typescript
+import { createClient } from '@neondatabase/neon-js';
+
+// Dual URLs - explicit dataApiUrl and authUrl
+const client = createClient({
+  dataApiUrl: 'https://data-api.example.com/rest/v1',
+  authUrl: 'https://auth.example.com/api',
+  clientOptions: {
+    options: {
+      global: {
+        headers: { 'X-Custom-Header': 'value' },
+      },
+      db: {
+        schema: 'public',
+      },
+    },
+  },
+  authOptions: {
+    // Additional Better Auth options (baseURL is set from authUrl above)
+  },
+});
+
+// Same API as single URL mode
+await client.auth.signInWithPassword({ email, password });
 const { data: items } = await client.from('items').select();
 ```
 
