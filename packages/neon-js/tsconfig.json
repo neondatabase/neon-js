@@ -7,14 +7,13 @@
     "paths": {
       "@neondatabase/postgrest-js": ["../postgrest-js/src"],
       "@neondatabase/postgrest-js/client": ["../postgrest-js/src/client/index.ts"],
-      "@neondatabase/auth": ["../auth/src"],
-      "@neondatabase/auth/better-auth": ["../auth/src/adapters/better-auth/index.ts"],
-      "@neondatabase/auth/stack-auth": ["../auth/src/adapters/stack-auth/index.ts"]
+      "@neondatabase/neon-auth": ["../neon-auth/src"],
+      "@neondatabase/neon-auth/better-auth": ["../neon-auth/src/adapters/better-auth/index.ts"]
     }
   },
   "include": ["src"],
   "references": [
     { "path": "../postgrest-js" },
-    { "path": "../auth" }
+    { "path": "../neon-auth" }
   ]
 }

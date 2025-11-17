@@ -21,7 +21,7 @@ export default defineConfig({
       if (pkg.dependencies) {
         for (const [name, version] of Object.entries(pkg.dependencies)) {
           if (typeof version === 'string' && version.startsWith('workspace:')) {
-            // Extract workspace package name (e.g., 'auth' from '@neondatabase/auth')
+            // Extract workspace package name (e.g., 'neon-auth' from '@neondatabase/neon-auth')
             const workspaceName = name.split('/').pop();
             const workspacePkgPath = path.resolve(
               import.meta.dirname,

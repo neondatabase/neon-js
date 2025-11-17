@@ -6,7 +6,6 @@ export default defineConfig({
   entry: [
     'src/index.ts',
     'src/adapters/better-auth/index.ts',
-    'src/adapters/stack-auth/index.ts',
   ],
   format: ['esm'],
   clean: true,

@@ -17,7 +17,7 @@ A unified TypeScript SDK for Neon services, providing seamless integration with 
   - [Usage Examples](#usage-examples)
     - [Using @neondatabase/neon-js (Recommended)](#using-neondatabaseneon-js-recommended)
     - [Using @neondatabase/postgrest-js (No Auth)](#using-neondatabasepostgrest-js-no-auth)
-    - [Using @neondatabase/auth-js (Custom Integrations)](#using-neondatabaseauth-js-custom-integrations)
+    - [Using @neondatabase/neon-auth (Custom Integrations)](#using-neondatabaseneon-auth-custom-integrations)
   - [Supabase Migration Guide](#supabase-migration-guide)
     - [Quick Migration Steps](#quick-migration-steps)
   - [Authentication Methods](#authentication-methods)
@@ -33,7 +33,7 @@ A unified TypeScript SDK for Neon services, providing seamless integration with 
 
 - **Unified SDK**: Single client for authentication and database queries
 - **Familiar API**: Drop-in replacement with minimal code changes for migration
-- **Adapter Pattern**: Pluggable authentication providers (Better Auth & Stack Auth)
+- **Adapter Pattern**: Pluggable authentication providers (Better Auth)
 - **Automatic Token Injection**: Seamless authentication for all database calls
 - **TypeScript**: Full type safety with strict mode enabled
 - **Performance Optimized**: Cross-tab sync and automatic token refresh
@@ -76,7 +76,7 @@ This monorepo contains three packages. Choose based on your needs:
 
 - **`@neondatabase/neon-js`** (Recommended): Full-featured SDK with auth + Neon Data API. Use this for most applications.
 - **`@neondatabase/postgrest-js`**: Database queries only. Use when you handle authentication externally or don't need auth.
-- **`@neondatabase/auth-js`**: Authentication only. Use when you want to use Neon Auth for authentication and don't need to use the Neon Data API.
+- **`@neondatabase/neon-auth`**: Authentication only. Use when you want to use Neon Auth for authentication and don't need to use the Neon Data API.
 - 
 ## Quick Start
 
@@ -203,12 +203,12 @@ const client = new NeonPostgrestClient({
 const { data } = await client.from('items').select();
 ```
 
-### Using @neondatabase/auth-js (Custom Integrations)
+### Using @neondatabase/neon-auth (Custom Integrations)
 
 For building custom clients or integrations:
 
 ```typescript
-import { NeonAuthClient } from '@neondatabase/auth-js';
+import { NeonAuthClient } from '@neondatabase/neon-auth';
 
 const auth = new NeonAuthClient({
   baseURL: import.meta.env.VITE_NEON_AUTH_URL,
@@ -286,7 +286,7 @@ The SDK works in both browser and Node.js environments:
 
 - **NeonClient**: Unified client for authentication and database queries
 - **AuthClient Interface**: Compatible authentication interface for easy adoption
-- **Adapter Pattern**: Pluggable authentication providers (Better Auth primary, Stack Auth legacy)
+- **Adapter Pattern**: Pluggable authentication providers (Better Auth)
 - **Factory Pattern**: `createClient()` handles initialization and wiring
 - **Performance Optimized**: Cross-tab sync, automatic token refresh detection, and seamless token injection
 

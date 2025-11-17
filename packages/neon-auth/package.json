@@ -1,5 +1,5 @@
 {
-  "name": "@neondatabase/auth",
+  "name": "@neondatabase/neon-auth",
   "version": "0.1.0-alpha.1",
   "description": "Authentication adapters for Neon services",
   "type": "module",
@@ -23,7 +23,7 @@
     "test:node": "node --run test",
     "test:ci": "vitest run",
     "typecheck": "tsc --noEmit",
-    "release": "bumpp --tag 'auth-v%s' && npm publish dist/"
+    "release": "bumpp --tag 'neon-auth-v%s' && npm publish dist/"
   },
   "devDependencies": {
     "tsdown": "0.16.0",
@@ -33,13 +33,11 @@
     "msw": "2.6.8"
   },
   "dependencies": {
-    "@stackframe/js": "2.8.41",
     "@supabase/auth-js": "2.79.0",
     "better-auth": "1.3.34",
     "zod": "4.1.12"
   },
   "peerDependencies": {
-    "better-auth": "^1.3.34",
-    "@stackframe/js": "^2.8.41"
+    "better-auth": "^1.3.34"
   }
 }

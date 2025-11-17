@@ -74,7 +74,6 @@ After implementation:
 - [ ] Token refresh detection still works via polling
 - [ ] No dependencies on Better Auth reactive internals
 - [ ] Tests pass (especially signOut race condition test)
-- [ ] Stack Auth adapter comparison shows similar pattern
 
 ## What We're NOT Doing
 
@@ -844,7 +843,6 @@ it('broadcasts sign-out to other tabs via BroadcastChannel', async () => {
 ### Implementation Files
 - Better Auth adapter: `src/auth/adapters/better-auth/better-auth-adapter.ts`
 - Session cache: `src/auth/adapters/better-auth/session-cache.ts`
-- Stack Auth adapter (for comparison): `src/auth/adapters/stack-auth/stack-auth-adapter.ts`
 
 ### Better Auth Internals (for reference only)
 - Session atom: `/Users/pedro.figueiredo/Documents/git/neon/better-auth/packages/better-auth/src/client/session-atom.ts`

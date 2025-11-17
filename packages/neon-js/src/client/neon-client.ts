@@ -1,4 +1,4 @@
-import type { NeonAuthClient } from '@neondatabase/auth';
+import type { NeonAuthClient } from '@neondatabase/neon-auth';
 import {
   NeonPostgrestClient,
   type NeonPostgrestClientConstructorOptions,

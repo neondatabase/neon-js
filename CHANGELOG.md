@@ -21,9 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Authentication
 - Complete Supabase-compatible `AuthClient` interface for easy migration
-- Stack Auth adapter with 25+ authentication methods:
+- Better Auth adapter with 25+ authentication methods:
   - Email/password authentication (`signUp`, `signInWithPassword`)
-  - OAuth social login (`signInWithOAuth`) with all Stack Auth providers
+  - OAuth social login (`signInWithOAuth`) with all Better Auth providers
   - Magic link/OTP authentication (`signInWithOtp`, `verifyOtp`)
   - Session management (`getSession`, `refreshSession`, `setSession`, `signOut`)
   - User management (`getUser`, `updateUser`, `getClaims`)
@@ -32,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - OAuth callback handling (`exchangeCodeForSession`)
   - Reauthentication (`reauthenticate`)
   - State change monitoring (`onAuthStateChange`)
-- Session caching optimization leveraging Stack Auth internals (<5ms cached reads)
+- Session caching optimization with TTL-based expiration (<5ms cached reads)
 - JWT token validation with Zod schemas
 - Comprehensive error handling with detailed error messages
 
@@ -70,17 +70,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - API reference for all authentication methods
 - Architecture documentation
 - Performance benchmarks
-- Stack Auth vs Supabase feature comparison
-
-### Known Limitations
-
-The following authentication methods are not supported by Stack Auth and return detailed error messages:
-- `signInWithIdToken()` - Stack Auth uses OAuth redirect flows only
-- `signInWithSSO()` - SAML SSO not supported (OAuth social providers only)
-- `signInWithWeb3()` - Blockchain/crypto wallet authentication not supported
-- `signInAnonymously()` - Anonymous authentication not supported
-
-Password updates via `updateUser({ password })` require old password or password reset flow due to Stack Auth security requirements.
 
 [unreleased]: https://github.com/neondatabase-labs/neon-js/compare/v0.1.0-alpha.1...HEAD
 [0.1.0-alpha.1]: https://github.com/neondatabase-labs/neon-js/releases/tag/v0.1.0-alpha.1

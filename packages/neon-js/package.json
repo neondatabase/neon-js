@@ -52,7 +52,7 @@
   },
   "dependencies": {
     "@neondatabase/postgrest-js": "workspace:*",
-    "@neondatabase/auth": "workspace:*",
+    "@neondatabase/neon-auth": "workspace:*",
     "@supabase/postgres-meta": "0.93.1",
     "meow": "14.0.0",
     "zod": "4.1.12"

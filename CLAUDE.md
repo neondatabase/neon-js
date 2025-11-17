@@ -20,21 +20,18 @@ Generic PostgreSQL client for Neon Data API without authentication:
 - `@neondatabase/postgrest-js` - Main exports (client, utilities)
 - `@neondatabase/postgrest-js/client` - Client components
 
-### `@neondatabase/auth` (packages/auth/)
-Authentication adapters implementing the Supabase-compatible `AuthClient` interface:
-- **Better Auth Adapter** (Primary): Full-featured adapter with session caching, request deduplication, and cross-tab sync
-- **Stack Auth Adapter** (Legacy): Maintained for backward compatibility
+### `@neondatabase/neon-auth` (packages/neon-auth/)
+Authentication adapter implementing the Supabase-compatible `AuthClient` interface:
+- **Better Auth Adapter**: Full-featured adapter with session caching, request deduplication, and cross-tab sync
 
 **Exports:**
-- `@neondatabase/auth` - Main exports (AuthClient interface, adapters, utilities)
-- `@neondatabase/auth/better-auth` - Better Auth adapter
-- `@neondatabase/auth/stack-auth` - Stack Auth adapter
+- `@neondatabase/neon-auth` - Main exports (AuthClient interface, adapter, utilities)
+- `@neondatabase/neon-auth/better-auth` - Better Auth adapter
 
 ### `@neondatabase/neon-js` (packages/neon-js/)
 Main SDK package that combines authentication with PostgreSQL querying:
 - **NeonClient**: Auth-integrated client extending NeonPostgrestClient
 - **createClient()**: Factory function for Better Auth setup
-- **createClientStackAuth()**: Factory function for Stack Auth (legacy)
 - **CLI Tool**: Database type generation utility
 - Re-exports all postgrest-js utilities for convenience
 
@@ -46,7 +43,7 @@ Main SDK package that combines authentication with PostgreSQL querying:
 **Dependencies:**
 ```
 @neondatabase/neon-js
-    ├── @neondatabase/auth
+    ├── @neondatabase/neon-auth
     └── @neondatabase/postgrest-js
 ```
 
@@ -65,7 +62,7 @@ bun dev
 bun build
 
 # Build specific package
-bun run --filter '@neondatabase/auth' build
+bun run --filter '@neondatabase/neon-auth' build
 
 # Run tests
 bun test              # Run all tests
@@ -90,14 +87,14 @@ bun release           # Bump version and publish all three packages
 
 **No Dependencies on Auth**: This package is completely independent and can be used for scenarios where authentication is handled externally or not required.
 
-### Authentication Layer (`packages/auth/`)
+### Authentication Layer (`packages/neon-auth/`)
 
 **Core Interface**: `src/auth-interface.ts`
 - Defines `AuthClient` interface (Supabase-compatible)
 - Error types: `AuthError`, `AuthApiError`
 
 **Adapters**: `src/adapters/`
-- **Better Auth** (Primary): `adapters/better-auth/`
+- **Better Auth**: `adapters/better-auth/`
   - `better-auth-adapter.ts` - Main implementation (~1820 lines)
   - `better-auth-types.ts` - Type definitions
   - `better-auth-helpers.ts` - Session mapping and error handling
@@ -108,16 +105,10 @@ bun release           # Bump version and publish all three packages
   - Cross-tab sync via BroadcastChannel (browser only)
   - Token refresh detection (30s polling interval)
 
-- **Stack Auth** (Legacy): `adapters/stack-auth/`
-  - `stack-auth-adapter.ts` - Full implementation (2000+ lines)
-  - `stack-auth-types.ts` - Type definitions
-  - `stack-auth-schemas.ts` - Zod schemas
-  - `stack-auth-helpers.ts` - JWT utilities
-
 - **Shared**: `adapters/shared-helpers.ts`, `adapters/shared-schemas.ts`
 
 **Tests**: `src/__tests__/`
-- Uses real Stack/Better Auth SDKs with MSW for network mocking
+- Uses real Better Auth SDK with MSW for network mocking
 - Run with `bun test:node` for reliable MSW interception
 
 ### Auth-Integrated Client Layer (`packages/neon-js/`)
@@ -125,7 +116,6 @@ bun release           # Bump version and publish all three packages
 **Client**: `src/client/`
 - `neon-client.ts` - NeonClient class (extends NeonPostgrestClient, adds required auth)
 - `client-factory.ts` - Better Auth factory: `createClient()`
-- `client-factory-stack-auth.ts` - Legacy Stack Auth factory
 - `index.ts` - Re-exports fetchWithToken from postgrest-js
 
 **CLI Tool**: `src/cli/`
@@ -134,7 +124,7 @@ bun release           # Bump version and publish all three packages
 - `commands/generate-types.ts` - Core logic using postgres-meta
 - `utils/parse-duration.ts` - Duration parsing
 
-**Dependencies**: Imports from `@neondatabase/postgrest-js` and `@neondatabase/auth-js`
+**Dependencies**: Imports from `@neondatabase/postgrest-js` and `@neondatabase/neon-auth`
 
 ## Usage
 
@@ -241,7 +231,7 @@ const { data: items } = await client.from('items').select();
 ### Using Auth Adapters Directly
 
 ```typescript
-import { BetterAuthAdapter } from '@neondatabase/auth/better-auth';
+import { BetterAuthAdapter } from '@neondatabase/neon-auth/better-auth';
 
 const auth = new BetterAuthAdapter({
   baseURL: 'https://your-auth-server.com',
@@ -288,8 +278,8 @@ Works in both browser and Node.js:
 
 Tests use real SDKs with MSW for network mocking:
 - Verifies retrocompatibility with Supabase AuthClient API
-- Catches breaking changes in Stack/Better Auth SDK versions
-- Located in `packages/auth/src/__tests__/`
+- Catches breaking changes in Better Auth SDK versions
+- Located in `packages/neon-auth/src/__tests__/`
 
 **Run tests:**
 ```bash
@@ -334,9 +324,9 @@ Following the [Better Auth Supabase Migration Guide](https://www.better-auth.com
 
 ## Additional Documentation
 
-- `packages/auth/src/adapters/better-auth/better-auth-docs.md` - Comprehensive adapter docs
-- `packages/auth/src/adapters/better-auth/better-auth-plugins.md` - Plugin configuration
-- `packages/auth/src/__tests__/README.md` - Testing guide
+- `packages/neon-auth/src/adapters/better-auth/better-auth-docs.md` - Comprehensive adapter docs
+- `packages/neon-auth/src/adapters/better-auth/better-auth-plugins.md` - Plugin configuration
+- `packages/neon-auth/src/__tests__/README.md` - Testing guide
 - `BETTER_AUTH_SIMPLIFICATION.md` - Simplification strategy
 - `REMOVE_BETTER_AUTH_SESSION_LISTENER.md` - Event implementation notes
 

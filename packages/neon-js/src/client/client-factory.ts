@@ -1,4 +1,4 @@
-import { NeonAuthClient, type NeonAuthClientOptions } from '@neondatabase/auth';
+import { NeonAuthClient, type NeonAuthClientOptions } from '@neondatabase/neon-auth';
 import { fetchWithToken } from '@neondatabase/postgrest-js';
 import {
   NeonClient,

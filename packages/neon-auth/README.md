@@ -1,10 +1,10 @@
-# @neondatabase/auth
+# @neondatabase/neon-auth
 
 Supabase-compatible authentication adapter for Neon Auth, built on Better Auth.
 
 ## Overview
 
-`@neondatabase/auth` provides a Supabase-compatible authentication client for applications using Neon Auth. It's a wrapper on top of [Better Auth](https://www.better-auth.com) that implements the Supabase `AuthClient` interface, making it easy to migrate from Supabase or use familiar authentication patterns.
+`@neondatabase/neon-auth` provides a Supabase-compatible authentication client for applications using Neon Auth. It's a wrapper on top of [Better Auth](https://www.better-auth.com) that implements the Supabase `AuthClient` interface, making it easy to migrate from Supabase or use familiar authentication patterns.
 
 This package is designed to work seamlessly with Neon's authentication infrastructure while providing:
 
@@ -16,9 +16,9 @@ This package is designed to work seamlessly with Neon's authentication infrastru
 ## Installation
 
 ```bash
-npm install @neondatabase/auth
+npm install @neondatabase/neon-auth
 # or
-bun add @neondatabase/auth
+bun add @neondatabase/neon-auth
 ```
 
 ## Usage
@@ -26,7 +26,7 @@ bun add @neondatabase/auth
 ### Basic Setup
 
 ```typescript
-import { BetterAuthAdapter } from '@neondatabase/auth/better-auth';
+import { BetterAuthAdapter } from '@neondatabase/neon-auth/better-auth';
 
 const auth = new BetterAuthAdapter({
   baseURL: 'https://your-auth-server.com',
@@ -278,7 +278,7 @@ Sessions are cached in memory with intelligent TTL management:
 
 Multiple concurrent `getSession()` calls are automatically deduplicated:
 - Single network request for concurrent calls
-- 10x faster cold starts (10 concurrent calls: ~2000ms ’ ~200ms)
+- 10x faster cold starts (10 concurrent calls: ~2000ms ï¿½ ~200ms)
 - Reduces server load by N-1 for N concurrent calls
 
 ### Cross-Tab Synchronization
@@ -302,7 +302,7 @@ Authentication state syncs across browser tabs (browser only):
 Full TypeScript support with strict typing:
 
 ```typescript
-import type { AuthClient, Session, User } from '@neondatabase/auth';
+import type { AuthClient, Session, User } from '@neondatabase/neon-auth';
 
 const auth: AuthClient = new BetterAuthAdapter({
   baseURL: 'https://your-auth-server.com',
