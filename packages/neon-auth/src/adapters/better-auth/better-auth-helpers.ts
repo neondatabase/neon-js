@@ -5,9 +5,10 @@ import type {
   BetterAuthSession,
   BetterAuthUser,
 } from './better-auth-types';
-import type { Session, User } from '@supabase/auth-js';
+import type { Session, User, UserIdentity } from '@supabase/auth-js';
 import { toISOString } from '../shared-helpers';
 import { DEFAULT_SESSION_EXPIRY_MS } from './constants';
+import type { accountInfo, listUserAccounts } from 'better-auth/api';
 
 /**
  * Map Better Auth errors to Supabase error format
@@ -170,11 +171,11 @@ export function mapBetterAuthSessionToSupabase(
   const expiresAt =
     typeof betterAuthSession.expiresAt === 'string'
       ? Math.floor(new Date(betterAuthSession.expiresAt).getTime() / 1000)
-      : (typeof betterAuthSession.expiresAt === 'object' &&
+      : typeof betterAuthSession.expiresAt === 'object' &&
           betterAuthSession.expiresAt instanceof Date
         ? Math.floor(betterAuthSession.expiresAt.getTime() / 1000)
         : Math.floor(Date.now() / 1000) +
-          Math.floor(DEFAULT_SESSION_EXPIRY_MS / 1000)); // Default 1 hour if can't parse
+          Math.floor(DEFAULT_SESSION_EXPIRY_MS / 1000); // Default 1 hour if can't parse
 
   const now = Math.floor(Date.now() / 1000);
   const expiresIn = Math.max(0, expiresAt - now);
@@ -246,6 +247,40 @@ export function mapBetterAuthUserToSupabase(
   };
 
   return user;
+}
+
+export function mapBetterAuthUserIdentityToSupabase(
+  betterAuthUserIdentityAccount: Awaited<
+    ReturnType<typeof listUserAccounts>
+  >[number],
+  accountInfoData: Awaited<ReturnType<typeof accountInfo>>
+): UserIdentity {
+  return {
+    id: betterAuthUserIdentityAccount.id,
+    user_id: betterAuthUserIdentityAccount.id,
+    identity_id: betterAuthUserIdentityAccount.accountId,
+    provider: betterAuthUserIdentityAccount.providerId,
+    created_at: toISOString(betterAuthUserIdentityAccount.createdAt),
+    updated_at: toISOString(betterAuthUserIdentityAccount.updatedAt),
+    // TODO: pretty sure this needs a plugin.
+    last_sign_in_at: toISOString(betterAuthUserIdentityAccount.updatedAt),
+    identity_data: accountInfoData
+      ? {
+          provider: betterAuthUserIdentityAccount.providerId,
+          provider_id: betterAuthUserIdentityAccount.accountId,
+          scopes: betterAuthUserIdentityAccount.scopes,
+          email: accountInfoData.data.email,
+          name: accountInfoData.data.user.name,
+          picture: accountInfoData.data.user.picture,
+          email_verified: accountInfoData.data.user.email_verified,
+          ...accountInfoData.data,
+        }
+      : {
+          provider: betterAuthUserIdentityAccount.providerId,
+          provider_id: betterAuthUserIdentityAccount.accountId,
+          scopes: betterAuthUserIdentityAccount.scopes,
+        },
+  };
 }
 
 // Re-export shared helpers for backward compatibility

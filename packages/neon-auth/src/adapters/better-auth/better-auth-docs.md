@@ -374,6 +374,47 @@ User {
 3. Stores session with TTL based on JWT expiration
 4. Maps Better Auth session format to Supabase format
 
+### Cache Bypass with `forceFetch`
+
+The `getSession()` method accepts an optional `forceFetch` parameter to bypass the cache when fresh data is needed:
+
+```typescript
+async getSession(options?: { forceFetch?: boolean }): Promise<AuthResponse>
+```
+
+**When to use `forceFetch: true`**:
+- After state-changing operations (email verification, profile updates, account unlinking)
+- When you need to guarantee the latest session state from the server
+- After operations that modify user attributes or session data
+
+**Default behavior (`forceFetch` omitted or `false`)**:
+- Uses in-memory cache if available and not expired
+- Fast reads (<1ms) for cached sessions
+- Reduces server load and improves performance
+
+**Example Usage**:
+```typescript
+// Standard usage (uses cache)
+const session = await adapter.getSession();
+
+// Force fresh fetch after state change
+await adapter.verifyEmail({ token });
+const freshSession = await adapter.getSession({ forceFetch: true });
+// ✅ freshSession.user.emailVerified reflects server state
+
+// Subsequent calls use new cache
+const cachedSession = await adapter.getSession();
+// ✅ cachedSession also has emailVerified = true (from new cache)
+```
+
+**Implementation Notes**:
+- The adapter automatically uses `forceFetch: true` internally after:
+  - Email verification (`verifyOtp` with type `signup`, `invite`, or `email_change`)
+  - User profile updates (`updateUser`)
+  - Account unlinking (`unlinkIdentity`)
+- Backward compatible - existing code without the parameter continues to work
+- After a forced fetch, the new session is cached for subsequent calls
+
 ---
 
 ## Request Deduplication

@@ -1,6 +1,14 @@
 import { AuthError, type AuthClient } from '../../auth-interface';
-import type { Session, AuthChangeEvent, Subscription } from '@supabase/auth-js';
-import { accessTokenSchema } from '../shared-schemas';
+import type {
+  Session,
+  AuthChangeEvent,
+  Subscription,
+  JwtHeader,
+  JwtPayload,
+  Provider,
+  VerifyMobileOtpParams,
+  VerifyEmailOtpParams,
+} from '@supabase/auth-js';
 import {
   createAuthClient,
   type BetterAuthClientOptions,
@@ -10,12 +18,15 @@ import {
   normalizeBetterAuthError,
   mapBetterAuthSessionToSupabase,
   supportsBroadcastChannel,
-  toISOString,
+  mapBetterAuthUserIdentityToSupabase,
 } from './better-auth-helpers';
 import {
   jwtClient,
   adminClient,
   organizationClient,
+  emailOTPClient,
+  phoneNumberClient,
+  magicLinkClient,
 } from 'better-auth/client/plugins';
 import { InFlightRequestManager } from './in-flight-request-manager';
 import {
@@ -23,13 +34,23 @@ import {
   CLOCK_SKEW_BUFFER_MS,
   BROADCAST_CHANNEL_NAME,
 } from './constants';
+import { base64url, decodeJwt, decodeProtectedHeader } from 'jose';
 
 /**
  * Better Auth adapter implementing the Supabase-compatible AuthClient interface.
  * See CLAUDE.md for architecture details and API mappings.
  */
 const defaultBetterAuthClientOptions = {
-  plugins: [jwtClient(), adminClient(), organizationClient()],
+  plugins: [
+    jwtClient(),
+    adminClient(),
+    organizationClient(),
+
+    // TODO: add these in
+    emailOTPClient(),
+    phoneNumberClient(),
+    magicLinkClient(),
+  ],
 } satisfies BetterAuthClientOptions;
 
 export class BetterAuthAdapter implements AuthClient {
@@ -160,16 +181,21 @@ export class BetterAuthAdapter implements AuthClient {
   //#endregion
 
   //#region PUBLIC API - Session Management
-  getSession: AuthClient['getSession'] = async () => {
+  async getSession(options?: {
+    forceFetch?: boolean;
+  }): ReturnType<AuthClient['getSession']> {
     try {
-      const cachedSession = this.getCachedSession();
-      if (cachedSession) {
-        // Re-check cache to prevent stale data from concurrent signOut()
-        if (this.#sessionCache === null) {
-          return { data: { session: null }, error: null };
-        }
+      // Skip cache if forceFetch is true
+      if (!options?.forceFetch) {
+        const cachedSession = this.getCachedSession();
+        if (cachedSession) {
+          // Re-check cache to prevent stale data from concurrent signOut()
+          if (this.#sessionCache === null) {
+            return { data: { session: null }, error: null };
+          }
 
-        return { data: { session: cachedSession }, error: null };
+          return { data: { session: cachedSession }, error: null };
+        }
       }
 
       return await this.inFlightRequests.deduplicate('getSession', async () => {
@@ -241,7 +267,7 @@ export class BetterAuthAdapter implements AuthClient {
         error: normalizeBetterAuthError(error),
       };
     }
-  };
+  }
 
   refreshSession: AuthClient['refreshSession'] = async () => {
     try {
@@ -269,6 +295,7 @@ export class BetterAuthAdapter implements AuthClient {
     }
   };
 
+  // TODO: we need to implement a custom plugin to allow setting external sessions
   setSession: AuthClient['setSession'] = async () => {
     return {
       data: { user: null, session: null },
@@ -339,10 +366,15 @@ export class BetterAuthAdapter implements AuthClient {
             ? credentials.options.data.displayName
             : '';
 
+        // TODO: for channels (sms/whatsapp), we would need to implement the channel-based plugins
+        // TODO: for captcha, we would need to implement the captcha plugin
         const result = await this.betterAuth.signUp.email({
           email: credentials.email,
           password: credentials.password,
           name: displayName,
+          callbackURL: credentials.options?.emailRedirectTo,
+          // TODO: user's metadata, we need to define them at the server adapter, else this won't be stored I think
+          ...credentials.options?.data,
         });
 
         if (result.error) {
@@ -370,12 +402,9 @@ export class BetterAuthAdapter implements AuthClient {
           session: sessionResult.data.session,
         };
 
-        // Emit SIGNED_IN synchronously (matches Supabase pattern)
-        await this.notifyAllSubscribers('SIGNED_IN', data.session);
-        this.lastSessionState = data.session;
-
         return { data, error: null };
       } else if ('phone' in credentials && credentials.phone) {
+        // TODO: we would need to add the phone-number plugin
         return {
           data: { user: null, session: null },
           error: new AuthError(
@@ -402,6 +431,7 @@ export class BetterAuthAdapter implements AuthClient {
     }
   };
 
+  // TODO: we need to add the anonymous() plugin to the server adapter
   signInAnonymously: AuthClient['signInAnonymously'] = async () => {
     return {
       data: { user: null, session: null },
@@ -418,6 +448,7 @@ export class BetterAuthAdapter implements AuthClient {
   ) => {
     try {
       if ('email' in credentials && credentials.email) {
+        // TODO: for captcha, we would need to add the captcha plugin
         const result = await this.betterAuth.signIn.email({
           email: credentials.email,
           password: credentials.password,
@@ -448,12 +479,9 @@ export class BetterAuthAdapter implements AuthClient {
           session: sessionResult.data.session,
         };
 
-        // Emit SIGNED_IN synchronously (matches Supabase pattern)
-        await this.notifyAllSubscribers('SIGNED_IN', data.session);
-        this.lastSessionState = data.session;
-
         return { data, error: null };
       } else if ('phone' in credentials && credentials.phone) {
+        // TODO: we would need to add the phone-number plugin
         return {
           data: { user: null, session: null },
           error: new AuthError(
@@ -480,12 +508,16 @@ export class BetterAuthAdapter implements AuthClient {
     }
   };
 
+  // TODO: we should omit queryParams from the credentials
   signInWithOAuth: AuthClient['signInWithOAuth'] = async (credentials) => {
     try {
       const { provider, options } = credentials;
 
       await this.betterAuth.signIn.social({
         provider,
+        // Convert scopes from Supabase format (space-separated string) to Better Auth format (array)
+        scopes: options?.scopes?.split(' '),
+        disableRedirect: options?.skipBrowserRedirect,
         callbackURL:
           options?.redirectTo ||
           (globalThis.window === undefined ? '' : globalThis.location.origin),
@@ -514,6 +546,7 @@ export class BetterAuthAdapter implements AuthClient {
   /**
    * @todo Add email-otp plugin to server
    */
+  // TODO: we need to add the email-otp plugin to the server adapter
   signInWithOtp: AuthClient['signInWithOtp'] = async () => {
     try {
       return {
@@ -532,30 +565,61 @@ export class BetterAuthAdapter implements AuthClient {
     }
   };
 
-  /**
-   * @deprecated Better Auth uses OAuth authorization code flow and does not accept ID tokens.
-   */
   signInWithIdToken: AuthClient['signInWithIdToken'] = async (credentials) => {
-    const attemptedProvider = credentials.provider;
-    const hasAccessToken = !!credentials.access_token;
-    const hasNonce = !!credentials.nonce;
+    try {
+      const result = await this.betterAuth.signIn.social({
+        provider: credentials.provider,
+        idToken: {
+          token: credentials.token,
+          accessToken: credentials.access_token,
+          nonce: credentials.nonce,
+        },
+      });
 
-    return {
-      data: {
-        user: null,
-        session: null,
-      },
-      error: new AuthError(
-        `Better Auth does not support OIDC ID token authentication. Attempted with provider: ${attemptedProvider}${hasAccessToken ? ' (with access_token)' : ''}${hasNonce ? ' (with nonce)' : ''}. Use signInWithOAuth() instead.`,
-        501,
-        'id_token_provider_disabled'
-      ),
-    };
+      if (result.error) {
+        return {
+          data: { user: null, session: null },
+          error: normalizeBetterAuthError(result.error),
+        };
+      }
+
+      if (!('user' in result.data) || !result.data.user) {
+        return {
+          data: { user: null, session: null },
+          error: new AuthError(
+            'Failed to sign in with ID token',
+            500,
+            'unexpected_failure'
+          ),
+        };
+      }
+
+      const session = await this.getSession();
+      if (session.error || !session.data.session) {
+        return {
+          data: { user: null, session: null },
+          error:
+            session.error ||
+            new AuthError('Failed to get session', 500, 'unexpected_failure'),
+        };
+      }
+
+      return {
+        data: {
+          user: session.data.session.user,
+          session: session.data.session,
+        },
+        error: null,
+      };
+    } catch (error) {
+      return {
+        data: { user: null, session: null },
+        error: normalizeBetterAuthError(error),
+      };
+    }
   };
 
-  /**
-   * @deprecated Better Auth only supports OAuth social providers, not enterprise SAML SSO.
-   */
+  // TODO: we need to add the sso plugin to the server adapter
   signInWithSSO: AuthClient['signInWithSSO'] = async (params) => {
     const attemptedWith =
       'providerId' in params
@@ -572,9 +636,7 @@ export class BetterAuthAdapter implements AuthClient {
     };
   };
 
-  /**
-   * @deprecated Better Auth does not support Web3/crypto wallet authentication.
-   */
+  // TODO: we need to add the SIWE plugin to the server adapter
   signInWithWeb3: AuthClient['signInWithWeb3'] = async (credentials) => {
     const attemptedChain = credentials.chain;
 
@@ -625,7 +687,7 @@ export class BetterAuthAdapter implements AuthClient {
           data: { user: null },
           error:
             sessionResult.error ||
-            new AuthError('No user session found', 401, 'session_not_found'),
+            new AuthError('No user session found', 404, 'not_found'),
         };
       }
 
@@ -643,52 +705,69 @@ export class BetterAuthAdapter implements AuthClient {
     }
   };
 
-  getClaims: AuthClient['getClaims'] = async (jwt?: string) => {
+  // TODO: we dont have the options param, like JWKS
+  getClaims = async (jwtArg?: string) => {
     try {
-      const sessionResult = await this.getSession();
+      let jwt = jwtArg;
 
-      if (sessionResult.error || !sessionResult.data.session) {
-        return {
-          data: null,
-          error:
-            sessionResult.error ||
-            new AuthError('No user session found', 401, 'session_not_found'),
-        };
+      // Get session if JWT not provided
+      if (!jwt) {
+        const sessionResult = await this.getSession();
+
+        if (sessionResult.error || !sessionResult.data?.session) {
+          return {
+            data: null,
+            error:
+              sessionResult.error ||
+              new AuthError('No user session found', 404, 'session_not_found'),
+          };
+        }
+
+        jwt = sessionResult.data.session.access_token;
       }
 
-      const accessToken = jwt || sessionResult.data.session.access_token;
-
-      if (!accessToken) {
+      if (!jwt) {
         return {
           data: null,
           error: new AuthError(
             'No access token found',
-            401,
+            404,
             'session_not_found'
           ),
         };
       }
 
-      const tokenParts = accessToken.split('.');
+      // Split JWT into parts
+      const tokenParts = jwt.split('.');
       if (tokenParts.length !== 3) {
         return {
           data: null,
-          error: new AuthError('Invalid token format', 401, 'bad_jwt'),
+          error: new AuthError('Invalid token format', 400, 'bad_jwt'),
         };
       }
 
       try {
-        const payload = accessTokenSchema.parse(
-          JSON.parse(atob(tokenParts[1]))
-        );
+        // Decode header using JOSE
+        const header = decodeProtectedHeader(jwt) as JwtHeader;
+
+        // Decode payload using JOSE
+        const claims = decodeJwt(jwt) as JwtPayload;
+
+        // Decode signature to Uint8Array using JOSE's base64url
+        const signature = base64url.decode(jwt.split('.')[2]);
+
         return {
-          data: payload as any,
+          data: {
+            header,
+            claims,
+            signature,
+          },
           error: null,
         };
-      } catch {
+      } catch (error) {
         return {
           data: null,
-          error: new AuthError('Failed to decode token', 401, 'bad_jwt'),
+          error: normalizeBetterAuthError(error),
         };
       }
     } catch (error) {
@@ -701,53 +780,39 @@ export class BetterAuthAdapter implements AuthClient {
 
   updateUser: AuthClient['updateUser'] = async (attributes) => {
     try {
-      const sessionResult = await this.getSession();
-
-      if (sessionResult.error || !sessionResult.data.session) {
-        return {
-          data: { user: null },
-          error:
-            sessionResult.error ||
-            new AuthError('No user session found', 401, 'session_not_found'),
-        };
-      }
-
       if (attributes.password) {
         return {
           data: { user: null },
           error: new AuthError(
-            'Password updates require reauthentication. Use resetPasswordForEmail flow instead.',
+            'The password cannot be updated through the updateUser method, use the changePassword method instead.',
             400,
             'feature_not_supported'
           ),
         };
       }
 
-      const updateData: Record<string, unknown> = {};
-
-      if (attributes.data) {
-        const data = attributes.data;
-        if (
-          data &&
-          'displayName' in data &&
-          typeof data.displayName === 'string'
-        ) {
-          updateData.name = data.displayName;
-        }
-        if (
-          data &&
-          'profileImageUrl' in data &&
-          typeof data.profileImageUrl === 'string'
-        ) {
-          updateData.image = data.profileImageUrl;
-        }
-      }
-
       if (attributes.email) {
-        updateData.email = attributes.email;
+        return {
+          data: { user: null },
+          error: new AuthError(
+            // TODO: check the changeEmail method in the better-auth docs
+            'The email cannot be updated through the updateUser method, use the changeEmail method instead.',
+            400,
+            'feature_not_supported'
+          ),
+        };
       }
 
-      const result = await (this.betterAuth as any).user?.update?.(updateData);
+      const result = await this.betterAuth.updateUser({
+        ...attributes.data,
+      });
+
+      if (result.data?.status) {
+        return {
+          data: { user: null },
+          error: new AuthError('Failed to update user', 400, 'bad_request'),
+        };
+      }
 
       if (result?.error) {
         return {
@@ -756,18 +821,10 @@ export class BetterAuthAdapter implements AuthClient {
         };
       }
 
-      const updatedSessionResult = await this.getSession();
-
+      const updatedSessionResult = await this.getSession({ forceFetch: true });
       if (!updatedSessionResult.data.session) {
         throw new Error('Failed to retrieve updated user');
       }
-
-      // Emit USER_UPDATED synchronously (matches Supabase pattern)
-      await this.notifyAllSubscribers(
-        'USER_UPDATED',
-        updatedSessionResult.data.session
-      );
-      this.lastSessionState = updatedSessionResult.data.session;
 
       return {
         data: { user: updatedSessionResult.data.session.user },
@@ -797,7 +854,7 @@ export class BetterAuthAdapter implements AuthClient {
       return await this.inFlightRequests.deduplicate(
         'getUserIdentities',
         async () => {
-          const result = await (this.betterAuth as any).account?.list?.();
+          const result = await this.betterAuth.listAccounts();
 
           if (!result) {
             return {
@@ -817,21 +874,28 @@ export class BetterAuthAdapter implements AuthClient {
             };
           }
 
-          const identities =
-            result.data?.accounts?.map((account: any) => ({
-              id: account.id,
-              user_id: account.userId,
-              identity_id: account.id,
-              provider: account.provider,
-              identity_data: {
-                provider_account_id: account.providerAccountId,
-                provider: account.provider,
-                user_id: account.userId,
-              },
-              created_at: toISOString(account.createdAt),
-              last_sign_in_at: toISOString(account.createdAt),
-              updated_at: toISOString(account.updatedAt),
-            })) || [];
+          const identitiesPromises = result.data.map(async (account) => {
+            let accountInfo = null;
+            try {
+              const infoResult = await this.betterAuth.accountInfo({
+                accountId: account.accountId,
+              });
+              accountInfo = infoResult.data;
+            } catch (error) {
+              // If getAccountInfo fails, continue with basic data
+              console.warn(
+                `Failed to get account info for ${account.providerId}:`,
+                error
+              );
+            }
+
+            return mapBetterAuthUserIdentityToSupabase(
+              account,
+              accountInfo ?? null
+            );
+          });
+
+          const identities = await Promise.all(identitiesPromises);
 
           return {
             data: { identities },
@@ -847,60 +911,86 @@ export class BetterAuthAdapter implements AuthClient {
     }
   };
 
-  // @ts-expect-error - this should infer the overload correctly...
+  // TODO: we need to enable the account/accountLinking plugin to the server adapter
   linkIdentity: AuthClient['linkIdentity'] = async (credentials) => {
-    if ('token' in credentials) {
-      return {
-        data: { user: null, session: null },
-        error: new AuthError(
-          'Better Auth does not support linking identities with ID tokens. Use OAuth credentials instead.',
-          501,
-          'id_token_provider_disabled'
-        ),
-      };
-    }
-
-    const oauthCredentials = credentials;
-    const provider = oauthCredentials.provider;
-
+    const provider = credentials.provider as Provider;
     try {
       const sessionResult = await this.getSession();
 
       if (sessionResult.error || !sessionResult.data.session) {
         return {
-          data: { provider, url: null },
+          data: { provider, url: null, user: null, session: null },
           error:
             sessionResult.error ||
             new AuthError('No user session found', 401, 'session_not_found'),
         };
       }
 
+      // Link with ID token (direct)
+      if ('token' in credentials) {
+        const result = await this.betterAuth.linkSocial({
+          provider,
+          idToken: {
+            token: credentials.token,
+            accessToken: credentials.access_token,
+            nonce: credentials.nonce,
+          },
+        });
+
+        if (result.error) {
+          return {
+            data: { user: null, session: null, provider, url: null },
+            error: normalizeBetterAuthError(result.error),
+          };
+        }
+
+        return {
+          data: {
+            user: sessionResult.data.session.user,
+            session: sessionResult.data.session,
+            provider,
+            url: result.data?.url,
+          },
+          error: null,
+        };
+      }
+
+      // OAuth flow (redirect)
       const callbackURL =
-        oauthCredentials.options?.redirectTo ||
+        credentials.options?.redirectTo ||
         (globalThis.window === undefined ? '' : globalThis.location.origin);
+      const scopes = credentials.options?.scopes
+        ?.split(' ')
+        .filter((s: string) => s.length > 0);
 
-      const scopes = oauthCredentials.options?.scopes
-        ? oauthCredentials.options.scopes
-            .split(' ')
-            .filter((s: string) => s.length > 0)
-        : undefined;
-
-      await this.betterAuth.linkSocial({
+      const result = await this.betterAuth.linkSocial({
         provider,
         callbackURL,
+        errorCallbackURL: callbackURL
+          ? `${callbackURL}?error=linking-failed`
+          : undefined,
         scopes,
       });
+
+      if (result.error) {
+        return {
+          data: { provider, url: null, user: null, session: null },
+          error: normalizeBetterAuthError(result.error),
+        };
+      }
 
       return {
         data: {
           provider,
-          url: callbackURL,
+          url: result.data?.url,
+          user: sessionResult.data.session.user,
+          session: sessionResult.data.session,
         },
         error: null,
       };
     } catch (error) {
       return {
-        data: { provider, url: null },
+        data: { provider, url: null, user: null, session: null },
         error: normalizeBetterAuthError(error),
       };
     }
@@ -909,7 +999,6 @@ export class BetterAuthAdapter implements AuthClient {
   unlinkIdentity: AuthClient['unlinkIdentity'] = async (identity) => {
     try {
       const sessionResult = await this.getSession();
-
       if (sessionResult.error || !sessionResult.data.session) {
         return {
           data: null,
@@ -919,8 +1008,35 @@ export class BetterAuthAdapter implements AuthClient {
         };
       }
 
+      const identities = await this.getUserIdentities();
+      if (identities.error || !identities.data) {
+        return {
+          data: null,
+          error:
+            identities.error ||
+            new AuthError('Failed to fetch identities', 500, 'internal_error'),
+        };
+      }
+
+      // Find the identity by internal DB ID
+      const targetIdentity = identities.data.identities.find(
+        (i) => i.id === identity.identity_id
+      );
+      if (!targetIdentity) {
+        return {
+          data: null,
+          error: new AuthError('Identity not found', 404, 'identity_not_found'),
+        };
+      }
+
+      // Map to better-auth fields
+      const providerId = targetIdentity.provider; // e.g., "google"
+      const accountId = targetIdentity.identity_id; // e.g., "google-user-id-12345"
+
+      // Call better-auth
       const result = await this.betterAuth.unlinkAccount({
-        providerId: identity.provider,
+        providerId,
+        accountId,
       });
 
       if (result?.error) {
@@ -930,7 +1046,7 @@ export class BetterAuthAdapter implements AuthClient {
         };
       }
 
-      const updatedSession = await this.getSession();
+      const updatedSession = await this.getSession({ forceFetch: true });
       if (updatedSession.data.session) {
         await this.notifyAllSubscribers(
           'USER_UPDATED',
@@ -952,6 +1068,9 @@ export class BetterAuthAdapter implements AuthClient {
   };
   //#endregion
 
+  // TODO: add emailOTP plugin to the server adapter
+  // TODO: add twoFactor plugin to the server adapter
+  // TODO: add magiclink plugin to the server adapter
   //#region PUBLIC API - Verification & Password Reset
   verifyOtp: AuthClient['verifyOtp'] = async (params) => {
     try {
@@ -962,7 +1081,15 @@ export class BetterAuthAdapter implements AuthClient {
         return await this.verifyPhoneOtp(params);
       }
       if ('token_hash' in params && params.token_hash) {
-        return await this.verifyTokenHashOtp(params);
+        // TODO: this will fail, we need handlers for this in this code
+        return {
+          data: { user: null, session: null },
+          error: new AuthError(
+            'Token hash verification not supported',
+            400,
+            'feature_not_supported'
+          ),
+        };
       }
       return {
         data: { user: null, session: null },
@@ -980,6 +1107,8 @@ export class BetterAuthAdapter implements AuthClient {
     }
   };
 
+  // TODO: this will only work with a magic link and not with the OTP token flow
+  // we need to derive which flow is being used and handle it accordingly
   resetPasswordForEmail: AuthClient['resetPasswordForEmail'] = async (
     email,
     options
@@ -1012,17 +1141,23 @@ export class BetterAuthAdapter implements AuthClient {
     }
   };
 
-  /**
-   * @deprecated Better Auth uses password reset flow instead of nonce-based reauthentication.
-   */
+  // TODO: we would need a custom plugin to be able to actually recreate the session
   reauthenticate: AuthClient['reauthenticate'] = async () => {
+    const newSession = await this.getSession();
+
+    if (newSession.error || !newSession.data.session) {
+      return {
+        data: { user: null, session: null },
+        error: new AuthError('No session found', 401, 'session_not_found'),
+      };
+    }
+
     return {
-      data: { user: null, session: null },
-      error: new AuthError(
-        'Better Auth does not support nonce-based reauthentication. For password changes, use the password reset flow (resetPasswordForEmail) or access Better Auth directly.',
-        400,
-        'feature_not_supported'
-      ),
+      data: {
+        user: newSession.data.session?.user || null,
+        session: newSession.data.session,
+      },
+      error: null,
     };
   };
 
@@ -1065,14 +1200,28 @@ export class BetterAuthAdapter implements AuthClient {
       }
 
       if ('phone' in credentials) {
-        return {
-          data: { user: null, session: null },
-          error: new AuthError(
-            'Phone OTP resend not supported',
-            501,
-            'phone_provider_disabled'
-          ),
-        };
+        const { phone, type } = credentials;
+
+        if (type === 'sms' || type === 'phone_change') {
+          const result = await this.betterAuth.phoneNumber.sendOtp({
+            phoneNumber: phone,
+          });
+
+          if (result?.error) {
+            return {
+              data: { user: null, session: null },
+              error: normalizeBetterAuthError(result.error),
+            };
+          }
+
+          const messageId =
+            type === 'sms' ? 'sms-otp-sent' : 'phone-change-otp-sent';
+
+          return {
+            data: { messageId: messageId, user: null, session: null },
+            error: null,
+          };
+        }
       }
 
       return {
@@ -1098,12 +1247,6 @@ export class BetterAuthAdapter implements AuthClient {
       const sessionResult = await this.getSession();
 
       if (sessionResult.data.session) {
-        await this.notifyAllSubscribers(
-          'SIGNED_IN',
-          sessionResult.data.session
-        );
-        this.lastSessionState = sessionResult.data.session;
-
         return {
           data: {
             session: sessionResult.data.session,
@@ -1254,14 +1397,21 @@ export class BetterAuthAdapter implements AuthClient {
   //#endregion
 
   //#region PRIVATE HELPERS - Verification
-  private async verifyEmailOtp(
-    params: Extract<Parameters<AuthClient['verifyOtp']>[0], { email: string }>
-  ) {
-    const { token, type } = params;
+  private async verifyEmailOtp(params: VerifyEmailOtpParams) {
+    const { type } = params;
 
-    if (type === 'magiclink' || type === 'email') {
-      const sessionResult = await this.getSession();
-
+    if (type === 'email') {
+      const result = await this.betterAuth.signIn.emailOtp({
+        email: params.email,
+        otp: params.token,
+      });
+      if (result.error) {
+        return {
+          data: { user: null, session: null },
+          error: normalizeBetterAuthError(result.error),
+        };
+      }
+      const sessionResult = await this.getSession({ forceFetch: true });
       if (!sessionResult.data.session) {
         return {
           data: { user: null, session: null },
@@ -1273,9 +1423,6 @@ export class BetterAuthAdapter implements AuthClient {
         };
       }
 
-      await this.notifyAllSubscribers('SIGNED_IN', sessionResult.data.session);
-      this.lastSessionState = sessionResult.data.session;
-
       return {
         data: {
           user: sessionResult.data.session.user,
@@ -1285,9 +1432,48 @@ export class BetterAuthAdapter implements AuthClient {
       };
     }
 
+    if (type === 'magiclink') {
+      const result = await this.betterAuth.magicLink.verify({
+        query: {
+          token: params.token,
+          callbackURL:
+            params.options?.redirectTo ||
+            (globalThis.window === undefined ? '' : globalThis.location.origin),
+        },
+      });
+      if (result?.error) {
+        return {
+          data: { user: null, session: null },
+          error: normalizeBetterAuthError(result.error),
+        };
+      }
+
+      // Get session after magic link verification
+      const sessionResult = await this.getSession({ forceFetch: true });
+      if (!sessionResult.data?.session) {
+        return {
+          data: { user: null, session: null },
+          error: new AuthError(
+            'Failed to retrieve session after magic link verification',
+            500,
+            'unexpected_failure'
+          ),
+        };
+      }
+
+      return {
+        data: {
+          user: sessionResult.data.session?.user || null,
+          session: sessionResult.data.session,
+        },
+        error: null,
+      };
+    }
+
     if (type === 'signup' || type === 'invite') {
-      const result = await this.betterAuth.verifyEmail?.({
-        query: { token },
+      const result = await this.betterAuth.emailOtp.verifyEmail({
+        email: params.email,
+        otp: params.token,
       });
 
       if (result?.error) {
@@ -1297,7 +1483,7 @@ export class BetterAuthAdapter implements AuthClient {
         };
       }
 
-      const sessionResult = await this.getSession();
+      const sessionResult = await this.getSession({ forceFetch: true });
 
       return {
         data: {
@@ -1309,18 +1495,33 @@ export class BetterAuthAdapter implements AuthClient {
     }
 
     if (type === 'recovery') {
+      // First, check if OTP is valid
+      const checkResult = await this.betterAuth.emailOtp.checkVerificationOtp({
+        email: params.email,
+        otp: params.token,
+        type: 'forget-password',
+      });
+
+      if (checkResult.error || !checkResult.data?.success) {
+        return {
+          data: { user: null, session: null },
+          error: normalizeBetterAuthError(checkResult.error),
+        };
+      }
+      // For recovery, user needs to call resetPassword separately
+      // Return success but no session yet
       return {
-        data: {
-          user: null,
-          session: null,
-        },
+        data: { user: null, session: null },
         error: null,
       };
     }
 
     if (type === 'email_change') {
-      const result = await this.betterAuth.verifyEmail?.({
-        query: { token },
+      const result = await this.betterAuth.verifyEmail({
+        query: {
+          token: params.token,
+          callbackURL: params.options?.redirectTo,
+        },
       });
 
       if (result?.error) {
@@ -1330,7 +1531,16 @@ export class BetterAuthAdapter implements AuthClient {
         };
       }
 
-      const sessionResult = await this.getSession();
+      // Get current session
+      const sessionResult = await this.getSession({ forceFetch: true });
+      if (sessionResult.error || !sessionResult.data) {
+        return {
+          data: { user: null, session: null },
+          error:
+            sessionResult.error ||
+            new AuthError('Failed to get session', 500, 'internal_error'),
+        };
+      }
 
       if (sessionResult.data.session) {
         await this.notifyAllSubscribers(
@@ -1342,8 +1552,40 @@ export class BetterAuthAdapter implements AuthClient {
 
       return {
         data: {
-          user: sessionResult.data.session?.user ?? null,
-          session: sessionResult.data.session,
+          user: sessionResult.data?.session?.user || null,
+          session: sessionResult.data?.session || null,
+        },
+        error: null,
+      };
+    }
+
+    if (type === 'invite') {
+      const result = await this.betterAuth.organization.acceptInvitation({
+        invitationId: params.token, // The token is the invitation ID
+      });
+
+      if (result.error) {
+        return {
+          data: { user: null, session: null },
+          error: normalizeBetterAuthError(result.error),
+        };
+      }
+
+      // Get current session
+      const sessionResult = await this.getSession({ forceFetch: true });
+      if (sessionResult.error || !sessionResult.data) {
+        return {
+          data: { user: null, session: null },
+          error:
+            sessionResult.error ||
+            new AuthError('Failed to get session', 500, 'internal_error'),
+        };
+      }
+
+      return {
+        data: {
+          user: sessionResult.data?.session?.user || null,
+          session: sessionResult.data?.session,
         },
         error: null,
       };
@@ -1359,111 +1601,93 @@ export class BetterAuthAdapter implements AuthClient {
     };
   }
 
-  private async verifyPhoneOtp(
-    _params: Extract<Parameters<AuthClient['verifyOtp']>[0], { phone: string }>
-  ) {
-    return {
-      data: { user: null, session: null },
-      error: new AuthError(
-        'Phone OTP verification not supported by Better Auth',
-        501,
-        'phone_provider_disabled'
-      ),
-    };
-  }
+  private async verifyPhoneOtp(params: VerifyMobileOtpParams) {
+    // SMS OTP (phone verification)
+    if (params.type === 'sms') {
+      // Verify phone number with OTP
+      // This creates a session by default
+      const result = await this.betterAuth.phoneNumber.verify({
+        phoneNumber: params.phone,
+        code: params.token,
+        disableSession: false, // Create session after verification
+        updatePhoneNumber: false, // This is a new verification, not an update
+      });
 
-  private async verifyTokenHashOtp(
-    params: Extract<
-      Parameters<AuthClient['verifyOtp']>[0],
-      { token_hash: string }
-    >
-  ) {
-    const { token_hash, type } = params;
+      if (result.error) {
+        return {
+          data: { user: null, session: null },
+          error: normalizeBetterAuthError(result.error),
+        };
+      }
 
-    if (type === 'magiclink' || type === 'email') {
-      const sessionResult = await this.getSession();
+      // Get current session
+      const sessionResult = await this.getSession({ forceFetch: true });
+      if (sessionResult.error || !sessionResult.data) {
+        return {
+          data: { user: null, session: null },
+          error:
+            sessionResult.error ||
+            new AuthError('Failed to get session', 500, 'internal_error'),
+        };
+      }
 
-      if (!sessionResult.data.session) {
+      return {
+        data: {
+          user: sessionResult.data?.session?.user || null,
+          session: sessionResult.data?.session || null,
+        },
+        error: null,
+      };
+    }
+
+    if (params.type === 'phone_change') {
+      // Check if user is authenticated
+      const currentSession = await this.betterAuth.getSession();
+      if (currentSession.error || !currentSession.data?.session) {
         return {
           data: { user: null, session: null },
           error: new AuthError(
-            'Failed to retrieve session after token hash verification',
-            500,
-            'unexpected_failure'
+            'You must be signed in to change your phone number',
+            401,
+            'session_not_found'
           ),
         };
       }
 
-      await this.notifyAllSubscribers('SIGNED_IN', sessionResult.data.session);
-      this.lastSessionState = sessionResult.data.session;
-
-      return {
-        data: {
-          user: sessionResult.data.session.user,
-          session: sessionResult.data.session,
-        },
-        error: null,
-      };
-    }
-
-    if (type === 'signup' || type === 'invite') {
-      const result = await this.betterAuth.verifyEmail?.({
-        query: { token: token_hash },
+      // Verify phone number and update it
+      const result = await this.betterAuth.phoneNumber.verify({
+        phoneNumber: params.phone,
+        code: params.token,
+        disableSession: false,
+        updatePhoneNumber: true, // This updates the user's phone number
       });
 
-      if (result?.error) {
+      if (result.error) {
         return {
           data: { user: null, session: null },
           error: normalizeBetterAuthError(result.error),
         };
       }
 
-      const sessionResult = await this.getSession();
+      // Get updated session with new phone number
+      const sessionResult = await this.getSession({ forceFetch: true });
 
-      return {
-        data: {
-          user: sessionResult.data.session?.user ?? null,
-          session: sessionResult.data.session,
-        },
-        error: null,
-      };
-    }
-
-    if (type === 'recovery') {
-      return {
-        data: {
-          user: null,
-          session: null,
-        },
-        error: null,
-      };
-    }
-
-    if (type === 'email_change') {
-      const result = await this.betterAuth.verifyEmail?.({
-        query: { token: token_hash },
-      });
-
-      if (result?.error) {
+      if (sessionResult.error || !sessionResult.data) {
         return {
           data: { user: null, session: null },
-          error: normalizeBetterAuthError(result.error),
+          error:
+            sessionResult.error ||
+            new AuthError(
+              'Failed to get updated session',
+              500,
+              'internal_error'
+            ),
         };
       }
 
-      const sessionResult = await this.getSession();
-
-      if (sessionResult.data.session) {
-        await this.notifyAllSubscribers(
-          'USER_UPDATED',
-          sessionResult.data.session
-        );
-        this.lastSessionState = sessionResult.data.session;
-      }
-
       return {
         data: {
-          user: sessionResult.data.session?.user ?? null,
+          user: sessionResult.data.session?.user || null,
           session: sessionResult.data.session,
         },
         error: null,
@@ -1473,12 +1697,13 @@ export class BetterAuthAdapter implements AuthClient {
     return {
       data: { user: null, session: null },
       error: new AuthError(
-        `Unsupported token hash OTP type: ${type}`,
+        `Unsupported phone OTP type: ${params.type}`,
         400,
         'validation_failed'
       ),
     };
   }
+
   //#endregion
 
   //#region PRIVATE HELPERS - Event System
