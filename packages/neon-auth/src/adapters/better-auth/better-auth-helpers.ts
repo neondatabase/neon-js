@@ -9,8 +9,8 @@ import type { Session, User, UserIdentity } from '@supabase/auth-js';
 import { toISOString } from '../shared-helpers';
 import { DEFAULT_SESSION_EXPIRY_MS } from './constants';
 import type { accountInfo, listUserAccounts } from 'better-auth/api';
-import { AuthErrorCode, getErrorDefinition } from './error-codes';
-import { BETTER_AUTH_ERROR_MAP } from './better-auth-error-codes';
+import { AuthErrorCode, getErrorDefinition } from './errors/definitions';
+import { BETTER_AUTH_ERROR_MAP } from './errors/mappings';
 
 /**
  * Normalize Better Auth errors to Supabase-compatible AuthError format

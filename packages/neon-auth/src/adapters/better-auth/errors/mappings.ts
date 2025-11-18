@@ -1,4 +1,4 @@
-import { AuthErrorCode } from './error-codes';
+import { AuthErrorCode } from './definitions';
 
 /**
  * Maps Better Auth error codes to AuthErrorCode

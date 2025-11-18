@@ -20,7 +20,7 @@ import {
   supportsBroadcastChannel,
   mapBetterAuthUserIdentityToSupabase,
 } from './better-auth-helpers';
-import { AuthErrorCode, createAuthError } from './error-codes';
+import { AuthErrorCode, createAuthError } from './errors/definitions';
 import {
   jwtClient,
   adminClient,
