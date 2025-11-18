@@ -9,14 +9,26 @@ import type { Session, User, UserIdentity } from '@supabase/auth-js';
 import { toISOString } from '../shared-helpers';
 import { DEFAULT_SESSION_EXPIRY_MS } from './constants';
 import type { accountInfo, listUserAccounts } from 'better-auth/api';
+import { AuthErrorCode, getErrorDefinition } from './error-codes';
+import { BETTER_AUTH_ERROR_MAP } from './better-auth-error-codes';
 
 /**
- * Map Better Auth errors to Supabase error format
+ * Normalize Better Auth errors to Supabase-compatible AuthError format
+ *
+ * Handles three error formats:
+ * 1. BetterFetchError: { status, statusText, message?, code? }
+ * 2. BetterAuthErrorResponse: { status, statusText, message?, code? }
+ * 3. Standard Error: { message, name, stack }
+ *
+ * Maps Better Auth errors to appropriate AuthError/AuthApiError with:
+ * - Correct HTTP status codes
+ * - Supabase-compatible error codes (snake_case)
+ * - User-friendly, security-conscious messages
  */
 export function normalizeBetterAuthError(
   error: BetterFetchError | BetterAuthErrorResponse | Error | unknown
 ): AuthError {
-  // Handle BetterFetchError format: { message?, status, statusText }
+  // Handle Better Auth error format: { message?, status, statusText, code? }
   if (
     error !== null &&
     error !== undefined &&
@@ -25,135 +37,265 @@ export function normalizeBetterAuthError(
     'statusText' in error
   ) {
     const betterError = error as BetterFetchError | BetterAuthErrorResponse;
-    const message =
-      betterError.message || betterError.statusText || 'Authentication failed';
     const status = betterError.status;
-    let code = 'unknown_error';
 
-    // Map HTTP status codes to Supabase error codes
-    switch (status) {
-      case 401: {
-        code = 'bad_jwt';
-
-        break;
-      }
-      case 404: {
-        code = 'user_not_found';
-
-        break;
-      }
-      case 422: {
-        code = 'user_already_exists';
-
-        break;
-      }
-      case 429: {
-        code = 'over_request_rate_limit';
-
-        break;
-      }
-      case 500: {
-        code = 'unexpected_failure';
-
-        break;
-      }
-      default: {
-        // Fall back to message-based detection
-        const lowerMessage = message.toLowerCase();
-        if (
-          lowerMessage.includes('invalid login') ||
-          lowerMessage.includes('incorrect') ||
-          lowerMessage.includes('wrong password')
-        ) {
-          code = 'invalid_credentials';
-        } else if (
-          lowerMessage.includes('already exists') ||
-          lowerMessage.includes('already registered')
-        ) {
-          code = 'user_already_exists';
-        } else if (lowerMessage.includes('not found')) {
-          code = 'user_not_found';
-        } else if (
-          lowerMessage.includes('token') &&
-          (lowerMessage.includes('invalid') || lowerMessage.includes('expired'))
-        ) {
-          code = 'bad_jwt';
-        } else if (
-          lowerMessage.includes('rate limit') ||
-          lowerMessage.includes('too many requests')
-        ) {
-          code = 'over_request_rate_limit';
-        } else if (
-          lowerMessage.includes('email') &&
-          lowerMessage.includes('invalid')
-        ) {
-          code = 'email_address_invalid';
-        }
+    // Try to map Better Auth error code first (most specific)
+    if (
+      'code' in betterError &&
+      betterError.code &&
+      typeof betterError.code === 'string'
+    ) {
+      const mappedCode = BETTER_AUTH_ERROR_MAP[betterError.code];
+      if (mappedCode) {
+        const def = getErrorDefinition(mappedCode);
+        return createNormalizedError(def.message, def.status, def.code, status);
       }
     }
 
-    // Use AuthApiError for API-related errors (non-500 status)
-    if (status !== 500) {
-      return new AuthApiError(message, status, code);
-    }
-    return new AuthError(message, status, code);
+    // Map by HTTP status code (fallback)
+    const mappedCode = mapStatusCodeToErrorCode(
+      status,
+      betterError.message || betterError.statusText
+    );
+    const def = getErrorDefinition(mappedCode);
+
+    // Use Better Auth's message if provided, otherwise use our default
+    const message = betterError.message || def.message;
+
+    return createNormalizedError(message, status, def.code, status);
   }
 
   // Handle standard Error objects
   if (error instanceof Error) {
-    const message = error.message;
-    let status = 500;
-    let code = 'unexpected_failure';
+    const mappedCode = mapMessageToErrorCode(error.message);
+    const def = getErrorDefinition(mappedCode);
 
-    const lowerMessage = message.toLowerCase();
-    if (
-      lowerMessage.includes('already exists') ||
-      lowerMessage.includes('already registered')
-    ) {
-      status = 422;
-      code = 'user_already_exists';
-    } else if (
-      lowerMessage.includes('invalid login') ||
-      lowerMessage.includes('incorrect')
-    ) {
-      status = 400;
-      code = 'invalid_credentials';
-    } else if (lowerMessage.includes('not found')) {
-      status = 404;
-      code = 'user_not_found';
-    } else if (
-      lowerMessage.includes('token') &&
-      (lowerMessage.includes('invalid') || lowerMessage.includes('expired'))
-    ) {
-      status = 401;
-      code = 'bad_jwt';
-    } else if (
-      lowerMessage.includes('rate limit') ||
-      lowerMessage.includes('too many requests')
-    ) {
-      status = 429;
-      code = 'over_request_rate_limit';
-    } else if (
-      lowerMessage.includes('email') &&
-      lowerMessage.includes('invalid')
-    ) {
-      status = 400;
-      code = 'email_address_invalid';
-    }
-
-    // Use AuthApiError for API-related errors (non-500 status)
-    if (status !== 500) {
-      return new AuthApiError(message, status, code);
-    }
-    return new AuthError(message, status, code);
+    return createNormalizedError(
+      error.message || def.message,
+      def.status,
+      def.code,
+      def.status
+    );
   }
 
-  // Fallback
-  return new AuthError(
-    'An unexpected error occurred',
-    500,
-    'unexpected_failure'
-  );
+  // Fallback for unknown error types
+  const def = getErrorDefinition(AuthErrorCode.UnknownError);
+  return new AuthError(def.message, def.status, def.code);
+}
+
+/**
+ * Map HTTP status code to AuthErrorCode
+ * Uses message content for disambiguation when status code is ambiguous
+ */
+function mapStatusCodeToErrorCode(
+  status: number,
+  message?: string
+): AuthErrorCode {
+  const lowerMessage = message?.toLowerCase() || '';
+
+  // Specific mappings based on status code + message content
+  switch (status) {
+    case 401: {
+      if (lowerMessage.includes('token') || lowerMessage.includes('jwt')) {
+        return AuthErrorCode.BadJwt;
+      }
+      if (lowerMessage.includes('session')) {
+        return AuthErrorCode.SessionNotFound;
+      }
+      if (lowerMessage.includes('expired')) {
+        return AuthErrorCode.SessionExpired;
+      }
+      return AuthErrorCode.InvalidCredentials;
+    }
+
+    case 404: {
+      if (
+        lowerMessage.includes('identity') ||
+        lowerMessage.includes('account')
+      ) {
+        return AuthErrorCode.IdentityNotFound;
+      }
+      if (lowerMessage.includes('session')) {
+        return AuthErrorCode.SessionNotFound;
+      }
+      return AuthErrorCode.UserNotFound;
+    }
+
+    case 409: {
+      if (lowerMessage.includes('email')) {
+        return AuthErrorCode.EmailExists;
+      }
+      if (lowerMessage.includes('phone')) {
+        return AuthErrorCode.PhoneExists;
+      }
+      return AuthErrorCode.UserAlreadyExists;
+    }
+
+    case 422: {
+      if (lowerMessage.includes('email') && lowerMessage.includes('confirm')) {
+        return AuthErrorCode.EmailNotConfirmed;
+      }
+      if (lowerMessage.includes('phone') && lowerMessage.includes('confirm')) {
+        return AuthErrorCode.PhoneNotConfirmed;
+      }
+      return AuthErrorCode.ValidationFailed;
+    }
+
+    case 429: {
+      if (lowerMessage.includes('email')) {
+        return AuthErrorCode.OverEmailSendRateLimit;
+      }
+      if (lowerMessage.includes('sms') || lowerMessage.includes('phone')) {
+        return AuthErrorCode.OverSmsSendRateLimit;
+      }
+      return AuthErrorCode.OverRequestRateLimit;
+    }
+
+    case 400: {
+      if (lowerMessage.includes('password') && lowerMessage.includes('weak')) {
+        return AuthErrorCode.WeakPassword;
+      }
+      if (lowerMessage.includes('email') && lowerMessage.includes('invalid')) {
+        return AuthErrorCode.EmailAddressInvalid;
+      }
+      if (lowerMessage.includes('json')) {
+        return AuthErrorCode.BadJson;
+      }
+      if (lowerMessage.includes('oauth') || lowerMessage.includes('callback')) {
+        return AuthErrorCode.BadOAuthCallback;
+      }
+      return AuthErrorCode.ValidationFailed;
+    }
+
+    case 403: {
+      if (lowerMessage.includes('provider') || lowerMessage.includes('oauth')) {
+        return AuthErrorCode.OAuthProviderNotSupported;
+      }
+      if (lowerMessage.includes('phone')) {
+        return AuthErrorCode.PhoneProviderDisabled;
+      }
+      if (lowerMessage.includes('sso')) {
+        return AuthErrorCode.SsoProviderDisabled;
+      }
+      return AuthErrorCode.FeatureNotSupported;
+    }
+
+    case 501: {
+      return AuthErrorCode.NotImplemented;
+    }
+
+    case 503: {
+      return AuthErrorCode.FeatureNotSupported;
+    }
+
+    default: {
+      if (lowerMessage.includes('oauth')) {
+        return AuthErrorCode.OAuthCallbackFailed;
+      }
+      return AuthErrorCode.UnexpectedFailure;
+    }
+  }
+}
+
+/**
+ * Map error message content to AuthErrorCode
+ * Used as fallback when status code is not available
+ */
+function mapMessageToErrorCode(message: string): AuthErrorCode {
+  const lower = message.toLowerCase();
+
+  // Authentication
+  if (
+    lower.includes('invalid login') ||
+    lower.includes('incorrect') ||
+    lower.includes('wrong password')
+  ) {
+    return AuthErrorCode.InvalidCredentials;
+  }
+  if (
+    lower.includes('token') &&
+    (lower.includes('invalid') || lower.includes('expired'))
+  ) {
+    return AuthErrorCode.BadJwt;
+  }
+  if (lower.includes('session') && lower.includes('expired')) {
+    return AuthErrorCode.SessionExpired;
+  }
+  if (lower.includes('session') && lower.includes('not found')) {
+    return AuthErrorCode.SessionNotFound;
+  }
+
+  // User management
+  if (
+    lower.includes('already exists') ||
+    lower.includes('already registered')
+  ) {
+    return AuthErrorCode.UserAlreadyExists;
+  }
+  if (lower.includes('not found') && lower.includes('user')) {
+    return AuthErrorCode.UserNotFound;
+  }
+  if (lower.includes('not found') && lower.includes('identity')) {
+    return AuthErrorCode.IdentityNotFound;
+  }
+
+  // Verification
+  if (lower.includes('email') && lower.includes('not confirmed')) {
+    return AuthErrorCode.EmailNotConfirmed;
+  }
+  if (lower.includes('phone') && lower.includes('not confirmed')) {
+    return AuthErrorCode.PhoneNotConfirmed;
+  }
+
+  // Validation
+  if (
+    lower.includes('weak password') ||
+    (lower.includes('password') && lower.includes('requirements'))
+  ) {
+    return AuthErrorCode.WeakPassword;
+  }
+  if (lower.includes('email') && lower.includes('invalid')) {
+    return AuthErrorCode.EmailAddressInvalid;
+  }
+
+  // Rate limiting
+  if (lower.includes('rate limit') || lower.includes('too many requests')) {
+    return AuthErrorCode.OverRequestRateLimit;
+  }
+
+  // OAuth
+  if (lower.includes('oauth') && lower.includes('failed')) {
+    return AuthErrorCode.OAuthCallbackFailed;
+  }
+  if (lower.includes('provider') && lower.includes('not supported')) {
+    return AuthErrorCode.OAuthProviderNotSupported;
+  }
+
+  // Default
+  return AuthErrorCode.UnexpectedFailure;
+}
+
+/**
+ * Create normalized error with correct type (AuthError vs AuthApiError)
+ * Uses AuthApiError for non-500 status codes (API/client errors)
+ * Uses AuthError for 500 status codes (server errors)
+ */
+function createNormalizedError(
+  message: string,
+  targetStatus: number,
+  code: string,
+  _originalStatus: number
+): AuthError {
+  // Use target status from error definition unless we want to preserve original
+  const status = targetStatus;
+
+  // Use AuthApiError for non-500 errors (client/API errors)
+  if (status !== 500 && status !== 501 && status !== 503) {
+    return new AuthApiError(message, status, code);
+  }
+
+  // Use AuthError for server errors
+  return new AuthError(message, status, code);
 }
 
 /**

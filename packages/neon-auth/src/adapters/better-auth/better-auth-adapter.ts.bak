@@ -1,4 +1,4 @@
-import { type AuthClient } from '../../auth-interface';
+import { AuthError, type AuthClient } from '../../auth-interface';
 import type {
   Session,
   AuthChangeEvent,
@@ -20,7 +20,11 @@ import {
   supportsBroadcastChannel,
   mapBetterAuthUserIdentityToSupabase,
 } from './better-auth-helpers';
-import { AuthErrorCode, createAuthError } from './error-codes';
+import {
+  AuthErrorCode,
+  createAuthError,
+  toAuthErrorTuple,
+} from './error-codes';
 import {
   jwtClient,
   adminClient,
@@ -220,12 +224,10 @@ export class BetterAuthAdapter implements AuthClient {
         }
 
         if (!response.data?.session || !response.data?.user) {
+          const err = createAuthError(AuthErrorCode.SessionNotFound, 'Failed to get session data from response');
           return {
             data: { session: null },
-            error: createAuthError(
-              AuthErrorCode.SessionNotFound,
-              'Failed to get session data from response'
-            ),
+            error: new AuthError(err.message, err.status, err.code),
           };
         }
 
@@ -234,22 +236,18 @@ export class BetterAuthAdapter implements AuthClient {
           response.data.user
         );
         if (!session) {
+          const err = createAuthError(AuthErrorCode.InternalError, 'Failed to map session data');
           return {
             data: { session: null },
-            error: createAuthError(
-              AuthErrorCode.InternalError,
-              'Failed to map session data'
-            ),
+            error: new AuthError(err.message, err.status, err.code),
           };
         }
 
         if (!headerJwt) {
+          const err = createAuthError(AuthErrorCode.InternalError, 'Failed to get JWT token from response header. Please check if the server is configured correctly.');
           return {
             data: { session: null },
-            error: createAuthError(
-              AuthErrorCode.InternalError,
-              'Failed to get JWT token from response header. Please check if the server is configured correctly.'
-            ),
+            error: new AuthError(err.message, err.status, err.code),
           };
         }
 
@@ -295,12 +293,10 @@ export class BetterAuthAdapter implements AuthClient {
 
   // TODO: we need to implement a custom plugin to allow setting external sessions
   setSession: AuthClient['setSession'] = async () => {
+    const err = createAuthError(AuthErrorCode.NotImplemented, 'Setting external sessions is not supported by Better Auth');
     return {
       data: { user: null, session: null },
-      error: createAuthError(
-        AuthErrorCode.NotImplemented,
-        'Setting external sessions is not supported by Better Auth'
-      ),
+      error: new AuthError(err.message, err.status, err.code),
     };
   };
 
@@ -386,10 +382,7 @@ export class BetterAuthAdapter implements AuthClient {
         if (!sessionResult.data.session?.user) {
           return {
             data: { user: null, session: null },
-            error: createAuthError(
-              AuthErrorCode.SessionNotFound,
-              'Failed to retrieve user session'
-            ),
+            error: new AuthError(...toAuthErrorTuple(createAuthError(AuthErrorCode.SessionNotFound, 'Failed to retrieve user session'))),
           };
         }
 
@@ -403,18 +396,12 @@ export class BetterAuthAdapter implements AuthClient {
         // TODO: we would need to add the phone-number plugin
         return {
           data: { user: null, session: null },
-          error: createAuthError(
-            AuthErrorCode.PhoneProviderDisabled,
-            'Phone sign-up not supported'
-          ),
+          error: new AuthError(...toAuthErrorTuple(createAuthError(AuthErrorCode.PhoneProviderDisabled, 'Phone sign-up not supported'))),
         };
       } else {
         return {
           data: { user: null, session: null },
-          error: createAuthError(
-            AuthErrorCode.ValidationFailed,
-            'Invalid credentials format'
-          ),
+          error: new AuthError(...toAuthErrorTuple(createAuthError(AuthErrorCode.ValidationFailed, 'Invalid credentials format'))),
         };
       }
     } catch (error) {
@@ -429,10 +416,7 @@ export class BetterAuthAdapter implements AuthClient {
   signInAnonymously: AuthClient['signInAnonymously'] = async () => {
     return {
       data: { user: null, session: null },
-      error: createAuthError(
-        AuthErrorCode.AnonymousProviderDisabled,
-        'Anonymous sign-in is not supported by Better Auth'
-      ),
+      error: new AuthError(...toAuthErrorTuple(createAuthError(AuthErrorCode.AnonymousProviderDisabled, 'Anonymous sign-in is not supported by Better Auth'))),
     };
   };
 
@@ -459,10 +443,7 @@ export class BetterAuthAdapter implements AuthClient {
         if (!sessionResult.data.session?.user) {
           return {
             data: { user: null, session: null },
-            error: createAuthError(
-              AuthErrorCode.SessionNotFound,
-              'Failed to retrieve user session'
-            ),
+            error: new AuthError(...toAuthErrorTuple(createAuthError(AuthErrorCode.SessionNotFound, 'Failed to retrieve user session'))),
           };
         }
 
@@ -476,18 +457,12 @@ export class BetterAuthAdapter implements AuthClient {
         // TODO: we would need to add the phone-number plugin
         return {
           data: { user: null, session: null },
-          error: createAuthError(
-            AuthErrorCode.PhoneProviderDisabled,
-            'Phone sign-in not supported'
-          ),
+          error: new AuthError(...toAuthErrorTuple(createAuthError(AuthErrorCode.PhoneProviderDisabled, 'Phone sign-in not supported'))),
         };
       } else {
         return {
           data: { user: null, session: null },
-          error: createAuthError(
-            AuthErrorCode.ValidationFailed,
-            'Invalid credentials format'
-          ),
+          error: new AuthError(...toAuthErrorTuple(createAuthError(AuthErrorCode.ValidationFailed, 'Invalid credentials format'))),
         };
       }
     } catch (error) {
@@ -541,9 +516,8 @@ export class BetterAuthAdapter implements AuthClient {
     try {
       return {
         data: { user: null, session: null },
-        error: createAuthError(
-          AuthErrorCode.NotImplemented,
-          'Email OTP is still missing the plugin in the server adapter for Neon Auth'
+        error: new AuthError(
+          ...createAuthError(AuthErrorCode.NotImplemented, 'Email OTP is still missing the plugin in the server adapter for Neon Auth')
         ),
       };
     } catch (error) {
@@ -575,9 +549,8 @@ export class BetterAuthAdapter implements AuthClient {
       if (!('user' in result.data) || !result.data.user) {
         return {
           data: { user: null, session: null },
-          error: createAuthError(
-            AuthErrorCode.OAuthCallbackFailed,
-            'Failed to sign in with ID token'
+          error: new AuthError(
+            ...createAuthError(AuthErrorCode.OAuthCallbackFailed, 'Failed to sign in with ID token')
           ),
         };
       }
@@ -588,10 +561,7 @@ export class BetterAuthAdapter implements AuthClient {
           data: { user: null, session: null },
           error:
             session.error ||
-            createAuthError(
-              AuthErrorCode.SessionNotFound,
-              'Failed to get session'
-            ),
+            new AuthError(...createAuthError(AuthErrorCode.SessionNotFound, 'Failed to get session')),
         };
       }
 
@@ -619,10 +589,7 @@ export class BetterAuthAdapter implements AuthClient {
 
     return {
       data: null,
-      error: createAuthError(
-        AuthErrorCode.SsoProviderDisabled,
-        `Better Auth does not support enterprise SAML SSO. Attempted with ${attemptedWith}. Use signInWithOAuth() for OAuth providers instead.`
-      ),
+      error: new AuthError(...toAuthErrorTuple(createAuthError(AuthErrorCode.SsoProviderDisabled, `Better Auth does not support enterprise SAML SSO. Attempted with ${attemptedWith}. Use signInWithOAuth() for OAuth providers instead.`))),
     };
   };
 
@@ -635,10 +602,7 @@ export class BetterAuthAdapter implements AuthClient {
         user: null,
         session: null,
       },
-      error: createAuthError(
-        AuthErrorCode.Web3ProviderDisabled,
-        `Better Auth does not support Web3 authentication. Attempted with chain: ${attemptedChain}. Supported: OAuth, email/password, magic link.`
-      ),
+      error: new AuthError(...toAuthErrorTuple(createAuthError(AuthErrorCode.Web3ProviderDisabled, `Better Auth does not support Web3 authentication. Attempted with chain: ${attemptedChain}. Supported: OAuth, email/password, magic link.`))),
     };
   };
 
@@ -676,10 +640,7 @@ export class BetterAuthAdapter implements AuthClient {
           data: { user: null },
           error:
             sessionResult.error ||
-            createAuthError(
-              AuthErrorCode.SessionNotFound,
-              'No user session found'
-            ),
+            new AuthError(...createAuthError(AuthErrorCode.SessionNotFound, 'No user session found')),
         };
       }
 
@@ -711,10 +672,7 @@ export class BetterAuthAdapter implements AuthClient {
             data: null,
             error:
               sessionResult.error ||
-              createAuthError(
-                AuthErrorCode.SessionNotFound,
-                'No user session found'
-              ),
+              new AuthError(...createAuthError(AuthErrorCode.SessionNotFound, 'No user session found')),
           };
         }
 
@@ -724,9 +682,8 @@ export class BetterAuthAdapter implements AuthClient {
       if (!jwt) {
         return {
           data: null,
-          error: createAuthError(
-            AuthErrorCode.SessionNotFound,
-            'No access token found'
+          error: new AuthError(
+            ...createAuthError(AuthErrorCode.SessionNotFound, 'No access token found')
           ),
         };
       }
@@ -736,7 +693,7 @@ export class BetterAuthAdapter implements AuthClient {
       if (tokenParts.length !== 3) {
         return {
           data: null,
-          error: createAuthError(AuthErrorCode.BadJwt, 'Invalid token format'),
+          error: new AuthError(...createAuthError(AuthErrorCode.BadJwt, 'Invalid token format')),
         };
       }
 
@@ -777,9 +734,8 @@ export class BetterAuthAdapter implements AuthClient {
       if (attributes.password) {
         return {
           data: { user: null },
-          error: createAuthError(
-            AuthErrorCode.FeatureNotSupported,
-            'The password cannot be updated through the updateUser method, use the changePassword method instead.'
+          error: new AuthError(
+            ...createAuthError(AuthErrorCode.FeatureNotSupported, 'The password cannot be updated through the updateUser method, use the changePassword method instead.')
           ),
         };
       }
@@ -787,9 +743,9 @@ export class BetterAuthAdapter implements AuthClient {
       if (attributes.email) {
         return {
           data: { user: null },
-          error: createAuthError(
-            AuthErrorCode.FeatureNotSupported,
-            'The email cannot be updated through the updateUser method, use the changeEmail method instead.'
+          error: new AuthError(
+            // TODO: check the changeEmail method in the better-auth docs
+            ...createAuthError(AuthErrorCode.FeatureNotSupported, 'The email cannot be updated through the updateUser method, use the changeEmail method instead.')
           ),
         };
       }
@@ -801,10 +757,7 @@ export class BetterAuthAdapter implements AuthClient {
       if (result.data?.status) {
         return {
           data: { user: null },
-          error: createAuthError(
-            AuthErrorCode.InternalError,
-            'Failed to update user'
-          ),
+          error: new AuthError(...createAuthError(AuthErrorCode.InternalError, 'Failed to update user')),
         };
       }
 
@@ -841,10 +794,7 @@ export class BetterAuthAdapter implements AuthClient {
           data: null,
           error:
             sessionResult.error ||
-            createAuthError(
-              AuthErrorCode.SessionNotFound,
-              'No user session found'
-            ),
+            new AuthError(...createAuthError(AuthErrorCode.SessionNotFound, 'No user session found')),
         };
       }
 
@@ -856,9 +806,8 @@ export class BetterAuthAdapter implements AuthClient {
           if (!result) {
             return {
               data: null,
-              error: createAuthError(
-                AuthErrorCode.InternalError,
-                'Failed to list accounts'
+              error: new AuthError(
+                ...createAuthError(AuthErrorCode.InternalError, 'Failed to list accounts')
               ),
             };
           }
@@ -918,10 +867,7 @@ export class BetterAuthAdapter implements AuthClient {
           data: { provider, url: null, user: null, session: null },
           error:
             sessionResult.error ||
-            createAuthError(
-              AuthErrorCode.SessionNotFound,
-              'No user session found'
-            ),
+            new AuthError(...createAuthError(AuthErrorCode.SessionNotFound, 'No user session found')),
         };
       }
 
@@ -1003,10 +949,7 @@ export class BetterAuthAdapter implements AuthClient {
           data: null,
           error:
             sessionResult.error ||
-            createAuthError(
-              AuthErrorCode.SessionNotFound,
-              'No user session found'
-            ),
+            new AuthError(...createAuthError(AuthErrorCode.SessionNotFound, 'No user session found')),
         };
       }
 
@@ -1016,10 +959,7 @@ export class BetterAuthAdapter implements AuthClient {
           data: null,
           error:
             identities.error ||
-            createAuthError(
-              AuthErrorCode.InternalError,
-              'Failed to fetch identities'
-            ),
+            new AuthError(...createAuthError(AuthErrorCode.InternalError, 'Failed to fetch identities')),
         };
       }
 
@@ -1030,10 +970,7 @@ export class BetterAuthAdapter implements AuthClient {
       if (!targetIdentity) {
         return {
           data: null,
-          error: createAuthError(
-            AuthErrorCode.IdentityNotFound,
-            'Identity not found'
-          ),
+          error: new AuthError(...createAuthError(AuthErrorCode.IdentityNotFound, 'Identity not found')),
         };
       }
 
@@ -1092,17 +1029,15 @@ export class BetterAuthAdapter implements AuthClient {
         // TODO: this will fail, we need handlers for this in this code
         return {
           data: { user: null, session: null },
-          error: createAuthError(
-            AuthErrorCode.FeatureNotSupported,
-            'Token hash verification not supported'
+          error: new AuthError(
+            ...createAuthError(AuthErrorCode.FeatureNotSupported, 'Token hash verification not supported')
           ),
         };
       }
       return {
         data: { user: null, session: null },
-        error: createAuthError(
-          AuthErrorCode.ValidationFailed,
-          'Invalid OTP verification parameters'
+        error: new AuthError(
+          ...createAuthError(AuthErrorCode.ValidationFailed, 'Invalid OTP verification parameters')
         ),
       };
     } catch (error) {
@@ -1154,10 +1089,7 @@ export class BetterAuthAdapter implements AuthClient {
     if (newSession.error || !newSession.data.session) {
       return {
         data: { user: null, session: null },
-        error: createAuthError(
-          AuthErrorCode.SessionNotFound,
-          'No session found'
-        ),
+        error: new AuthError(...createAuthError(AuthErrorCode.SessionNotFound, 'No session found')),
       };
     }
 
@@ -1200,9 +1132,8 @@ export class BetterAuthAdapter implements AuthClient {
 
         return {
           data: { user: null, session: null },
-          error: createAuthError(
-            AuthErrorCode.ValidationFailed,
-            `Unsupported resend type: ${type}`
+          error: new AuthError(
+            ...createAuthError(AuthErrorCode.ValidationFailed, `Unsupported resend type: ${type}`)
           ),
         };
       }
@@ -1234,9 +1165,8 @@ export class BetterAuthAdapter implements AuthClient {
 
       return {
         data: { user: null, session: null },
-        error: createAuthError(
-          AuthErrorCode.ValidationFailed,
-          'Invalid credentials format'
+        error: new AuthError(
+          ...createAuthError(AuthErrorCode.ValidationFailed, 'Invalid credentials format')
         ),
       };
     } catch (error) {
@@ -1265,9 +1195,8 @@ export class BetterAuthAdapter implements AuthClient {
 
       return {
         data: { session: null, user: null },
-        error: createAuthError(
-          AuthErrorCode.OAuthCallbackFailed,
-          'OAuth callback completed but no session was created. Make sure the OAuth callback has been processed.'
+        error: new AuthError(
+          ...createAuthError(AuthErrorCode.OAuthCallbackFailed, 'OAuth callback completed but no session was created. Make sure the OAuth callback has been processed.')
         ),
       };
     } catch (error) {
@@ -1421,9 +1350,8 @@ export class BetterAuthAdapter implements AuthClient {
       if (!sessionResult.data.session) {
         return {
           data: { user: null, session: null },
-          error: createAuthError(
-            AuthErrorCode.SessionNotFound,
-            'Failed to retrieve session after OTP verification. Make sure the magic link callback has been processed.'
+          error: new AuthError(
+            ...createAuthError(AuthErrorCode.SessionNotFound, 'Failed to retrieve session after OTP verification. Make sure the magic link callback has been processed.')
           ),
         };
       }
@@ -1458,9 +1386,8 @@ export class BetterAuthAdapter implements AuthClient {
       if (!sessionResult.data?.session) {
         return {
           data: { user: null, session: null },
-          error: createAuthError(
-            AuthErrorCode.SessionNotFound,
-            'Failed to retrieve session after magic link verification'
+          error: new AuthError(
+            ...createAuthError(AuthErrorCode.SessionNotFound, 'Failed to retrieve session after magic link verification')
           ),
         };
       }
@@ -1542,10 +1469,7 @@ export class BetterAuthAdapter implements AuthClient {
           data: { user: null, session: null },
           error:
             sessionResult.error ||
-            createAuthError(
-              AuthErrorCode.InternalError,
-              'Failed to get session'
-            ),
+            new AuthError(...createAuthError(AuthErrorCode.InternalError, 'Failed to get session')),
         };
       }
 
@@ -1585,10 +1509,7 @@ export class BetterAuthAdapter implements AuthClient {
           data: { user: null, session: null },
           error:
             sessionResult.error ||
-            createAuthError(
-              AuthErrorCode.InternalError,
-              'Failed to get session'
-            ),
+            new AuthError(...createAuthError(AuthErrorCode.InternalError, 'Failed to get session')),
         };
       }
 
@@ -1603,9 +1524,8 @@ export class BetterAuthAdapter implements AuthClient {
 
     return {
       data: { user: null, session: null },
-      error: createAuthError(
-        AuthErrorCode.ValidationFailed,
-        `Unsupported email OTP type: ${type}`
+      error: new AuthError(
+        ...createAuthError(AuthErrorCode.ValidationFailed, `Unsupported email OTP type: ${type}`)
       ),
     };
   }
@@ -1636,10 +1556,7 @@ export class BetterAuthAdapter implements AuthClient {
           data: { user: null, session: null },
           error:
             sessionResult.error ||
-            createAuthError(
-              AuthErrorCode.InternalError,
-              'Failed to get session'
-            ),
+            new AuthError(...createAuthError(AuthErrorCode.InternalError, 'Failed to get session')),
         };
       }
 
@@ -1658,9 +1575,8 @@ export class BetterAuthAdapter implements AuthClient {
       if (currentSession.error || !currentSession.data?.session) {
         return {
           data: { user: null, session: null },
-          error: createAuthError(
-            AuthErrorCode.SessionNotFound,
-            'You must be signed in to change your phone number'
+          error: new AuthError(
+            ...createAuthError(AuthErrorCode.SessionNotFound, 'You must be signed in to change your phone number')
           ),
         };
       }
@@ -1688,9 +1604,8 @@ export class BetterAuthAdapter implements AuthClient {
           data: { user: null, session: null },
           error:
             sessionResult.error ||
-            createAuthError(
-              AuthErrorCode.InternalError,
-              'Failed to get updated session'
+            new AuthError(
+              ...createAuthError(AuthErrorCode.InternalError, 'Failed to get updated session')
             ),
         };
       }
@@ -1706,9 +1621,8 @@ export class BetterAuthAdapter implements AuthClient {
 
     return {
       data: { user: null, session: null },
-      error: createAuthError(
-        AuthErrorCode.ValidationFailed,
-        `Unsupported phone OTP type: ${params.type}`
+      error: new AuthError(
+        ...createAuthError(AuthErrorCode.ValidationFailed, `Unsupported phone OTP type: ${params.type}`)
       ),
     };
   }
