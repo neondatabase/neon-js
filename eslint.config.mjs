@@ -9,7 +9,7 @@ export default defineConfig(
   eslint.configs.recommended,
   tseslint.configs.recommended,
   unicorn.configs.recommended, // Use Unicorn's recommended preset
-  globalIgnores(['dist']),
+  globalIgnores(['**/dist/**']),
   {
     rules: {
       // Unicorn customizations (override recommended preset)
@@ -25,7 +25,8 @@ export default defineConfig(
       'unicorn/no-array-reduce': 'warn', // Reduce strictness
       'unicorn/prevent-abbreviations': 'off', // Allow SDK abbreviations
       'unicorn/string-content': 'off',
-      'unicorn/consistent-function-scoping': 'off', // Allow inline arrow functions in class methods
+      'unicorn/consistent-function-scoping': 'off', // Allow inline arrow functions in class methods,
+      'unicorn/explicit-length-check': 'off', // Allow explicit length checks
 
       // TypeScript rules
       '@typescript-eslint/no-explicit-any': 'off',
