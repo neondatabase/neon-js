@@ -17,7 +17,6 @@ import type { NeonBetterAuthOptions } from './better-auth-types';
 import {
   normalizeBetterAuthError,
   mapBetterAuthSessionToSupabase,
-  supportsBroadcastChannel,
   mapBetterAuthUserIdentityToSupabase,
 } from './better-auth-helpers';
 import { AuthErrorCode, createAuthError } from './errors/definitions';
@@ -36,6 +35,7 @@ import {
   BROADCAST_CHANNEL_NAME,
 } from './constants';
 import { base64url, decodeJwt, decodeProtectedHeader } from 'jose';
+import { supportsBroadcastChannel } from '../../utils/browser';
 
 /**
  * Better Auth adapter implementing the Supabase-compatible AuthClient interface.
@@ -295,13 +295,10 @@ export class BetterAuthAdapter implements AuthClient {
 
   // TODO: we need to implement a custom plugin to allow setting external sessions
   setSession: AuthClient['setSession'] = async () => {
-    return {
-      data: { user: null, session: null },
-      error: createAuthError(
-        AuthErrorCode.NotImplemented,
-        'Setting external sessions is not supported by Better Auth'
-      ),
-    };
+    throw createAuthError(
+      AuthErrorCode.NotImplemented,
+      'setSession() is not supported by Better Auth. Use signInWithPassword() instead.'
+    );
   };
 
   /**

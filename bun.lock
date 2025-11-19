@@ -45,6 +45,22 @@
         "better-auth": "^1.3.34",
       },
     },
+    "packages/neon-auth-ui": {
+      "name": "@neondatabase/neon-auth-ui",
+      "version": "0.1.0-alpha.1",
+      "dependencies": {
+        "@neondatabase/neon-auth": "workspace:*",
+      },
+      "devDependencies": {
+        "tsdown": "0.16.0",
+        "typescript": "^5.9.3",
+        "vite-tsconfig-paths": "5.1.4",
+        "vitest": "4.0.7",
+      },
+      "peerDependencies": {
+        "@neondatabase/neon-auth": "^0.1.0-alpha.1",
+      },
+    },
     "packages/neon-js": {
       "name": "@neondatabase/neon-js",
       "version": "0.1.0-alpha.1",
@@ -254,6 +270,8 @@
     "@napi-rs/wasm-runtime": ["@napi-rs/wasm-runtime@1.0.7", "", { "dependencies": { "@emnapi/core": "^1.5.0", "@emnapi/runtime": "^1.5.0", "@tybys/wasm-util": "^0.10.1" } }, "sha512-SeDnOO0Tk7Okiq6DbXmmBODgOAb9dp9gjlphokTUxmt8U3liIP1ZsozBahH69j/RJv+Rfs6IwUKHTgQYJ/HBAw=="],
 
     "@neondatabase/neon-auth": ["@neondatabase/neon-auth@workspace:packages/neon-auth"],
+
+    "@neondatabase/neon-auth-ui": ["@neondatabase/neon-auth-ui@workspace:packages/neon-auth-ui"],
 
     "@neondatabase/neon-js": ["@neondatabase/neon-js@workspace:packages/neon-js"],
 
