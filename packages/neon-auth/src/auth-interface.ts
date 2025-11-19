@@ -1,9 +1,4 @@
-import {
-  type AuthClient as AuthClientSupabase,
-  
-  
-  
-} from '@supabase/auth-js';
+import { type AuthClient as AuthClientSupabase } from '@supabase/auth-js';
 
 type _AuthClientSupabaseInstance = InstanceType<typeof AuthClientSupabase>;
 type _AuthClientBase = {
@@ -15,6 +10,4 @@ type _AuthClientBase = {
 export type AuthClient = _AuthClientBase;
 
 // Re-export Supabase error types
-
-
-export {AuthError, AuthApiError, isAuthError} from '@supabase/auth-js';
+export { AuthError, AuthApiError, isAuthError } from '@supabase/auth-js';

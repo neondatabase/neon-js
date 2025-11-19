@@ -6,7 +6,7 @@ import type {
   BetterAuthUser,
 } from './better-auth-types';
 import type { Session, User, UserIdentity } from '@supabase/auth-js';
-import { toISOString } from '../shared-helpers';
+import { toISOString } from '../../utils/date';
 import { DEFAULT_SESSION_EXPIRY_MS } from './constants';
 import type { accountInfo, listUserAccounts } from 'better-auth/api';
 import { AuthErrorCode, getErrorDefinition } from './errors/definitions';
@@ -431,10 +431,3 @@ export function mapBetterAuthUserIdentityToSupabase(
         },
   };
 }
-
-// Re-export shared helpers for backward compatibility
-export {
-  isBrowser,
-  supportsBroadcastChannel,
-  toISOString,
-} from '../shared-helpers';

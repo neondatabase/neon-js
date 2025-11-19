@@ -46,9 +46,9 @@ const defaultBetterAuthClientOptions = {
     jwtClient(),
     adminClient(),
     organizationClient(),
+    emailOTPClient(),
 
     // TODO: add these in
-    emailOTPClient(),
     phoneNumberClient(),
     magicLinkClient(),
   ],
@@ -533,17 +533,26 @@ export class BetterAuthAdapter implements AuthClient {
     }
   };
 
-  /**
-   * @todo Add email-otp plugin to server
-   */
-  // TODO: we need to add the email-otp plugin to the server adapter
-  signInWithOtp: AuthClient['signInWithOtp'] = async () => {
+  // TODO: we need to setup this up with `phone` type
+  signInWithOtp: AuthClient['signInWithOtp'] = async (credentials) => {
     try {
+      if ('email' in credentials) {
+        await this.betterAuth.emailOtp.sendVerificationOtp({
+          email: credentials.email,
+          type: 'sign-in',
+        });
+
+        return {
+          data: { user: null, session: null, messageId: undefined },
+          error: null,
+        };
+      }
+
       return {
-        data: { user: null, session: null },
+        data: { user: null, session: null, messageId: undefined },
         error: createAuthError(
           AuthErrorCode.NotImplemented,
-          'Email OTP is still missing the plugin in the server adapter for Neon Auth'
+          `We haven't implemented this type of otp authentication.`
         ),
       };
     } catch (error) {
@@ -1076,7 +1085,6 @@ export class BetterAuthAdapter implements AuthClient {
   };
   //#endregion
 
-  // TODO: add emailOTP plugin to the server adapter
   // TODO: add twoFactor plugin to the server adapter
   // TODO: add magiclink plugin to the server adapter
   //#region PUBLIC API - Verification & Password Reset
@@ -1121,7 +1129,7 @@ export class BetterAuthAdapter implements AuthClient {
   ) => {
     try {
       // TODO: this will fail, we need to setup `sendResetPassword` in the server adapter
-      const result = await this.betterAuth.forgetPassword({
+      const result = await this.betterAuth.requestPasswordReset({
         email,
         redirectTo:
           options?.redirectTo ||

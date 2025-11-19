@@ -1,12 +1,4 @@
 /**
- * Shared utility functions for authentication adapters
- * Based on Supabase's auth-js implementation patterns
- */
-
-// Re-export toISOString utility
-export { toISOString } from '../utils/date';
-
-/**
  * Checks if the code is running in a browser environment
  * @returns true if in browser, false otherwise (e.g., Node.js)
  */
