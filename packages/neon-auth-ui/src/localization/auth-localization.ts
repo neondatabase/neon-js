@@ -2,7 +2,6 @@ import { ADMIN_ERROR_CODES } from "./admin-error-codes"
 import { ANONYMOUS_ERROR_CODES } from "./anonymous-error-codes"
 import { API_KEY_ERROR_CODES } from "./api-key-error-codes"
 import { BASE_ERROR_CODES } from "./base-error-codes"
-import { CAPTCHA_ERROR_CODES } from "./captcha-error-codes"
 import { EMAIL_OTP_ERROR_CODES } from "./email-otp-error-codes"
 import { GENERIC_OAUTH_ERROR_CODES } from "./generic-oauth-error-codes"
 import { HAVEIBEENPWNED_ERROR_CODES } from "./haveibeenpwned-error-codes"
@@ -567,9 +566,6 @@ export const authLocalization = {
     /** @default "Terms of Service" */
     TERMS_OF_SERVICE: "Terms of Service",
 
-    /** @default "This site is protected by reCAPTCHA." */
-    PROTECTED_BY_RECAPTCHA: "This site is protected by reCAPTCHA.",
-
     /** @default "By continuing, you agree to the" */
     BY_CONTINUING_YOU_AGREE: "By continuing, you agree to the",
 
@@ -724,7 +720,6 @@ export const authLocalization = {
     ...ADMIN_ERROR_CODES,
     ...ANONYMOUS_ERROR_CODES,
     ...API_KEY_ERROR_CODES,
-    ...CAPTCHA_ERROR_CODES,
     ...EMAIL_OTP_ERROR_CODES,
     ...GENERIC_OAUTH_ERROR_CODES,
     ...HAVEIBEENPWNED_ERROR_CODES,

@@ -94,12 +94,12 @@ export function ResetPasswordForm({
         if (tokenChecked.current) return
         tokenChecked.current = true
 
-        const searchParams = new URLSearchParams(window.location.search)
+        const searchParams = new URLSearchParams(globalThis.location.search)
         const token = searchParams.get("token")
 
         if (!token || token === "INVALID_TOKEN") {
             navigate(
-                `${basePath}/${viewPaths.SIGN_IN}${window.location.search}`
+                `${basePath}/${viewPaths.SIGN_IN}${globalThis.location.search}`
             )
             toast({ variant: "error", message: localization.INVALID_TOKEN })
         }
@@ -107,7 +107,7 @@ export function ResetPasswordForm({
 
     async function resetPassword({ newPassword }: z.infer<typeof formSchema>) {
         try {
-            const searchParams = new URLSearchParams(window.location.search)
+            const searchParams = new URLSearchParams(globalThis.location.search)
             const token = searchParams.get("token") as string
 
             await authClient.resetPassword({
@@ -122,7 +122,7 @@ export function ResetPasswordForm({
             })
 
             navigate(
-                `${basePath}/${viewPaths.SIGN_IN}${window.location.search}`
+                `${basePath}/${viewPaths.SIGN_IN}${globalThis.location.search}`
             )
         } catch (error) {
             toast({

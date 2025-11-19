@@ -50,22 +50,18 @@ export function ProviderCell({
 
     const handleLink = async () => {
         setIsLoading(true)
-        const callbackURL = `${baseURL}${basePath}/${viewPaths.CALLBACK}?redirectTo=${encodeURIComponent(window.location.pathname)}`
+        const callbackURL = `${baseURL}${basePath}/${viewPaths.CALLBACK}?redirectTo=${encodeURIComponent(globalThis.location.pathname)}`
 
         try {
-            if (other) {
-                await authClient.oauth2.link({
+            await (other ? authClient.oauth2.link({
                     providerId: provider.provider as SocialProvider,
                     callbackURL,
                     fetchOptions: { throw: true }
-                })
-            } else {
-                await authClient.linkSocial({
+                }) : authClient.linkSocial({
                     provider: provider.provider as SocialProvider,
                     callbackURL,
                     fetchOptions: { throw: true }
-                })
-            }
+                }));
         } catch (error) {
             toast({
                 variant: "error",

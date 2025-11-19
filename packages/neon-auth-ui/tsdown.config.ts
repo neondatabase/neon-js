@@ -1,6 +1,7 @@
 import { defineConfig } from 'tsdown';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   entry: ['src/index.ts'],
@@ -9,6 +10,7 @@ export default defineConfig({
   dts: {
     build: true,
   },
+  plugins: [tailwindcss()],
 
   // Transform package.json after build
   hooks: {

@@ -376,9 +376,9 @@ export function OrganizationSwitcher({
                                     <Link
                                         href={
                                             activeOrganization
-                                                ? pathMode === "slug"
+                                                ? (pathMode === "slug"
                                                     ? `${organizationOptions?.basePath}/${activeOrganization.slug}/${organizationOptions?.viewPaths.SETTINGS}`
-                                                    : `${organizationOptions?.basePath}/${organizationOptions?.viewPaths.SETTINGS}`
+                                                    : `${organizationOptions?.basePath}/${organizationOptions?.viewPaths.SETTINGS}`)
                                                 : `${accountOptions?.basePath}/${accountOptions?.viewPaths.SETTINGS}`
                                         }
                                     >

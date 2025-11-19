@@ -115,13 +115,7 @@ export function CreateOrganizationDialog({
                 organizationOptions.logo.extension
             )
 
-            let image: string | undefined | null
-
-            if (organizationOptions?.logo.upload) {
-                image = await organizationOptions.logo.upload(resizedFile)
-            } else {
-                image = await fileToBase64(resizedFile)
-            }
+            const image = await (organizationOptions?.logo.upload ? organizationOptions.logo.upload(resizedFile) : fileToBase64(resizedFile));
 
             setLogo(image || null)
             form.setValue("logo", image || "")

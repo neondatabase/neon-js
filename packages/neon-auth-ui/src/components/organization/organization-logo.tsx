@@ -57,18 +57,21 @@ export function OrganizationLogo({
     const name = organization?.name
     const src = organization?.logo
 
+    const sizeClasses = {
+        sm: "size-6",
+        default: "size-8",
+        lg: "size-10",
+        xl: "size-12",
+    } as const
+
+    const sizeClass = size ? sizeClasses[size] ?? sizeClasses.default : sizeClasses.default
+
     if (isPending) {
         return (
             <Skeleton
                 className={cn(
                     "shrink-0 rounded-full",
-                    size === "sm"
-                        ? "size-6"
-                        : size === "lg"
-                          ? "size-10"
-                          : size === "xl"
-                            ? "size-12"
-                            : "size-8",
+                    sizeClass,
                     className,
                     classNames?.base,
                     classNames?.skeleton
@@ -81,13 +84,7 @@ export function OrganizationLogo({
         <Avatar
             className={cn(
                 "bg-muted",
-                size === "sm"
-                    ? "size-6"
-                    : size === "lg"
-                      ? "size-10"
-                      : size === "xl"
-                        ? "size-12"
-                        : "size-8",
+                sizeClass,
                 className,
                 classNames?.base
             )}
@@ -95,13 +92,13 @@ export function OrganizationLogo({
         >
             {avatar?.Image ? (
                 <avatar.Image
-                    alt={name || localization?.ORGANIZATION!}
+                    alt={name ?? localization?.ORGANIZATION ?? "Organization"}
                     className={classNames?.image}
                     src={src || ""}
                 />
             ) : (
                 <AvatarImage
-                    alt={name || localization?.ORGANIZATION!}
+                    alt={name ?? localization?.ORGANIZATION ?? "Organization"}
                     className={classNames?.image}
                     src={src || undefined}
                 />

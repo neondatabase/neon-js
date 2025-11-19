@@ -7,7 +7,6 @@ import { useContext, useEffect } from "react"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
 
-import { useCaptcha } from "../../../hooks/use-captcha"
 import { useIsHydrated } from "../../../hooks/use-hydrated"
 import { useOnSuccessTransition } from "../../../hooks/use-success-transition"
 import { AuthUIContext } from "../../../lib/auth-ui-provider"
@@ -19,7 +18,6 @@ import {
 } from "../../../lib/utils"
 import type { AuthLocalization } from "../../../localization/auth-localization"
 import type { PasswordValidation } from "../../../types/password-validation"
-import { Captcha } from "../../captcha/captcha"
 import { PasswordInput } from "../../password-input"
 import { Button } from "../../ui/button"
 import { Checkbox } from "../../ui/checkbox"
@@ -54,9 +52,6 @@ export function SignInForm({
     passwordValidation
 }: SignInFormProps) {
     const isHydrated = useIsHydrated()
-    const { captchaRef, getCaptchaHeaders, resetCaptcha } = useCaptcha({
-        localization
-    })
 
     const {
         authClient,
@@ -118,8 +113,7 @@ export function SignInForm({
 
             if (usernameEnabled && !isValidEmail(email)) {
                 const fetchOptions: BetterFetchOption = {
-                    throw: true,
-                    headers: await getCaptchaHeaders("/sign-in/username")
+                    throw: true
                 }
 
                 response = await authClient.signIn.username({
@@ -130,8 +124,7 @@ export function SignInForm({
                 })
             } else {
                 const fetchOptions: BetterFetchOption = {
-                    throw: true,
-                    headers: await getCaptchaHeaders("/sign-in/email")
+                    throw: true
                 }
 
                 response = await authClient.signIn.email({
@@ -144,14 +137,13 @@ export function SignInForm({
 
             if (response.twoFactorRedirect) {
                 navigate(
-                    `${basePath}/${viewPaths.TWO_FACTOR}${window.location.search}`
+                    `${basePath}/${viewPaths.TWO_FACTOR}${globalThis.location.search}`
                 )
             } else {
                 await onSuccess()
             }
         } catch (error) {
             form.resetField("password")
-            resetCaptcha()
 
             toast({
                 variant: "error",
@@ -216,7 +208,7 @@ export function SignInForm({
                                             "text-sm hover:underline",
                                             classNames?.forgotPasswordLink
                                         )}
-                                        href={`${basePath}/${viewPaths.FORGOT_PASSWORD}${isHydrated ? window.location.search : ""}`}
+                                        href={`${basePath}/${viewPaths.FORGOT_PASSWORD}${isHydrated ? globalThis.location.search : ""}`}
                                     >
                                         {localization.FORGOT_PASSWORD_LINK}
                                     </Link>
@@ -261,12 +253,6 @@ export function SignInForm({
                         )}
                     />
                 )}
-
-                <Captcha
-                    ref={captchaRef}
-                    localization={localization}
-                    action="/sign-in/email"
-                />
 
                 <Button
                     type="submit"

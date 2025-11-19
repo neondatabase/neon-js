@@ -36,7 +36,7 @@ export function MagicLinkButton({
             variant="secondary"
             onClick={() =>
                 navigate(
-                    `${basePath}/${view === "MAGIC_LINK" || !credentials ? viewPaths.SIGN_IN : viewPaths.MAGIC_LINK}${window.location.search}`
+                    `${basePath}/${view === "MAGIC_LINK" || !credentials ? viewPaths.SIGN_IN : viewPaths.MAGIC_LINK}${globalThis.location.search}`
                 )
             }
         >
