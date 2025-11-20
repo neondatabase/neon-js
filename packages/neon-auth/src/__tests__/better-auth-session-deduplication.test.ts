@@ -1,7 +1,7 @@
 /**
  * Session Deduplication Tests for BetterAuthAdapter
  *
- * Tests that getSession and getJwtToken are wrapped with p-memoize for request deduplication.
+ * Tests that getSession is wrapped with InFlightRequestManager for request deduplication.
  * This prevents the "thundering herd" problem during initial page load where multiple
  * components try to fetch the session simultaneously.
  */
@@ -45,12 +45,6 @@ describe('BetterAuthAdapter - Request Deduplication with p-memoize', () => {
     const adapter = createAdapter();
     expect(typeof adapter.getSession).toBe('function');
     expect(adapter.getSession).toBeDefined();
-  });
-
-  it('should have getJwtToken method that is a function', () => {
-    const adapter = createAdapter();
-    expect(typeof adapter.getJwtToken).toBe('function');
-    expect(adapter.getJwtToken).toBeDefined();
   });
 
   it('should return consistent results for concurrent getSession calls', async () => {

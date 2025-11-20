@@ -302,12 +302,19 @@ function createNormalizedError(
  * Map Better Auth session to Supabase Session format
  */
 export function mapBetterAuthSessionToSupabase(
-  betterAuthSession: BetterAuthSession | null,
-  betterAuthUser: BetterAuthUser | null
+  betterAuthSession: BetterAuthSession | null | undefined,
+  betterAuthUser: BetterAuthUser | null | undefined
 ): Session | null {
   if (!betterAuthSession || !betterAuthUser) {
     return null;
   }
+
+  console.log('[mapBetterAuthSessionToSupabase] Input token:', {
+    token: betterAuthSession.token,
+    tokenLength: betterAuthSession.token?.length,
+    tokenType: typeof betterAuthSession.token,
+    isJWT: betterAuthSession.token?.startsWith('eyJ'),
+  });
 
   // Parse expiresAt
   let expiresAt: number;
@@ -340,6 +347,12 @@ export function mapBetterAuthSessionToSupabase(
     token_type: 'bearer' as const,
     user: mapBetterAuthUserToSupabase(betterAuthUser),
   };
+
+  console.log('[mapBetterAuthSessionToSupabase] Output access_token:', {
+    accessToken: session.access_token,
+    accessTokenLength: session.access_token?.length,
+    isJWT: session.access_token?.startsWith('eyJ'),
+  });
 
   return session;
 }

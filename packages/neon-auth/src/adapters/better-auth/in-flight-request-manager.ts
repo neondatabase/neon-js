@@ -33,7 +33,7 @@ export class InFlightRequestManager {
    * If request with same key is in-flight, returns existing Promise.
    * Otherwise, executes fn and tracks the Promise.
    *
-   * @param key - Unique identifier for this request (e.g., "getSession", "getJwtToken")
+   * @param key - Unique identifier for this request (e.g., "getSession")
    * @param fn - Async function to execute (only called if no in-flight request exists)
    * @returns Promise that resolves to the function result
    *
@@ -53,7 +53,9 @@ export class InFlightRequestManager {
     // Check if request is already in-flight
     const existing = this.inFlightRequests.get(key);
     if (existing) {
-      console.debug(`[InFlightRequestManager] Awaiting in-flight request: ${key}`);
+      console.debug(
+        `[InFlightRequestManager] Awaiting in-flight request: ${key}`
+      );
       return existing as Promise<T>;
     }
 

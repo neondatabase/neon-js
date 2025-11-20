@@ -511,30 +511,71 @@ getUserIdentities = async () => {
 
 ## Auth State Change Implementation
 
-### Supabase Approach
-- `onAuthStateChange(callback)` returns subscription
-- Emits events: `INITIAL_SESSION`, `SIGNED_IN`, `SIGNED_OUT`, `TOKEN_REFRESHED`, `USER_UPDATED`
-- Supports cross-tab sync via BroadcastChannel
-- Polls for token refresh detection
+### Unified Event System Architecture
 
-### Better Auth Approach
-- Uses nanostores atoms (`useSession`)
-- Reactive updates via atoms
-- May not have explicit event system
+The adapter implements a **single unified event bus** that handles both Better Auth ecosystem broadcasts and Supabase-compatible events from one central point.
 
-**Implementation Strategy**:
-1. Wrap Better Auth's reactive system with callback-based API
-2. Listen to session atom changes
-3. Map changes to Supabase auth events
-4. Implement BroadcastChannel for cross-tab sync
-5. Implement token refresh polling (if needed)
+#### Event Flow
 
-**Event Detection**:
-- `INITIAL_SESSION`: Emit on first subscription
-- `SIGNED_IN`: Detect when session changes from null to session
-- `SIGNED_OUT`: Detect when session changes from session to null
-- `TOKEN_REFRESHED`: Detect when token refresh occurs (may need polling)
-- `USER_UPDATED`: Detect when user data changes
+```
+Auth Operation (signIn, signOut, etc.)
+    ↓
+emitAuthEvent(InternalAuthEvent)
+    ├── Better Auth Broadcast (for cross-tab + ecosystem)
+    │   └── getGlobalBroadcastChannel().post(...)
+    └── Supabase Event Notification (for client API)
+        └── notify all onAuthStateChange subscribers
+```
+
+#### Internal Event Types
+
+Canonical internal events that map to both systems:
+- `SIGN_IN` → Supabase: `SIGNED_IN` | Better Auth: (no broadcast)
+- `SIGN_OUT` → Supabase: `SIGNED_OUT` | Better Auth: `'signout'`
+- `TOKEN_REFRESH` → Supabase: `TOKEN_REFRESHED` | Better Auth: `'getSession'`
+- `USER_UPDATE` → Supabase: `USER_UPDATED` | Better Auth: `'updateUser'`
+
+#### Event Emission Points
+
+1. **Automatic Detection (onSuccess callback)**:
+   - Detects sign-in/sign-up by URL pattern (`/sign-in`, `/sign-up`)
+   - Detects sign-out by URL pattern (`/sign-out`)
+   - Detects token refresh by comparing access tokens (`/get-session`, `/token`)
+   - Detects user updates by URL pattern (`/update-user`)
+
+2. **Manual Emission**:
+   - `unlinkIdentity()` - emits USER_UPDATE after unlinking
+   - `verifyEmailOtp()` (email_change type) - emits USER_UPDATE after verification
+
+#### Cross-Tab Synchronization
+
+**Broadcast System**:
+- Uses Better Auth's `getGlobalBroadcastChannel()` for cross-tab sync
+- Broadcasts from `emitAuthEvent()` propagate to all tabs
+- Each tab's `setupCrossTabListener()` receives events from other tabs
+
+**Listener Behavior**:
+```typescript
+// Tab A: User signs out
+await client.auth.signOut();
+  → emitAuthEvent({ type: 'SIGN_OUT' })
+  → Better Auth broadcasts 'signout' to all tabs
+  → Tab B's listener receives broadcast
+  → Tab B clears cache & notifies local subscribers
+```
+
+**useSession Subscription**:
+- Minimal subscription for cache clearing only
+- Does NOT emit events (prevents race conditions)
+- Better Auth's internal atom automatically updates from broadcasts
+
+#### Key Benefits
+
+1. **Single Source of Truth**: All events flow through `emitAuthEvent()`
+2. **No Duplication**: Each operation emits events exactly once
+3. **Clear Separation**: Better Auth broadcasts for cross-tab, Supabase events for API
+4. **Ecosystem Compatible**: Participates in Better Auth's internal event system
+5. **Easier Testing**: Single method to mock/test for all event behavior
 
 ---
 

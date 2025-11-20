@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "link:neon-js": "cd packages/neon-auth && bun link && cd ../postgrest-js && bun link && cd ../neon-auth-ui && bun link && cd ../neon-js && bun link",
-    "build": "bun run --filter '@neondatabase/postgrest-js' build && bun run --filter '@neondatabase/neon-auth' build && bun run --filter '@neondatabase/neon-auth-ui' build && bun run --filter '@neondatabase/neon-js' build",
+    "build": "bun run --filter '@neondatabase/postgrest-js' build && bun run --filter '@neondatabase/neon-auth' build && bun run --filter '@neondatabase/neon-js' build",
     "dev": "bun run --filter '@neondatabase/postgrest-js' dev & bun run --filter '@neondatabase/neon-auth' dev & bun run --filter '@neondatabase/neon-auth-ui' dev & bun run --filter '@neondatabase/neon-js' dev",
     "test": "bun run --filter '@neondatabase/postgrest-js' test && bun run --filter '@neondatabase/neon-auth' test && bun run --filter '@neondatabase/neon-auth-ui' test && bun run --filter '@neondatabase/neon-js' test",
     "test:node": "bun run --filter '@neondatabase/postgrest-js' test:node && bun run --filter '@neondatabase/neon-auth' test:node && bun run --filter '@neondatabase/neon-auth-ui' test:node && bun run --filter '@neondatabase/neon-js' test:node",

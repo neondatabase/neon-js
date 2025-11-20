@@ -89,9 +89,9 @@ export function AuthView({
   let socialLayout = socialLayoutProp;
   if (socialLayout === 'auto') {
     socialLayout = credentials
-      ? (social?.providers && social.providers.length > 2
+      ? social?.providers && social.providers.length > 2
         ? 'horizontal'
-        : 'vertical')
+        : 'vertical'
       : 'vertical';
   }
 
@@ -300,11 +300,11 @@ export function AuthView({
           view === 'MAGIC_LINK' ||
           view === 'EMAIL_OTP' ? (
             localization.DONT_HAVE_AN_ACCOUNT
-          ) : (view === 'SIGN_UP' ? (
+          ) : view === 'SIGN_UP' ? (
             localization.ALREADY_HAVE_AN_ACCOUNT
           ) : (
             <ArrowLeftIcon className="size-3" />
-          ))}
+          )}
 
           {view === 'SIGN_IN' ||
           view === 'MAGIC_LINK' ||
