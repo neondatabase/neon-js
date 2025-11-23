@@ -7,10 +7,12 @@ import { useCallback, useContext, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 
+import { useCaptcha } from '../../../hooks/use-captcha';
 import { useIsHydrated } from '../../../hooks/use-hydrated';
 import { AuthUIContext } from '../../../lib/auth-ui-provider';
 import { cn, getLocalizedError, getSearchParam } from '../../../lib/utils';
 import type { AuthLocalization } from '../../../localization/auth-localization';
+import { Captcha } from '../../captcha/captcha';
 import { Button } from '../../ui/button';
 import {
   Form,
@@ -43,6 +45,9 @@ export function MagicLinkForm({
   setIsSubmitting,
 }: MagicLinkFormProps) {
   const isHydrated = useIsHydrated();
+  const { captchaRef, getCaptchaHeaders, resetCaptcha } = useCaptcha({
+    localization,
+  });
 
   const {
     authClient,
@@ -103,6 +108,7 @@ export function MagicLinkForm({
     try {
       const fetchOptions: BetterFetchOption = {
         throw: true,
+        headers: await getCaptchaHeaders('/sign-in/magic-link'),
       };
 
       await authClient.signIn.magicLink({
@@ -122,6 +128,7 @@ export function MagicLinkForm({
         variant: 'error',
         message: getLocalizedError({ error, localization }),
       });
+      resetCaptcha();
     }
   }
 
@@ -154,6 +161,12 @@ export function MagicLinkForm({
               <FormMessage className={classNames?.error} />
             </FormItem>
           )}
+        />
+
+        <Captcha
+          ref={captchaRef}
+          localization={localization}
+          action="/sign-in/magic-link"
         />
 
         <Button

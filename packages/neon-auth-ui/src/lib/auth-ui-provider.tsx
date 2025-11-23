@@ -3,6 +3,7 @@
 import { createContext, type ReactNode, useMemo } from 'react';
 import { toast } from 'sonner';
 
+import { RecaptchaV3 } from '../components/captcha/recaptcha-v3';
 import { useAuthData } from '../hooks/use-auth-data';
 import {
   type AuthLocalization,
@@ -15,9 +16,11 @@ import type {
 import type { AdditionalFields } from '../types/additional-fields';
 import type { AnyAuthClient } from '../types/any-auth-client';
 import type { AuthClient } from '../types/auth-client';
+import type { AuthClient as VanillaAuthClient } from 'better-auth/client';
 import type { AuthHooks } from '../types/auth-hooks';
 import type { AuthMutators } from '../types/auth-mutators';
 import type { AvatarOptions } from '../types/avatar-options';
+import type { CaptchaOptions } from '../types/captcha-options';
 import type { CredentialsOptions } from '../types/credentials-options';
 import type { DeleteUserOptions } from '../types/delete-user-options';
 import type { GenericOAuthOptions } from '../types/generic-oauth-options';
@@ -37,6 +40,7 @@ import {
   authViewPaths,
   organizationViewPaths,
 } from './view-paths';
+import { getReactClient } from './react-adapter';
 
 const DefaultLink: Link = ({ href, className, children }) => (
   <a className={className} href={href}>
@@ -95,6 +99,10 @@ export type AuthUIContextType = {
    * Front end base URL for auth API callbacks
    */
   baseURL?: string;
+  /**
+   * Captcha configuration
+   */
+  captcha?: CaptchaOptions;
   credentials?: CredentialsOptions;
   /**
    * Default redirect URL after authenticating
@@ -222,7 +230,7 @@ export type AuthUIProviderProps = {
    * @default Required
    * @remarks `AuthClient`
    */
-  authClient: AnyAuthClient;
+  authClient: AnyAuthClient | VanillaAuthClient<any>;
   /**
    * Enable account view & account configuration
    * @default { fields: ["image", "name"] }
@@ -309,6 +317,7 @@ export const AuthUIProvider = ({
   genericOAuth: genericOAuthProp,
   basePath = '/auth',
   baseURL = '',
+  captcha,
   redirectTo = '/',
   credentials: credentialsProp,
   changeEmail = true,
@@ -326,7 +335,7 @@ export const AuthUIProvider = ({
   Link = DefaultLink,
   ...props
 }: AuthUIProviderProps) => {
-  const authClient = authClientProp as AuthClient;
+  const authClient = getReactClient(authClientProp as AuthClient);
 
   const avatar = useMemo<AvatarOptions | undefined>(() => {
     if (!avatarProp) return;
@@ -445,7 +454,7 @@ export const AuthUIProvider = ({
         delete: organizationProp.logo.delete,
         extension: organizationProp.logo.extension || 'png',
         size:
-          (organizationProp.logo.size ?? 0) > 0 || organizationProp.logo.upload
+          organizationProp.logo.size || organizationProp.logo.upload
             ? 256
             : 128,
       };
@@ -472,11 +481,6 @@ export const AuthUIProvider = ({
     return {
       deleteApiKey: (params) =>
         authClient.apiKey.delete({
-          ...params,
-          fetchOptions: { throw: true },
-        }),
-      deletePasskey: (params) =>
-        authClient.passkey.deletePasskey({
           ...params,
           fetchOptions: { throw: true },
         }),
@@ -536,7 +540,6 @@ export const AuthUIProvider = ({
           queryFn: authClient.listSessions,
           cacheKey: 'listSessions',
         }),
-      useListPasskeys: authClient.useListPasskeys,
       useListApiKeys: () =>
         useAuthData({
           queryFn: authClient.apiKey.list,
@@ -614,6 +617,7 @@ export const AuthUIProvider = ({
         avatar,
         basePath: basePath === '/' ? '' : basePath,
         baseURL,
+        captcha,
         redirectTo,
         changeEmail,
         credentials,
@@ -637,7 +641,12 @@ export const AuthUIProvider = ({
       }}
     >
       {sessionData && organization && <OrganizationRefetcher />}
-      {children}
+
+      {captcha?.provider === 'google-recaptcha-v3' ? (
+        <RecaptchaV3>{children}</RecaptchaV3>
+      ) : (
+        children
+      )}
     </AuthUIContext.Provider>
   );
 };

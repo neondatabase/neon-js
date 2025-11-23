@@ -4,17 +4,11 @@
   "description": "Authentication adapters for Neon services",
   "type": "module",
   "license": "Apache-2.0",
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
   "exports": {
-    ".": "./dist/index.mjs"
-  },
-  "files": [
-    "dist"
-  ],
-  "publishConfig": {
-    "access": "public"
+    ".": "./src/index.ts"
   },
   "scripts": {
     "build": "tsdown",
@@ -34,7 +28,7 @@
   },
   "dependencies": {
     "@supabase/auth-js": "2.79.0",
-    "better-auth": "1.4.0-beta.25",
+    "better-auth": "1.4.2-beta.1",
     "zod": "4.1.12",
     "jose": "6.1.2"
   }

@@ -3,6 +3,15 @@ type MutateFn<T = Record<string, unknown>> = (
 ) => Promise<unknown> | Promise<void>
 
 export interface AuthMutators {
-    updateUser: MutateFn<{ data?: Record<string, unknown>; email?: string; password?: string }>
-    unlinkIdentity: MutateFn<{ identity_id: string }>
+    deleteApiKey: MutateFn<{ keyId: string }>
+    deletePasskey: MutateFn<{ id: string }>
+    revokeDeviceSession: MutateFn<{ sessionToken: string }>
+    revokeSession: MutateFn<{ token: string }>
+    setActiveSession: MutateFn<{ sessionToken: string }>
+    updateOrganization: MutateFn<{
+        organizationId: string
+        data: Record<string, unknown>
+    }>
+    updateUser: MutateFn
+    unlinkAccount: MutateFn<{ providerId: string; accountId?: string }>
 }

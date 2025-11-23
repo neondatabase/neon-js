@@ -66,7 +66,7 @@ export function ChangeEmailCard({
         try {
             await authClient.changeEmail({
                 newEmail: email,
-                callbackURL: globalThis.location.pathname,
+                callbackURL: window.location.pathname,
                 fetchOptions: { throw: true }
             })
 

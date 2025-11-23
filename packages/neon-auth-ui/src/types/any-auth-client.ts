@@ -1,3 +1,6 @@
-import type { AuthClient } from "@neondatabase/neon-auth"
+import type { createAuthClient } from 'better-auth/react';
 
-export type AnyAuthClient = AuthClient
+export type AnyAuthClient = Omit<
+  ReturnType<typeof createAuthClient>,
+  'signUp' | 'getSession'
+>;

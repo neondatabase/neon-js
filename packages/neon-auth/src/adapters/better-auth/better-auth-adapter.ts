@@ -11,8 +11,9 @@ import {
 } from '@supabase/auth-js';
 import {
   createAuthClient,
-  type BetterAuthClientOptions,
+  type AuthClient as BetterAuthClient,
   getGlobalBroadcastChannel,
+  type BetterAuthClientOptions,
 } from 'better-auth/client';
 import type { NeonBetterAuthOptions } from './better-auth-types';
 import {
@@ -54,20 +55,12 @@ const defaultBetterAuthClientOptions = {
 } satisfies BetterAuthClientOptions;
 
 export class BetterAuthAdapter implements AuthClient {
-  //#region Public Properties
   admin: AuthClient['admin'] = undefined as never;
   mfa: AuthClient['mfa'] = undefined as never;
   oauth: AuthClient['oauth'] = undefined as never;
-  //#endregion
-
-  //#region Private Fields
-  private betterAuth: ReturnType<
-    typeof createAuthClient<typeof defaultBetterAuthClientOptions>
-  >;
+  betterAuth: BetterAuthClient<typeof defaultBetterAuthClientOptions>;
 
   private stateChangeEmitters = new Map<string, Subscription>();
-
-  //#endregion
 
   //#region Constructor
   constructor(betterAuthClientOptions: NeonBetterAuthOptions) {

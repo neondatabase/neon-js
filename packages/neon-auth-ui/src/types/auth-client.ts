@@ -1,2 +1,35 @@
-export type { AuthClient } from "@neondatabase/neon-auth"
-export type { Session, User } from "@neondatabase/neon-auth"
+import {
+  anonymousClient,
+  apiKeyClient,
+  emailOTPClient,
+  genericOAuthClient,
+  magicLinkClient,
+  multiSessionClient,
+  oneTapClient,
+  organizationClient,
+  twoFactorClient,
+  usernameClient,
+} from 'better-auth/client/plugins';
+import { createAuthClient } from 'better-auth/react';
+
+export const authClient = createAuthClient({
+  plugins: [
+    apiKeyClient(),
+    multiSessionClient(),
+    oneTapClient({
+      clientId: '',
+    }),
+    genericOAuthClient(),
+    anonymousClient(),
+    usernameClient(),
+    magicLinkClient(),
+    emailOTPClient(),
+    twoFactorClient(),
+    organizationClient(),
+  ],
+});
+
+export type AuthClient = typeof authClient;
+
+export type Session = AuthClient['$Infer']['Session']['session'];
+export type User = AuthClient['$Infer']['Session']['user'];

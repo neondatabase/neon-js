@@ -216,7 +216,7 @@ export function UserButton({
                             <UserView
                                 size={size}
                                 user={
-                                    (user as User)?.isAnonymous ? null : user
+                                    !(user as User)?.isAnonymous ? user : null
                                 }
                                 isPending={isPending}
                                 classNames={classNames?.trigger?.user}

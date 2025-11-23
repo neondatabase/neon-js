@@ -85,7 +85,7 @@ export function ProviderButton({
 
                     setTimeout(() => {
                         setIsSubmitting(false)
-                    }, 10_000)
+                    }, 10000)
                 } else {
                     await authClient.signIn.oauth2(oauth2Params)
                 }
@@ -101,7 +101,7 @@ export function ProviderButton({
 
                     setTimeout(() => {
                         setIsSubmitting(false)
-                    }, 10_000)
+                    }, 10000)
                 } else {
                     await authClient.signIn.social(socialParams)
                 }

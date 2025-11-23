@@ -79,7 +79,7 @@ export function UpdateFieldCard({
     if (type === "number") {
         fieldSchema = required
             ? z.preprocess(
-                  (val) => (val ? Number(val) : undefined),
+                  (val) => (!val ? undefined : Number(val)),
                   z.number({
                       message: `${label} ${localization.IS_INVALID}`
                   })
@@ -194,7 +194,7 @@ export function UpdateFieldCard({
                                     </FormItem>
                                 )}
                             />
-                        ) : (isPending ? (
+                        ) : isPending ? (
                             <Skeleton
                                 className={cn(
                                     "h-9 w-full",
@@ -227,7 +227,7 @@ export function UpdateFieldCard({
                                                         field.value as string
                                                     }
                                                 />
-                                            ) : (multiline ? (
+                                            ) : multiline ? (
                                                 <Textarea
                                                     className={
                                                         classNames?.input
@@ -264,7 +264,7 @@ export function UpdateFieldCard({
                                                         field.value as string
                                                     }
                                                 />
-                                            ))}
+                                            )}
                                         </FormControl>
 
                                         <FormMessage
@@ -273,7 +273,7 @@ export function UpdateFieldCard({
                                     </FormItem>
                                 )}
                             />
-                        ))}
+                        )}
                     </CardContent>
                 </SettingsCard>
             </form>

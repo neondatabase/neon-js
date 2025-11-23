@@ -35,7 +35,7 @@ export function EmailOTPButton({
             variant="secondary"
             onClick={() =>
                 navigate(
-                    `${basePath}/${view === "EMAIL_OTP" ? viewPaths.SIGN_IN : viewPaths.EMAIL_OTP}${globalThis.location.search}`
+                    `${basePath}/${view === "EMAIL_OTP" ? viewPaths.SIGN_IN : viewPaths.EMAIL_OTP}${window.location.search}`
                 )
             }
         >

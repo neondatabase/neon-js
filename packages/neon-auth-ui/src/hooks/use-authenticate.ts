@@ -1,6 +1,6 @@
 import { useContext, useEffect } from "react"
 import { AuthUIContext } from "../lib/auth-ui-provider"
-import type { AuthViewPath } from "../lib/view-paths"
+import type { AuthViewPath } from "../server"
 import type { AnyAuthClient } from "../types/any-auth-client"
 
 interface AuthenticateOptions<TAuthClient extends AnyAuthClient> {
@@ -36,10 +36,10 @@ export function useAuthenticate<TAuthClient extends AnyAuthClient>(
     useEffect(() => {
         if (!enabled || isPending || sessionData) return
 
-        const currentUrl = new URL(globalThis.location.href)
+        const currentUrl = new URL(window.location.href)
         const redirectTo =
             currentUrl.searchParams.get("redirectTo") ||
-            globalThis.location.href.replace(globalThis.location.origin, "")
+            window.location.href.replace(window.location.origin, "")
 
         replace(
             `${basePath}/${viewPaths[authView]}?redirectTo=${encodeURIComponent(redirectTo)}`

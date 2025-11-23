@@ -15,7 +15,7 @@ import type { FetchError } from "../types/fetch-error"
 export function useAuthData<T>({
     queryFn,
     cacheKey,
-    staleTime = 10_000 // Default 10 seconds
+    staleTime = 10000 // Default 10 seconds
 }: {
     queryFn: () => Promise<{ data: T | null; error?: FetchError | null }>
     cacheKey?: string
@@ -69,8 +69,8 @@ export function useAuthData<T>({
                 } else {
                     setError(null)
                 }
-            } catch (error_) {
-                setError(error_ as FetchError)
+            } catch (err) {
+                setError(err as FetchError)
             }
             return
         }
@@ -101,8 +101,8 @@ export function useAuthData<T>({
 
             // Update cache with new data
             authDataCache.set(stableCacheKey, data)
-        } catch (error_) {
-            const error = error_ as FetchError
+        } catch (err) {
+            const error = err as FetchError
             setError(error)
             toast({
                 variant: "error",
@@ -143,16 +143,18 @@ export function useAuthData<T>({
         const isStale =
             !cacheEntry || Date.now() - cacheEntry.timestamp > staleTime
 
-        if ((
+        if (
             !initialized.current ||
             !hasCachedData ||
             userIdChanged ||
             (hasCachedData && isStale)
-        ) && // Only fetch if we don't have data or if the data is stale
-            (!hasCachedData || isStale)) {
+        ) {
+            // Only fetch if we don't have data or if the data is stale
+            if (!hasCachedData || isStale) {
                 initialized.current = true
                 refetch()
             }
+        }
 
         // Update the previous user ID
         previousUserId.current = currentUserId
