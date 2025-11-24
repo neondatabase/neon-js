@@ -58,27 +58,28 @@ export class BetterAuthAdapter implements AuthClient {
   admin: AuthClient['admin'] = undefined as never;
   mfa: AuthClient['mfa'] = undefined as never;
   oauth: AuthClient['oauth'] = undefined as never;
-  betterAuth: BetterAuthClient<typeof defaultBetterAuthClientOptions>;
-
-  private stateChangeEmitters = new Map<string, Subscription>();
+  private _betterAuth: BetterAuthClient<typeof defaultBetterAuthClientOptions>;
+  private _stateChangeEmitters = new Map<string, Subscription>();
 
   //#region Constructor
   constructor(betterAuthClientOptions: NeonBetterAuthOptions) {
     // Preserve user's onSuccess callback if they provided one
     const userOnSuccess = betterAuthClientOptions.fetchOptions?.onSuccess;
+    const userOnRequest = betterAuthClientOptions.fetchOptions?.onRequest;
 
-    this.betterAuth = createAuthClient({
+    this._betterAuth = createAuthClient({
       ...betterAuthClientOptions,
       ...defaultBetterAuthClientOptions,
       fetchOptions: {
         ...betterAuthClientOptions.fetchOptions,
         onRequest: (request) => {
           const url = request.url;
-
           const method = deriveBetterAuthMethodFromUrl(url.toString());
           if (method) {
             BETTER_AUTH_METHODS_HOOKS[method].onRequest();
           }
+
+          userOnRequest?.(request);
         },
         customFetchImpl: async (url, init) => {
           // Skip deduplication if X-Force-Fetch header is present
@@ -94,20 +95,11 @@ export class BetterAuthAdapter implements AuthClient {
           const body = init?.body || '';
           const key = `${method}:${url}:${body}`;
 
-          console.log('[customFetch] Request:', {
-            url,
-            method,
-            dedupeKey: key,
-          });
           const response =
             await BETTER_AUTH_METHODS_IN_FLIGHT_REQUESTS.deduplicate(key, () =>
               fetch(url, init)
             );
-          console.log('[customFetch] Response:', {
-            url,
-            status: response.status,
-            ok: response.ok,
-          });
+
           // Clone the response so each caller gets a fresh body stream
           // (Response bodies can only be read once, but deduplication shares the same Response)
           return response.clone();
@@ -139,9 +131,7 @@ export class BetterAuthAdapter implements AuthClient {
           }
 
           // Call user's onSuccess callback if they provided one
-          if (userOnSuccess) {
-            await userOnSuccess(ctx);
-          }
+          await userOnSuccess?.(ctx);
         },
       },
     });
@@ -171,7 +161,7 @@ export class BetterAuthAdapter implements AuthClient {
      *   }
      * })
      */
-    this.betterAuth.useSession.subscribe((value) => {
+    this._betterAuth.useSession.subscribe((value) => {
       // If session is null/undefined, clear cache (sign-out detected from any tab)
       if (!value.data?.session || !value.data?.user) {
         console.log('[useSession.subscribe] Session is null, clearing cache');
@@ -207,7 +197,7 @@ export class BetterAuthAdapter implements AuthClient {
         }
 
         // 2. Notify all Supabase-compatible subscribers
-        const promises = [...this.stateChangeEmitters.values()].map(
+        const promises = [...this._stateChangeEmitters.values()].map(
           (subscription) => {
             try {
               return Promise.resolve(
@@ -226,6 +216,10 @@ export class BetterAuthAdapter implements AuthClient {
   //#endregion
 
   //#region PUBLIC API - Initialization
+  getBetterAuthInstance() {
+    return this._betterAuth;
+  }
+
   initialize: AuthClient['initialize'] = async () => {
     try {
       const session = await this.getSession();
@@ -268,7 +262,7 @@ export class BetterAuthAdapter implements AuthClient {
 
       // Fetch-level deduplication handles concurrent requests automatically
       console.log('[getSession] Calling betterAuth.getSession()');
-      const currentSession = await this.betterAuth.getSession();
+      const currentSession = await this._betterAuth.getSession();
       console.log('[getSession] Better Auth response:', {
         hasData: !!currentSession.data,
         hasSession: !!currentSession.data?.session,
@@ -368,7 +362,7 @@ export class BetterAuthAdapter implements AuthClient {
 
         // TODO: for channels (sms/whatsapp), we would need to implement the channel-based plugins
         // TODO: for captcha, we would need to implement the captcha plugin
-        const result = await this.betterAuth.signUp.email({
+        const result = await this._betterAuth.signUp.email({
           email: credentials.email,
           password: credentials.password,
           name: displayName,
@@ -445,7 +439,7 @@ export class BetterAuthAdapter implements AuthClient {
     try {
       if ('email' in credentials && credentials.email) {
         // TODO: for captcha, we would need to add the captcha plugin
-        const result = await this.betterAuth.signIn.email({
+        const result = await this._betterAuth.signIn.email({
           email: credentials.email,
           password: credentials.password,
         });
@@ -505,7 +499,7 @@ export class BetterAuthAdapter implements AuthClient {
     try {
       const { provider, options } = credentials;
 
-      await this.betterAuth.signIn.social({
+      await this._betterAuth.signIn.social({
         provider,
         // Convert scopes from Supabase format (space-separated string) to Better Auth format (array)
         scopes: options?.scopes?.split(' '),
@@ -539,7 +533,7 @@ export class BetterAuthAdapter implements AuthClient {
   signInWithOtp: AuthClient['signInWithOtp'] = async (credentials) => {
     try {
       if ('email' in credentials) {
-        await this.betterAuth.emailOtp.sendVerificationOtp({
+        await this._betterAuth.emailOtp.sendVerificationOtp({
           email: credentials.email,
           type: 'sign-in',
         });
@@ -567,7 +561,7 @@ export class BetterAuthAdapter implements AuthClient {
 
   signInWithIdToken: AuthClient['signInWithIdToken'] = async (credentials) => {
     try {
-      const result = await this.betterAuth.signIn.social({
+      const result = await this._betterAuth.signIn.social({
         provider: credentials.provider,
         idToken: {
           token: credentials.token,
@@ -655,7 +649,7 @@ export class BetterAuthAdapter implements AuthClient {
 
   signOut: AuthClient['signOut'] = async () => {
     try {
-      const result = await this.betterAuth.signOut();
+      const result = await this._betterAuth.signOut();
 
       if (result.error) {
         throw result.error;
@@ -796,7 +790,7 @@ export class BetterAuthAdapter implements AuthClient {
         };
       }
 
-      const result = await this.betterAuth.updateUser({
+      const result = await this._betterAuth.updateUser({
         ...attributes.data,
       });
 
@@ -851,7 +845,7 @@ export class BetterAuthAdapter implements AuthClient {
       }
 
       // Fetch-level deduplication handles concurrent requests automatically
-      const result = await this.betterAuth.listAccounts();
+      const result = await this._betterAuth.listAccounts();
 
       if (!result) {
         return {
@@ -873,7 +867,7 @@ export class BetterAuthAdapter implements AuthClient {
       const identitiesPromises = result.data.map(async (account) => {
         let accountInfo = null;
         try {
-          const infoResult = await this.betterAuth.accountInfo({
+          const infoResult = await this._betterAuth.accountInfo({
             accountId: account.accountId,
           });
           accountInfo = infoResult.data;
@@ -925,7 +919,7 @@ export class BetterAuthAdapter implements AuthClient {
 
       // Link with ID token (direct)
       if ('token' in credentials) {
-        const result = await this.betterAuth.linkSocial({
+        const result = await this._betterAuth.linkSocial({
           provider,
           idToken: {
             token: credentials.token,
@@ -960,7 +954,7 @@ export class BetterAuthAdapter implements AuthClient {
         ?.split(' ')
         .filter((s: string) => s.length > 0);
 
-      const result = await this.betterAuth.linkSocial({
+      const result = await this._betterAuth.linkSocial({
         provider,
         callbackURL,
         errorCallbackURL: callbackURL
@@ -1040,7 +1034,7 @@ export class BetterAuthAdapter implements AuthClient {
       const accountId = targetIdentity.identity_id; // e.g., "google-user-id-12345"
 
       // Call better-auth
-      const result = await this.betterAuth.unlinkAccount({
+      const result = await this._betterAuth.unlinkAccount({
         providerId,
         accountId,
       });
@@ -1116,7 +1110,7 @@ export class BetterAuthAdapter implements AuthClient {
   ) => {
     try {
       // TODO: this will fail, we need to setup `sendResetPassword` in the server adapter
-      const result = await this.betterAuth.requestPasswordReset({
+      const result = await this._betterAuth.requestPasswordReset({
         email,
         redirectTo:
           options?.redirectTo ||
@@ -1171,7 +1165,7 @@ export class BetterAuthAdapter implements AuthClient {
         const { email, type, options } = credentials;
 
         if (type === 'signup' || type === 'email_change') {
-          const result = await this.betterAuth.sendVerificationEmail({
+          const result = await this._betterAuth.sendVerificationEmail({
             email,
             callbackURL:
               options?.emailRedirectTo ||
@@ -1206,7 +1200,7 @@ export class BetterAuthAdapter implements AuthClient {
         const { phone, type } = credentials;
 
         if (type === 'sms' || type === 'phone_change') {
-          const result = await this.betterAuth.phoneNumber.sendOtp({
+          const result = await this._betterAuth.phoneNumber.sendOtp({
             phoneNumber: phone,
           });
 
@@ -1282,11 +1276,11 @@ export class BetterAuthAdapter implements AuthClient {
       id,
       callback,
       unsubscribe: () => {
-        this.stateChangeEmitters.delete(id);
+        this._stateChangeEmitters.delete(id);
       },
     };
 
-    this.stateChangeEmitters.set(id, subscription);
+    this._stateChangeEmitters.set(id, subscription);
 
     this.emitInitialSession(callback);
 
@@ -1319,7 +1313,7 @@ export class BetterAuthAdapter implements AuthClient {
     const { type } = params;
 
     if (type === 'email') {
-      const result = await this.betterAuth.signIn.emailOtp({
+      const result = await this._betterAuth.signIn.emailOtp({
         email: params.email,
         otp: params.token,
       });
@@ -1350,7 +1344,7 @@ export class BetterAuthAdapter implements AuthClient {
     }
 
     if (type === 'magiclink') {
-      const result = await this.betterAuth.magicLink.verify({
+      const result = await this._betterAuth.magicLink.verify({
         query: {
           token: params.token,
           callbackURL:
@@ -1387,7 +1381,7 @@ export class BetterAuthAdapter implements AuthClient {
     }
 
     if (type === 'signup' || type === 'invite') {
-      const result = await this.betterAuth.emailOtp.verifyEmail({
+      const result = await this._betterAuth.emailOtp.verifyEmail({
         email: params.email,
         otp: params.token,
       });
@@ -1412,7 +1406,7 @@ export class BetterAuthAdapter implements AuthClient {
 
     if (type === 'recovery') {
       // First, check if OTP is valid
-      const checkResult = await this.betterAuth.emailOtp.checkVerificationOtp({
+      const checkResult = await this._betterAuth.emailOtp.checkVerificationOtp({
         email: params.email,
         otp: params.token,
         type: 'forget-password',
@@ -1433,7 +1427,7 @@ export class BetterAuthAdapter implements AuthClient {
     }
 
     if (type === 'email_change') {
-      const result = await this.betterAuth.verifyEmail({
+      const result = await this._betterAuth.verifyEmail({
         query: {
           token: params.token,
           callbackURL: params.options?.redirectTo,
@@ -1477,7 +1471,7 @@ export class BetterAuthAdapter implements AuthClient {
     }
 
     if (type === 'invite') {
-      const result = await this.betterAuth.organization.acceptInvitation({
+      const result = await this._betterAuth.organization.acceptInvitation({
         invitationId: params.token, // The token is the invitation ID
       });
 
@@ -1525,7 +1519,7 @@ export class BetterAuthAdapter implements AuthClient {
     if (params.type === 'sms') {
       // Verify phone number with OTP
       // This creates a session by default
-      const result = await this.betterAuth.phoneNumber.verify({
+      const result = await this._betterAuth.phoneNumber.verify({
         phoneNumber: params.phone,
         code: params.token,
         disableSession: false, // Create session after verification
@@ -1564,7 +1558,7 @@ export class BetterAuthAdapter implements AuthClient {
 
     if (params.type === 'phone_change') {
       // Check if user is authenticated
-      const currentSession = await this.betterAuth.getSession();
+      const currentSession = await this._betterAuth.getSession();
       if (currentSession.error || !currentSession.data?.session) {
         return {
           data: { user: null, session: null },
@@ -1576,7 +1570,7 @@ export class BetterAuthAdapter implements AuthClient {
       }
 
       // Verify phone number and update it
-      const result = await this.betterAuth.phoneNumber.verify({
+      const result = await this._betterAuth.phoneNumber.verify({
         phoneNumber: params.phone,
         code: params.token,
         disableSession: false,
