@@ -1,6 +1,6 @@
 # @neondatabase/neon-auth-ui
 
-React UI component library for authentication, built on the Supabase-compatible `AuthClient` interface. Works with any auth provider that implements Supabase's auth API, including `@neondatabase/neon-auth`.
+UI components for Neon Auth built on top of [better-auth-ui](https://better-auth-ui.com).
 
 ## Installation
 
@@ -8,119 +8,109 @@ React UI component library for authentication, built on the Supabase-compatible 
 npm install @neondatabase/neon-auth-ui
 # or
 bun add @neondatabase/neon-auth-ui
+# or
+pnpm add @neondatabase/neon-auth-ui
 ```
 
-## Quick Start
+## Usage
+
+### 1. Import the CSS
+
+Add this to your root layout or app entry point:
 
 ```typescript
-import { createClient } from '@neondatabase/neon-js';
-import { AuthUIProvider, AuthView } from '@neondatabase/neon-auth-ui';
 import '@neondatabase/neon-auth-ui/css';
+```
 
-const client = createClient('https://ep-xxx.neon.build/neondb');
+### 2. Use the Provider
 
-function App() {
+```typescript
+'use client';
+
+import { NeonAuthUIProvider } from '@neondatabase/neon-auth-ui';
+import { createAuthClient } from '@neondatabase/neon-auth';
+
+const authClient = createAuthClient({
+  baseURL: process.env.NEXT_PUBLIC_AUTH_URL,
+});
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
-    <AuthUIProvider authClient={client.auth}>
-      <AuthView />
-    </AuthUIProvider>
+    <NeonAuthUIProvider authClient={authClient}>
+      {children}
+    </NeonAuthUIProvider>
   );
 }
 ```
 
+### 3. Use Components
+
+All components from `@daveyplate/better-auth-ui` are re-exported:
+
+```typescript
+import { 
+  SignInForm, 
+  SignUpForm, 
+  UserButton,
+  // ... all other components
+} from '@neondatabase/neon-auth-ui';
+```
+
 ## Features
 
-### Supported
-- ✅ Email/Password authentication
-- ✅ OAuth providers (Google, GitHub, etc.)
-- ✅ Password reset/recovery
-- ✅ Email verification
-- ✅ Magic link sign-in (if supported by adapter)
-- ✅ Email OTP sign-in (if supported by adapter)
-- ✅ User profile management
-- ✅ Account linking/unlinking
-- ✅ Session management
-- ✅ Customizable UI components
+- ✅ **No TailwindCSS required** - Complete CSS bundle included (7KB minified)
+- ✅ **Automatic React adapter** - Works with both vanilla and React Better Auth clients
+- ✅ **Full better-auth-ui compatibility** - All components and utilities re-exported
+- ✅ **Type-safe** - Full TypeScript support
 
-### Not Supported
-- ❌ Organizations
-- ❌ API Keys
-- ❌ Passkeys (WebAuthn)
-- ❌ Multi-session management
-- ❌ TOTP two-factor auth
+## Example (Next.js App Router)
 
-These features are specific to Better Auth and not part of the Supabase-compatible interface.
-
-## Components
-
-### Authentication
-- `<AuthView />` - Complete authentication UI
-- `<SignInForm />` - Sign-in form
-- `<SignUpForm />` - Sign-up form
-- `<ForgotPasswordForm />` - Password reset request
-- `<ResetPasswordForm />` - Password reset form
-- `<MagicLinkForm />` - Magic link sign-in
-
-### Account Management
-- `<AccountView />` - Complete account management UI
-- `<UpdateAvatarCard />` - Avatar upload
-- `<UpdateNameCard />` - Name update
-- `<ChangeEmailCard />` - Email change
-- `<ChangePasswordCard />` - Password change
-- `<AccountsCard />` - Linked accounts management
-
-### Utility
-- `<SignedIn>` - Render when authenticated
-- `<SignedOut>` - Render when not authenticated
-- `<UserAvatar />` - User avatar display
-- `<UserButton />` - User menu dropdown
-
-## Hooks
-
-### useSession
+**app/layout.tsx**
 ```typescript
-const { data, isPending, error, refetch } = useSession(authClient);
+import '@neondatabase/neon-auth-ui/css';
+import { AuthProvider } from './auth-provider';
 
-// Access session data
-const session = data?.session;
-const user = data?.user;
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        <AuthProvider>
+          {children}
+        </AuthProvider>
+      </body>
+    </html>
+  );
+}
 ```
 
-### useAuthData
-Generic hook for fetching auth-related data with caching:
+**app/auth-provider.tsx**
 ```typescript
-const { data, isPending, error, refetch } = useAuthData({
-  queryFn: () => authClient.getUserIdentities(),
-  cacheKey: 'identities',
-  staleTime: 60000, // 1 minute
-});
+'use client';
+
+import { NeonAuthUIProvider } from '@neondatabase/neon-auth-ui';
+import { authClient } from './auth';
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  return (
+    <NeonAuthUIProvider authClient={authClient}>
+      {children}
+    </NeonAuthUIProvider>
+  );
+}
 ```
 
-## Development
+**app/auth/page.tsx**
+```typescript
+import { SignInForm } from '@neondatabase/neon-auth-ui';
 
-```bash
-# Build the package
-bun run build
-
-# Watch mode
-bun run dev
-
-# Run tests
-bun test
-
-# Type check
-bun typecheck
+export default function AuthPage() {
+  return <SignInForm />;
+}
 ```
 
-## Migration Guide
+## Documentation
 
-If you're upgrading from an earlier version using Better Auth React client, see [MIGRATION.md](./MIGRATION.md) for breaking changes and upgrade instructions.
-
-## Architecture
-
-This package provides React components and hooks built on top of the Supabase-compatible `AuthClient` interface. It has no direct dependency on Better Auth - all auth functionality is delegated to the provided auth client.
-
-For implementation details, see [CLAUDE.md](./CLAUDE.md).
+For component documentation, see the [better-auth-ui docs](https://better-auth-ui.com).
 
 ## License
 

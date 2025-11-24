@@ -1,9 +1,10 @@
-import { useStore } from 'better-auth/react';
-import type { AuthClient as VanillaAuthClient } from 'better-auth/client';
-import type { Store } from 'nanostores';
-import type { AuthClient } from '../types/auth-client';
+import {
+  type VanillaBetterAuthClient,
+  type ReactBetterAuthClient,
+  useBetterAuthStore,
+} from '@neondatabase/neon-auth';
 
-function isVanillaClient(client: any): client is VanillaAuthClient<any> {
+function isVanillaClient(client: any): client is VanillaBetterAuthClient {
   // React clients have useSession as a function
   // Vanilla clients have useSession as an atom (object with .get method)
   return typeof client.useSession !== 'function';
@@ -18,9 +19,9 @@ function isVanillaClient(client: any): client is VanillaAuthClient<any> {
  * 3. Wraps atoms with useStore for React compatibility
  * 4. Passes through everything else unchanged
  */
-function toReactClient<TClient extends VanillaAuthClient<any>>(
+function toReactClient<TClient extends VanillaBetterAuthClient>(
   vanillaClient: TClient
-): AuthClient {
+): ReactBetterAuthClient {
   // Cache for converted hooks to avoid recreating them
 
   const hookCache = new Map<string, () => any>();
@@ -50,7 +51,7 @@ function toReactClient<TClient extends VanillaAuthClient<any>>(
         const reactHook = function useReactHook() {
           // Runtime has all properties, vanilla types are incomplete
 
-          return useStore(value as Store<any>) as any;
+          return useBetterAuthStore(value);
         };
 
         hookCache.set(prop, reactHook);
@@ -60,12 +61,12 @@ function toReactClient<TClient extends VanillaAuthClient<any>>(
       // Return everything else as-is
       return value;
     },
-  }) as AuthClient;
+  }) as ReactBetterAuthClient;
 }
 
 export function getReactClient(
-  client: VanillaAuthClient<any> | AuthClient
-): AuthClient {
+  client: VanillaBetterAuthClient | ReactBetterAuthClient
+): ReactBetterAuthClient {
   if (isVanillaClient(client)) {
     return toReactClient(client);
   }

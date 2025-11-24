@@ -1,16 +1,14 @@
 import { defineConfig } from 'tsdown';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   entry: ['src/index.ts'],
   format: ['esm'],
-  clean: true,
+  clean: false, // Don't clean dist since CSS is generated first by TailwindCSS CLI
   dts: {
     build: true,
   },
-  plugins: [tailwindcss()],
 
   // Transform package.json after build
   hooks: {
