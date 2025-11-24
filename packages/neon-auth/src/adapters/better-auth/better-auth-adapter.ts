@@ -37,6 +37,7 @@ import {
   BETTER_AUTH_METHODS_CACHE,
   deriveBetterAuthMethodFromUrl,
 } from './better-auth-methods';
+import { BETTER_AUTH_TOKEN_STORAGE } from '../../utils/storage';
 /**
  * Better Auth adapter implementing the Supabase-compatible AuthClient interface.
  * See CLAUDE.md for architecture details and API mappings.
@@ -72,6 +73,11 @@ export class BetterAuthAdapter implements AuthClient {
       ...defaultBetterAuthClientOptions,
       fetchOptions: {
         ...betterAuthClientOptions.fetchOptions,
+        // Configure Bearer token auth - automatically includes stored token in Authorization header
+        auth: {
+          type: 'Bearer',
+          token: () => BETTER_AUTH_TOKEN_STORAGE.getToken() || '',
+        },
         onRequest: (request) => {
           const url = request.url;
           const method = deriveBetterAuthMethodFromUrl(url.toString());
@@ -108,6 +114,9 @@ export class BetterAuthAdapter implements AuthClient {
           // Capture JWT from any request that includes it
           const jwt = ctx.response.headers.get('set-auth-jwt');
           if (jwt) {
+            // Store JWT in persistent storage (handles sign-in, sign-up, token refresh, etc.)
+            BETTER_AUTH_TOKEN_STORAGE.setToken(jwt);
+
             // Inject JWT into response data BEFORE Better Auth processes it.
             // Better Auth will then update its internal state, triggering useSession.subscribe()
             // which will cache the session with JWT included (single cache-setting point).

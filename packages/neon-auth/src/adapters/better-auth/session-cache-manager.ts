@@ -1,5 +1,6 @@
 import type { Session } from '@supabase/auth-js';
 import { SESSION_CACHE_TTL_MS, CLOCK_SKEW_BUFFER_MS } from './constants';
+import { getJwtExpiration } from '../../utils/jwt';
 
 type SessionCache = {
   session: Session;
@@ -116,7 +117,7 @@ export class SessionCacheManager {
       return SESSION_CACHE_TTL_MS;
     }
 
-    const exp = this.getJwtExpiration(jwt);
+    const exp = getJwtExpiration(jwt);
     if (!exp) {
       return SESSION_CACHE_TTL_MS;
     }
@@ -126,22 +127,5 @@ export class SessionCacheManager {
     const ttl = expiresAtMs - now - CLOCK_SKEW_BUFFER_MS;
 
     return Math.max(ttl, 1000);
-  }
-
-  /**
-   * Extract expiration timestamp from JWT payload.
-   */
-  private getJwtExpiration(jwt: string): number | null {
-    try {
-      const tokenParts = jwt.split('.');
-      if (tokenParts.length !== 3) {
-        return null;
-      }
-      const payload = JSON.parse(atob(tokenParts[1]));
-      const exp = payload.exp;
-      return typeof exp === 'number' ? exp : null;
-    } catch {
-      return null;
-    }
   }
 }
