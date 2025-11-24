@@ -1,5 +1,5 @@
 import { defineConfig } from 'tsdown';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, copyFileSync } from 'node:fs';
 import path from 'node:path';
 
 export default defineConfig({
@@ -56,6 +56,20 @@ export default defineConfig({
       );
       writeFileSync(distPkgPath, JSON.stringify(pkg, null, 2));
       console.log('✅ Copied and transformed package.json to dist/');
+
+      // Copy CSS type declaration to dist/
+      const cssDtsPath = path.resolve(import.meta.dirname, 'src', 'css.d.ts');
+      const distCssDtsPath = path.resolve(
+        import.meta.dirname,
+        'dist',
+        'css.d.ts'
+      );
+      try {
+        copyFileSync(cssDtsPath, distCssDtsPath);
+        console.log('✅ Copied css.d.ts to dist/');
+      } catch (error) {
+        console.warn('⚠️  Could not copy css.d.ts:', error);
+      }
     },
   },
 });
