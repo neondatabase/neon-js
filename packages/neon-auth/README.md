@@ -1,16 +1,20 @@
 # @neondatabase/neon-auth
 
-Authentication adapter for Neon Auth, built on Better Auth.
+Authentication adapters for Neon Auth, supporting multiple auth providers.
 
 ## Overview
 
-`@neondatabase/neon-auth` provides an authentication client for applications using Neon Auth. It's a wrapper on top of [Better Auth](https://www.better-auth.com) that implements the `NeonAuthClient` interface, making it easy to integrate authentication into your applications.
+`@neondatabase/neon-auth` provides authentication adapters for applications using Neon Auth. It supports multiple auth providers through a unified adapter system:
+
+- **SupabaseAdapter** - Supabase-compatible API for familiar auth patterns
+- **BetterAuthVanillaAdapter** - Direct Better Auth API for vanilla JS/TS
+- **BetterAuthReactAdapter** - Better Auth with React hooks support
 
 This package is designed to work seamlessly with Neon's authentication infrastructure while providing:
 
-- **Standard API compatibility** - Familiar auth patterns for easy adoption
-- **Better Auth features** - Built on Better Auth's robust foundation
-- **Performance optimizations** - Session caching, request deduplication, and cross-tab sync
+- **Multiple adapter options** - Choose the API that fits your needs
+- **Better Auth foundation** - Built on Better Auth's robust architecture
+- **Performance optimizations** - Session caching and request deduplication
 - **TypeScript support** - Fully typed with strict type checking
 
 ## Installation
@@ -23,44 +27,97 @@ bun add @neondatabase/neon-auth
 
 ## Usage
 
-### Basic Setup
+### Using createNeonAuth (Recommended)
+
+The `createNeonAuth` factory function creates an auth client with the appropriate adapter:
+
+#### SupabaseAdapter - Supabase-compatible API
 
 ```typescript
-import { BetterAuthAdapter } from '@neondatabase/neon-auth/better-auth';
+import { createNeonAuth, SupabaseAdapter } from '@neondatabase/neon-auth';
 
-const auth = new BetterAuthAdapter({
-  baseURL: 'https://your-auth-server.com',
+const auth = createNeonAuth('https://your-auth-server.com', {
+  adapter: SupabaseAdapter,
 });
 
-// Sign up
+// Supabase-compatible methods
 await auth.signUp({
   email: 'user@example.com',
   password: 'secure-password',
   options: {
-    data: {
-      name: 'John Doe',
-    },
+    data: { name: 'John Doe' },
   },
 });
 
-// Sign in
 await auth.signInWithPassword({
   email: 'user@example.com',
   password: 'secure-password',
 });
 
-// Get current session
 const { data: session } = await auth.getSession();
-console.log(session?.user);
-
-// Sign out
 await auth.signOut();
 ```
 
-### OAuth Authentication
+#### BetterAuthVanillaAdapter - Direct Better Auth API
 
 ```typescript
-// Sign in with OAuth provider
+import { createNeonAuth, BetterAuthVanillaAdapter } from '@neondatabase/neon-auth';
+
+const auth = createNeonAuth('https://your-auth-server.com', {
+  adapter: BetterAuthVanillaAdapter,
+});
+
+// Direct Better Auth API
+await auth.signUp.email({
+  email: 'user@example.com',
+  password: 'secure-password',
+  name: 'John Doe',
+});
+
+await auth.signIn.email({
+  email: 'user@example.com',
+  password: 'secure-password',
+});
+
+const session = await auth.getSession();
+await auth.signOut();
+```
+
+#### BetterAuthReactAdapter - Better Auth with React Hooks
+
+```typescript
+import { createNeonAuth, BetterAuthReactAdapter } from '@neondatabase/neon-auth';
+
+const auth = createNeonAuth('https://your-auth-server.com', {
+  adapter: BetterAuthReactAdapter,
+});
+
+// Direct Better Auth API
+await auth.signIn.email({
+  email: 'user@example.com',
+  password: 'secure-password',
+});
+
+// React hooks
+function MyComponent() {
+  const session = auth.useSession();
+
+  if (session.isPending) return <div>Loading...</div>;
+  if (!session.data) return <div>Not logged in</div>;
+
+  return <div>Hello, {session.data.user.name}</div>;
+}
+```
+
+### OAuth Authentication (SupabaseAdapter)
+
+```typescript
+import { createNeonAuth, SupabaseAdapter } from '@neondatabase/neon-auth';
+
+const auth = createNeonAuth('https://your-auth-server.com', {
+  adapter: SupabaseAdapter,
+});
+
 await auth.signInWithOAuth({
   provider: 'google',
   options: {
@@ -69,198 +126,65 @@ await auth.signInWithOAuth({
 });
 ```
 
-### Session Management
+### OAuth Authentication (BetterAuth Adapters)
 
 ```typescript
-// Get current session (cached for performance)
-const { data: session } = await auth.getSession();
+import { createNeonAuth, BetterAuthVanillaAdapter } from '@neondatabase/neon-auth';
 
-// Get current user
-const { data: user } = await auth.getUser();
-
-// Update user metadata
-await auth.updateUser({
-  data: {
-    name: 'Jane Doe',
-    avatar_url: 'https://example.com/avatar.jpg',
-  },
-});
-```
-
-### Auth State Changes
-
-Listen to authentication state changes across your application:
-
-```typescript
-const { data: subscription } = auth.onAuthStateChange((event, session) => {
-  console.log('Auth event:', event);
-
-  switch (event) {
-    case 'SIGNED_IN':
-      console.log('User signed in:', session?.user);
-      break;
-    case 'SIGNED_OUT':
-      console.log('User signed out');
-      break;
-    case 'TOKEN_REFRESHED':
-      console.log('Token refreshed');
-      break;
-    case 'USER_UPDATED':
-      console.log('User updated:', session?.user);
-      break;
-  }
+const auth = createNeonAuth('https://your-auth-server.com', {
+  adapter: BetterAuthVanillaAdapter,
 });
 
-// Cleanup when done
-subscription.unsubscribe();
+await auth.signIn.social({
+  provider: 'google',
+  callbackURL: '/dashboard',
+});
 ```
 
 ## API Reference
 
-### Authentication Methods
+### createNeonAuth(url, config)
 
-#### `signUp(credentials)`
+Factory function to create an auth client.
 
-Create a new user account.
+**Parameters:**
+- `url` - The auth service URL
+- `config.adapter` - The adapter class to use
+- `config.options` - Additional adapter-specific options
 
-```typescript
-await auth.signUp({
-  email: 'user@example.com',
-  password: 'secure-password',
-  options: {
-    data: {
-      name: 'John Doe',
-      // ... additional metadata
-    },
-  },
-});
-```
+**Returns:** The adapter's public API (varies by adapter type)
 
-#### `signInWithPassword(credentials)`
+### Adapters
 
-Sign in with email and password.
+#### SupabaseAdapter
 
-```typescript
-await auth.signInWithPassword({
-  email: 'user@example.com',
-  password: 'secure-password',
-});
-```
+Provides a Supabase-compatible API:
 
-#### `signInWithOAuth(options)`
+- `signUp(credentials)` - Create a new user
+- `signInWithPassword(credentials)` - Sign in with email/password
+- `signInWithOAuth(options)` - Sign in with OAuth provider
+- `signOut()` - Sign out current user
+- `getSession()` - Get current session
+- `getUser()` - Get current user
+- `updateUser(attributes)` - Update user metadata
+- `getUserIdentities()` - Get linked OAuth identities
+- `linkIdentity(credentials)` - Link OAuth provider
+- `unlinkIdentity(identity)` - Unlink OAuth provider
+- `resetPasswordForEmail(email, options)` - Send password reset
+- `onAuthStateChange(callback)` - Listen to auth state changes
 
-Sign in with an OAuth provider.
+#### BetterAuthVanillaAdapter / BetterAuthReactAdapter
 
-```typescript
-await auth.signInWithOAuth({
-  provider: 'google', // or 'github', 'apple', etc.
-  options: {
-    redirectTo: '/dashboard',
-  },
-});
-```
+Exposes the Better Auth client directly:
 
-#### `signOut()`
+- `signIn.email(credentials)` - Sign in with email
+- `signIn.social(options)` - Sign in with OAuth
+- `signUp.email(credentials)` - Create new user
+- `signOut()` - Sign out current user
+- `getSession()` - Get current session
 
-Sign out the current user.
-
-```typescript
-await auth.signOut();
-```
-
-### Session Methods
-
-#### `getSession()`
-
-Get the current session (cached for performance).
-
-```typescript
-const { data: session, error } = await auth.getSession();
-```
-
-#### `getUser()`
-
-Get the current user.
-
-```typescript
-const { data: user, error } = await auth.getUser();
-```
-
-### User Management
-
-#### `updateUser(attributes)`
-
-Update user metadata.
-
-```typescript
-await auth.updateUser({
-  data: {
-    name: 'Jane Doe',
-    avatar_url: 'https://example.com/avatar.jpg',
-  },
-});
-```
-
-#### `getUserIdentities()`
-
-Get linked OAuth identities.
-
-```typescript
-const { data: identities } = await auth.getUserIdentities();
-```
-
-#### `linkIdentity(credentials)`
-
-Link a new OAuth provider to the current user.
-
-```typescript
-await auth.linkIdentity({
-  provider: 'github',
-});
-```
-
-#### `unlinkIdentity(identity)`
-
-Unlink an OAuth provider.
-
-```typescript
-await auth.unlinkIdentity({
-  identity: {
-    id: 'identity-id',
-    provider: 'github',
-  },
-});
-```
-
-### Password Management
-
-#### `resetPasswordForEmail(email)`
-
-Send a password reset email.
-
-```typescript
-await auth.resetPasswordForEmail('user@example.com', {
-  redirectTo: '/reset-password',
-});
-```
-
-### Event Listeners
-
-#### `onAuthStateChange(callback)`
-
-Listen to authentication state changes.
-
-```typescript
-const { data: subscription } = auth.onAuthStateChange((event, session) => {
-  // Handle auth state change
-});
-```
-
-**Events:**
-- `SIGNED_IN` - User signed in
-- `SIGNED_OUT` - User signed out
-- `TOKEN_REFRESHED` - Access token refreshed
-- `USER_UPDATED` - User metadata updated
+**React-specific (BetterAuthReactAdapter only):**
+- `useSession()` - React hook for session state
 
 ## Performance Features
 
@@ -272,60 +196,35 @@ Sessions are cached in memory with intelligent TTL management:
 - Lazy expiration checking on reads
 - Synchronous cache clearing on sign-out
 
-**Result:** Sub-millisecond session reads after initial fetch.
-
 ### Request Deduplication
 
 Multiple concurrent `getSession()` calls are automatically deduplicated:
 - Single network request for concurrent calls
-- 10x faster cold starts (10 concurrent calls: ~2000ms � ~200ms)
+- 10x faster cold starts (10 concurrent calls: ~2000ms → ~200ms)
 - Reduces server load by N-1 for N concurrent calls
-
-### Cross-Tab Synchronization
-
-Authentication state syncs across browser tabs (browser only):
-- Automatic sync via BroadcastChannel API
-- <50ms latency for cross-tab updates
-- Sign out in one tab, all tabs update instantly
 
 ## Environment Compatibility
 
--  Node.js 14+
--  Browser (all modern browsers)
--  Edge Runtime (Vercel, Cloudflare Workers, etc.)
--  Bun
-
-**Note:** Cross-tab sync is browser-only. Other features work in all environments.
+- Node.js 14+
+- Browser (all modern browsers)
+- Edge Runtime (Vercel, Cloudflare Workers, etc.)
+- Bun
 
 ## TypeScript
 
 Full TypeScript support with strict typing:
 
 ```typescript
-import type { AuthClient, Session, User } from '@neondatabase/neon-auth';
+import { createNeonAuth, SupabaseAdapter } from '@neondatabase/neon-auth';
+import type { Session, User } from '@neondatabase/neon-auth';
 
-const auth: AuthClient = new BetterAuthAdapter({
-  baseURL: 'https://your-auth-server.com',
+const auth = createNeonAuth('https://your-auth-server.com', {
+  adapter: SupabaseAdapter,
 });
 
 // Fully typed responses
 const { data: session }: { data: Session | null } = await auth.getSession();
-const { data: user }: { data: User | null } = await auth.getUser();
 ```
-
-## Supabase Compatibility
-
-This package implements the Supabase `AuthClient` interface, making it compatible with Supabase's authentication API. If you're migrating from Supabase, most of your existing auth code will work without changes.
-
-### Key Differences
-
-While the API is Supabase-compatible, the underlying implementation uses Better Auth, which provides:
-- Enhanced security features
-- Better session management
-- More OAuth providers
-- Improved developer experience
-
-For a detailed migration guide, see the [Better Auth Supabase Migration Guide](https://www.better-auth.com/docs/guides/supabase-migration-guide).
 
 ## Related Packages
 

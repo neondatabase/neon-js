@@ -8,12 +8,12 @@ The official TypeScript SDK for Neon, combining authentication and database quer
 
 **Key Features:**
 
-- = **Integrated Authentication** - Built on Better Auth with standard API compatibility
-- =� **PostgreSQL Querying** - Full PostgREST client with type-safe queries
-- � **High Performance** - Session caching, request deduplication, and cross-tab sync
-- = **Automatic Token Management** - Seamless token injection for database queries
-- =� **TypeScript First** - Fully typed with strict type checking
-- < **Universal** - Works in Node.js, browsers, and edge runtimes
+- **Integrated Authentication** - Multiple auth adapters (Supabase-compatible, Better Auth)
+- **PostgreSQL Querying** - Full PostgREST client with type-safe queries
+- **High Performance** - Session caching, request deduplication
+- **Automatic Token Management** - Seamless token injection for database queries
+- **TypeScript First** - Fully typed with strict type checking
+- **Universal** - Works in Node.js, browsers, and edge runtimes
 
 ## Installation
 
@@ -25,16 +25,22 @@ bun add @neondatabase/neon-js
 
 ## Quick Start
 
-```typescript
-import { createClient } from '@neondatabase/neon-js';
+### Using SupabaseAdapter (Supabase-compatible API)
 
-// Create client with auth and database configuration
+```typescript
+import { createClient, SupabaseAdapter } from '@neondatabase/neon-js';
+
 const client = createClient<Database>({
-  dataApiUrl: import.meta.env.VITE_NEON_DATA_API_URL,
-  authUrl: import.meta.env.VITE_NEON_AUTH_URL,
+  auth: {
+    adapter: SupabaseAdapter,
+    url: import.meta.env.VITE_NEON_AUTH_URL,
+  },
+  dataApi: {
+    url: import.meta.env.VITE_NEON_DATA_API_URL,
+  },
 });
 
-// Authenticate
+// Authenticate with Supabase-compatible API
 await client.auth.signInWithPassword({
   email: 'user@example.com',
   password: 'secure-password',
@@ -45,13 +51,64 @@ const { data: users, error } = await client
   .from('users')
   .select('*')
   .eq('status', 'active');
+```
 
-console.log(users);
+### Using BetterAuthVanillaAdapter (Direct Better Auth API)
+
+```typescript
+import { createClient, BetterAuthVanillaAdapter } from '@neondatabase/neon-js';
+
+const client = createClient<Database>({
+  auth: {
+    adapter: BetterAuthVanillaAdapter,
+    url: import.meta.env.VITE_NEON_AUTH_URL,
+  },
+  dataApi: {
+    url: import.meta.env.VITE_NEON_DATA_API_URL,
+  },
+});
+
+// Authenticate with Better Auth API
+await client.auth.signIn.email({
+  email: 'user@example.com',
+  password: 'secure-password',
+});
+
+// Query database (token automatically injected)
+const { data: users } = await client
+  .from('users')
+  .select('*');
+```
+
+### Using BetterAuthReactAdapter (Better Auth with React Hooks)
+
+```typescript
+import { createClient, BetterAuthReactAdapter } from '@neondatabase/neon-js';
+
+const client = createClient<Database>({
+  auth: {
+    adapter: BetterAuthReactAdapter,
+    url: import.meta.env.VITE_NEON_AUTH_URL,
+  },
+  dataApi: {
+    url: import.meta.env.VITE_NEON_DATA_API_URL,
+  },
+});
+
+// Use in React components
+function MyComponent() {
+  const session = client.auth.useSession();
+
+  if (session.isPending) return <div>Loading...</div>;
+  if (!session.data) return <div>Not logged in</div>;
+
+  return <div>Hello, {session.data.user.name}</div>;
+}
 ```
 
 ## Authentication
 
-### Sign Up
+### Sign Up (SupabaseAdapter)
 
 ```typescript
 await client.auth.signUp({
@@ -66,7 +123,17 @@ await client.auth.signUp({
 });
 ```
 
-### Sign In
+### Sign Up (BetterAuth Adapters)
+
+```typescript
+await client.auth.signUp.email({
+  email: 'user@example.com',
+  password: 'secure-password',
+  name: 'John Doe',
+});
+```
+
+### Sign In (SupabaseAdapter)
 
 ```typescript
 // Email & Password
@@ -84,7 +151,23 @@ await client.auth.signInWithOAuth({
 });
 ```
 
-### Session Management
+### Sign In (BetterAuth Adapters)
+
+```typescript
+// Email & Password
+await client.auth.signIn.email({
+  email: 'user@example.com',
+  password: 'secure-password',
+});
+
+// OAuth
+await client.auth.signIn.social({
+  provider: 'google',
+  callbackURL: '/dashboard',
+});
+```
+
+### Session Management (SupabaseAdapter)
 
 ```typescript
 // Get current session
@@ -104,7 +187,17 @@ await client.auth.updateUser({
 await client.auth.signOut();
 ```
 
-### Auth State Changes
+### Session Management (BetterAuth Adapters)
+
+```typescript
+// Get current session
+const session = await client.auth.getSession();
+
+// Sign out
+await client.auth.signOut();
+```
+
+### Auth State Changes (SupabaseAdapter)
 
 ```typescript
 client.auth.onAuthStateChange((event, session) => {
@@ -203,24 +296,25 @@ const { data } = await client
 ### Client Options
 
 ```typescript
-import { createClient } from '@neondatabase/neon-js';
+import { createClient, SupabaseAdapter } from '@neondatabase/neon-js';
 
 const client = createClient({
-  // Required: Data API URL
-  dataApiUrl: 'https://your-data-api.neon.tech/rest/v1',
-
-  // Required: Auth URL
-  authUrl: 'https://your-auth-server.neon.tech/auth',
-
-  // Optional: Client options
-  clientOptions: {
+  // Auth configuration
+  auth: {
+    adapter: SupabaseAdapter,
+    url: 'https://your-auth-server.neon.tech/auth',
     options: {
-      // Database options
+      // Additional adapter-specific options
+    },
+  },
+
+  // Data API configuration
+  dataApi: {
+    url: 'https://your-data-api.neon.tech/rest/v1',
+    options: {
       db: {
         schema: 'public', // Default schema
       },
-
-      // Global options for all requests
       global: {
         headers: {
           'X-Custom-Header': 'value',
@@ -228,28 +322,30 @@ const client = createClient({
       },
     },
   },
-
-  // Optional: Auth options
-  authOptions: {
-    // Additional Better Auth options
-  },
 });
 ```
 
 ### Environment Variables
 
 ```bash
-# Data API URL
-NEON_DATA_API_URL=https://your-data-api.neon.tech/rest/v1
-
 # Auth URL
 NEON_AUTH_URL=https://your-auth-server.neon.tech/auth
+
+# Data API URL
+NEON_DATA_API_URL=https://your-data-api.neon.tech/rest/v1
 ```
 
 ```typescript
+import { createClient, SupabaseAdapter } from '@neondatabase/neon-js';
+
 const client = createClient({
-  dataApiUrl: process.env.NEON_DATA_API_URL!,
-  authUrl: process.env.NEON_AUTH_URL!,
+  auth: {
+    adapter: SupabaseAdapter,
+    url: process.env.NEON_AUTH_URL!,
+  },
+  dataApi: {
+    url: process.env.NEON_DATA_API_URL!,
+  },
 });
 ```
 
@@ -265,18 +361,23 @@ Use generated types for full type safety:
 
 ```typescript
 import type { Database } from './types/database';
-import { createClient } from '@neondatabase/neon-js';
+import { createClient, SupabaseAdapter } from '@neondatabase/neon-js';
 
 const client = createClient<Database>({
-  dataApiUrl: process.env.NEON_DATA_API_URL!,
-  authUrl: process.env.NEON_AUTH_URL!,
+  auth: {
+    adapter: SupabaseAdapter,
+    url: process.env.NEON_AUTH_URL!,
+  },
+  dataApi: {
+    url: process.env.NEON_DATA_API_URL!,
+  },
 });
 
 // Fully typed queries!
 const { data } = await client
-  .from('users') //  Autocomplete for table names
-  .select('id, name, email') //  Autocomplete for column names
-  .eq('status', 'active'); //  Type checking for values
+  .from('users') // Autocomplete for table names
+  .select('id, name, email') // Autocomplete for column names
+  .eq('status', 'active'); // Type checking for values
 ```
 
 ## CLI Tool
@@ -318,28 +419,19 @@ Concurrent authentication calls are automatically deduplicated:
 - **With deduplication:** 10 concurrent calls = 1 request (~200ms)
 - **Result:** 10x faster, N-1 fewer server requests
 
-### Cross-Tab Sync
-
-Auth state syncs across browser tabs (browser only):
-- **Sync method:** BroadcastChannel API
-- **Latency:** <50ms
-- **Events:** Sign in, sign out, token refresh, user updates
-
 ## Environment Compatibility
 
--  **Node.js** 14+ (with native fetch or polyfill)
--  **Browser** (all modern browsers)
--  **Edge Runtime** (Vercel, Cloudflare Workers, Deno, etc.)
--  **Bun** (native support)
-
-**Note:** Cross-tab sync is browser-only. All other features work in all environments.
+- **Node.js** 14+ (with native fetch or polyfill)
+- **Browser** (all modern browsers)
+- **Edge Runtime** (Vercel, Cloudflare Workers, Deno, etc.)
+- **Bun** (native support)
 
 ## Error Handling
 
 ```typescript
-import { AuthError, PostgrestError } from '@neondatabase/neon-js';
+import { AuthError } from '@neondatabase/neon-js';
 
-// Auth errors
+// Auth errors (SupabaseAdapter)
 try {
   await client.auth.signInWithPassword({ email, password });
 } catch (error) {
@@ -361,11 +453,16 @@ if (error) {
 
 ```typescript
 // app/lib/neon.ts
-import { createClient } from '@neondatabase/neon-js';
+import { createClient, SupabaseAdapter } from '@neondatabase/neon-js';
 
 export const neon = createClient({
-  dataApiUrl: process.env.NEON_DATA_API_URL!,
-  authUrl: process.env.NEON_AUTH_URL!,
+  auth: {
+    adapter: SupabaseAdapter,
+    url: process.env.NEON_AUTH_URL!,
+  },
+  dataApi: {
+    url: process.env.NEON_DATA_API_URL!,
+  },
 });
 
 // app/api/users/route.ts
@@ -377,38 +474,29 @@ export async function GET() {
 }
 ```
 
-### React Hook
+### React Hook with BetterAuthReactAdapter
 
 ```typescript
-import { useEffect, useState } from 'react';
-import { createClient } from '@neondatabase/neon-js';
+import { createClient, BetterAuthReactAdapter } from '@neondatabase/neon-js';
 
 const client = createClient({
-  dataApiUrl: process.env.NEXT_PUBLIC_NEON_DATA_API_URL!,
-  authUrl: process.env.NEXT_PUBLIC_NEON_AUTH_URL!,
+  auth: {
+    adapter: BetterAuthReactAdapter,
+    url: process.env.NEXT_PUBLIC_NEON_AUTH_URL!,
+  },
+  dataApi: {
+    url: process.env.NEXT_PUBLIC_NEON_DATA_API_URL!,
+  },
 });
 
 export function useAuth() {
-  const [user, setUser] = useState(null);
-
-  useEffect(() => {
-    // Get initial session
-    client.auth.getUser().then(({ data }) => setUser(data));
-
-    // Listen for changes
-    const { data: subscription } = client.auth.onAuthStateChange(
-      (event, session) => {
-        setUser(session?.user ?? null);
-      }
-    );
-
-    return () => subscription.unsubscribe();
-  }, []);
+  const session = client.auth.useSession();
 
   return {
-    user,
+    user: session.data?.user ?? null,
+    isPending: session.isPending,
     signIn: (email: string, password: string) =>
-      client.auth.signInWithPassword({ email, password }),
+      client.auth.signIn.email({ email, password }),
     signOut: () => client.auth.signOut(),
   };
 }
@@ -418,32 +506,33 @@ export function useAuth() {
 
 This package combines two underlying packages:
 
-- [`@neondatabase/neon-auth`](../neon-auth) - Authentication adapter (can be used standalone)
+- [`@neondatabase/neon-auth`](../neon-auth) - Authentication adapters (can be used standalone)
 - [`@neondatabase/postgrest-js`](../postgrest-js) - PostgreSQL client (can be used standalone)
 
-## Migration Guides
+## Migration from Previous Version
 
-### From Supabase
-
-The API is designed to be compatible with Supabase:
+If you're migrating from the old API that used `dataApiUrl` and `authUrl` directly:
 
 ```typescript
-// Before (Supabase)
-import { createClient } from '@supabase/supabase-js';
-const supabase = createClient(url, anonKey);
-
-// After (Neon)
-import { createClient } from '@neondatabase/neon-js';
-const neon = createClient({
-  dataApiUrl,
-  authUrl,
+// Before (old API)
+const client = createClient({
+  dataApiUrl: 'https://data-api.example.com/rest/v1',
+  authUrl: 'https://auth.example.com',
 });
 
-// Same API for queries and auth!
-const { data } = await neon.from('users').select();
-```
+// After (new API with adapters)
+import { createClient, SupabaseAdapter } from '@neondatabase/neon-js';
 
-For detailed migration instructions, see the [Better Auth Supabase Migration Guide](https://www.better-auth.com/docs/guides/supabase-migration-guide).
+const client = createClient({
+  auth: {
+    adapter: SupabaseAdapter,
+    url: 'https://auth.example.com',
+  },
+  dataApi: {
+    url: 'https://data-api.example.com/rest/v1',
+  },
+});
+```
 
 ## Resources
 
