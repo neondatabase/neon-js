@@ -225,7 +225,7 @@ export class BetterAuthAdapter implements AuthClient {
   //#endregion
 
   //#region PUBLIC API - Initialization
-  getBetterAuthInstance() {
+  getBetterAuthInstance(): ReturnType<typeof createAuthClient> {
     return this._betterAuth;
   }
 
@@ -352,10 +352,13 @@ export class BetterAuthAdapter implements AuthClient {
 
   // TODO: we need to implement a custom plugin to allow setting external sessions
   setSession: AuthClient['setSession'] = async () => {
-    throw createAuthError(
-      AuthErrorCode.NotImplemented,
-      'setSession() is not supported by Better Auth. Use signInWithPassword() instead.'
-    );
+    return {
+      data: { user: null, session: null },
+      error: createAuthError(
+        AuthErrorCode.NotImplemented,
+        'setSession() is not supported by Better Auth. Use signInWithPassword() instead.'
+      ),
+    };
   };
 
   //#region PUBLIC API - Authentication
@@ -661,7 +664,7 @@ export class BetterAuthAdapter implements AuthClient {
       const result = await this._betterAuth.signOut();
 
       if (result.error) {
-        throw result.error;
+        return { error: normalizeBetterAuthError(result.error) };
       }
 
       return { error: null };
@@ -822,7 +825,10 @@ export class BetterAuthAdapter implements AuthClient {
 
       const updatedSessionResult = await this.getSession({ forceFetch: true });
       if (!updatedSessionResult.data.session) {
-        throw new Error('Failed to retrieve updated user');
+        throw createAuthError(
+          AuthErrorCode.SessionNotFound,
+          'Failed to retrieve updated user'
+        );
       }
 
       return {
@@ -877,7 +883,7 @@ export class BetterAuthAdapter implements AuthClient {
         let accountInfo = null;
         try {
           const infoResult = await this._betterAuth.accountInfo({
-            accountId: account.accountId,
+            query: { accountId: account.accountId },
           });
           accountInfo = infoResult.data;
         } catch (error) {
