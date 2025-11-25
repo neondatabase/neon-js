@@ -1,4 +1,4 @@
-import { type AuthClient, isAuthError } from '../../auth-interface';
+import { type NeonAuthClientInterface, isAuthError } from '../../auth-interface';
 import { APIError } from 'better-auth/api';
 import {
   type Session,
@@ -19,8 +19,8 @@ import {
 import type { NeonBetterAuthOptions } from './better-auth-types';
 import {
   normalizeBetterAuthError,
-  mapBetterAuthSessionToSupabase,
-  mapBetterAuthUserIdentityToSupabase,
+  mapBetterAuthSession,
+  mapBetterAuthIdentity,
 } from './better-auth-helpers';
 import { AuthErrorCode, createAuthError } from './errors/definitions';
 import {
@@ -40,7 +40,7 @@ import {
 } from './better-auth-methods';
 import { BETTER_AUTH_TOKEN_STORAGE } from '../../utils/storage';
 /**
- * Better Auth adapter implementing the Supabase-compatible AuthClient interface.
+ * Better Auth adapter implementing the NeonAuthClient interface.
  * See CLAUDE.md for architecture details and API mappings.
  */
 const defaultBetterAuthClientOptions = {
@@ -56,10 +56,10 @@ const defaultBetterAuthClientOptions = {
   ],
 } satisfies BetterAuthClientOptions;
 
-export class BetterAuthAdapter implements AuthClient {
-  admin: AuthClient['admin'] = undefined as never;
-  mfa: AuthClient['mfa'] = undefined as never;
-  oauth: AuthClient['oauth'] = undefined as never;
+export class BetterAuthAdapter implements NeonAuthClientInterface {
+  admin: NeonAuthClientInterface['admin'] = undefined as never;
+  mfa: NeonAuthClientInterface['mfa'] = undefined as never;
+  oauth: NeonAuthClientInterface['oauth'] = undefined as never;
   private _betterAuth: BetterAuthClient<typeof defaultBetterAuthClientOptions>;
   private _stateChangeEmitters = new Map<string, Subscription>();
 
@@ -191,7 +191,7 @@ export class BetterAuthAdapter implements AuthClient {
     });
 
     // Set up cross-tab event listener for Better Auth broadcasts
-    // This listens to events from other tabs and notifies local Supabase subscribers
+    // This listens to events from other tabs and notifies local subscribers
     getGlobalBroadcastChannel().subscribe((message) => {
       console.log('[cross-tab event] Received message, before if:', message);
 
@@ -206,7 +206,7 @@ export class BetterAuthAdapter implements AuthClient {
           BETTER_AUTH_METHODS_CACHE.clearSessionCache();
         }
 
-        // 2. Notify all Supabase-compatible subscribers
+        // 2. Notify all subscribers
         const promises = [...this._stateChangeEmitters.values()].map(
           (subscription) => {
             try {
@@ -230,7 +230,7 @@ export class BetterAuthAdapter implements AuthClient {
     return this._betterAuth;
   }
 
-  initialize: AuthClient['initialize'] = async () => {
+  initialize: NeonAuthClientInterface['initialize'] = async () => {
     try {
       const session = await this.getSession();
 
@@ -257,7 +257,7 @@ export class BetterAuthAdapter implements AuthClient {
   //#region PUBLIC API - Session Management
   async getSession(options?: {
     forceFetch?: boolean;
-  }): ReturnType<AuthClient['getSession']> {
+  }): ReturnType<NeonAuthClientInterface['getSession']> {
     try {
       console.log('[getSession] Called with options:', options);
 
@@ -297,7 +297,7 @@ export class BetterAuthAdapter implements AuthClient {
         return { data: { session: null }, error: null };
       }
 
-      const session = mapBetterAuthSessionToSupabase(
+      const session = mapBetterAuthSession(
         currentSession.data.session,
         currentSession.data.user
       );
@@ -335,7 +335,7 @@ export class BetterAuthAdapter implements AuthClient {
     }
   }
 
-  refreshSession: AuthClient['refreshSession'] = async () => {
+  refreshSession: NeonAuthClientInterface['refreshSession'] = async () => {
     try {
       const sessionResult = await this.getSession();
 
@@ -362,7 +362,7 @@ export class BetterAuthAdapter implements AuthClient {
   };
 
   // TODO: we need to implement a custom plugin to allow setting external sessions
-  setSession: AuthClient['setSession'] = async () => {
+  setSession: NeonAuthClientInterface['setSession'] = async () => {
     return {
       data: { user: null, session: null },
       error: createAuthError(
@@ -373,7 +373,7 @@ export class BetterAuthAdapter implements AuthClient {
   };
 
   //#region PUBLIC API - Authentication
-  signUp: AuthClient['signUp'] = async (credentials) => {
+  signUp: NeonAuthClientInterface['signUp'] = async (credentials) => {
     try {
       if ('email' in credentials && credentials.email && credentials.password) {
         const displayName =
@@ -437,7 +437,7 @@ export class BetterAuthAdapter implements AuthClient {
   };
 
   // TODO: we need to add the anonymous() plugin to the server adapter
-  signInAnonymously: AuthClient['signInAnonymously'] = async () => {
+  signInAnonymously: NeonAuthClientInterface['signInAnonymously'] = async () => {
     return {
       data: { user: null, session: null },
       error: createAuthError(
@@ -447,7 +447,7 @@ export class BetterAuthAdapter implements AuthClient {
     };
   };
 
-  signInWithPassword: AuthClient['signInWithPassword'] = async (
+  signInWithPassword: NeonAuthClientInterface['signInWithPassword'] = async (
     credentials
   ) => {
     try {
@@ -500,13 +500,13 @@ export class BetterAuthAdapter implements AuthClient {
   };
 
   // TODO: we should omit queryParams from the credentials
-  signInWithOAuth: AuthClient['signInWithOAuth'] = async (credentials) => {
+  signInWithOAuth: NeonAuthClientInterface['signInWithOAuth'] = async (credentials) => {
     try {
       const { provider, options } = credentials;
 
       await this._betterAuth.signIn.social({
         provider,
-        // Convert scopes from Supabase format (space-separated string) to Better Auth format (array)
+        // Convert scopes from space-separated string to Better Auth format (array)
         scopes: options?.scopes?.split(' '),
         disableRedirect: options?.skipBrowserRedirect,
         callbackURL:
@@ -535,7 +535,7 @@ export class BetterAuthAdapter implements AuthClient {
   };
 
   // TODO: we need to setup this up with `phone` type
-  signInWithOtp: AuthClient['signInWithOtp'] = async (credentials) => {
+  signInWithOtp: NeonAuthClientInterface['signInWithOtp'] = async (credentials) => {
     try {
       if ('email' in credentials) {
         await this._betterAuth.emailOtp.sendVerificationOtp({
@@ -564,7 +564,7 @@ export class BetterAuthAdapter implements AuthClient {
     }
   };
 
-  signInWithIdToken: AuthClient['signInWithIdToken'] = async (credentials) => {
+  signInWithIdToken: NeonAuthClientInterface['signInWithIdToken'] = async (credentials) => {
     try {
       const result = await this._betterAuth.signIn.social({
         provider: credentials.provider,
@@ -614,7 +614,7 @@ export class BetterAuthAdapter implements AuthClient {
   };
 
   // TODO: we need to add the sso plugin to the server adapter
-  signInWithSSO: AuthClient['signInWithSSO'] = async (params) => {
+  signInWithSSO: NeonAuthClientInterface['signInWithSSO'] = async (params) => {
     const attemptedWith =
       'providerId' in params
         ? `provider ID: ${params.providerId}`
@@ -630,7 +630,7 @@ export class BetterAuthAdapter implements AuthClient {
   };
 
   // TODO: we need to add the SIWE plugin to the server adapter
-  signInWithWeb3: AuthClient['signInWithWeb3'] = async (credentials) => {
+  signInWithWeb3: NeonAuthClientInterface['signInWithWeb3'] = async (credentials) => {
     const attemptedChain = credentials.chain;
 
     return {
@@ -645,7 +645,7 @@ export class BetterAuthAdapter implements AuthClient {
     };
   };
 
-  signOut: AuthClient['signOut'] = async () => {
+  signOut: NeonAuthClientInterface['signOut'] = async () => {
     try {
       const result = await this._betterAuth.signOut();
 
@@ -667,7 +667,7 @@ export class BetterAuthAdapter implements AuthClient {
   //#endregion
 
   //#region PUBLIC API - User Management
-  getUser: AuthClient['getUser'] = async () => {
+  getUser: NeonAuthClientInterface['getUser'] = async () => {
     try {
       const sessionResult = await this.getSession();
 
@@ -757,7 +757,7 @@ export class BetterAuthAdapter implements AuthClient {
     }
   };
 
-  updateUser: AuthClient['updateUser'] = async (attributes) => {
+  updateUser: NeonAuthClientInterface['updateUser'] = async (attributes) => {
     try {
       if (attributes.password) {
         throw createAuthError(
@@ -811,7 +811,7 @@ export class BetterAuthAdapter implements AuthClient {
     }
   };
 
-  getUserIdentities: AuthClient['getUserIdentities'] = async () => {
+  getUserIdentities: NeonAuthClientInterface['getUserIdentities'] = async () => {
     try {
       const sessionResult = await this.getSession();
 
@@ -852,7 +852,7 @@ export class BetterAuthAdapter implements AuthClient {
           );
         }
 
-        return mapBetterAuthUserIdentityToSupabase(
+        return mapBetterAuthIdentity(
           account,
           accountInfo ?? null
         );
@@ -876,7 +876,7 @@ export class BetterAuthAdapter implements AuthClient {
   };
 
   // TODO: we need to enable the account/accountLinking plugin to the server adapter
-  linkIdentity: AuthClient['linkIdentity'] = async (credentials) => {
+  linkIdentity: NeonAuthClientInterface['linkIdentity'] = async (credentials) => {
     const provider = credentials.provider as Provider;
     try {
       const sessionResult = await this.getSession();
@@ -956,7 +956,7 @@ export class BetterAuthAdapter implements AuthClient {
     }
   };
 
-  unlinkIdentity: AuthClient['unlinkIdentity'] = async (identity) => {
+  unlinkIdentity: NeonAuthClientInterface['unlinkIdentity'] = async (identity) => {
     try {
       const sessionResult = await this.getSession();
       if (sessionResult.error || !sessionResult.data.session) {
@@ -1027,7 +1027,7 @@ export class BetterAuthAdapter implements AuthClient {
   // TODO: add twoFactor plugin to the server adapter
   // TODO: add magiclink plugin to the server adapter
   //#region PUBLIC API - Verification & Password Reset
-  verifyOtp: AuthClient['verifyOtp'] = async (params) => {
+  verifyOtp: NeonAuthClientInterface['verifyOtp'] = async (params) => {
     try {
       if ('email' in params && params.email) {
         return await this.verifyEmailOtp(params);
@@ -1059,7 +1059,7 @@ export class BetterAuthAdapter implements AuthClient {
 
   // TODO: this will only work with a magic link and not with the OTP token flow
   // we need to derive which flow is being used and handle it accordingly
-  resetPasswordForEmail: AuthClient['resetPasswordForEmail'] = async (
+  resetPasswordForEmail: NeonAuthClientInterface['resetPasswordForEmail'] = async (
     email,
     options
   ) => {
@@ -1092,7 +1092,7 @@ export class BetterAuthAdapter implements AuthClient {
   };
 
   // TODO: we would need a custom plugin to be able to actually recreate the session
-  reauthenticate: AuthClient['reauthenticate'] = async () => {
+  reauthenticate: NeonAuthClientInterface['reauthenticate'] = async () => {
     try {
       const newSession = await this.getSession();
 
@@ -1122,7 +1122,7 @@ export class BetterAuthAdapter implements AuthClient {
     }
   };
 
-  resend: AuthClient['resend'] = async (credentials) => {
+  resend: NeonAuthClientInterface['resend'] = async (credentials) => {
     try {
       if ('email' in credentials) {
         const { email, type, options } = credentials;
@@ -1193,7 +1193,7 @@ export class BetterAuthAdapter implements AuthClient {
     }
   };
 
-  exchangeCodeForSession: AuthClient['exchangeCodeForSession'] = async (
+  exchangeCodeForSession: NeonAuthClientInterface['exchangeCodeForSession'] = async (
     _authCode: string
   ) => {
     try {
@@ -1229,7 +1229,7 @@ export class BetterAuthAdapter implements AuthClient {
   //#endregion
 
   //#region PUBLIC API - Event System
-  onAuthStateChange: AuthClient['onAuthStateChange'] = (callback) => {
+  onAuthStateChange: NeonAuthClientInterface['onAuthStateChange'] = (callback) => {
     const id = crypto.randomUUID();
 
     const subscription: Subscription = {
@@ -1257,13 +1257,13 @@ export class BetterAuthAdapter implements AuthClient {
   //#endregion
 
   //#region PUBLIC API - Auto Refresh & Configuration
-  isThrowOnErrorEnabled: AuthClient['isThrowOnErrorEnabled'] = () => false;
+  isThrowOnErrorEnabled: NeonAuthClientInterface['isThrowOnErrorEnabled'] = () => false;
 
-  startAutoRefresh: AuthClient['startAutoRefresh'] = async () => {
+  startAutoRefresh: NeonAuthClientInterface['startAutoRefresh'] = async () => {
     return;
   };
 
-  stopAutoRefresh: AuthClient['stopAutoRefresh'] = async () => {
+  stopAutoRefresh: NeonAuthClientInterface['stopAutoRefresh'] = async () => {
     return;
   };
   //#endregion

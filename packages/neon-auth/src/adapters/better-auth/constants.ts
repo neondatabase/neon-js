@@ -1,9 +1,7 @@
 /**
  * Session caching configuration constants
  *
- * Industry Standards:
- * - Supabase: 60s cache
- * - Clerk: 60s cache
+ * Uses industry-standard 60s cache TTL (common across auth providers).
  *
  * Note: Token refresh detection is now automatic via Better Auth's
  * fetchOptions.onSuccess callback. No polling is needed.

@@ -1,14 +1,14 @@
 # @neondatabase/neon-auth
 
-Supabase-compatible authentication adapter for Neon Auth, built on Better Auth.
+Authentication adapter for Neon Auth, built on Better Auth.
 
 ## Overview
 
-`@neondatabase/neon-auth` provides a Supabase-compatible authentication client for applications using Neon Auth. It's a wrapper on top of [Better Auth](https://www.better-auth.com) that implements the Supabase `AuthClient` interface, making it easy to migrate from Supabase or use familiar authentication patterns.
+`@neondatabase/neon-auth` provides an authentication client for applications using Neon Auth. It's a wrapper on top of [Better Auth](https://www.better-auth.com) that implements the `NeonAuthClient` interface, making it easy to integrate authentication into your applications.
 
 This package is designed to work seamlessly with Neon's authentication infrastructure while providing:
 
-- **Supabase API compatibility** - Drop-in replacement for Supabase auth
+- **Standard API compatibility** - Familiar auth patterns for easy adoption
 - **Better Auth features** - Built on Better Auth's robust foundation
 - **Performance optimizations** - Session caching, request deduplication, and cross-tab sync
 - **TypeScript support** - Fully typed with strict type checking

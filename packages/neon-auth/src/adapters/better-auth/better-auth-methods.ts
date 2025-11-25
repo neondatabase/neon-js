@@ -2,7 +2,7 @@ import type { AuthChangeEvent, Session } from '@supabase/auth-js';
 import { getGlobalBroadcastChannel } from 'better-auth/client';
 import { InFlightRequestManager } from './in-flight-request-manager';
 import { SessionCacheManager } from './session-cache-manager';
-import { mapBetterAuthSessionToSupabase } from './better-auth-helpers';
+import { mapBetterAuthSession } from './better-auth-helpers';
 import type { BetterAuthSessionResponse } from './better-auth-types';
 import { BETTER_AUTH_TOKEN_STORAGE } from '../../utils/storage';
 
@@ -28,7 +28,7 @@ export const BETTER_AUTH_METHODS_HOOKS = {
     onRequest: () => {},
     onSuccess: (responseData) => {
       if (isSessionResponseData(responseData)) {
-        const session = mapBetterAuthSessionToSupabase(
+        const session = mapBetterAuthSession(
           responseData.session,
           responseData.user
         );
@@ -42,7 +42,7 @@ export const BETTER_AUTH_METHODS_HOOKS = {
     onRequest: () => {},
     onSuccess: (responseData) => {
       if (isSessionResponseData(responseData)) {
-        const session = mapBetterAuthSessionToSupabase(
+        const session = mapBetterAuthSession(
           responseData.session,
           responseData.user
         );
@@ -70,7 +70,7 @@ export const BETTER_AUTH_METHODS_HOOKS = {
     onRequest: () => {},
     onSuccess: (responseData) => {
       if (isSessionResponseData(responseData)) {
-        const session = mapBetterAuthSessionToSupabase(
+        const session = mapBetterAuthSession(
           responseData.session,
           responseData.user
         );
@@ -84,7 +84,7 @@ export const BETTER_AUTH_METHODS_HOOKS = {
     onRequest: () => {},
     onSuccess: (responseData) => {
       if (isSessionResponseData(responseData)) {
-        const session = mapBetterAuthSessionToSupabase(
+        const session = mapBetterAuthSession(
           responseData.session,
           responseData.user
         );
@@ -98,17 +98,17 @@ export const BETTER_AUTH_METHODS_HOOKS = {
 
 /**
  * Unified event emission method that handles both Better Auth broadcasts
- * and Supabase-compatible event notifications from a single point.
+ * and compatible event notifications from a single point.
  *
  * This ensures:
  * - Single source of truth for all event emissions
  * - Better Auth ecosystem compatibility via getGlobalBroadcastChannel()
- * - Supabase-compatible API via onAuthStateChange callbacks
+ * - Compatible API via onAuthStateChange callbacks
  * - Cross-tab synchronization via Better Auth's broadcast system
  */
 export async function emitAuthEvent(event: InternalAuthEvent): Promise<void> {
-  // Map internal event to Supabase event and extract session
-  const supabaseEvent = mapToSupabaseEvent(event);
+  // Map internal event to auth event and extract session
+  const authEvent = mapToAuthEvent(event);
   const session = 'session' in event ? event.session : null;
 
   // 1. Emit Better Auth broadcast for cross-tab sync + ecosystem compatibility
@@ -123,13 +123,13 @@ export async function emitAuthEvent(event: InternalAuthEvent): Promise<void> {
 
   getGlobalBroadcastChannel().post({
     event: 'session',
-    data: { trigger: supabaseEvent, session },
+    data: { trigger: authEvent, session },
     clientId: crypto.randomUUID(),
   });
 }
 
-/** Maps internal event types to Supabase-compatible event names */
-function mapToSupabaseEvent(event: InternalAuthEvent): AuthChangeEvent {
+/** Maps internal event types to compatible event names */
+function mapToAuthEvent(event: InternalAuthEvent): AuthChangeEvent {
   switch (event.type) {
     case 'SIGN_IN': {
       return 'SIGNED_IN';

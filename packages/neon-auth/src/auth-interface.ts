@@ -1,13 +1,13 @@
-import { type AuthClient as AuthClientSupabase } from '@supabase/auth-js';
+import { type AuthClient as UpstreamAuthClient } from '@supabase/auth-js';
 
-type _AuthClientSupabaseInstance = InstanceType<typeof AuthClientSupabase>;
+type _UpstreamAuthClientInstance = InstanceType<typeof UpstreamAuthClient>;
 type _AuthClientBase = {
-  [K in keyof _AuthClientSupabaseInstance as _AuthClientSupabaseInstance[K] extends never
+  [K in keyof _UpstreamAuthClientInstance as _UpstreamAuthClientInstance[K] extends never
     ? never
-    : K]: _AuthClientSupabaseInstance[K]; // This filters out protected/private members by checking if they are accessible
+    : K]: _UpstreamAuthClientInstance[K]; // This filters out protected/private members by checking if they are accessible
 };
 
-export type AuthClient = _AuthClientBase;
+export type NeonAuthClientInterface = _AuthClientBase;
 
-// Re-export Supabase error types
+// Re-export error types for auth handling
 export { AuthError, AuthApiError, isAuthError } from '@supabase/auth-js';

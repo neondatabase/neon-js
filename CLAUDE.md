@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A unified TypeScript SDK monorepo for Neon services, providing seamless integration with **Neon Auth** (authentication service) and **Neon Data API** (PostgreSQL database queries). Built with a Supabase-compatible interface for easy migration.
+A unified TypeScript SDK monorepo for Neon services, providing seamless integration with **Neon Auth** (authentication service) and **Neon Data API** (PostgreSQL database queries). Built with a familiar interface for easy adoption.
 
 ## Monorepo Structure
 
@@ -12,7 +12,7 @@ This is a Bun workspaces monorepo with three published packages:
 
 ### `@neondatabase/postgrest-js` (packages/postgrest-js/)
 Generic PostgreSQL client for Neon Data API without authentication:
-- **NeonPostgrestClient**: Wrapper around Supabase's PostgrestClient with Neon-specific configuration
+- **NeonPostgrestClient**: Wrapper around the upstream PostgrestClient with Neon-specific configuration
 - **fetchWithToken()**: Generic utility for adding token-based authentication to requests
 - No auth dependencies - can be used standalone for non-authenticated scenarios
 
@@ -21,7 +21,7 @@ Generic PostgreSQL client for Neon Data API without authentication:
 - `@neondatabase/postgrest-js/client` - Client components
 
 ### `@neondatabase/neon-auth` (packages/neon-auth/)
-Authentication adapter implementing the Supabase-compatible `AuthClient` interface:
+Authentication adapter implementing the `NeonAuthClientInterface`:
 - **Better Auth Adapter**: Full-featured adapter with session caching, request deduplication, and cross-tab sync
 
 **Exports:**
@@ -81,7 +81,7 @@ bun release           # Bump version and publish all three packages
 ### PostgreSQL Client Layer (`packages/postgrest-js/`)
 
 **Client**: `src/client/`
-- `postgrest-client.ts` - NeonPostgrestClient class (extends Supabase's PostgrestClient)
+- `postgrest-client.ts` - NeonPostgrestClient class (extends the upstream PostgrestClient)
 - `fetch-with-token.ts` - Generic token-based fetch wrapper
 - `index.ts` - Client exports
 
@@ -90,7 +90,7 @@ bun release           # Bump version and publish all three packages
 ### Authentication Layer (`packages/neon-auth/`)
 
 **Core Interface**: `src/auth-interface.ts`
-- Defines `AuthClient` interface (Supabase-compatible)
+- Defines `NeonAuthClientInterface` (standard auth interface)
 - Error types: `AuthError`, `AuthApiError`
 
 **Adapters**: `src/adapters/`
@@ -189,7 +189,7 @@ const client = createClient(
   }
 );
 
-// Auth methods (Supabase-compatible)
+// Auth methods
 await client.auth.signInWithPassword({ email, password });
 const { data } = await client.auth.getSession();
 
@@ -277,7 +277,7 @@ Works in both browser and Node.js:
 ## Testing
 
 Tests use real SDKs with MSW for network mocking:
-- Verifies retrocompatibility with Supabase AuthClient API
+- Verifies API compatibility and interface contracts
 - Catches breaking changes in Better Auth SDK versions
 - Located in `packages/neon-auth/src/__tests__/`
 

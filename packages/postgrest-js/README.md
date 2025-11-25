@@ -98,7 +98,7 @@ const client = new NeonPostgrestClient({
 
 ### `NeonPostgrestClient`
 
-Extends Supabase's `PostgrestClient` with Neon-specific configuration.
+Extends the upstream `PostgrestClient` with Neon-specific configuration.
 
 **Constructor Options:**
 

@@ -13,7 +13,7 @@ import { AuthErrorCode, getErrorDefinition } from './errors/definitions';
 import { BETTER_AUTH_ERROR_MAP } from './errors/mappings';
 
 /**
- * Normalize Better Auth errors to Supabase-compatible AuthError format
+ * Normalize Better Auth errors to standard AuthError format
  *
  * Handles three error formats:
  * 1. BetterFetchError: { status, statusText, message?, code? }
@@ -22,7 +22,7 @@ import { BETTER_AUTH_ERROR_MAP } from './errors/mappings';
  *
  * Maps Better Auth errors to appropriate AuthError/AuthApiError with:
  * - Correct HTTP status codes
- * - Supabase-compatible error codes (snake_case)
+ * - Standard error codes (snake_case)
  * - User-friendly, security-conscious messages
  */
 export function normalizeBetterAuthError(
@@ -299,9 +299,9 @@ function createNormalizedError(
 }
 
 /**
- * Map Better Auth session to Supabase Session format
+ * Map Better Auth session to Session format
  */
-export function mapBetterAuthSessionToSupabase(
+export function mapBetterAuthSession(
   betterAuthSession: BetterAuthSession | null | undefined,
   betterAuthUser: BetterAuthUser | null | undefined
 ): Session | null {
@@ -309,7 +309,7 @@ export function mapBetterAuthSessionToSupabase(
     return null;
   }
 
-  console.log('[mapBetterAuthSessionToSupabase] Input token:', {
+  console.log('[mapBetterAuthSession] Input token:', {
     token: betterAuthSession.token,
     tokenLength: betterAuthSession.token?.length,
     tokenType: typeof betterAuthSession.token,
@@ -338,17 +338,17 @@ export function mapBetterAuthSessionToSupabase(
 
   // Note: betterAuthSession.token is an OPAQUE token (random string), not a JWT
   // We cannot decode it to extract claims. Better Auth stores session data server-side.
-  // The adapter will replace this with the JWT token when available for Supabase compatibility
+  // The adapter will replace this with the JWT token when available
   const session: Session = {
     access_token: betterAuthSession.token, // Opaque token (will be replaced with JWT by adapter)
     refresh_token: betterAuthSession.refreshToken || '',
     expires_at: expiresAt,
     expires_in: expiresIn,
     token_type: 'bearer' as const,
-    user: mapBetterAuthUserToSupabase(betterAuthUser),
+    user: mapBetterAuthUser(betterAuthUser),
   };
 
-  console.log('[mapBetterAuthSessionToSupabase] Output access_token:', {
+  console.log('[mapBetterAuthSession] Output access_token:', {
     accessToken: session.access_token,
     accessTokenLength: session.access_token?.length,
     isJWT: session.access_token?.startsWith('eyJ'),
@@ -358,9 +358,9 @@ export function mapBetterAuthSessionToSupabase(
 }
 
 /**
- * Map Better Auth user to Supabase User format
+ * Map Better Auth user to User format
  */
-export function mapBetterAuthUserToSupabase(
+export function mapBetterAuthUser(
   betterAuthUser: BetterAuthUser
 ): User {
   const createdAt = toISOString(betterAuthUser.createdAt);
@@ -411,7 +411,7 @@ export function mapBetterAuthUserToSupabase(
   return user;
 }
 
-export function mapBetterAuthUserIdentityToSupabase(
+export function mapBetterAuthIdentity(
   betterAuthUserIdentityAccount: Awaited<
     ReturnType<typeof listUserAccounts>
   >[number],

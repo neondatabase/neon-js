@@ -3,9 +3,9 @@ import type { createAuthClient as createVanillaAuthClient } from 'better-auth/cl
 
 // Main interface
 export { AuthError, AuthApiError, isAuthError } from './auth-interface';
-export type { AuthClient } from './auth-interface';
+export type { NeonAuthClientInterface } from './auth-interface';
 
-// Supabase types re-exports
+// Auth types re-exports
 export type { Session, User } from '@supabase/auth-js';
 
 // Adapters

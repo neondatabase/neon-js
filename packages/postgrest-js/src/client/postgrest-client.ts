@@ -24,7 +24,7 @@ export type DefaultSchemaName<Database> = 'public' extends keyof Database
  * This is a generic PostgreSQL client without authentication built-in.
  * For auth-integrated clients, use @neondatabase/neon-js instead.
  *
- * Extends Supabase's PostgrestClient with Neon-specific configuration.
+ * Extends the upstream PostgrestClient with Neon-specific configuration.
  */
 export class NeonPostgrestClient<
   Database = any,

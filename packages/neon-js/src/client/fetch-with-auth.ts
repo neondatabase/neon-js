@@ -1,6 +1,5 @@
 /**
  * Fetch wrapper that automatically injects authentication headers
- * Based on Supabase's fetchWithAuth pattern, adapted for Neon
  */
 
 type Fetch = typeof fetch;
@@ -21,8 +20,8 @@ export class AuthRequiredError extends Error {
 /**
  * Creates a fetch wrapper that injects auth headers into every request
  *
- * Unlike Supabase, Neon requires authentication - requests without a valid
- * session will throw an AuthRequiredError.
+ * Neon requires authentication - requests without a valid session will
+ * throw an AuthRequiredError.
  *
  * @param getAccessToken - Async function that returns current access token
  * @param customFetch - Optional custom fetch implementation

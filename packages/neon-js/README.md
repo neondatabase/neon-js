@@ -1,14 +1,14 @@
 # @neondatabase/neon-js
 
-The official TypeScript SDK for Neon, combining authentication and database querying in a Supabase-compatible interface.
+The official TypeScript SDK for Neon, combining authentication and database querying in a familiar interface.
 
 ## Overview
 
-`@neondatabase/neon-js` is a comprehensive SDK that brings together Neon Auth and Neon Data API. It provides a unified client for managing authentication and querying PostgreSQL databases with a familiar Supabase-compatible interface.
+`@neondatabase/neon-js` is a comprehensive SDK that brings together Neon Auth and Neon Data API. It provides a unified client for managing authentication and querying PostgreSQL databases with a familiar, intuitive interface.
 
 **Key Features:**
 
-- = **Integrated Authentication** - Built on Better Auth with Supabase API compatibility
+- = **Integrated Authentication** - Built on Better Auth with standard API compatibility
 - =� **PostgreSQL Querying** - Full PostgREST client with type-safe queries
 - � **High Performance** - Session caching, request deduplication, and cross-tab sync
 - = **Automatic Token Management** - Seamless token injection for database queries
