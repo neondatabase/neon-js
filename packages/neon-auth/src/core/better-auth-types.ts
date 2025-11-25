@@ -1,14 +1,4 @@
-import type { BetterAuthClientOptions } from 'better-auth/client';
 import type { BetterFetchError } from '@better-fetch/fetch';
-import { createAuthClient } from 'better-auth/client';
-
-/**
- * Better Auth client type
- * Return type of createAuthClient() with standard email/password and OAuth plugins
- */
-export type BetterAuthClient<T extends BetterAuthClientOptions> = ReturnType<
-  typeof createAuthClient<T>
->;
 
 /**
  * Better Auth session structure
@@ -112,5 +102,3 @@ export interface BetterAuthAccountListResponse {
  * Neon-specific Better Auth configuration
  * Extends Better Auth client options
  */
-export interface NeonBetterAuthOptions
-  extends Omit<BetterAuthClientOptions, 'plugins'> {}

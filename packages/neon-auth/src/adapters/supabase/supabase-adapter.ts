@@ -1,4 +1,7 @@
-import { type NeonAuthClientInterface, isAuthError } from '../../auth-interface';
+import {
+  type SupabaseAuthClientInterface,
+  isAuthError,
+} from './auth-interface';
 import { APIError } from 'better-auth/api';
 import {
   type Session,
@@ -16,33 +19,34 @@ import {
   getGlobalBroadcastChannel,
   type BetterAuthClientOptions,
 } from 'better-auth/client';
-import type { NeonBetterAuthOptions } from './better-auth-types';
 import {
   normalizeBetterAuthError,
   mapBetterAuthSession,
   mapBetterAuthIdentity,
-} from './better-auth-helpers';
+} from '../../core/better-auth-helpers';
 import { AuthErrorCode, createAuthError } from './errors/definitions';
+
+import { base64url, decodeJwt, decodeProtectedHeader } from 'jose';
+import {
+  BETTER_AUTH_METHODS_HOOKS,
+  BETTER_AUTH_METHODS_CACHE,
+} from '../../core/better-auth-methods';
+import {
+  NeonAuthAdapterCore,
+  type NeonAuthAdapterCoreAuthOptions,
+} from '../../core/adapter-core';
 import {
   jwtClient,
   adminClient,
   organizationClient,
   emailOTPClient,
-  magicLinkClient,
   phoneNumberClient,
+  magicLinkClient,
 } from 'better-auth/client/plugins';
-import { base64url, decodeJwt, decodeProtectedHeader } from 'jose';
-import {
-  BETTER_AUTH_METHODS_HOOKS,
-  BETTER_AUTH_METHODS_IN_FLIGHT_REQUESTS,
-  BETTER_AUTH_METHODS_CACHE,
-  deriveBetterAuthMethodFromUrl,
-} from './better-auth-methods';
-/**
- * Better Auth adapter implementing the NeonAuthClient interface.
- * See CLAUDE.md for architecture details and API mappings.
- */
-const defaultBetterAuthClientOptions = {
+
+export type SupabaseAdapterOptions = NeonAuthAdapterCoreAuthOptions;
+
+const _defaultBetterAuthClientOptions = {
   plugins: [
     jwtClient(),
     adminClient(),
@@ -55,87 +59,20 @@ const defaultBetterAuthClientOptions = {
   ],
 } satisfies BetterAuthClientOptions;
 
-export class BetterAuthAdapter implements NeonAuthClientInterface {
-  admin: NeonAuthClientInterface['admin'] = undefined as never;
-  mfa: NeonAuthClientInterface['mfa'] = undefined as never;
-  oauth: NeonAuthClientInterface['oauth'] = undefined as never;
-  private _betterAuth: BetterAuthClient<typeof defaultBetterAuthClientOptions>;
+export class SupabaseAdapter
+  extends NeonAuthAdapterCore
+  implements SupabaseAuthClientInterface
+{
+  admin: SupabaseAuthClientInterface['admin'] = undefined as never;
+  mfa: SupabaseAuthClientInterface['mfa'] = undefined as never;
+  oauth: SupabaseAuthClientInterface['oauth'] = undefined as never;
+  private _betterAuth: BetterAuthClient<typeof _defaultBetterAuthClientOptions>;
   private _stateChangeEmitters = new Map<string, Subscription>();
 
-  //#region Constructor
-  constructor(betterAuthClientOptions: NeonBetterAuthOptions) {
-    // Preserve user's onSuccess callback if they provided one
-    const userOnSuccess = betterAuthClientOptions.fetchOptions?.onSuccess;
-    const userOnRequest = betterAuthClientOptions.fetchOptions?.onRequest;
-
-    this._betterAuth = createAuthClient({
-      ...betterAuthClientOptions,
-      ...defaultBetterAuthClientOptions,
-      fetchOptions: {
-        ...betterAuthClientOptions.fetchOptions,
-        onRequest: (request) => {
-          const url = request.url;
-          const method = deriveBetterAuthMethodFromUrl(url.toString());
-          if (method) {
-            BETTER_AUTH_METHODS_HOOKS[method].onRequest();
-          }
-
-          userOnRequest?.(request);
-        },
-        customFetchImpl: async (url, init) => {
-          // Skip deduplication if X-Force-Fetch header is present
-          if (init?.headers && 'X-Force-Fetch' in init.headers) {
-            const headers = { ...init.headers };
-            delete headers['X-Force-Fetch'];
-            console.log('[customFetch] Force-fetch bypass:', url);
-            return fetch(url, { ...init, headers });
-          }
-
-          // Create body-aware deduplication key
-          const method = init?.method || 'GET';
-          const body = init?.body || '';
-          const key = `${method}:${url}:${body}`;
-
-          const response =
-            await BETTER_AUTH_METHODS_IN_FLIGHT_REQUESTS.deduplicate(key, () =>
-              fetch(url, init)
-            );
-
-          // Clone the response so each caller gets a fresh body stream
-          // (Response bodies can only be read once, but deduplication shares the same Response)
-          return response.clone();
-        },
-        onSuccess: async (ctx) => {
-          // Capture JWT from any request that includes it
-          const jwt = ctx.response.headers.get('set-auth-jwt');
-          if (jwt) {
-            // Inject JWT into response data BEFORE Better Auth processes it.
-            // Better Auth will then update its internal state, triggering useSession.subscribe()
-            // which will cache the session with JWT included (single cache-setting point).
-            if (ctx.data?.session) {
-              console.log('[onSuccess] Injecting JWT into session.token');
-              ctx.data.session.token = jwt;
-            } else {
-              console.warn(
-                '[onSuccess] JWT found but no session data to inject into!'
-              );
-            }
-          }
-
-          const url = ctx.request.url.toString();
-          const responseData = ctx.data;
-
-          // Detect sign-in/sign-up
-          const method = deriveBetterAuthMethodFromUrl(url);
-          if (method) {
-            BETTER_AUTH_METHODS_HOOKS[method].onSuccess(responseData);
-          }
-
-          // Call user's onSuccess callback if they provided one
-          await userOnSuccess?.(ctx);
-        },
-      },
-    });
+  constructor(betterAuthClientOptions: SupabaseAdapterOptions) {
+    super(betterAuthClientOptions);
+    // @ts-expect-error - defaultBetterAuthClientOptions is not typed
+    this._betterAuth = createAuthClient(this.betterAuthOptions);
 
     /**
      * useSession() - Automatic Session Management
@@ -214,14 +151,21 @@ export class BetterAuthAdapter implements NeonAuthClientInterface {
       }
     });
   }
-  //#endregion
-
-  //#region PUBLIC API - Initialization
-  getBetterAuthInstance(): ReturnType<typeof createAuthClient> {
+  getBetterAuthInstance(): BetterAuthClient<BetterAuthClientOptions> {
     return this._betterAuth;
   }
 
-  initialize: NeonAuthClientInterface['initialize'] = async () => {
+  async getJWTToken(): Promise<string | null> {
+    const session = await this.getSession();
+
+    if (session.error) {
+      return null;
+    }
+
+    return session.data.session?.access_token ?? null;
+  }
+
+  initialize: SupabaseAuthClientInterface['initialize'] = async () => {
     try {
       const session = await this.getSession();
 
@@ -238,7 +182,10 @@ export class BetterAuthAdapter implements NeonAuthClientInterface {
         return { data: { session: null }, error };
       }
       if (error instanceof APIError) {
-        return { data: { session: null }, error: normalizeBetterAuthError(error) };
+        return {
+          data: { session: null },
+          error: normalizeBetterAuthError(error),
+        };
       }
       throw error;
     }
@@ -248,7 +195,7 @@ export class BetterAuthAdapter implements NeonAuthClientInterface {
   //#region PUBLIC API - Session Management
   async getSession(options?: {
     forceFetch?: boolean;
-  }): ReturnType<NeonAuthClientInterface['getSession']> {
+  }): ReturnType<SupabaseAuthClientInterface['getSession']> {
     try {
       console.log('[getSession] Called with options:', options);
 
@@ -268,19 +215,7 @@ export class BetterAuthAdapter implements NeonAuthClientInterface {
         console.log('[getSession] Cache miss, fetching from Better Auth');
       }
 
-      // Fetch-level deduplication handles concurrent requests automatically
-      console.log('[getSession] Calling betterAuth.getSession()');
       const currentSession = await this._betterAuth.getSession();
-      console.log('[getSession] Better Auth response:', {
-        hasData: !!currentSession.data,
-        hasSession: !!currentSession.data?.session,
-        hasUser: !!currentSession.data?.user,
-        hasError: !!currentSession.error,
-        sessionToken: currentSession.data?.session?.token
-          ? `${currentSession.data.session.token.slice(0, 20)}...`
-          : 'null',
-      });
-
       if (!currentSession.data?.session) {
         console.log(
           '[getSession] No session in Better Auth response, returning null'
@@ -292,15 +227,6 @@ export class BetterAuthAdapter implements NeonAuthClientInterface {
         currentSession.data.session,
         currentSession.data.user
       );
-      console.log('[getSession] Mapped session:', {
-        hasAccessToken: !!session?.access_token,
-        accessToken: session?.access_token
-          ? `${session.access_token.slice(0, 20)}...`
-          : 'null',
-        accessTokenLength: session?.access_token?.length,
-        accessTokenFull: session?.access_token, // Log FULL JWT to check for corruption
-        accessTokenType: typeof session?.access_token,
-      });
 
       // Cache immediately if we have a JWT (before useSession.subscribe can overwrite)
       if (session?.access_token?.startsWith('eyJ')) {
@@ -320,13 +246,16 @@ export class BetterAuthAdapter implements NeonAuthClientInterface {
         return { data: { session: null }, error };
       }
       if (error instanceof APIError) {
-        return { data: { session: null }, error: normalizeBetterAuthError(error) };
+        return {
+          data: { session: null },
+          error: normalizeBetterAuthError(error),
+        };
       }
       throw error;
     }
   }
 
-  refreshSession: NeonAuthClientInterface['refreshSession'] = async () => {
+  refreshSession: SupabaseAuthClientInterface['refreshSession'] = async () => {
     try {
       const sessionResult = await this.getSession();
 
@@ -346,14 +275,17 @@ export class BetterAuthAdapter implements NeonAuthClientInterface {
         return { data: { user: null, session: null }, error };
       }
       if (error instanceof APIError) {
-        return { data: { user: null, session: null }, error: normalizeBetterAuthError(error) };
+        return {
+          data: { user: null, session: null },
+          error: normalizeBetterAuthError(error),
+        };
       }
       throw error;
     }
   };
 
   // TODO: we need to implement a custom plugin to allow setting external sessions
-  setSession: NeonAuthClientInterface['setSession'] = async () => {
+  setSession: SupabaseAuthClientInterface['setSession'] = async () => {
     return {
       data: { user: null, session: null },
       error: createAuthError(
@@ -364,7 +296,7 @@ export class BetterAuthAdapter implements NeonAuthClientInterface {
   };
 
   //#region PUBLIC API - Authentication
-  signUp: NeonAuthClientInterface['signUp'] = async (credentials) => {
+  signUp: SupabaseAuthClientInterface['signUp'] = async (credentials) => {
     try {
       if ('email' in credentials && credentials.email && credentials.password) {
         const displayName =
@@ -421,77 +353,85 @@ export class BetterAuthAdapter implements NeonAuthClientInterface {
         return { data: { user: null, session: null }, error };
       }
       if (error instanceof APIError) {
-        return { data: { user: null, session: null }, error: normalizeBetterAuthError(error) };
+        return {
+          data: { user: null, session: null },
+          error: normalizeBetterAuthError(error),
+        };
       }
       throw error;
     }
   };
 
   // TODO: we need to add the anonymous() plugin to the server adapter
-  signInAnonymously: NeonAuthClientInterface['signInAnonymously'] = async () => {
-    return {
-      data: { user: null, session: null },
-      error: createAuthError(
-        AuthErrorCode.AnonymousProviderDisabled,
-        'Anonymous sign-in is not supported by Better Auth'
-      ),
+  signInAnonymously: SupabaseAuthClientInterface['signInAnonymously'] =
+    async () => {
+      return {
+        data: { user: null, session: null },
+        error: createAuthError(
+          AuthErrorCode.AnonymousProviderDisabled,
+          'Anonymous sign-in is not supported by Better Auth'
+        ),
+      };
     };
-  };
 
-  signInWithPassword: NeonAuthClientInterface['signInWithPassword'] = async (
-    credentials
-  ) => {
-    try {
-      if ('email' in credentials && credentials.email) {
-        // TODO: for captcha, we would need to add the captcha plugin
-        const result = await this._betterAuth.signIn.email({
-          email: credentials.email,
-          password: credentials.password,
-        });
+  signInWithPassword: SupabaseAuthClientInterface['signInWithPassword'] =
+    async (credentials) => {
+      try {
+        if ('email' in credentials && credentials.email) {
+          // TODO: for captcha, we would need to add the captcha plugin
+          const result = await this._betterAuth.signIn.email({
+            email: credentials.email,
+            password: credentials.password,
+          });
 
-        if (result.error) {
-          throw normalizeBetterAuthError(result.error);
-        }
+          if (result.error) {
+            throw normalizeBetterAuthError(result.error);
+          }
 
-        const sessionResult = await this.getSession();
-        if (!sessionResult.data.session?.user) {
+          const sessionResult = await this.getSession();
+          if (!sessionResult.data.session?.user) {
+            throw createAuthError(
+              AuthErrorCode.SessionNotFound,
+              'Failed to retrieve user session'
+            );
+          }
+
+          const data = {
+            user: sessionResult.data.session.user,
+            session: sessionResult.data.session,
+          };
+
+          return { data, error: null };
+        } else if ('phone' in credentials && credentials.phone) {
+          // TODO: we would need to add the phone-number plugin
           throw createAuthError(
-            AuthErrorCode.SessionNotFound,
-            'Failed to retrieve user session'
+            AuthErrorCode.PhoneProviderDisabled,
+            'Phone sign-in not supported'
+          );
+        } else {
+          throw createAuthError(
+            AuthErrorCode.ValidationFailed,
+            'Invalid credentials format'
           );
         }
-
-        const data = {
-          user: sessionResult.data.session.user,
-          session: sessionResult.data.session,
-        };
-
-        return { data, error: null };
-      } else if ('phone' in credentials && credentials.phone) {
-        // TODO: we would need to add the phone-number plugin
-        throw createAuthError(
-          AuthErrorCode.PhoneProviderDisabled,
-          'Phone sign-in not supported'
-        );
-      } else {
-        throw createAuthError(
-          AuthErrorCode.ValidationFailed,
-          'Invalid credentials format'
-        );
+      } catch (error) {
+        if (isAuthError(error)) {
+          return { data: { user: null, session: null }, error };
+        }
+        if (error instanceof APIError) {
+          return {
+            data: { user: null, session: null },
+            error: normalizeBetterAuthError(error),
+          };
+        }
+        throw error;
       }
-    } catch (error) {
-      if (isAuthError(error)) {
-        return { data: { user: null, session: null }, error };
-      }
-      if (error instanceof APIError) {
-        return { data: { user: null, session: null }, error: normalizeBetterAuthError(error) };
-      }
-      throw error;
-    }
-  };
+    };
 
   // TODO: we should omit queryParams from the credentials
-  signInWithOAuth: NeonAuthClientInterface['signInWithOAuth'] = async (credentials) => {
+  signInWithOAuth: SupabaseAuthClientInterface['signInWithOAuth'] = async (
+    credentials
+  ) => {
     try {
       const { provider, options } = credentials;
 
@@ -519,14 +459,19 @@ export class BetterAuthAdapter implements NeonAuthClientInterface {
         return { data: { provider: credentials.provider, url: null }, error };
       }
       if (error instanceof APIError) {
-        return { data: { provider: credentials.provider, url: null }, error: normalizeBetterAuthError(error) };
+        return {
+          data: { provider: credentials.provider, url: null },
+          error: normalizeBetterAuthError(error),
+        };
       }
       throw error;
     }
   };
 
   // TODO: we need to setup this up with `phone` type
-  signInWithOtp: NeonAuthClientInterface['signInWithOtp'] = async (credentials) => {
+  signInWithOtp: SupabaseAuthClientInterface['signInWithOtp'] = async (
+    credentials
+  ) => {
     try {
       if ('email' in credentials) {
         await this._betterAuth.emailOtp.sendVerificationOtp({
@@ -546,16 +491,24 @@ export class BetterAuthAdapter implements NeonAuthClientInterface {
       );
     } catch (error) {
       if (isAuthError(error)) {
-        return { data: { user: null, session: null, messageId: undefined }, error };
+        return {
+          data: { user: null, session: null, messageId: undefined },
+          error,
+        };
       }
       if (error instanceof APIError) {
-        return { data: { user: null, session: null, messageId: undefined }, error: normalizeBetterAuthError(error) };
+        return {
+          data: { user: null, session: null, messageId: undefined },
+          error: normalizeBetterAuthError(error),
+        };
       }
       throw error;
     }
   };
 
-  signInWithIdToken: NeonAuthClientInterface['signInWithIdToken'] = async (credentials) => {
+  signInWithIdToken: SupabaseAuthClientInterface['signInWithIdToken'] = async (
+    credentials
+  ) => {
     try {
       const result = await this._betterAuth.signIn.social({
         provider: credentials.provider,
@@ -579,11 +532,13 @@ export class BetterAuthAdapter implements NeonAuthClientInterface {
 
       const session = await this.getSession();
       if (session.error || !session.data.session) {
-        throw session.error ||
+        throw (
+          session.error ||
           createAuthError(
             AuthErrorCode.SessionNotFound,
             'Failed to get session'
-          );
+          )
+        );
       }
 
       return {
@@ -598,14 +553,19 @@ export class BetterAuthAdapter implements NeonAuthClientInterface {
         return { data: { user: null, session: null }, error };
       }
       if (error instanceof APIError) {
-        return { data: { user: null, session: null }, error: normalizeBetterAuthError(error) };
+        return {
+          data: { user: null, session: null },
+          error: normalizeBetterAuthError(error),
+        };
       }
       throw error;
     }
   };
 
   // TODO: we need to add the sso plugin to the server adapter
-  signInWithSSO: NeonAuthClientInterface['signInWithSSO'] = async (params) => {
+  signInWithSSO: SupabaseAuthClientInterface['signInWithSSO'] = async (
+    params
+  ) => {
     const attemptedWith =
       'providerId' in params
         ? `provider ID: ${params.providerId}`
@@ -621,7 +581,9 @@ export class BetterAuthAdapter implements NeonAuthClientInterface {
   };
 
   // TODO: we need to add the SIWE plugin to the server adapter
-  signInWithWeb3: NeonAuthClientInterface['signInWithWeb3'] = async (credentials) => {
+  signInWithWeb3: SupabaseAuthClientInterface['signInWithWeb3'] = async (
+    credentials
+  ) => {
     const attemptedChain = credentials.chain;
 
     return {
@@ -636,7 +598,7 @@ export class BetterAuthAdapter implements NeonAuthClientInterface {
     };
   };
 
-  signOut: NeonAuthClientInterface['signOut'] = async () => {
+  signOut: SupabaseAuthClientInterface['signOut'] = async () => {
     try {
       const result = await this._betterAuth.signOut();
 
@@ -658,16 +620,18 @@ export class BetterAuthAdapter implements NeonAuthClientInterface {
   //#endregion
 
   //#region PUBLIC API - User Management
-  getUser: NeonAuthClientInterface['getUser'] = async () => {
+  getUser: SupabaseAuthClientInterface['getUser'] = async () => {
     try {
       const sessionResult = await this.getSession();
 
       if (sessionResult.error || !sessionResult.data.session) {
-        throw sessionResult.error ||
+        throw (
+          sessionResult.error ||
           createAuthError(
             AuthErrorCode.SessionNotFound,
             'No user session found'
-          );
+          )
+        );
       }
 
       return {
@@ -697,11 +661,13 @@ export class BetterAuthAdapter implements NeonAuthClientInterface {
         const sessionResult = await this.getSession();
 
         if (sessionResult.error || !sessionResult.data?.session) {
-          throw sessionResult.error ||
+          throw (
+            sessionResult.error ||
             createAuthError(
               AuthErrorCode.SessionNotFound,
               'No user session found'
-            );
+            )
+          );
         }
 
         jwt = sessionResult.data.session.access_token;
@@ -748,7 +714,9 @@ export class BetterAuthAdapter implements NeonAuthClientInterface {
     }
   };
 
-  updateUser: NeonAuthClientInterface['updateUser'] = async (attributes) => {
+  updateUser: SupabaseAuthClientInterface['updateUser'] = async (
+    attributes
+  ) => {
     try {
       if (attributes.password) {
         throw createAuthError(
@@ -802,82 +770,86 @@ export class BetterAuthAdapter implements NeonAuthClientInterface {
     }
   };
 
-  getUserIdentities: NeonAuthClientInterface['getUserIdentities'] = async () => {
-    try {
-      const sessionResult = await this.getSession();
+  getUserIdentities: SupabaseAuthClientInterface['getUserIdentities'] =
+    async () => {
+      try {
+        const sessionResult = await this.getSession();
 
-      if (sessionResult.error || !sessionResult.data.session) {
-        throw sessionResult.error ||
-          createAuthError(
-            AuthErrorCode.SessionNotFound,
-            'No user session found'
-          );
-      }
-
-      // Fetch-level deduplication handles concurrent requests automatically
-      const result = await this._betterAuth.listAccounts();
-
-      if (!result) {
-        throw createAuthError(
-          AuthErrorCode.InternalError,
-          'Failed to list accounts'
-        );
-      }
-
-      if (result.error) {
-        throw normalizeBetterAuthError(result.error);
-      }
-
-      const identitiesPromises = result.data.map(async (account) => {
-        let accountInfo = null;
-        try {
-          const infoResult = await this._betterAuth.accountInfo({
-            query: { accountId: account.accountId },
-          });
-          accountInfo = infoResult.data;
-        } catch (error) {
-          // If getAccountInfo fails, continue with basic data
-          console.warn(
-            `Failed to get account info for ${account.providerId}:`,
-            error
+        if (sessionResult.error || !sessionResult.data.session) {
+          throw (
+            sessionResult.error ||
+            createAuthError(
+              AuthErrorCode.SessionNotFound,
+              'No user session found'
+            )
           );
         }
 
-        return mapBetterAuthIdentity(
-          account,
-          accountInfo ?? null
-        );
-      });
+        // Fetch-level deduplication handles concurrent requests automatically
+        const result = await this._betterAuth.listAccounts();
 
-      const identities = await Promise.all(identitiesPromises);
+        if (!result) {
+          throw createAuthError(
+            AuthErrorCode.InternalError,
+            'Failed to list accounts'
+          );
+        }
 
-      return {
-        data: { identities },
-        error: null,
-      };
-    } catch (error) {
-      if (isAuthError(error)) {
-        return { data: null, error };
+        if (result.error) {
+          throw normalizeBetterAuthError(result.error);
+        }
+
+        const identitiesPromises = result.data.map(async (account) => {
+          let accountInfo = null;
+          try {
+            const infoResult = await this._betterAuth.accountInfo({
+              query: { accountId: account.accountId },
+            });
+            accountInfo = infoResult.data;
+          } catch (error) {
+            // If getAccountInfo fails, continue with basic data
+            console.warn(
+              `Failed to get account info for ${account.providerId}:`,
+              error
+            );
+          }
+
+          return mapBetterAuthIdentity(account, accountInfo ?? null);
+        });
+
+        const identities = await Promise.all(identitiesPromises);
+
+        return {
+          data: { identities },
+          error: null,
+        };
+      } catch (error) {
+        if (isAuthError(error)) {
+          return { data: null, error };
+        }
+        if (error instanceof APIError) {
+          return { data: null, error: normalizeBetterAuthError(error) };
+        }
+        throw error;
       }
-      if (error instanceof APIError) {
-        return { data: null, error: normalizeBetterAuthError(error) };
-      }
-      throw error;
-    }
-  };
+    };
 
   // TODO: we need to enable the account/accountLinking plugin to the server adapter
-  linkIdentity: NeonAuthClientInterface['linkIdentity'] = async (credentials) => {
+  linkIdentity: SupabaseAuthClientInterface['linkIdentity'] = async (
+    credentials
+  ) => {
     const provider = credentials.provider as Provider;
     try {
       const sessionResult = await this.getSession();
 
       if (sessionResult.error || !sessionResult.data.session) {
-        throw sessionResult.error ||
+        throw (
+          sessionResult.error ||
           createAuthError(
             AuthErrorCode.SessionNotFound,
             'No user session found'
-          );
+          )
+        );
       }
 
       // Link with ID token (direct)
@@ -938,33 +910,45 @@ export class BetterAuthAdapter implements NeonAuthClientInterface {
       };
     } catch (error) {
       if (isAuthError(error)) {
-        return { data: { provider, url: null, user: null, session: null }, error };
+        return {
+          data: { provider, url: null, user: null, session: null },
+          error,
+        };
       }
       if (error instanceof APIError) {
-        return { data: { provider, url: null, user: null, session: null }, error: normalizeBetterAuthError(error) };
+        return {
+          data: { provider, url: null, user: null, session: null },
+          error: normalizeBetterAuthError(error),
+        };
       }
       throw error;
     }
   };
 
-  unlinkIdentity: NeonAuthClientInterface['unlinkIdentity'] = async (identity) => {
+  unlinkIdentity: SupabaseAuthClientInterface['unlinkIdentity'] = async (
+    identity
+  ) => {
     try {
       const sessionResult = await this.getSession();
       if (sessionResult.error || !sessionResult.data.session) {
-        throw sessionResult.error ||
+        throw (
+          sessionResult.error ||
           createAuthError(
             AuthErrorCode.SessionNotFound,
             'No user session found'
-          );
+          )
+        );
       }
 
       const identities = await this.getUserIdentities();
       if (identities.error || !identities.data) {
-        throw identities.error ||
+        throw (
+          identities.error ||
           createAuthError(
             AuthErrorCode.InternalError,
             'Failed to fetch identities'
-          );
+          )
+        );
       }
 
       // Find the identity by internal DB ID
@@ -1018,7 +1002,7 @@ export class BetterAuthAdapter implements NeonAuthClientInterface {
   // TODO: add twoFactor plugin to the server adapter
   // TODO: add magiclink plugin to the server adapter
   //#region PUBLIC API - Verification & Password Reset
-  verifyOtp: NeonAuthClientInterface['verifyOtp'] = async (params) => {
+  verifyOtp: SupabaseAuthClientInterface['verifyOtp'] = async (params) => {
     try {
       if ('email' in params && params.email) {
         return await this.verifyEmailOtp(params);
@@ -1042,7 +1026,10 @@ export class BetterAuthAdapter implements NeonAuthClientInterface {
         return { data: { user: null, session: null }, error };
       }
       if (error instanceof APIError) {
-        return { data: { user: null, session: null }, error: normalizeBetterAuthError(error) };
+        return {
+          data: { user: null, session: null },
+          error: normalizeBetterAuthError(error),
+        };
       }
       throw error;
     }
@@ -1050,49 +1037,46 @@ export class BetterAuthAdapter implements NeonAuthClientInterface {
 
   // TODO: this will only work with a magic link and not with the OTP token flow
   // we need to derive which flow is being used and handle it accordingly
-  resetPasswordForEmail: NeonAuthClientInterface['resetPasswordForEmail'] = async (
-    email,
-    options
-  ) => {
-    try {
-      // TODO: this will fail, we need to setup `sendResetPassword` in the server adapter
-      const result = await this._betterAuth.requestPasswordReset({
-        email,
-        redirectTo:
-          options?.redirectTo ||
-          (globalThis.window === undefined ? '' : globalThis.location.origin),
-      });
+  resetPasswordForEmail: SupabaseAuthClientInterface['resetPasswordForEmail'] =
+    async (email, options) => {
+      try {
+        // TODO: this will fail, we need to setup `sendResetPassword` in the server adapter
+        const result = await this._betterAuth.requestPasswordReset({
+          email,
+          redirectTo:
+            options?.redirectTo ||
+            (globalThis.window === undefined ? '' : globalThis.location.origin),
+        });
 
-      if (result?.error) {
-        throw normalizeBetterAuthError(result.error);
-      }
+        if (result?.error) {
+          throw normalizeBetterAuthError(result.error);
+        }
 
-      return {
-        data: {},
-        error: null,
-      };
-    } catch (error) {
-      if (isAuthError(error)) {
-        return { data: null, error };
+        return {
+          data: {},
+          error: null,
+        };
+      } catch (error) {
+        if (isAuthError(error)) {
+          return { data: null, error };
+        }
+        if (error instanceof APIError) {
+          return { data: null, error: normalizeBetterAuthError(error) };
+        }
+        throw error;
       }
-      if (error instanceof APIError) {
-        return { data: null, error: normalizeBetterAuthError(error) };
-      }
-      throw error;
-    }
-  };
+    };
 
   // TODO: we would need a custom plugin to be able to actually recreate the session
-  reauthenticate: NeonAuthClientInterface['reauthenticate'] = async () => {
+  reauthenticate: SupabaseAuthClientInterface['reauthenticate'] = async () => {
     try {
       const newSession = await this.getSession();
 
       if (newSession.error || !newSession.data.session) {
-        throw newSession.error ||
-          createAuthError(
-            AuthErrorCode.SessionNotFound,
-            'No session found'
-          );
+        throw (
+          newSession.error ||
+          createAuthError(AuthErrorCode.SessionNotFound, 'No session found')
+        );
       }
 
       return {
@@ -1107,13 +1091,16 @@ export class BetterAuthAdapter implements NeonAuthClientInterface {
         return { data: { user: null, session: null }, error };
       }
       if (error instanceof APIError) {
-        return { data: { user: null, session: null }, error: normalizeBetterAuthError(error) };
+        return {
+          data: { user: null, session: null },
+          error: normalizeBetterAuthError(error),
+        };
       }
       throw error;
     }
   };
 
-  resend: NeonAuthClientInterface['resend'] = async (credentials) => {
+  resend: SupabaseAuthClientInterface['resend'] = async (credentials) => {
     try {
       if ('email' in credentials) {
         const { email, type, options } = credentials;
@@ -1184,43 +1171,44 @@ export class BetterAuthAdapter implements NeonAuthClientInterface {
     }
   };
 
-  exchangeCodeForSession: NeonAuthClientInterface['exchangeCodeForSession'] = async (
-    _authCode: string
-  ) => {
-    try {
-      const sessionResult = await this.getSession();
+  exchangeCodeForSession: SupabaseAuthClientInterface['exchangeCodeForSession'] =
+    async (_authCode: string) => {
+      try {
+        const sessionResult = await this.getSession();
 
-      if (sessionResult.data.session) {
-        return {
-          data: {
-            session: sessionResult.data.session,
-            user: sessionResult.data.session.user,
-          },
-          error: null,
-        };
-      }
+        if (sessionResult.data.session) {
+          return {
+            data: {
+              session: sessionResult.data.session,
+              user: sessionResult.data.session.user,
+            },
+            error: null,
+          };
+        }
 
-      throw createAuthError(
-        AuthErrorCode.OAuthCallbackFailed,
-        'OAuth callback completed but no session was created. Make sure the OAuth callback has been processed.'
-      );
-    } catch (error) {
-      if (isAuthError(error)) {
-        return { data: { session: null, user: null }, error };
+        throw createAuthError(
+          AuthErrorCode.OAuthCallbackFailed,
+          'OAuth callback completed but no session was created. Make sure the OAuth callback has been processed.'
+        );
+      } catch (error) {
+        if (isAuthError(error)) {
+          return { data: { session: null, user: null }, error };
+        }
+        if (error instanceof APIError) {
+          return {
+            data: { session: null, user: null },
+            error: normalizeBetterAuthError(error),
+          };
+        }
+        throw error;
       }
-      if (error instanceof APIError) {
-        return {
-          data: { session: null, user: null },
-          error: normalizeBetterAuthError(error),
-        };
-      }
-      throw error;
-    }
-  };
+    };
   //#endregion
 
   //#region PUBLIC API - Event System
-  onAuthStateChange: NeonAuthClientInterface['onAuthStateChange'] = (callback) => {
+  onAuthStateChange: SupabaseAuthClientInterface['onAuthStateChange'] = (
+    callback
+  ) => {
     const id = crypto.randomUUID();
 
     const subscription: Subscription = {
@@ -1248,15 +1236,18 @@ export class BetterAuthAdapter implements NeonAuthClientInterface {
   //#endregion
 
   //#region PUBLIC API - Auto Refresh & Configuration
-  isThrowOnErrorEnabled: NeonAuthClientInterface['isThrowOnErrorEnabled'] = () => false;
+  isThrowOnErrorEnabled: SupabaseAuthClientInterface['isThrowOnErrorEnabled'] =
+    () => false;
 
-  startAutoRefresh: NeonAuthClientInterface['startAutoRefresh'] = async () => {
-    return;
-  };
+  startAutoRefresh: SupabaseAuthClientInterface['startAutoRefresh'] =
+    async () => {
+      return;
+    };
 
-  stopAutoRefresh: NeonAuthClientInterface['stopAutoRefresh'] = async () => {
-    return;
-  };
+  stopAutoRefresh: SupabaseAuthClientInterface['stopAutoRefresh'] =
+    async () => {
+      return;
+    };
   //#endregion
 
   //#region PRIVATE HELPERS - Verification

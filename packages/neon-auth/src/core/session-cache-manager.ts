@@ -1,6 +1,6 @@
 import type { Session } from '@supabase/auth-js';
 import { SESSION_CACHE_TTL_MS, CLOCK_SKEW_BUFFER_MS } from './constants';
-import { getJwtExpiration } from '../../utils/jwt';
+import { getJwtExpiration } from '../utils/jwt';
 
 type SessionCache = {
   session: Session;

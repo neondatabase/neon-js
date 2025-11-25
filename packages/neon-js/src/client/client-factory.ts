@@ -1,171 +1,183 @@
-import { NeonAuthClient, type NeonAuthClientOptions } from '@neondatabase/neon-auth';
+import {
+  createNeonAuth,
+  type NeonAuthAdapterClass,
+  type NeonAuthAdapter,
+  BetterAuthVanillaAdapter,
+  BetterAuthReactAdapter,
+  SupabaseAdapter,
+} from '@neondatabase/neon-auth';
 import { fetchWithToken } from '@neondatabase/postgrest-js';
 import {
   NeonClient,
   type DefaultSchemaName,
   type NeonClientConstructorOptions,
 } from './neon-client';
+import { createInternalNeonAuth } from '../../../neon-auth/src/neon-auth';
 
-// Public-facing options for createClient (options only)
-export type CreateClientOptions<SchemaName> = {
-  clientOptions?: Omit<
-    NeonClientConstructorOptions<SchemaName>,
-    'dataApiUrl' | 'authClient'
-  >;
-  authOptions?: NeonAuthClientOptions;
-};
-
-// Dual-URL configuration for createClient (explicit URLs)
-export type CreateClientDualUrlConfig<SchemaName> = {
-  dataApiUrl: string;
-  authUrl: string;
-  clientOptions?: Omit<
-    NeonClientConstructorOptions<SchemaName>,
-    'dataApiUrl' | 'authClient'
-  >;
-  authOptions?: Omit<NeonAuthClientOptions, 'baseURL'>;
+/**
+ * Auth configuration for createClient
+ */
+export type CreateClientAuthConfig<T extends NeonAuthAdapterClass> = {
+  /** The adapter class to use (e.g., SupabaseAdapter, BetterAuthVanillaAdapter) */
+  adapter: T;
+  /** The auth service URL */
+  url: string;
+  /** Additional auth options (baseURL is set from url above) */
+  options?: Omit<ConstructorParameters<T>[0], 'baseURL'>;
 };
 
 /**
- * Factory function to create NeonClient with seamless auth integration (single URL mode)
- *
- * @param neonUrl - The Neon base branch URL (will derive dataApiUrl and authUrl)
- * @param options - Configuration options
- * @returns NeonClient instance with auth-aware fetch wrapper
- * @throws AuthRequiredError when making requests without authentication
+ * Data API configuration for createClient
  */
-export function createClient<
-  Database = any,
-  SchemaName extends string & keyof Database = DefaultSchemaName<Database>,
->(
-  neonUrl: string,
-  options?: CreateClientOptions<SchemaName>
-): NeonClient<Database, SchemaName>;
+export type CreateClientDataApiConfig<
+  SchemaName,
+  TAuth extends NeonAuthAdapter,
+> = {
+  /** The Data API URL */
+  url: string;
+  /** Additional client options */
+  options?: Omit<
+    NeonClientConstructorOptions<SchemaName, TAuth>,
+    'dataApiUrl' | 'authClient'
+  >['options'];
+};
 
 /**
- * Factory function to create NeonClient with explicit URLs (dual URL mode)
- *
- * @param config - Configuration with explicit dataApiUrl and authUrl
- * @returns NeonClient instance with auth-aware fetch wrapper
- * @throws AuthRequiredError when making requests without authentication
+ * Configuration for createClient
  */
-export function createClient<
-  Database = any,
-  SchemaName extends string & keyof Database = DefaultSchemaName<Database>,
->(
-  config: CreateClientDualUrlConfig<SchemaName>
-): NeonClient<Database, SchemaName>;
+export type CreateClientConfig<SchemaName, T extends NeonAuthAdapterClass> = {
+  /** Auth service configuration */
+  auth: CreateClientAuthConfig<T>;
+  /** Data API configuration */
+  dataApi: CreateClientDataApiConfig<SchemaName, InstanceType<T>>;
+};
 
 /**
- * Implementation signature (not exported)
+ * Factory function to create NeonClient with seamless auth integration.
+ *
+ * @param config - Configuration with auth and dataApi sections
+ * @returns NeonClient instance with auth-aware fetch wrapper
+ * @throws AuthRequiredError when making requests without authentication
+ *
+ * @example
+ * ```typescript
+ * import { createClient, SupabaseAdapter } from '@neondatabase/neon-js';
+ *
+ * const client = createClient({
+ *   auth: {
+ *     adapter: SupabaseAdapter,
+ *     url: 'https://auth.example.com',
+ *   },
+ *   dataApi: {
+ *     url: 'https://data-api.example.com/rest/v1',
+ *   },
+ * });
+ *
+ * // Auth methods (API depends on adapter)
+ * await client.auth.signInWithPassword({ email, password });
+ *
+ * // Database queries (automatic token injection)
+ * const { data: items } = await client.from('items').select();
+ * ```
+ *
+ * @example
+ * ```typescript
+ * import { createClient, BetterAuthVanillaAdapter } from '@neondatabase/neon-js';
+ *
+ * const client = createClient({
+ *   auth: {
+ *     adapter: BetterAuthVanillaAdapter,
+ *     url: 'https://auth.example.com',
+ *   },
+ *   dataApi: {
+ *     url: 'https://data-api.example.com/rest/v1',
+ *   },
+ * });
+ *
+ * // Access raw Better Auth client
+ * const betterAuth = client.auth.getBetterAuthInstance();
+ * await betterAuth.signIn.email({ email, password });
+ * ```
  */
+
+/**
+ * Helper type to create NeonClient with proper schema resolution.
+ * Uses 'public' as the default schema since it's the most common case.
+ */
+type CreateClientResult<
+  Database,
+  TAdapter extends NeonAuthAdapter,
+> = NeonClient<Database, DefaultSchemaName<Database>, TAdapter>;
+
+// Overload: SupabaseAdapter
+export function createClient<Database = any>(
+  config: CreateClientConfig<
+    DefaultSchemaName<Database>,
+    typeof SupabaseAdapter
+  >
+): CreateClientResult<Database, SupabaseAdapter>;
+
+// Overload: BetterAuthVanillaAdapter
+export function createClient<Database = any>(
+  config: CreateClientConfig<
+    DefaultSchemaName<Database>,
+    typeof BetterAuthVanillaAdapter
+  >
+): CreateClientResult<Database, BetterAuthVanillaAdapter>;
+
+// Overload: BetterAuthReactAdapter
+export function createClient<Database = any>(
+  config: CreateClientConfig<
+    DefaultSchemaName<Database>,
+    typeof BetterAuthReactAdapter
+  >
+): CreateClientResult<Database, BetterAuthReactAdapter>;
+
+// Implementation signature
 export function createClient<
   Database = any,
   SchemaName extends string & keyof Database = DefaultSchemaName<Database>,
+  TAuthAdapter extends NeonAuthAdapterClass = NeonAuthAdapterClass,
 >(
-  urlOrConfig: string | CreateClientDualUrlConfig<SchemaName>,
-  options?: CreateClientOptions<SchemaName>
-): NeonClient<Database, SchemaName> {
-  // Step 1: Determine mode and extract configuration
-  let dataApiUrl: string;
-  let authUrl: string;
-  let neonClientOptions: CreateClientOptions<SchemaName>['clientOptions'];
-  let authOptions: CreateClientOptions<SchemaName>['authOptions'];
+  config: CreateClientConfig<SchemaName, TAuthAdapter>
+): NeonClient<Database, SchemaName, InstanceType<TAuthAdapter>> {
+  const { auth: authConfig, dataApi: dataApiConfig } = config;
 
-  if (typeof urlOrConfig === 'string') {
-    // Single URL mode: derive both URLs from base Neon URL
-    const urls = getNeonUrls(urlOrConfig);
-    dataApiUrl = urls.dataApiUrl;
-    authUrl = urls.authUrl;
+  // Step 1: Instantiate auth adapter using createNeonAuth
+  const auth = createInternalNeonAuth(authConfig.url, {
+    adapter: authConfig.adapter,
+    options: authConfig.options,
+  });
 
-    // Extract options from second parameter
-    neonClientOptions = options?.clientOptions;
-    authOptions = options?.authOptions;
-  } else {
-    // Dual URL mode: use explicit URLs from config
-    dataApiUrl = urlOrConfig.dataApiUrl;
-    authUrl = urlOrConfig.authUrl;
-
-    // Extract options from config object
-    neonClientOptions = urlOrConfig.clientOptions;
-    authOptions = urlOrConfig.authOptions;
-  }
-
-  // Step 2: Instantiate auth adapter
-  const auth = new NeonAuthClient({ baseURL: authUrl, ...authOptions });
-
-  // Step 3: Create lazy token accessor - called on every request
+  // Step 2: Create lazy token accessor - called on every request
   // Returns null if no session (will throw AuthRequiredError in fetchWithToken)
-  // Note: session.access_token contains the JWT (not opaque token) for API authentication
   const getAccessToken = async (): Promise<string | null> => {
-    const { data, error } = await auth.getSession();
-
-    if (error || !data.session) {
-      return null;
-    }
-
-    return data.session.access_token; // This is the JWT token
+    const jwt = await auth.getJWTToken();
+    return jwt;
   };
 
-  // Step 4: Create auth-aware fetch wrapper
+  // Step 3: Create auth-aware fetch wrapper
   const authFetch = fetchWithToken(
     getAccessToken,
-    neonClientOptions?.options?.global?.fetch
+    dataApiConfig.options?.global?.fetch
   );
 
-  // Step 5: Create client with auth integrated
-  const client = new NeonClient<Database, SchemaName>({
-    dataApiUrl,
+  // Step 4: Create client with auth integrated
+  const client = new NeonClient<
+    Database,
+    SchemaName,
+    InstanceType<TAuthAdapter>
+  >({
+    dataApiUrl: dataApiConfig.url,
     authClient: auth,
     options: {
-      ...neonClientOptions?.options,
+      ...dataApiConfig.options,
       global: {
-        ...neonClientOptions?.options?.global,
+        ...dataApiConfig.options?.global,
         fetch: authFetch,
       },
     },
   });
 
   return client;
-}
-
-/**
- * Get the Neon URLs for a given base branch URL
- * @param baseBranchUrl - The base branch URL
- * @returns The Neon URLs
- * example baseBranchUrl: https://ep-round-waterfall-w15wzz10.eu-west-1.aws.neon.build/neondb/
- * example dataApiUrl: https://ep-round-waterfall-w15wzz10.apirest.eu-west-1.aws.neon.build/neondb/rest/v1
- * example authUrl: https://ep-round-waterfall-w15wzz10.neonauth.eu-west-1.aws.neon.build/neondb/auth
- */
-function getNeonUrls(baseBranchUrl: string) {
-  const urlObj = new URL(baseBranchUrl);
-
-  // Extract hostname parts: ep-round-waterfall-w15wzz10.eu-west-1.aws.neon.build
-  const hostname = urlObj.hostname;
-  const hostnameParts = hostname.split('.');
-
-  // First part is the subdomain (e.g., "ep-round-waterfall-w15wzz10")
-  const subdomain = hostnameParts[0];
-
-  // Rest is region + domain (e.g., ["eu-west-1", "aws", "neon", "build"])
-  const regionAndDomain = hostnameParts.slice(1).join('.');
-
-  // Extract pathname (e.g., "/neondb/" or "/neondb") and normalize it
-  // Handle both "/neondb/" and "/neondb" - ensure it ends with "/"
-  const pathname = urlObj.pathname.endsWith('/')
-    ? urlObj.pathname
-    : `${urlObj.pathname}/`;
-
-  // Construct dataApiUrl: subdomain.apirest.region.domain + pathname + "rest/v1"
-  // Works with both "/neondb/" -> "/neondb/rest/v1" and "/neondb" -> "/neondb/rest/v1"
-  const dataApiUrl = `${urlObj.protocol}//${subdomain}.apirest.${regionAndDomain}${pathname}rest/v1`;
-
-  // Construct authUrl: subdomain.neonauth.region.domain + pathname + "auth"
-  // Works with both "/neondb/" -> "/neondb/auth" and "/neondb" -> "/neondb/auth"
-  const authUrl = `${urlObj.protocol}//${subdomain}.neonauth.${regionAndDomain}${pathname}auth`;
-
-  return {
-    dataApiUrl,
-    authUrl,
-  };
 }

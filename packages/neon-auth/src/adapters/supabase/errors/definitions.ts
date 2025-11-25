@@ -1,4 +1,4 @@
-import { AuthError, AuthApiError } from '../../../auth-interface';
+import { AuthError, AuthApiError } from '../auth-interface';
 
 /**
  * Error code enum for type-safe error handling

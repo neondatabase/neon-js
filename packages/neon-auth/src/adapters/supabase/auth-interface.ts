@@ -7,7 +7,7 @@ type _AuthClientBase = {
     : K]: _UpstreamAuthClientInstance[K]; // This filters out protected/private members by checking if they are accessible
 };
 
-export type NeonAuthClientInterface = _AuthClientBase;
+export type SupabaseAuthClientInterface = _AuthClientBase;
 
 // Re-export error types for auth handling
 export { AuthError, AuthApiError, isAuthError } from '@supabase/auth-js';

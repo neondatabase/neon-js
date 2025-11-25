@@ -1,22 +1,33 @@
-import type { createAuthClient as createReactAuthClient } from 'better-auth/react';
-import type { createAuthClient as createVanillaAuthClient } from 'better-auth/client';
+// NeonAuth factory and types
+export {
+  createNeonAuth,
+  type NeonAuth,
+  type NeonAuthAdapter,
+  type NeonAuthAdapterClass,
+  type NeonAuthConfig,
+  type NeonAuthPublicApi,
+  type ReactBetterAuthClient,
+  type VanillaBetterAuthClient,
+} from './neon-auth';
 
 // Main interface
-export { AuthError, AuthApiError, isAuthError } from './auth-interface';
-export type { NeonAuthClientInterface } from './auth-interface';
+export {
+  AuthError,
+  AuthApiError,
+  isAuthError,
+} from './adapters/supabase/auth-interface';
 
 // Auth types re-exports
 export type { Session, User } from '@supabase/auth-js';
 
 // Adapters
-export { BetterAuthAdapter as NeonAuthClient } from './adapters/better-auth';
-export type { NeonBetterAuthOptions as NeonAuthClientOptions } from './adapters/better-auth';
+export { BetterAuthVanillaAdapter } from './adapters/better-auth-vanilla/better-auth-vanilla-adapter';
+export { BetterAuthReactAdapter } from './adapters/better-auth-react/better-auth-react-adapter';
+export { SupabaseAdapter } from './adapters/supabase/supabase-adapter';
+export type { SupabaseAdapterOptions } from './adapters/supabase/supabase-adapter';
 
 // JWT utilities
 export { getJwtExpiration, getJwtExpirationMs } from './utils/jwt';
 
-export type ReactBetterAuthClient = ReturnType<typeof createReactAuthClient>;
-export type VanillaBetterAuthClient = ReturnType<
-  typeof createVanillaAuthClient
->;
+// Better Auth React hooks
 export { useStore as useBetterAuthStore } from 'better-auth/react';

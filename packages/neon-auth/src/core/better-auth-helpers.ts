@@ -1,4 +1,4 @@
-import { AuthError, AuthApiError } from '../../auth-interface';
+import { AuthError, AuthApiError } from '../adapters/supabase/auth-interface';
 import type { BetterFetchError } from '@better-fetch/fetch';
 import type {
   BetterAuthErrorResponse,
@@ -6,11 +6,14 @@ import type {
   BetterAuthUser,
 } from './better-auth-types';
 import type { Session, User, UserIdentity } from '@supabase/auth-js';
-import { toISOString } from '../../utils/date';
+import { toISOString } from '../utils/date';
 import { DEFAULT_SESSION_EXPIRY_MS } from './constants';
 import type { accountInfo, listUserAccounts } from 'better-auth/api';
-import { AuthErrorCode, getErrorDefinition } from './errors/definitions';
-import { BETTER_AUTH_ERROR_MAP } from './errors/mappings';
+import {
+  AuthErrorCode,
+  getErrorDefinition,
+} from '../adapters/supabase/errors/definitions';
+import { BETTER_AUTH_ERROR_MAP } from '../adapters/supabase/errors/mappings';
 
 /**
  * Normalize Better Auth errors to standard AuthError format
@@ -360,9 +363,7 @@ export function mapBetterAuthSession(
 /**
  * Map Better Auth user to User format
  */
-export function mapBetterAuthUser(
-  betterAuthUser: BetterAuthUser
-): User {
+export function mapBetterAuthUser(betterAuthUser: BetterAuthUser): User {
   const createdAt = toISOString(betterAuthUser.createdAt);
   const updatedAt = toISOString(betterAuthUser.updatedAt);
 
