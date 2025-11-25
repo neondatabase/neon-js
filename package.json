@@ -14,6 +14,7 @@
     "test:node": "bun run --filter '@neondatabase/postgrest-js' test:node && bun run --filter '@neondatabase/neon-auth' test:node && bun run --filter '@neondatabase/neon-auth-ui' test:node && bun run --filter '@neondatabase/neon-js' test:node",
     "test:ci": "bun run --filter '@neondatabase/postgrest-js' test:ci && bun run --filter '@neondatabase/neon-auth' test:ci && bun run --filter '@neondatabase/neon-auth-ui' test:ci && bun run --filter '@neondatabase/neon-js' test:ci",
     "typecheck": "bun run --filter '*' typecheck",
+    "test:types": "bun run --filter '*' test:types",
     "lint": "bun run --filter '@neondatabase/neon-js' lint",
     "release": "bun run build && bun run --filter '@neondatabase/postgrest-js' release && bun run --filter '@neondatabase/neon-auth' release && bun run --filter '@neondatabase/neon-auth-ui' release && bun run --filter '@neondatabase/neon-js' release"
   },

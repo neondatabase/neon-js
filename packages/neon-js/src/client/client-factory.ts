@@ -1,5 +1,4 @@
 import {
-  createNeonAuth,
   type NeonAuthAdapterClass,
   type NeonAuthAdapter,
   BetterAuthVanillaAdapter,
@@ -12,7 +11,7 @@ import {
   type DefaultSchemaName,
   type NeonClientConstructorOptions,
 } from './neon-client';
-import { createInternalNeonAuth } from '../../../neon-auth/src/neon-auth';
+import { createInternalNeonAuth } from '@neondatabase/neon-auth';
 
 /**
  * Auth configuration for createClient

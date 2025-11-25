@@ -1,5 +1,6 @@
 // NeonAuth factory and types
 export {
+  createInternalNeonAuth,
   createNeonAuth,
   type NeonAuth,
   type NeonAuthAdapter,

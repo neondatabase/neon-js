@@ -33,6 +33,7 @@
     "test:node": "node --run test",
     "test:ci": "vitest run",
     "typecheck": "tsc --noEmit",
+    "test:types": "tsc --noEmit",
     "release": "bumpp --tag 'postgrest-js-v%s' && npm publish dist/",
     "lint": "eslint ."
   },
