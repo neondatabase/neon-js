@@ -1,4 +1,5 @@
-import { type AuthClient } from '../../auth-interface';
+import { type AuthClient, isAuthError } from '../../auth-interface';
+import { APIError } from 'better-auth/api';
 import {
   type Session,
   type AuthChangeEvent,
@@ -233,15 +234,22 @@ export class BetterAuthAdapter implements AuthClient {
     try {
       const session = await this.getSession();
 
+      if (session.error) {
+        throw session.error;
+      }
+
       return {
         data: session.data,
-        error: session.error,
+        error: null,
       };
     } catch (error) {
-      return {
-        data: { session: null },
-        error: normalizeBetterAuthError(error),
-      };
+      if (isAuthError(error)) {
+        return { data: { session: null }, error };
+      }
+      if (error instanceof APIError) {
+        return { data: { session: null }, error: normalizeBetterAuthError(error) };
+      }
+      throw error;
     }
   };
   //#endregion
@@ -317,10 +325,13 @@ export class BetterAuthAdapter implements AuthClient {
       };
     } catch (error) {
       console.error('[getSession] Error:', error);
-      return {
-        data: { session: null },
-        error: normalizeBetterAuthError(error),
-      };
+      if (isAuthError(error)) {
+        return { data: { session: null }, error };
+      }
+      if (error instanceof APIError) {
+        return { data: { session: null }, error: normalizeBetterAuthError(error) };
+      }
+      throw error;
     }
   }
 
@@ -329,10 +340,7 @@ export class BetterAuthAdapter implements AuthClient {
       const sessionResult = await this.getSession();
 
       if (sessionResult.error) {
-        return {
-          data: { user: null, session: null },
-          error: sessionResult.error,
-        };
+        throw sessionResult.error;
       }
 
       return {
@@ -343,10 +351,13 @@ export class BetterAuthAdapter implements AuthClient {
         error: null,
       };
     } catch (error) {
-      return {
-        data: { user: null, session: null },
-        error: normalizeBetterAuthError(error),
-      };
+      if (isAuthError(error)) {
+        return { data: { user: null, session: null }, error };
+      }
+      if (error instanceof APIError) {
+        return { data: { user: null, session: null }, error: normalizeBetterAuthError(error) };
+      }
+      throw error;
     }
   };
 
@@ -384,22 +395,16 @@ export class BetterAuthAdapter implements AuthClient {
         });
 
         if (result.error) {
-          return {
-            data: { user: null, session: null },
-            error: normalizeBetterAuthError(result.error),
-          };
+          throw normalizeBetterAuthError(result.error);
         }
 
         const sessionResult = await this.getSession();
 
         if (!sessionResult.data.session?.user) {
-          return {
-            data: { user: null, session: null },
-            error: createAuthError(
-              AuthErrorCode.SessionNotFound,
-              'Failed to retrieve user session'
-            ),
-          };
+          throw createAuthError(
+            AuthErrorCode.SessionNotFound,
+            'Failed to retrieve user session'
+          );
         }
 
         const data = {
@@ -410,27 +415,24 @@ export class BetterAuthAdapter implements AuthClient {
         return { data, error: null };
       } else if ('phone' in credentials && credentials.phone) {
         // TODO: we would need to add the phone-number plugin
-        return {
-          data: { user: null, session: null },
-          error: createAuthError(
-            AuthErrorCode.PhoneProviderDisabled,
-            'Phone sign-up not supported'
-          ),
-        };
+        throw createAuthError(
+          AuthErrorCode.PhoneProviderDisabled,
+          'Phone sign-up not supported'
+        );
       } else {
-        return {
-          data: { user: null, session: null },
-          error: createAuthError(
-            AuthErrorCode.ValidationFailed,
-            'Invalid credentials format'
-          ),
-        };
+        throw createAuthError(
+          AuthErrorCode.ValidationFailed,
+          'Invalid credentials format'
+        );
       }
     } catch (error) {
-      return {
-        data: { user: null, session: null },
-        error: normalizeBetterAuthError(error),
-      };
+      if (isAuthError(error)) {
+        return { data: { user: null, session: null }, error };
+      }
+      if (error instanceof APIError) {
+        return { data: { user: null, session: null }, error: normalizeBetterAuthError(error) };
+      }
+      throw error;
     }
   };
 
@@ -457,21 +459,15 @@ export class BetterAuthAdapter implements AuthClient {
         });
 
         if (result.error) {
-          return {
-            data: { user: null, session: null },
-            error: normalizeBetterAuthError(result.error),
-          };
+          throw normalizeBetterAuthError(result.error);
         }
 
         const sessionResult = await this.getSession();
         if (!sessionResult.data.session?.user) {
-          return {
-            data: { user: null, session: null },
-            error: createAuthError(
-              AuthErrorCode.SessionNotFound,
-              'Failed to retrieve user session'
-            ),
-          };
+          throw createAuthError(
+            AuthErrorCode.SessionNotFound,
+            'Failed to retrieve user session'
+          );
         }
 
         const data = {
@@ -482,27 +478,24 @@ export class BetterAuthAdapter implements AuthClient {
         return { data, error: null };
       } else if ('phone' in credentials && credentials.phone) {
         // TODO: we would need to add the phone-number plugin
-        return {
-          data: { user: null, session: null },
-          error: createAuthError(
-            AuthErrorCode.PhoneProviderDisabled,
-            'Phone sign-in not supported'
-          ),
-        };
+        throw createAuthError(
+          AuthErrorCode.PhoneProviderDisabled,
+          'Phone sign-in not supported'
+        );
       } else {
-        return {
-          data: { user: null, session: null },
-          error: createAuthError(
-            AuthErrorCode.ValidationFailed,
-            'Invalid credentials format'
-          ),
-        };
+        throw createAuthError(
+          AuthErrorCode.ValidationFailed,
+          'Invalid credentials format'
+        );
       }
     } catch (error) {
-      return {
-        data: { user: null, session: null },
-        error: normalizeBetterAuthError(error),
-      };
+      if (isAuthError(error)) {
+        return { data: { user: null, session: null }, error };
+      }
+      if (error instanceof APIError) {
+        return { data: { user: null, session: null }, error: normalizeBetterAuthError(error) };
+      }
+      throw error;
     }
   };
 
@@ -531,13 +524,13 @@ export class BetterAuthAdapter implements AuthClient {
         error: null,
       };
     } catch (error) {
-      return {
-        data: {
-          provider: credentials.provider,
-          url: null,
-        },
-        error: normalizeBetterAuthError(error),
-      };
+      if (isAuthError(error)) {
+        return { data: { provider: credentials.provider, url: null }, error };
+      }
+      if (error instanceof APIError) {
+        return { data: { provider: credentials.provider, url: null }, error: normalizeBetterAuthError(error) };
+      }
+      throw error;
     }
   };
 
@@ -556,18 +549,18 @@ export class BetterAuthAdapter implements AuthClient {
         };
       }
 
-      return {
-        data: { user: null, session: null, messageId: undefined },
-        error: createAuthError(
-          AuthErrorCode.NotImplemented,
-          `We haven't implemented this type of otp authentication.`
-        ),
-      };
+      throw createAuthError(
+        AuthErrorCode.NotImplemented,
+        `We haven't implemented this type of otp authentication.`
+      );
     } catch (error) {
-      return {
-        data: { user: null, session: null, messageId: undefined },
-        error: normalizeBetterAuthError(error),
-      };
+      if (isAuthError(error)) {
+        return { data: { user: null, session: null, messageId: undefined }, error };
+      }
+      if (error instanceof APIError) {
+        return { data: { user: null, session: null, messageId: undefined }, error: normalizeBetterAuthError(error) };
+      }
+      throw error;
     }
   };
 
@@ -583,33 +576,23 @@ export class BetterAuthAdapter implements AuthClient {
       });
 
       if (result.error) {
-        return {
-          data: { user: null, session: null },
-          error: normalizeBetterAuthError(result.error),
-        };
+        throw normalizeBetterAuthError(result.error);
       }
 
       if (!('user' in result.data) || !result.data.user) {
-        return {
-          data: { user: null, session: null },
-          error: createAuthError(
-            AuthErrorCode.OAuthCallbackFailed,
-            'Failed to sign in with ID token'
-          ),
-        };
+        throw createAuthError(
+          AuthErrorCode.OAuthCallbackFailed,
+          'Failed to sign in with ID token'
+        );
       }
 
       const session = await this.getSession();
       if (session.error || !session.data.session) {
-        return {
-          data: { user: null, session: null },
-          error:
-            session.error ||
-            createAuthError(
-              AuthErrorCode.SessionNotFound,
-              'Failed to get session'
-            ),
-        };
+        throw session.error ||
+          createAuthError(
+            AuthErrorCode.SessionNotFound,
+            'Failed to get session'
+          );
       }
 
       return {
@@ -620,10 +603,13 @@ export class BetterAuthAdapter implements AuthClient {
         error: null,
       };
     } catch (error) {
-      return {
-        data: { user: null, session: null },
-        error: normalizeBetterAuthError(error),
-      };
+      if (isAuthError(error)) {
+        return { data: { user: null, session: null }, error };
+      }
+      if (error instanceof APIError) {
+        return { data: { user: null, session: null }, error: normalizeBetterAuthError(error) };
+      }
+      throw error;
     }
   };
 
@@ -664,12 +650,18 @@ export class BetterAuthAdapter implements AuthClient {
       const result = await this._betterAuth.signOut();
 
       if (result.error) {
-        return { error: normalizeBetterAuthError(result.error) };
+        throw normalizeBetterAuthError(result.error);
       }
 
       return { error: null };
     } catch (error) {
-      return { error: normalizeBetterAuthError(error) };
+      if (isAuthError(error)) {
+        return { error };
+      }
+      if (error instanceof APIError) {
+        return { error: normalizeBetterAuthError(error) };
+      }
+      throw error;
     }
   };
   //#endregion
@@ -680,15 +672,11 @@ export class BetterAuthAdapter implements AuthClient {
       const sessionResult = await this.getSession();
 
       if (sessionResult.error || !sessionResult.data.session) {
-        return {
-          data: { user: null },
-          error:
-            sessionResult.error ||
-            createAuthError(
-              AuthErrorCode.SessionNotFound,
-              'No user session found'
-            ),
-        };
+        throw sessionResult.error ||
+          createAuthError(
+            AuthErrorCode.SessionNotFound,
+            'No user session found'
+          );
       }
 
       return {
@@ -698,10 +686,13 @@ export class BetterAuthAdapter implements AuthClient {
         error: null,
       };
     } catch (error) {
-      return {
-        data: { user: null },
-        error: normalizeBetterAuthError(error),
-      };
+      if (isAuthError(error)) {
+        return { data: { user: null }, error };
+      }
+      if (error instanceof APIError) {
+        return { data: { user: null }, error: normalizeBetterAuthError(error) };
+      }
+      throw error;
     }
   };
 
@@ -715,91 +706,71 @@ export class BetterAuthAdapter implements AuthClient {
         const sessionResult = await this.getSession();
 
         if (sessionResult.error || !sessionResult.data?.session) {
-          return {
-            data: null,
-            error:
-              sessionResult.error ||
-              createAuthError(
-                AuthErrorCode.SessionNotFound,
-                'No user session found'
-              ),
-          };
+          throw sessionResult.error ||
+            createAuthError(
+              AuthErrorCode.SessionNotFound,
+              'No user session found'
+            );
         }
 
         jwt = sessionResult.data.session.access_token;
       }
 
       if (!jwt) {
-        return {
-          data: null,
-          error: createAuthError(
-            AuthErrorCode.SessionNotFound,
-            'No access token found'
-          ),
-        };
+        throw createAuthError(
+          AuthErrorCode.SessionNotFound,
+          'No access token found'
+        );
       }
 
       // Split JWT into parts
       const tokenParts = jwt.split('.');
       if (tokenParts.length !== 3) {
-        return {
-          data: null,
-          error: createAuthError(AuthErrorCode.BadJwt, 'Invalid token format'),
-        };
+        throw createAuthError(AuthErrorCode.BadJwt, 'Invalid token format');
       }
 
-      try {
-        // Decode header using JOSE
-        const header = decodeProtectedHeader(jwt) as JwtHeader;
+      // Decode header using JOSE
+      const header = decodeProtectedHeader(jwt) as JwtHeader;
 
-        // Decode payload using JOSE
-        const claims = decodeJwt(jwt) as JwtPayload;
+      // Decode payload using JOSE
+      const claims = decodeJwt(jwt) as JwtPayload;
 
-        // Decode signature to Uint8Array using JOSE's base64url
-        const signature = base64url.decode(jwt.split('.')[2]);
+      // Decode signature to Uint8Array using JOSE's base64url
+      const signature = base64url.decode(jwt.split('.')[2]);
 
-        return {
-          data: {
-            header,
-            claims,
-            signature,
-          },
-          error: null,
-        };
-      } catch (error) {
-        return {
-          data: null,
-          error: normalizeBetterAuthError(error),
-        };
-      }
-    } catch (error) {
       return {
-        data: null,
-        error: normalizeBetterAuthError(error),
+        data: {
+          header,
+          claims,
+          signature,
+        },
+        error: null,
       };
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { data: null, error };
+      }
+      if (error instanceof APIError) {
+        return { data: null, error: normalizeBetterAuthError(error) };
+      }
+      throw error;
     }
   };
 
   updateUser: AuthClient['updateUser'] = async (attributes) => {
     try {
       if (attributes.password) {
-        return {
-          data: { user: null },
-          error: createAuthError(
-            AuthErrorCode.FeatureNotSupported,
-            'The password cannot be updated through the updateUser method, use the changePassword method instead.'
-          ),
-        };
+        throw createAuthError(
+          AuthErrorCode.FeatureNotSupported,
+          'The password cannot be updated through the updateUser method, use the changePassword method instead.'
+        );
       }
 
       if (attributes.email) {
-        return {
-          data: { user: null },
-          error: createAuthError(
-            AuthErrorCode.FeatureNotSupported,
-            'The email cannot be updated through the updateUser method, use the changeEmail method instead.'
-          ),
-        };
+        throw createAuthError(
+          AuthErrorCode.FeatureNotSupported,
+          'The email cannot be updated through the updateUser method, use the changeEmail method instead.'
+        );
       }
 
       const result = await this._betterAuth.updateUser({
@@ -807,20 +778,14 @@ export class BetterAuthAdapter implements AuthClient {
       });
 
       if (result.data?.status) {
-        return {
-          data: { user: null },
-          error: createAuthError(
-            AuthErrorCode.InternalError,
-            'Failed to update user'
-          ),
-        };
+        throw createAuthError(
+          AuthErrorCode.InternalError,
+          'Failed to update user'
+        );
       }
 
       if (result?.error) {
-        return {
-          data: { user: null },
-          error: normalizeBetterAuthError(result.error),
-        };
+        throw normalizeBetterAuthError(result.error);
       }
 
       const updatedSessionResult = await this.getSession({ forceFetch: true });
@@ -836,10 +801,13 @@ export class BetterAuthAdapter implements AuthClient {
         error: null,
       };
     } catch (error) {
-      return {
-        data: { user: null },
-        error: normalizeBetterAuthError(error),
-      };
+      if (isAuthError(error)) {
+        return { data: { user: null }, error };
+      }
+      if (error instanceof APIError) {
+        return { data: { user: null }, error: normalizeBetterAuthError(error) };
+      }
+      throw error;
     }
   };
 
@@ -848,35 +816,25 @@ export class BetterAuthAdapter implements AuthClient {
       const sessionResult = await this.getSession();
 
       if (sessionResult.error || !sessionResult.data.session) {
-        return {
-          data: null,
-          error:
-            sessionResult.error ||
-            createAuthError(
-              AuthErrorCode.SessionNotFound,
-              'No user session found'
-            ),
-        };
+        throw sessionResult.error ||
+          createAuthError(
+            AuthErrorCode.SessionNotFound,
+            'No user session found'
+          );
       }
 
       // Fetch-level deduplication handles concurrent requests automatically
       const result = await this._betterAuth.listAccounts();
 
       if (!result) {
-        return {
-          data: null,
-          error: createAuthError(
-            AuthErrorCode.InternalError,
-            'Failed to list accounts'
-          ),
-        };
+        throw createAuthError(
+          AuthErrorCode.InternalError,
+          'Failed to list accounts'
+        );
       }
 
       if (result.error) {
-        return {
-          data: null,
-          error: normalizeBetterAuthError(result.error),
-        };
+        throw normalizeBetterAuthError(result.error);
       }
 
       const identitiesPromises = result.data.map(async (account) => {
@@ -907,10 +865,13 @@ export class BetterAuthAdapter implements AuthClient {
         error: null,
       };
     } catch (error) {
-      return {
-        data: null,
-        error: normalizeBetterAuthError(error),
-      };
+      if (isAuthError(error)) {
+        return { data: null, error };
+      }
+      if (error instanceof APIError) {
+        return { data: null, error: normalizeBetterAuthError(error) };
+      }
+      throw error;
     }
   };
 
@@ -921,15 +882,11 @@ export class BetterAuthAdapter implements AuthClient {
       const sessionResult = await this.getSession();
 
       if (sessionResult.error || !sessionResult.data.session) {
-        return {
-          data: { provider, url: null, user: null, session: null },
-          error:
-            sessionResult.error ||
-            createAuthError(
-              AuthErrorCode.SessionNotFound,
-              'No user session found'
-            ),
-        };
+        throw sessionResult.error ||
+          createAuthError(
+            AuthErrorCode.SessionNotFound,
+            'No user session found'
+          );
       }
 
       // Link with ID token (direct)
@@ -944,10 +901,7 @@ export class BetterAuthAdapter implements AuthClient {
         });
 
         if (result.error) {
-          return {
-            data: { user: null, session: null, provider, url: null },
-            error: normalizeBetterAuthError(result.error),
-          };
+          throw normalizeBetterAuthError(result.error);
         }
 
         return {
@@ -979,10 +933,7 @@ export class BetterAuthAdapter implements AuthClient {
       });
 
       if (result.error) {
-        return {
-          data: { provider, url: null, user: null, session: null },
-          error: normalizeBetterAuthError(result.error),
-        };
+        throw normalizeBetterAuthError(result.error);
       }
 
       return {
@@ -995,10 +946,13 @@ export class BetterAuthAdapter implements AuthClient {
         error: null,
       };
     } catch (error) {
-      return {
-        data: { provider, url: null, user: null, session: null },
-        error: normalizeBetterAuthError(error),
-      };
+      if (isAuthError(error)) {
+        return { data: { provider, url: null, user: null, session: null }, error };
+      }
+      if (error instanceof APIError) {
+        return { data: { provider, url: null, user: null, session: null }, error: normalizeBetterAuthError(error) };
+      }
+      throw error;
     }
   };
 
@@ -1006,28 +960,20 @@ export class BetterAuthAdapter implements AuthClient {
     try {
       const sessionResult = await this.getSession();
       if (sessionResult.error || !sessionResult.data.session) {
-        return {
-          data: null,
-          error:
-            sessionResult.error ||
-            createAuthError(
-              AuthErrorCode.SessionNotFound,
-              'No user session found'
-            ),
-        };
+        throw sessionResult.error ||
+          createAuthError(
+            AuthErrorCode.SessionNotFound,
+            'No user session found'
+          );
       }
 
       const identities = await this.getUserIdentities();
       if (identities.error || !identities.data) {
-        return {
-          data: null,
-          error:
-            identities.error ||
-            createAuthError(
-              AuthErrorCode.InternalError,
-              'Failed to fetch identities'
-            ),
-        };
+        throw identities.error ||
+          createAuthError(
+            AuthErrorCode.InternalError,
+            'Failed to fetch identities'
+          );
       }
 
       // Find the identity by internal DB ID
@@ -1035,13 +981,10 @@ export class BetterAuthAdapter implements AuthClient {
         (i) => i.id === identity.identity_id
       );
       if (!targetIdentity) {
-        return {
-          data: null,
-          error: createAuthError(
-            AuthErrorCode.IdentityNotFound,
-            'Identity not found'
-          ),
-        };
+        throw createAuthError(
+          AuthErrorCode.IdentityNotFound,
+          'Identity not found'
+        );
       }
 
       // Map to better-auth fields
@@ -1055,10 +998,7 @@ export class BetterAuthAdapter implements AuthClient {
       });
 
       if (result?.error) {
-        return {
-          data: null,
-          error: normalizeBetterAuthError(result.error),
-        };
+        throw normalizeBetterAuthError(result.error);
       }
 
       const updatedSession = await this.getSession({ forceFetch: true });
@@ -1073,10 +1013,13 @@ export class BetterAuthAdapter implements AuthClient {
         error: null,
       };
     } catch (error) {
-      return {
-        data: null,
-        error: normalizeBetterAuthError(error),
-      };
+      if (isAuthError(error)) {
+        return { data: null, error };
+      }
+      if (error instanceof APIError) {
+        return { data: null, error: normalizeBetterAuthError(error) };
+      }
+      throw error;
     }
   };
   //#endregion
@@ -1094,26 +1037,23 @@ export class BetterAuthAdapter implements AuthClient {
       }
       if ('token_hash' in params && params.token_hash) {
         // TODO: this will fail, we need handlers for this in this code
-        return {
-          data: { user: null, session: null },
-          error: createAuthError(
-            AuthErrorCode.FeatureNotSupported,
-            'Token hash verification not supported'
-          ),
-        };
+        throw createAuthError(
+          AuthErrorCode.FeatureNotSupported,
+          'Token hash verification not supported'
+        );
       }
-      return {
-        data: { user: null, session: null },
-        error: createAuthError(
-          AuthErrorCode.ValidationFailed,
-          'Invalid OTP verification parameters'
-        ),
-      };
+      throw createAuthError(
+        AuthErrorCode.ValidationFailed,
+        'Invalid OTP verification parameters'
+      );
     } catch (error) {
-      return {
-        data: { user: null, session: null },
-        error: normalizeBetterAuthError(error),
-      };
+      if (isAuthError(error)) {
+        return { data: { user: null, session: null }, error };
+      }
+      if (error instanceof APIError) {
+        return { data: { user: null, session: null }, error: normalizeBetterAuthError(error) };
+      }
+      throw error;
     }
   };
 
@@ -1133,10 +1073,7 @@ export class BetterAuthAdapter implements AuthClient {
       });
 
       if (result?.error) {
-        return {
-          data: null,
-          error: normalizeBetterAuthError(result.error),
-        };
+        throw normalizeBetterAuthError(result.error);
       }
 
       return {
@@ -1144,34 +1081,45 @@ export class BetterAuthAdapter implements AuthClient {
         error: null,
       };
     } catch (error) {
-      return {
-        data: null,
-        error: normalizeBetterAuthError(error),
-      };
+      if (isAuthError(error)) {
+        return { data: null, error };
+      }
+      if (error instanceof APIError) {
+        return { data: null, error: normalizeBetterAuthError(error) };
+      }
+      throw error;
     }
   };
 
   // TODO: we would need a custom plugin to be able to actually recreate the session
   reauthenticate: AuthClient['reauthenticate'] = async () => {
-    const newSession = await this.getSession();
+    try {
+      const newSession = await this.getSession();
 
-    if (newSession.error || !newSession.data.session) {
+      if (newSession.error || !newSession.data.session) {
+        throw newSession.error ||
+          createAuthError(
+            AuthErrorCode.SessionNotFound,
+            'No session found'
+          );
+      }
+
       return {
-        data: { user: null, session: null },
-        error: createAuthError(
-          AuthErrorCode.SessionNotFound,
-          'No session found'
-        ),
+        data: {
+          user: newSession.data.session?.user || null,
+          session: newSession.data.session,
+        },
+        error: null,
       };
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { data: { user: null, session: null }, error };
+      }
+      if (error instanceof APIError) {
+        return { data: { user: null, session: null }, error: normalizeBetterAuthError(error) };
+      }
+      throw error;
     }
-
-    return {
-      data: {
-        user: newSession.data.session?.user || null,
-        session: newSession.data.session,
-      },
-      error: null,
-    };
   };
 
   resend: AuthClient['resend'] = async (credentials) => {
@@ -1190,10 +1138,7 @@ export class BetterAuthAdapter implements AuthClient {
           });
 
           if (result?.error) {
-            return {
-              data: { user: null, session: null },
-              error: normalizeBetterAuthError(result.error),
-            };
+            throw normalizeBetterAuthError(result.error);
           }
 
           return {
@@ -1202,13 +1147,10 @@ export class BetterAuthAdapter implements AuthClient {
           };
         }
 
-        return {
-          data: { user: null, session: null },
-          error: createAuthError(
-            AuthErrorCode.ValidationFailed,
-            `Unsupported resend type: ${type}`
-          ),
-        };
+        throw createAuthError(
+          AuthErrorCode.ValidationFailed,
+          `Unsupported resend type: ${type}`
+        );
       }
 
       if ('phone' in credentials) {
@@ -1220,10 +1162,7 @@ export class BetterAuthAdapter implements AuthClient {
           });
 
           if (result?.error) {
-            return {
-              data: { user: null, session: null },
-              error: normalizeBetterAuthError(result.error),
-            };
+            throw normalizeBetterAuthError(result.error);
           }
 
           const messageId =
@@ -1236,18 +1175,21 @@ export class BetterAuthAdapter implements AuthClient {
         }
       }
 
-      return {
-        data: { user: null, session: null },
-        error: createAuthError(
-          AuthErrorCode.ValidationFailed,
-          'Invalid credentials format'
-        ),
-      };
+      throw createAuthError(
+        AuthErrorCode.ValidationFailed,
+        'Invalid credentials format'
+      );
     } catch (error) {
-      return {
-        data: { user: null, session: null },
-        error: normalizeBetterAuthError(error),
-      };
+      if (isAuthError(error)) {
+        return { data: { user: null, session: null }, error };
+      }
+      if (error instanceof APIError) {
+        return {
+          data: { user: null, session: null },
+          error: normalizeBetterAuthError(error),
+        };
+      }
+      throw error;
     }
   };
 
@@ -1267,18 +1209,21 @@ export class BetterAuthAdapter implements AuthClient {
         };
       }
 
-      return {
-        data: { session: null, user: null },
-        error: createAuthError(
-          AuthErrorCode.OAuthCallbackFailed,
-          'OAuth callback completed but no session was created. Make sure the OAuth callback has been processed.'
-        ),
-      };
+      throw createAuthError(
+        AuthErrorCode.OAuthCallbackFailed,
+        'OAuth callback completed but no session was created. Make sure the OAuth callback has been processed.'
+      );
     } catch (error) {
-      return {
-        data: { session: null, user: null },
-        error: normalizeBetterAuthError(error),
-      };
+      if (isAuthError(error)) {
+        return { data: { session: null, user: null }, error };
+      }
+      if (error instanceof APIError) {
+        return {
+          data: { session: null, user: null },
+          error: normalizeBetterAuthError(error),
+        };
+      }
+      throw error;
     }
   };
   //#endregion
