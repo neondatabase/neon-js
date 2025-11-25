@@ -4,7 +4,6 @@ import { InFlightRequestManager } from './in-flight-request-manager';
 import { SessionCacheManager } from './session-cache-manager';
 import { mapBetterAuthSession } from './better-auth-helpers';
 import type { BetterAuthSessionResponse } from './better-auth-types';
-import { BETTER_AUTH_TOKEN_STORAGE } from '../../utils/storage';
 
 export const BETTER_AUTH_METHODS_IN_FLIGHT_REQUESTS =
   new InFlightRequestManager();
@@ -54,14 +53,10 @@ export const BETTER_AUTH_METHODS_HOOKS = {
   },
   signOut: {
     onRequest: () => {
-      // Invalidate token immediately to prevent in-flight requests from using it
-      BETTER_AUTH_TOKEN_STORAGE.invalidateToken();
       BETTER_AUTH_METHODS_CACHE.invalidateSessionCache();
       BETTER_AUTH_METHODS_IN_FLIGHT_REQUESTS.clearAll();
     },
     onSuccess: () => {
-      // Clear token from persistent storage
-      BETTER_AUTH_TOKEN_STORAGE.clearToken();
       BETTER_AUTH_METHODS_CACHE.clearSessionCache();
       emitAuthEvent({ type: 'SIGN_OUT' });
     },
