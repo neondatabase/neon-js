@@ -67,7 +67,23 @@ export abstract class NeonAuthAdapterCore {
           if (init?.headers && 'X-Force-Fetch' in init.headers) {
             const headers = { ...init.headers };
             delete headers['X-Force-Fetch'];
-            return fetch(url, { ...init, headers });
+            const response = await fetch(url, { ...init, headers });
+
+            // Check for HTTP errors
+            if (!response.ok) {
+              const body = await response
+                .clone()
+                .json()
+                .catch(() => ({}));
+              const err = new Error(
+                body.message || `HTTP ${response.status} ${response.statusText}`
+              );
+              (err as any).status = response.status;
+              (err as any).statusText = response.statusText;
+              throw err;
+            }
+
+            return response;
           }
 
           // Create body-aware deduplication key
@@ -79,6 +95,21 @@ export abstract class NeonAuthAdapterCore {
             await BETTER_AUTH_METHODS_IN_FLIGHT_REQUESTS.deduplicate(key, () =>
               fetch(url, init)
             );
+
+          // Check for HTTP errors before returning
+          if (!response.ok) {
+            const errorBody = await response
+              .clone()
+              .json()
+              .catch(() => ({}));
+            const err = new Error(
+              errorBody.message ||
+                `HTTP ${response.status} ${response.statusText}`
+            );
+            (err as any).status = response.status;
+            (err as any).statusText = response.statusText;
+            throw err;
+          }
 
           // Clone the response so each caller gets a fresh body stream
           // (Response bodies can only be read once, but deduplication shares the same Response)
