@@ -5,7 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.0-alpha.2] - 2025-11-26
+
+### Added
+
+#### New Architecture
+- Explicit URL configuration with separate `auth.url` and `dataApi.url`
+- Updated `createClient()` factory with flexible URL configuration
+- Type-safe client factory with proper generics
+- Comprehensive type tests in `src/__tests__/type-tests.ts`
+- New client exports in `src/client/index.ts`
+
+### Changed
+
+- Renamed dependency from `@neondatabase/auth-js` to `@neondatabase/neon-auth`
+- Updated `NeonClient` to work with new auth adapter architecture
+- Improved `client-factory.ts` with better type inference
+- Updated documentation with dual URL mode examples
 
 ## [0.1.0-alpha.1] - 2025-10-24
 
@@ -30,7 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Identity linking (`linkIdentity`, `unlinkIdentity`, `getUserIdentities`)
   - Password reset (`resetPasswordForEmail`, `resend`)
   - OAuth callback handling (`exchangeCodeForSession`)
-  - Reauthentication (`reauthenticate`)
+  - Re-authentication (`reauthenticate`)
   - State change monitoring (`onAuthStateChange`)
 - Session caching optimization with TTL-based expiration (<5ms cached reads)
 - JWT token validation with Zod schemas
