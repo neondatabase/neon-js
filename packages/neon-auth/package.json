@@ -18,7 +18,7 @@
     "test:ci": "vitest run",
     "typecheck": "tsc --noEmit",
     "test:types": "tsc --noEmit",
-    "release": "bumpp --tag 'neon-auth-v%s' && npm publish dist/"
+    "release": "bun run build && bumpp --tag 'neon-auth-v%s' && npm publish --tag latest"
   },
   "devDependencies": {
     "tsdown": "0.16.0",
