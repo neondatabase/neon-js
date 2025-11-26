@@ -7,17 +7,17 @@
 
 import { createClient } from '../client/client-factory';
 import {
-  SupabaseAdapter,
+  SupabaseAuthAdapter,
   BetterAuthVanillaAdapter,
   BetterAuthReactAdapter,
 } from '@neondatabase/neon-auth';
 
 // =============================================================================
-// Test 1: SupabaseAdapter - should infer SupabaseAdapter methods on client.auth
+// Test 1: SupabaseAuthAdapter - should infer SupabaseAuthAdapter methods on client.auth
 // =============================================================================
 const supabaseClient = createClient({
   auth: {
-    adapter: SupabaseAdapter,
+    adapter: SupabaseAuthAdapter,
     url: 'https://auth.example.com',
   },
   dataApi: {
@@ -27,7 +27,7 @@ const supabaseClient = createClient({
 
 // These should all type-check correctly:
 async function testSupabaseAuth() {
-  // getSession exists on SupabaseAdapter
+  // getSession exists on SupabaseAuthAdapter
   const session = await supabaseClient.auth.getSession();
   const jwt = await supabaseClient.auth.getJWTToken();
 
@@ -104,10 +104,10 @@ async function testReactAuth() {
 // Test 4: Auth options should be correctly inferred from adapter
 // =============================================================================
 
-// This should accept SupabaseAdapterOptions (minus baseURL)
+// This should accept SupabaseAuthAdapterOptions (minus baseURL)
 const _clientWithOptions = createClient({
   auth: {
-    adapter: SupabaseAdapter,
+    adapter: SupabaseAuthAdapter,
     url: 'https://auth.example.com',
     options: {
       // These should be valid BetterAuthClientOptions (minus plugins and baseURL)
@@ -128,7 +128,7 @@ const _clientWithOptions = createClient({
 import type { NeonAuth } from '@neondatabase/neon-auth';
 
 // Verify the auth types are correctly inferred
-type ExpectedSupabaseAuthType = NeonAuth<SupabaseAdapter>;
+type ExpectedSupabaseAuthType = NeonAuth<SupabaseAuthAdapter>;
 type ExpectedVanillaAuthType = NeonAuth<BetterAuthVanillaAdapter>;
 type ExpectedReactAuthType = NeonAuth<BetterAuthReactAdapter>;
 
@@ -156,7 +156,7 @@ function testAdapterAccess() {
   const vanillaAdapterInstance = vanillaClient.auth;
   const reactAdapterInstance = reactClient.auth;
 
-  supabaseAdapterInstance satisfies SupabaseAdapter;
+  supabaseAdapterInstance satisfies SupabaseAuthAdapter;
   vanillaAdapterInstance satisfies ReturnType<
     BetterAuthVanillaAdapter['getBetterAuthInstance']
   >;
@@ -172,7 +172,7 @@ function testAdapterAccess() {
 // Uncomment to verify type error:
 // const _invalidOptions = createClient({
 //   auth: {
-//     adapter: SupabaseAdapter,
+//     adapter: SupabaseAuthAdapter,
 //     url: 'https://auth.example.com',
 //     options: {
 //       invalidOption: true, // Should error - not a valid option
@@ -205,7 +205,7 @@ interface TestDatabase {
 // This is the NEW capability: provide Database type, infer adapter from config
 const typedSupabaseClient = createClient<TestDatabase>({
   auth: {
-    adapter: SupabaseAdapter,
+    adapter: SupabaseAuthAdapter,
     url: 'https://auth.example.com',
   },
   dataApi: {

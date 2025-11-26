@@ -6,7 +6,7 @@ Authentication adapters for Neon Auth, supporting multiple auth providers.
 
 `@neondatabase/neon-auth` provides authentication adapters for applications using Neon Auth. It supports multiple auth providers through a unified adapter system:
 
-- **SupabaseAdapter** - Supabase-compatible API for familiar auth patterns
+- **SupabaseAuthAdapter** - Supabase-compatible API for familiar auth patterns
 - **BetterAuthVanillaAdapter** - Direct Better Auth API for vanilla JS/TS
 - **BetterAuthReactAdapter** - Better Auth with React hooks support
 
@@ -31,13 +31,13 @@ bun add @neondatabase/neon-auth
 
 The `createNeonAuth` factory function creates an auth client with the appropriate adapter:
 
-#### SupabaseAdapter - Supabase-compatible API
+#### SupabaseAuthAdapter - Supabase-compatible API
 
 ```typescript
-import { createNeonAuth, SupabaseAdapter } from '@neondatabase/neon-auth';
+import { createNeonAuth, SupabaseAuthAdapter } from '@neondatabase/neon-auth';
 
 const auth = createNeonAuth('https://your-auth-server.com', {
-  adapter: SupabaseAdapter,
+  adapter: SupabaseAuthAdapter,
 });
 
 // Supabase-compatible methods
@@ -109,13 +109,13 @@ function MyComponent() {
 }
 ```
 
-### OAuth Authentication (SupabaseAdapter)
+### OAuth Authentication (SupabaseAuthAdapter)
 
 ```typescript
-import { createNeonAuth, SupabaseAdapter } from '@neondatabase/neon-auth';
+import { createNeonAuth, SupabaseAuthAdapter } from '@neondatabase/neon-auth';
 
 const auth = createNeonAuth('https://your-auth-server.com', {
-  adapter: SupabaseAdapter,
+  adapter: SupabaseAuthAdapter,
 });
 
 await auth.signInWithOAuth({
@@ -156,7 +156,7 @@ Factory function to create an auth client.
 
 ### Adapters
 
-#### SupabaseAdapter
+#### SupabaseAuthAdapter
 
 Provides a Supabase-compatible API:
 
@@ -215,11 +215,11 @@ Multiple concurrent `getSession()` calls are automatically deduplicated:
 Full TypeScript support with strict typing:
 
 ```typescript
-import { createNeonAuth, SupabaseAdapter } from '@neondatabase/neon-auth';
+import { createNeonAuth, SupabaseAuthAdapter } from '@neondatabase/neon-auth';
 import type { Session, User } from '@neondatabase/neon-auth';
 
 const auth = createNeonAuth('https://your-auth-server.com', {
-  adapter: SupabaseAdapter,
+  adapter: SupabaseAuthAdapter,
 });
 
 // Fully typed responses

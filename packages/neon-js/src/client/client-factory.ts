@@ -3,7 +3,7 @@ import {
   type NeonAuthAdapter,
   BetterAuthVanillaAdapter,
   BetterAuthReactAdapter,
-  SupabaseAdapter,
+  SupabaseAuthAdapter,
 } from '@neondatabase/neon-auth';
 import { fetchWithToken } from '@neondatabase/postgrest-js';
 import {
@@ -17,7 +17,7 @@ import { createInternalNeonAuth } from '@neondatabase/neon-auth';
  * Auth configuration for createClient
  */
 export type CreateClientAuthConfig<T extends NeonAuthAdapterClass> = {
-  /** The adapter class to use (e.g., SupabaseAdapter, BetterAuthVanillaAdapter) */
+  /** The adapter class to use (e.g., SupabaseAuthAdapter, BetterAuthVanillaAdapter) */
   adapter: T;
   /** The auth service URL */
   url: string;
@@ -60,11 +60,11 @@ export type CreateClientConfig<SchemaName, T extends NeonAuthAdapterClass> = {
  *
  * @example
  * ```typescript
- * import { createClient, SupabaseAdapter } from '@neondatabase/neon-js';
+ * import { createClient, SupabaseAuthAdapter } from '@neondatabase/neon-js';
  *
  * const client = createClient({
  *   auth: {
- *     adapter: SupabaseAdapter,
+ *     adapter: SupabaseAuthAdapter,
  *     url: 'https://auth.example.com',
  *   },
  *   dataApi: {
@@ -108,13 +108,13 @@ type CreateClientResult<
   TAdapter extends NeonAuthAdapter,
 > = NeonClient<Database, DefaultSchemaName<Database>, TAdapter>;
 
-// Overload: SupabaseAdapter
+// Overload: SupabaseAuthAdapter
 export function createClient<Database = any>(
   config: CreateClientConfig<
     DefaultSchemaName<Database>,
-    typeof SupabaseAdapter
+    typeof SupabaseAuthAdapter
   >
-): CreateClientResult<Database, SupabaseAdapter>;
+): CreateClientResult<Database, SupabaseAuthAdapter>;
 
 // Overload: BetterAuthVanillaAdapter
 export function createClient<Database = any>(

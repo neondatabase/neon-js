@@ -44,7 +44,7 @@ import {
   magicLinkClient,
 } from 'better-auth/client/plugins';
 
-export type SupabaseAdapterOptions = NeonAuthAdapterCoreAuthOptions;
+export type SupabaseAuthAdapterOptions = NeonAuthAdapterCoreAuthOptions;
 
 const _defaultBetterAuthClientOptions = {
   plugins: [
@@ -59,7 +59,7 @@ const _defaultBetterAuthClientOptions = {
   ],
 } satisfies BetterAuthClientOptions;
 
-export class SupabaseAdapter
+export class SupabaseAuthAdapter
   extends NeonAuthAdapterCore
   implements SupabaseAuthClientInterface
 {
@@ -69,7 +69,7 @@ export class SupabaseAdapter
   private _betterAuth: BetterAuthClient<typeof _defaultBetterAuthClientOptions>;
   private _stateChangeEmitters = new Map<string, Subscription>();
 
-  constructor(betterAuthClientOptions: SupabaseAdapterOptions) {
+  constructor(betterAuthClientOptions: SupabaseAuthAdapterOptions) {
     super(betterAuthClientOptions);
     // @ts-expect-error - defaultBetterAuthClientOptions is not typed
     this._betterAuth = createAuthClient(this.betterAuthOptions);

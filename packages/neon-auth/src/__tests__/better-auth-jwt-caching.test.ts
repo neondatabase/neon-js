@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SupabaseAdapter } from '../adapters/supabase/supabase-adapter';
+import { SupabaseAuthAdapter } from '../adapters/supabase/supabase-adapter';
 import { server } from './msw-setup';
 import { http, HttpResponse } from 'msw';
 
@@ -14,7 +14,7 @@ import { http, HttpResponse } from 'msw';
 // =============================================================================
 
 function createAdapter() {
-  return new SupabaseAdapter({
+  return new SupabaseAuthAdapter({
     baseURL: 'http://localhost:3000/api/auth',
   });
 }

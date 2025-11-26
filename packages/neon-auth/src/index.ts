@@ -24,8 +24,8 @@ export type { Session, User } from '@supabase/auth-js';
 // Adapters
 export { BetterAuthVanillaAdapter } from './adapters/better-auth-vanilla/better-auth-vanilla-adapter';
 export { BetterAuthReactAdapter } from './adapters/better-auth-react/better-auth-react-adapter';
-export { SupabaseAdapter } from './adapters/supabase/supabase-adapter';
-export type { SupabaseAdapterOptions } from './adapters/supabase/supabase-adapter';
+export { SupabaseAuthAdapter } from './adapters/supabase/supabase-adapter';
+export type { SupabaseAuthAdapterOptions } from './adapters/supabase/supabase-adapter';
 
 // JWT utilities
 export { getJwtExpiration, getJwtExpirationMs } from './utils/jwt';

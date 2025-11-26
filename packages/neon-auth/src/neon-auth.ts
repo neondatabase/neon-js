@@ -2,7 +2,7 @@ import type { createAuthClient as createReactAuthClient } from 'better-auth/reac
 import type { createAuthClient as createVanillaAuthClient } from 'better-auth/client';
 import { BetterAuthReactAdapter } from './adapters/better-auth-react/better-auth-react-adapter';
 import { BetterAuthVanillaAdapter } from './adapters/better-auth-vanilla/better-auth-vanilla-adapter';
-import { SupabaseAdapter } from './adapters/supabase/supabase-adapter';
+import { SupabaseAuthAdapter } from './adapters/supabase/supabase-adapter';
 
 /**
  * Type representing the Better Auth React client
@@ -23,7 +23,7 @@ export type VanillaBetterAuthClient = ReturnType<
 export type NeonAuthAdapterClass =
   | typeof BetterAuthVanillaAdapter
   | typeof BetterAuthReactAdapter
-  | typeof SupabaseAdapter;
+  | typeof SupabaseAuthAdapter;
 
 /**
  * Union type of all supported auth adapter instances
@@ -31,14 +31,14 @@ export type NeonAuthAdapterClass =
 export type NeonAuthAdapter =
   | BetterAuthVanillaAdapter
   | BetterAuthReactAdapter
-  | SupabaseAdapter;
+  | SupabaseAuthAdapter;
 
 /**
  * Configuration for createNeonAuth
- * T is the adapter CLASS type (typeof SupabaseAdapter), not the instance type
+ * T is the adapter CLASS type (typeof SupabaseAuthAdapter), not the instance type
  */
 export interface NeonAuthConfig<T extends NeonAuthAdapterClass> {
-  /** The adapter class to use (e.g., SupabaseAdapter, BetterAuthVanillaAdapter) */
+  /** The adapter class to use (e.g., SupabaseAuthAdapter, BetterAuthVanillaAdapter) */
   adapter: T;
   /** Additional options to pass to the adapter (baseURL is auto-injected) */
   options?: Omit<ConstructorParameters<T>[0], 'baseURL'>;
@@ -46,7 +46,7 @@ export interface NeonAuthConfig<T extends NeonAuthAdapterClass> {
 
 /**
  * Resolves the public API type for an adapter.
- * - SupabaseAdapter: exposes its own methods directly (Supabase-compatible API)
+ * - SupabaseAuthAdapter: exposes its own methods directly (Supabase-compatible API)
  * - BetterAuth adapters: expose the Better Auth client directly
  */
 export type NeonAuthPublicApi<T extends NeonAuthAdapter> =
@@ -54,13 +54,13 @@ export type NeonAuthPublicApi<T extends NeonAuthAdapter> =
     ? VanillaBetterAuthClient
     : T extends BetterAuthReactAdapter
       ? ReactBetterAuthClient
-      : T; // SupabaseAdapter - use adapter methods directly
+      : T; // SupabaseAuthAdapter - use adapter methods directly
 
 /**
  * NeonAuth type - combines base functionality with the appropriate public API
  * This is the return type of createNeonAuth()
  *
- * For SupabaseAdapter: exposes Supabase-compatible methods (signInWithPassword, getSession, etc.)
+ * For SupabaseAuthAdapter: exposes Supabase-compatible methods (signInWithPassword, getSession, etc.)
  * For BetterAuth adapters: exposes the Better Auth client directly (signIn.email, signUp.email, etc.)
  */
 export type NeonAuth<T extends NeonAuthAdapter> = {
@@ -75,12 +75,12 @@ export type NeonAuth<T extends NeonAuthAdapter> = {
  * @param config - Configuration with adapter class and optional adapter-specific options
  * @returns NeonAuth instance with the adapter's API exposed directly
  *
- * @example SupabaseAdapter - Supabase-compatible API
+ * @example SupabaseAuthAdapter - Supabase-compatible API
  * ```typescript
- * import { createNeonAuth, SupabaseAdapter } from '@neondatabase/neon-auth';
+ * import { createNeonAuth, SupabaseAuthAdapter } from '@neondatabase/neon-auth';
  *
  * const auth = createNeonAuth('https://auth.example.com', {
- *   adapter: SupabaseAdapter,
+ *   adapter: SupabaseAuthAdapter,
  * });
  *
  * // Supabase-compatible methods
@@ -125,10 +125,11 @@ export function createInternalNeonAuth<T extends NeonAuthAdapterClass>(
     ...config.options,
   }) as InstanceType<T>;
 
-  // Check if this is a SupabaseAdapter by checking for its unique initialize method
-  const isSupabaseAdapter = typeof (adapter as any).initialize === 'function';
+  // Check if this is a SupabaseAuthAdapter by checking for its unique initialize method
+  const isSupabaseAuthAdapter =
+    typeof (adapter as any).initialize === 'function';
 
-  if (!isSupabaseAdapter) {
+  if (!isSupabaseAuthAdapter) {
     console.log('isBetterAuthAdapter');
     return {
       getJWTToken: adapter.getJWTToken.bind(adapter),
@@ -136,7 +137,7 @@ export function createInternalNeonAuth<T extends NeonAuthAdapterClass>(
     } as NeonAuth<InstanceType<T>>;
   }
 
-  console.log('isSupabaseAdapter');
+  console.log('isSupabaseAuthAdapter');
   return {
     getJWTToken: adapter.getJWTToken.bind(adapter),
     adapter,

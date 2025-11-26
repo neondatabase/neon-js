@@ -25,14 +25,14 @@ bun add @neondatabase/neon-js
 
 ## Quick Start
 
-### Using SupabaseAdapter (Supabase-compatible API)
+### Using SupabaseAuthAdapter (Supabase-compatible API)
 
 ```typescript
-import { createClient, SupabaseAdapter } from '@neondatabase/neon-js';
+import { createClient, SupabaseAuthAdapter } from '@neondatabase/neon-js';
 
 const client = createClient<Database>({
   auth: {
-    adapter: SupabaseAdapter,
+    adapter: SupabaseAuthAdapter,
     url: import.meta.env.VITE_NEON_AUTH_URL,
   },
   dataApi: {
@@ -108,7 +108,7 @@ function MyComponent() {
 
 ## Authentication
 
-### Sign Up (SupabaseAdapter)
+### Sign Up (SupabaseAuthAdapter)
 
 ```typescript
 await client.auth.signUp({
@@ -133,7 +133,7 @@ await client.auth.signUp.email({
 });
 ```
 
-### Sign In (SupabaseAdapter)
+### Sign In (SupabaseAuthAdapter)
 
 ```typescript
 // Email & Password
@@ -167,7 +167,7 @@ await client.auth.signIn.social({
 });
 ```
 
-### Session Management (SupabaseAdapter)
+### Session Management (SupabaseAuthAdapter)
 
 ```typescript
 // Get current session
@@ -197,7 +197,7 @@ const session = await client.auth.getSession();
 await client.auth.signOut();
 ```
 
-### Auth State Changes (SupabaseAdapter)
+### Auth State Changes (SupabaseAuthAdapter)
 
 ```typescript
 client.auth.onAuthStateChange((event, session) => {
@@ -296,12 +296,12 @@ const { data } = await client
 ### Client Options
 
 ```typescript
-import { createClient, SupabaseAdapter } from '@neondatabase/neon-js';
+import { createClient, SupabaseAuthAdapter } from '@neondatabase/neon-js';
 
 const client = createClient({
   // Auth configuration
   auth: {
-    adapter: SupabaseAdapter,
+    adapter: SupabaseAuthAdapter,
     url: 'https://your-auth-server.neon.tech/auth',
     options: {
       // Additional adapter-specific options
@@ -336,11 +336,11 @@ NEON_DATA_API_URL=https://your-data-api.neon.tech/rest/v1
 ```
 
 ```typescript
-import { createClient, SupabaseAdapter } from '@neondatabase/neon-js';
+import { createClient, SupabaseAuthAdapter } from '@neondatabase/neon-js';
 
 const client = createClient({
   auth: {
-    adapter: SupabaseAdapter,
+    adapter: SupabaseAuthAdapter,
     url: process.env.NEON_AUTH_URL!,
   },
   dataApi: {
@@ -361,11 +361,11 @@ Use generated types for full type safety:
 
 ```typescript
 import type { Database } from './types/database';
-import { createClient, SupabaseAdapter } from '@neondatabase/neon-js';
+import { createClient, SupabaseAuthAdapter } from '@neondatabase/neon-js';
 
 const client = createClient<Database>({
   auth: {
-    adapter: SupabaseAdapter,
+    adapter: SupabaseAuthAdapter,
     url: process.env.NEON_AUTH_URL!,
   },
   dataApi: {
@@ -431,7 +431,7 @@ Concurrent authentication calls are automatically deduplicated:
 ```typescript
 import { AuthError } from '@neondatabase/neon-js';
 
-// Auth errors (SupabaseAdapter)
+// Auth errors (SupabaseAuthAdapter)
 try {
   await client.auth.signInWithPassword({ email, password });
 } catch (error) {
@@ -453,11 +453,11 @@ if (error) {
 
 ```typescript
 // app/lib/neon.ts
-import { createClient, SupabaseAdapter } from '@neondatabase/neon-js';
+import { createClient, SupabaseAuthAdapter } from '@neondatabase/neon-js';
 
 export const neon = createClient({
   auth: {
-    adapter: SupabaseAdapter,
+    adapter: SupabaseAuthAdapter,
     url: process.env.NEON_AUTH_URL!,
   },
   dataApi: {
@@ -521,11 +521,11 @@ const client = createClient({
 });
 
 // After (new API with adapters)
-import { createClient, SupabaseAdapter } from '@neondatabase/neon-js';
+import { createClient, SupabaseAuthAdapter } from '@neondatabase/neon-js';
 
 const client = createClient({
   auth: {
-    adapter: SupabaseAdapter,
+    adapter: SupabaseAuthAdapter,
     url: 'https://auth.example.com',
   },
   dataApi: {

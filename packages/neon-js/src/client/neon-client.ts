@@ -42,9 +42,9 @@ export class NeonClient<
     console.log(this.auth);
     // Or try accessing the actual methods:
     console.log('signUp:', typeof this.auth.signUp);
-    // @ts-expect-error - signIn is not a method of SupabaseAdapter
+    // @ts-expect-error - signIn is not a method of SupabaseAuthAdapter
     console.log('signIn:', typeof this.auth.signIn);
-    // @ts-expect-error - getSession is not a method of SupabaseAdapter
+    // @ts-expect-error - getSession is not a method of SupabaseAuthAdapter
     console.log('getSession:', typeof this.auth.getSession);
   }
 }
