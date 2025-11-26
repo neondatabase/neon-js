@@ -21,22 +21,24 @@ Generic PostgreSQL client for Neon Data API without authentication:
 - `@neondatabase/postgrest-js/client` - Client components
 
 ### `@neondatabase/neon-auth` (packages/neon-auth/)
-Authentication adapter implementing the `NeonAuthClientInterface`:
-- **Better Auth Adapter**: Full-featured adapter with session caching, request deduplication, and cross-tab sync
+Authentication adapters for Neon Auth supporting multiple auth providers:
+- **createNeonAuth()**: Factory function for creating auth clients with configurable adapters
+- **SupabaseAuthAdapter**: Supabase-compatible API for familiar auth patterns
+- **BetterAuthVanillaAdapter**: Direct Better Auth API for vanilla JS/TS
+- **BetterAuthReactAdapter**: Better Auth with React hooks support
 
 **Exports:**
-- `@neondatabase/neon-auth` - Main exports (AuthClient interface, adapter, utilities)
-- `@neondatabase/neon-auth/better-auth` - Better Auth adapter
+- `@neondatabase/neon-auth` - Main exports (createNeonAuth, adapters, utilities)
 
 ### `@neondatabase/neon-js` (packages/neon-js/)
 Main SDK package that combines authentication with PostgreSQL querying:
 - **NeonClient**: Auth-integrated client extending NeonPostgrestClient
-- **createClient()**: Factory function for Better Auth setup
+- **createClient()**: Factory function that accepts any auth adapter
 - **CLI Tool**: Database type generation utility
-- Re-exports all postgrest-js utilities for convenience
+- Re-exports all neon-auth exports for convenience
 
 **Exports:**
-- `@neondatabase/neon-js` - Main exports (all postgrest-js + auth + client + factories)
+- `@neondatabase/neon-js` - Main exports (createClient, all neon-auth exports)
 - `@neondatabase/neon-js/client` - Client components
 - `@neondatabase/neon-js/cli` - CLI tool
 
@@ -89,23 +91,38 @@ bun release           # Bump version and publish all three packages
 
 ### Authentication Layer (`packages/neon-auth/`)
 
-**Core Interface**: `src/auth-interface.ts`
-- Defines `NeonAuthClientInterface` (standard auth interface)
-- Error types: `AuthError`, `AuthApiError`
+**Factory**: `src/neon-auth.ts`
+- `createNeonAuth()` - Public factory for creating auth clients
+- `createInternalNeonAuth()` - Internal factory for NeonClient integration
+- Type definitions for `NeonAuthAdapter`, `NeonAuthAdapterClass`
 
 **Adapters**: `src/adapters/`
-- **Better Auth**: `adapters/better-auth/`
-  - `better-auth-adapter.ts` - Main implementation (~1820 lines)
-  - `better-auth-types.ts` - Type definitions
-  - `better-auth-helpers.ts` - Session mapping and error handling
-  - `in-flight-request-manager.ts` - Request deduplication utility
-  - `constants.ts` - Configuration (TTLs, intervals, buffers)
-  - Session caching with TTL-based expiration
-  - Request deduplication for `getSession()` and `getJwtToken()`
-  - Cross-tab sync via BroadcastChannel (browser only)
-  - Token refresh detection (30s polling interval)
+- **Supabase Adapter**: `adapters/supabase/`
+  - `supabase-adapter.ts` - Supabase-compatible API implementation
+  - `auth-interface.ts` - AuthError, AuthApiError types
+  - `errors/` - Error definitions and mappings
+  - `better-auth-docs.md` - Adapter documentation
+  - `better-auth-plugins.md` - Plugin configuration
 
-- **Shared**: `adapters/shared-helpers.ts`, `adapters/shared-schemas.ts`
+- **Better Auth Vanilla**: `adapters/better-auth-vanilla/`
+  - `better-auth-vanilla-adapter.ts` - Direct Better Auth API
+
+- **Better Auth React**: `adapters/better-auth-react/`
+  - `better-auth-react-adapter.ts` - Better Auth with React hooks (`useSession`)
+
+**Core**: `src/core/`
+- `adapter-core.ts` - Base adapter class with shared functionality
+- `session-cache-manager.ts` - Session caching with TTL
+- `in-flight-request-manager.ts` - Request deduplication
+- `better-auth-helpers.ts` - Session mapping and error handling
+- `better-auth-types.ts` - Type definitions
+- `better-auth-methods.ts` - Shared method implementations
+- `constants.ts` - Configuration (TTLs, intervals, buffers)
+
+**Utilities**: `src/utils/`
+- `jwt.ts` - JWT parsing and expiration utilities
+- `date.ts` - Date utilities
+- `browser.ts` - Browser detection utilities
 
 **Tests**: `src/__tests__/`
 - Uses real Better Auth SDK with MSW for network mocking
@@ -115,8 +132,9 @@ bun release           # Bump version and publish all three packages
 
 **Client**: `src/client/`
 - `neon-client.ts` - NeonClient class (extends NeonPostgrestClient, adds required auth)
-- `client-factory.ts` - Better Auth factory: `createClient()`
-- `index.ts` - Re-exports fetchWithToken from postgrest-js
+- `client-factory.ts` - `createClient()` factory with adapter configuration
+- `fetch-with-auth.ts` - Auth-aware fetch wrapper
+- `index.ts` - Client exports
 
 **CLI Tool**: `src/cli/`
 - `index.ts` - CLI entry point (bin: `neon-js`)
@@ -159,88 +177,98 @@ const client = new NeonPostgrestClient({
 const { data: items } = await client.from('items').select();
 ```
 
-### Using NeonClient (With Auth) - Better Auth
+### Using NeonClient (With Auth) - Adapter Pattern
 
-#### Single URL Mode (Standard)
+The `createClient()` factory accepts any auth adapter, allowing you to choose the API style:
 
-For full auth integration with Better Auth using a single Neon branch URL:
+#### SupabaseAuthAdapter (Supabase-compatible API)
 
 ```typescript
-import { createClient } from '@neondatabase/neon-js';
+import { createClient, SupabaseAuthAdapter } from '@neondatabase/neon-js';
 
-// Single URL - automatically derives dataApiUrl and authUrl
-const client = createClient(
-  'https://ep-xxx.neon.build/neondb',
-  {
-    clientOptions: {
-      options: {
-        global: {
-          headers: { 'X-Custom-Header': 'value' },
-        },
-        db: {
-          schema: 'public',
-        },
-      },
-    },
-    authOptions: {
-      // baseURL is automatically derived from the Neon URL
-      // Additional Better Auth options can be passed here
-    },
-  }
-);
+const client = createClient<Database>({
+  auth: {
+    adapter: SupabaseAuthAdapter,
+    url: 'https://auth.example.com',
+  },
+  dataApi: {
+    url: 'https://data-api.example.com/rest/v1',
+  },
+});
 
-// Auth methods
+// Supabase-compatible auth methods
 await client.auth.signInWithPassword({ email, password });
-const { data } = await client.auth.getSession();
+const { data: session } = await client.auth.getSession();
+await client.auth.signOut();
 
 // Database queries (automatic token injection)
 const { data: items } = await client.from('items').select();
 ```
 
-#### Dual URL Mode (Explicit URLs)
-
-For scenarios where you need explicit control over data API and auth URLs:
+#### BetterAuthVanillaAdapter (Direct Better Auth API)
 
 ```typescript
-import { createClient } from '@neondatabase/neon-js';
+import { createClient, BetterAuthVanillaAdapter } from '@neondatabase/neon-js';
 
-// Dual URLs - explicit dataApiUrl and authUrl
-const client = createClient({
-  dataApiUrl: 'https://data-api.example.com/rest/v1',
-  authUrl: 'https://auth.example.com/api',
-  clientOptions: {
-    options: {
-      global: {
-        headers: { 'X-Custom-Header': 'value' },
-      },
-      db: {
-        schema: 'public',
-      },
-    },
+const client = createClient<Database>({
+  auth: {
+    adapter: BetterAuthVanillaAdapter,
+    url: 'https://auth.example.com',
   },
-  authOptions: {
-    // Additional Better Auth options (baseURL is set from authUrl above)
+  dataApi: {
+    url: 'https://data-api.example.com/rest/v1',
   },
 });
 
-// Same API as single URL mode
-await client.auth.signInWithPassword({ email, password });
+// Direct Better Auth API
+await client.auth.signIn.email({ email, password });
+const session = await client.auth.getSession();
+await client.auth.signOut();
+
+// Database queries (automatic token injection)
 const { data: items } = await client.from('items').select();
+```
+
+#### BetterAuthReactAdapter (With React Hooks)
+
+```typescript
+import { createClient, BetterAuthReactAdapter } from '@neondatabase/neon-js';
+
+const client = createClient<Database>({
+  auth: {
+    adapter: BetterAuthReactAdapter,
+    url: 'https://auth.example.com',
+  },
+  dataApi: {
+    url: 'https://data-api.example.com/rest/v1',
+  },
+});
+
+// React hooks available
+function MyComponent() {
+  const session = client.auth.useSession();
+
+  if (session.isPending) return <div>Loading...</div>;
+  if (!session.data) return <div>Not logged in</div>;
+
+  return <div>Hello, {session.data.user.name}</div>;
+}
 ```
 
 ### Using Auth Adapters Directly
 
 ```typescript
-import { BetterAuthAdapter } from '@neondatabase/neon-auth/better-auth';
+import { createNeonAuth, SupabaseAuthAdapter } from '@neondatabase/neon-auth';
 
-const auth = new BetterAuthAdapter({
-  baseURL: 'https://your-auth-server.com',
+const auth = createNeonAuth('https://your-auth-server.com', {
+  adapter: SupabaseAuthAdapter,
 });
 
 await auth.signInWithPassword({ email, password });
+const { data: session } = await auth.getSession();
 ```
 
-## Better Auth Adapter Features
+## Adapter Features
 
 ### Session Caching
 - In-memory cache with 60s TTL (or until JWT expires)
@@ -251,11 +279,11 @@ await auth.signInWithPassword({ email, password });
 
 ### Request Deduplication
 - Multiple concurrent `getSession()`/`getJwtToken()` calls deduplicate to single request
-- 10x faster cold starts (10 concurrent calls: ~2000ms → ~200ms)
+- 10x faster cold starts (10 concurrent calls: ~2000ms -> ~200ms)
 - Reduces server load by N-1 for N concurrent calls
 - Implemented via generic `InFlightRequestManager`
 
-### Event System
+### Event System (SupabaseAuthAdapter)
 - `onAuthStateChange()` monitors: `SIGNED_IN`, `SIGNED_OUT`, `TOKEN_REFRESHED`, `USER_UPDATED`
 - Synchronous emission in state-changing methods
 - Cross-tab sync via BroadcastChannel (browser only)
@@ -298,37 +326,34 @@ bun test         # May have MSW issues with Bun's fetch
 // Package naming: @neondatabase/package-name
 ```
 
-## Key Mappings (Better Auth)
+## Key Mappings (SupabaseAuthAdapter)
 
 Following the [Better Auth Supabase Migration Guide](https://www.better-auth.com/docs/guides/supabase-migration-guide):
 
 **Authentication:**
-- `signUp` → `betterAuth.signUp.email()`
-- `signInWithPassword` → `betterAuth.signIn.email()`
-- `signInWithOAuth` → `betterAuth.signIn.social()`
-- `signInWithOtp` → `betterAuth.signIn.email()` (magic link)
-- `signOut` → `betterAuth.signOut()`
+- `signUp` -> `betterAuth.signUp.email()`
+- `signInWithPassword` -> `betterAuth.signIn.email()`
+- `signInWithOAuth` -> `betterAuth.signIn.social()`
+- `signInWithOtp` -> `betterAuth.signIn.email()` (magic link)
+- `signOut` -> `betterAuth.signOut()`
 
 **Session Management:**
-- `getSession` → `betterAuth.getSession()`
-- `getUser` → `betterAuth.getSession()` (extract user)
+- `getSession` -> `betterAuth.getSession()`
+- `getUser` -> `betterAuth.getSession()` (extract user)
 
 **User Management:**
-- `updateUser` → `betterAuth.user.update()`
-- `getUserIdentities` → `betterAuth.account.list()`
-- `linkIdentity` → `betterAuth.linkSocial()`
-- `unlinkIdentity` → `betterAuth.account.unlink()`
+- `updateUser` -> `betterAuth.user.update()`
+- `getUserIdentities` -> `betterAuth.account.list()`
+- `linkIdentity` -> `betterAuth.linkSocial()`
+- `unlinkIdentity` -> `betterAuth.account.unlink()`
 
 **Password Management:**
-- `resetPasswordForEmail` → `betterAuth.forgetPassword()`
+- `resetPasswordForEmail` -> `betterAuth.forgetPassword()`
 
 ## Additional Documentation
 
-- `packages/neon-auth/src/adapters/better-auth/better-auth-docs.md` - Comprehensive adapter docs
-- `packages/neon-auth/src/adapters/better-auth/better-auth-plugins.md` - Plugin configuration
-- `packages/neon-auth/src/__tests__/README.md` - Testing guide
-- `BETTER_AUTH_SIMPLIFICATION.md` - Simplification strategy
-- `REMOVE_BETTER_AUTH_SESSION_LISTENER.md` - Event implementation notes
+- `packages/neon-auth/src/adapters/supabase/better-auth-docs.md` - Comprehensive adapter docs
+- `packages/neon-auth/src/adapters/supabase/better-auth-plugins.md` - Plugin configuration
 
 ## References
 

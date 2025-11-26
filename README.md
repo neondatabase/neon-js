@@ -77,24 +77,34 @@ This monorepo contains three packages. Choose based on your needs:
 - **`@neondatabase/neon-js`** (Recommended): Full-featured SDK with auth + Neon Data API. Use this for most applications.
 - **`@neondatabase/postgrest-js`**: Database queries only. Use when you handle authentication externally or don't need auth.
 - **`@neondatabase/neon-auth`**: Authentication only. Use when you want to use Neon Auth for authentication and don't need to use the Neon Data API.
-- 
+
 ## Quick Start
 
-Here's a complete example showing authentication and database queries:
+Here's a complete example showing authentication and database queries. Choose your preferred auth adapter:
+
+- **`SupabaseAuthAdapter`** - Supabase-compatible API (familiar patterns like `signInWithPassword`)
+- **`BetterAuthVanillaAdapter`** - Direct Better Auth API (`signIn.email`)
+- **`BetterAuthReactAdapter`** - Better Auth with React hooks (`useSession`)
 
 ```typescript
-import { createClient } from '@neondatabase/neon-js';
+import { createClient, SupabaseAuthAdapter } from '@neondatabase/neon-js';
+// Or use: BetterAuthVanillaAdapter, BetterAuthReactAdapter
 
-// OPTIONAL: generate these types file with the CLI tool bellow
+// OPTIONAL: generate these types file with the CLI tool below
 import type { Database } from './types/database.types';
 
-// Create client with Better Auth integration
+// Create client with your chosen auth adapter
 const client = createClient<Database>({
-  dataApiUrl: import.meta.env.VITE_NEON_DATA_API_URL,
-  authUrl: import.meta.env.VITE_NEON_AUTH_URL,
+  auth: {
+    adapter: SupabaseAuthAdapter, // swap for any adapter
+    url: import.meta.env.VITE_NEON_AUTH_URL,
+  },
+  dataApi: {
+    url: import.meta.env.VITE_NEON_DATA_API_URL,
+  },
 });
 
-// Sign in
+// Sign in (API depends on chosen adapter)
 await client.auth.signInWithPassword({
   email: 'user@example.com',
   password: 'password123',
@@ -154,11 +164,16 @@ npx @neondatabase/neon-js gen-types --db-url "postgresql://..." --query-timeout 
 Full-featured SDK with authentication and database queries:
 
 ```typescript
-import { createClient } from '@neondatabase/neon-js';
+import { createClient, SupabaseAuthAdapter } from '@neondatabase/neon-js';
 
 const client = createClient<Database>({
-  dataApiUrl: import.meta.env.VITE_NEON_DATA_API_URL,
-  authUrl: import.meta.env.VITE_NEON_AUTH_URL,
+  auth: {
+    adapter: SupabaseAuthAdapter,
+    url: import.meta.env.VITE_NEON_AUTH_URL,
+  },
+  dataApi: {
+    url: import.meta.env.VITE_NEON_DATA_API_URL,
+  },
 });
 
 // All auth methods available
@@ -208,10 +223,10 @@ const { data } = await client.from('items').select();
 For building custom clients or integrations:
 
 ```typescript
-import { NeonAuthClient } from '@neondatabase/neon-auth';
+import { createNeonAuth, SupabaseAuthAdapter } from '@neondatabase/neon-auth';
 
-const auth = new NeonAuthClient({
-  baseURL: import.meta.env.VITE_NEON_AUTH_URL,
+const auth = createNeonAuth(import.meta.env.VITE_NEON_AUTH_URL, {
+  adapter: SupabaseAuthAdapter,
 });
 
 // Use auth methods directly
@@ -245,15 +260,20 @@ neon-js provides a Supabase compatible API, making migration straightforward wit
 
 ```diff
 - import { createClient } from '@supabase/supabase-js';
-+ import { createClient } from '@neondatabase/neon-js';
++ import { createClient, SupabaseAuthAdapter } from '@neondatabase/neon-js';
 
 - export const client = createClient(
 -   import.meta.env.VITE_SUPABASE_URL,
 -   import.meta.env.VITE_SUPABASE_ANON_KEY
 - );
 + export const client = createClient<Database>({
-+   dataApiUrl: import.meta.env.VITE_NEON_DATA_API_URL,
-+   authUrl: import.meta.env.VITE_NEON_AUTH_URL,
++   auth: {
++     adapter: SupabaseAuthAdapter,
++     url: import.meta.env.VITE_NEON_AUTH_URL,
++   },
++   dataApi: {
++     url: import.meta.env.VITE_NEON_DATA_API_URL,
++   },
 + });
 ```
 
@@ -285,14 +305,16 @@ The SDK works in both browser and Node.js environments:
 ## Architecture
 
 - **NeonClient**: Unified client for authentication and database queries
-- **AuthClient Interface**: Compatible authentication interface for easy adoption
-- **Adapter Pattern**: Pluggable authentication providers (Better Auth)
-- **Factory Pattern**: `createClient()` handles initialization and wiring
-- **Performance Optimized**: Cross-tab sync, automatic token refresh detection, and seamless token injection
+- **Adapter Pattern**: Three pluggable authentication adapters:
+  - `SupabaseAuthAdapter` - Supabase-compatible API for familiar patterns
+  - `BetterAuthVanillaAdapter` - Direct Better Auth API
+  - `BetterAuthReactAdapter` - Better Auth with React hooks (`useSession`)
+- **Factory Pattern**: `createClient()` handles initialization and wiring with chosen adapter
+- **Performance Optimized**: Session caching, request deduplication, cross-tab sync, and automatic token injection
 
 ## Performance
 
-The Better Auth adapter provides production-ready performance:
+The auth adapters provide production-ready performance:
 
 - **Session retrieval**: Fast session access via Better Auth's built-in caching
 - **Token refresh**: Automatic token refresh with 30-second polling interval
