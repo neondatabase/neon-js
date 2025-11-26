@@ -1,6 +1,6 @@
 {
   "name": "@neondatabase/postgrest-js",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha.1",
   "description": "Generic PostgreSQL client for Neon Data API (without authentication)",
   "type": "module",
   "license": "Apache-2.0",
@@ -34,7 +34,7 @@
     "test:ci": "vitest run",
     "typecheck": "tsc --noEmit",
     "test:types": "tsc --noEmit",
-    "release": "bumpp --tag 'postgrest-js-v%s' && npm publish dist/",
+    "release": "bun run build && bumpp --tag 'postgrest-js-v%s' && npm publish --tag latest",
     "lint": "eslint ."
   },
   "devDependencies": {
