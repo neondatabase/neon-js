@@ -9,7 +9,6 @@ export default defineConfig({
   dts: {
     build: true,
   },
-
   // Transform package.json after build
   hooks: {
     'build:done': async () => {

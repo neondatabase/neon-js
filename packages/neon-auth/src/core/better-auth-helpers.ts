@@ -312,13 +312,6 @@ export function mapBetterAuthSession(
     return null;
   }
 
-  console.log('[mapBetterAuthSession] Input token:', {
-    token: betterAuthSession.token,
-    tokenLength: betterAuthSession.token?.length,
-    tokenType: typeof betterAuthSession.token,
-    isJWT: betterAuthSession.token?.startsWith('eyJ'),
-  });
-
   // Parse expiresAt
   let expiresAt: number;
   if (typeof betterAuthSession.expiresAt === 'string') {
@@ -350,12 +343,6 @@ export function mapBetterAuthSession(
     token_type: 'bearer' as const,
     user: mapBetterAuthUser(betterAuthUser),
   };
-
-  console.log('[mapBetterAuthSession] Output access_token:', {
-    accessToken: session.access_token,
-    accessTokenLength: session.access_token?.length,
-    isJWT: session.access_token?.startsWith('eyJ'),
-  });
 
   return session;
 }

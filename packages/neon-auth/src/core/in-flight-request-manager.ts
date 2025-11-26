@@ -53,19 +53,13 @@ export class InFlightRequestManager {
     // Check if request is already in-flight
     const existing = this.inFlightRequests.get(key);
     if (existing) {
-      console.debug(
-        `[InFlightRequestManager] Awaiting in-flight request: ${key}`
-      );
       return existing as Promise<T>;
     }
 
     // Create new tracked Promise
-    console.debug(`[InFlightRequestManager] Starting new request: ${key}`);
-
     const promise = fn().finally(() => {
       // Clear after resolution (success or error) to allow retry
       this.inFlightRequests.delete(key);
-      console.debug(`[InFlightRequestManager] Cleared request: ${key}`);
     });
 
     // Track Promise before returning

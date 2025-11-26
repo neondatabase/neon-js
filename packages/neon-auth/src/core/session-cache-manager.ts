@@ -32,19 +32,14 @@ export class SessionCacheManager {
    */
   getCachedSession(): Session | null {
     if (!this.cache || this.cache.invalidated) {
-      console.log(
-        '[SessionCacheManager] Cache miss: no cached session or invalidated'
-      );
       return null;
     }
 
     if (Date.now() > this.cache.expiresAt) {
-      console.log('[SessionCacheManager] Cache miss: session expired');
       this.clearSessionCache();
       return null;
     }
 
-    console.log('[SessionCacheManager] Cache hit: returning cached session');
     return this.cache.session;
   }
 
@@ -56,9 +51,6 @@ export class SessionCacheManager {
   setCachedSession(session: Session, ttl?: number): void {
     // Check if cache was invalidated (signOut called during in-flight request)
     if (this.cache?.invalidated) {
-      console.log(
-        '[SessionCacheManager] Cache invalidated, skipping setCachedSession'
-      );
       return;
     }
 
@@ -66,9 +58,6 @@ export class SessionCacheManager {
     this.lastSession = this.cache?.session ?? null;
 
     const calculatedTtl = ttl ?? this.calculateCacheTTL(session.access_token);
-    console.log(
-      `[SessionCacheManager] Setting cached session (TTL: ${calculatedTtl}ms)`
-    );
 
     this.cache = {
       session,
@@ -84,7 +73,6 @@ export class SessionCacheManager {
   invalidateSessionCache(): void {
     if (this.cache) {
       this.cache.invalidated = true;
-      console.log('[SessionCacheManager] Cache invalidated');
     }
   }
 
@@ -92,7 +80,6 @@ export class SessionCacheManager {
    * Clear cache completely.
    */
   clearSessionCache(): void {
-    console.log('[SessionCacheManager] Clearing session cache');
     this.cache = null;
     this.lastSession = null;
   }

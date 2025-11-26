@@ -130,14 +130,12 @@ export function createInternalNeonAuth<T extends NeonAuthAdapterClass>(
     typeof (adapter as any).initialize === 'function';
 
   if (!isSupabaseAuthAdapter) {
-    console.log('isBetterAuthAdapter');
     return {
       getJWTToken: adapter.getJWTToken.bind(adapter),
       adapter: adapter.getBetterAuthInstance(),
     } as NeonAuth<InstanceType<T>>;
   }
 
-  console.log('isSupabaseAuthAdapter');
   return {
     getJWTToken: adapter.getJWTToken.bind(adapter),
     adapter,

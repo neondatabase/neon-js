@@ -67,7 +67,6 @@ export abstract class NeonAuthAdapterCore {
           if (init?.headers && 'X-Force-Fetch' in init.headers) {
             const headers = { ...init.headers };
             delete headers['X-Force-Fetch'];
-            console.log('[customFetch] Force-fetch bypass:', url);
             return fetch(url, { ...init, headers });
           }
 
@@ -93,7 +92,6 @@ export abstract class NeonAuthAdapterCore {
             // Better Auth will then update its internal state, triggering useSession.subscribe()
             // which will cache the session with JWT included (single cache-setting point).
             if (ctx.data?.session) {
-              console.log('[onSuccess] Injecting JWT into session.token');
               ctx.data.session.token = jwt;
             } else {
               console.warn(

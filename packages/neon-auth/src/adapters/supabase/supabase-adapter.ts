@@ -102,27 +102,17 @@ export class SupabaseAuthAdapter
     this._betterAuth.useSession.subscribe((value) => {
       // If session is null/undefined, clear cache (sign-out detected from any tab)
       if (!value.data?.session || !value.data?.user) {
-        console.log('[useSession.subscribe] Session is null, clearing cache');
         BETTER_AUTH_METHODS_CACHE.clearSessionCache();
         return;
       }
 
       // If session exists, don't cache it here - it has opaque token
       // JWT-injected sessions are cached by getSession() immediately after fetch
-      console.log(
-        '[useSession.subscribe] Session exists but not caching (opaque token, JWT cached by getSession)'
-      );
-
-      if (value.error) {
-        console.error('[useSession.subscribe] Error:', value.error);
-      }
     });
 
     // Set up cross-tab event listener for Better Auth broadcasts
     // This listens to events from other tabs and notifies local subscribers
     getGlobalBroadcastChannel().subscribe((message) => {
-      console.log('[cross-tab event] Received message, before if:', message);
-
       if (message.data && 'session' in message.data) {
         const session = message.data?.session as Session | null;
         const trigger = message.data?.trigger;
@@ -197,29 +187,21 @@ export class SupabaseAuthAdapter
     forceFetch?: boolean;
   }): ReturnType<SupabaseAuthClientInterface['getSession']> {
     try {
-      console.log('[getSession] Called with options:', options);
-
       // Skip cache if forceFetch is true
       if (!options?.forceFetch) {
         const cachedSession = BETTER_AUTH_METHODS_CACHE.getCachedSession();
         if (cachedSession) {
-          console.log('[getSession] Cache hit, returning cached session');
           // Re-check cache to prevent stale data from concurrent signOut()
           if (!BETTER_AUTH_METHODS_CACHE.getCachedSession()) {
-            console.log('[getSession] Cache was cleared during retrieval');
             return { data: { session: null }, error: null };
           }
 
           return { data: { session: cachedSession }, error: null };
         }
-        console.log('[getSession] Cache miss, fetching from Better Auth');
       }
 
       const currentSession = await this._betterAuth.getSession();
       if (!currentSession.data?.session) {
-        console.log(
-          '[getSession] No session in Better Auth response, returning null'
-        );
         return { data: { session: null }, error: null };
       }
 
@@ -230,7 +212,6 @@ export class SupabaseAuthAdapter
 
       // Cache immediately if we have a JWT (before useSession.subscribe can overwrite)
       if (session?.access_token?.startsWith('eyJ')) {
-        console.log('[getSession] Caching JWT-injected session');
         BETTER_AUTH_METHODS_CACHE.setCachedSession(session);
       }
 
@@ -241,7 +222,6 @@ export class SupabaseAuthAdapter
         error: null,
       };
     } catch (error) {
-      console.error('[getSession] Error:', error);
       if (isAuthError(error)) {
         return { data: { session: null }, error };
       }

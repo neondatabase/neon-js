@@ -3,16 +3,12 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 export default defineConfig({
-  entry: [
-    'src/index.ts',
-    'src/adapters/better-auth/index.ts',
-  ],
+  entry: ['src/index.ts', 'src/adapters/better-auth/index.ts'],
   format: ['esm'],
   clean: true,
   dts: {
     build: true,
   },
-
   // Transform package.json after build
   hooks: {
     'build:done': async () => {
