@@ -1,0 +1,61 @@
+{
+  "name": "@neondatabase/neon-js",
+  "version": "0.1.0-alpha.1",
+  "description": "A TypeScript SDK for Neon services",
+  "type": "module",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/neondatabase-labs/neon-js/",
+  "bugs": {
+    "url": "https://github.com/neondatabase-labs/neon-js/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/neondatabase-labs/neon-js.git"
+  },
+  "author": "Pedro Figueiredo <pedro.figueiredo@databricks.com>",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "neon-js": "dist/cli/index.mjs"
+  },
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./client": "./dist/client/index.mjs",
+    "./cli": "./dist/cli/index.mjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "test": "vitest",
+    "test:node": "node --run test",
+    "test:ci": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "test:types": "tsc --noEmit",
+    "release": "bumpp --tag 'neon-js-v%s' && npm publish dist/",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "eslint": "^9.39.1",
+    "eslint-plugin-unicorn": "^62.0.0",
+    "tsdown": "0.16.0",
+    "typescript": "^5.9.3",
+    "vitest": "4.0.7",
+    "vite-tsconfig-paths": "5.1.4",
+    "msw": "2.6.8"
+  },
+  "dependencies": {
+    "@neondatabase/postgrest-js": "workspace:*",
+    "@neondatabase/neon-auth": "workspace:*",
+    "@supabase/postgres-meta": "0.93.1",
+    "meow": "14.0.0",
+    "zod": "4.1.12"
+  }
+}

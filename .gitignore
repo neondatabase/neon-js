@@ -7,3 +7,4 @@ todos.md
 database.types.ts
 intelligence
 dist
+load-test.ts
