@@ -11,6 +11,7 @@ import type {
 import { getReactClient } from './react-adapter';
 import { Toaster } from 'sonner';
 import { ThemeProvider } from 'next-themes';
+import { useMemo } from 'react';
 
 /**
  * Neon Auth UI Provider Props
@@ -30,10 +31,15 @@ export function NeonAuthUIProvider<T extends NeonAuthAdapter>({
   children,
   ...props
 }: NeonAuthUIProviderProps<T>) {
-  const reactClient =
-    'getBetterAuthInstance' in authClient
+  /*
+   * If the authClient is a Better Auth client, convert it to a React client.
+   * Otherwise, use the authClient directly.
+   */
+  const reactClient = useMemo(() => {
+    return 'getBetterAuthInstance' in authClient
       ? getReactClient(authClient.getBetterAuthInstance())
       : getReactClient(authClient);
+  }, [authClient]);
 
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
@@ -42,6 +48,11 @@ export function NeonAuthUIProvider<T extends NeonAuthAdapter>({
         {...props}
         multiSession={false}
         apiKey={false}
+        magicLink={false}
+        passkey={false}
+        oneTap={false}
+        genericOAuth={undefined}
+        twoFactor={undefined}
       >
         {children}
         <Toaster />

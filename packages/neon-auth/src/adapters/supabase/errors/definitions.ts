@@ -1,60 +1,62 @@
 import { AuthError, AuthApiError } from '../auth-interface';
 
 /**
- * Error code enum for type-safe error handling
+ * Error codes for type-safe error handling
  */
-export enum AuthErrorCode {
+export const AuthErrorCode = {
   // Authentication Errors (401)
-  BadJwt = 'bad_jwt',
-  InvalidCredentials = 'invalid_credentials',
-  SessionExpired = 'session_expired',
-  SessionNotFound = 'session_not_found',
-  InvalidGrant = 'invalid_grant',
+  BadJwt: 'bad_jwt',
+  InvalidCredentials: 'invalid_credentials',
+  SessionExpired: 'session_expired',
+  SessionNotFound: 'session_not_found',
+  InvalidGrant: 'invalid_grant',
 
   // User Management (404, 409, 422)
-  UserNotFound = 'user_not_found',
-  UserAlreadyExists = 'user_already_exists',
-  EmailExists = 'email_exists',
-  PhoneExists = 'phone_exists',
+  UserNotFound: 'user_not_found',
+  UserAlreadyExists: 'user_already_exists',
+  EmailExists: 'email_exists',
+  PhoneExists: 'phone_exists',
 
   // Verification (400, 422)
-  EmailNotConfirmed = 'email_not_confirmed',
-  PhoneNotConfirmed = 'phone_not_confirmed',
+  EmailNotConfirmed: 'email_not_confirmed',
+  PhoneNotConfirmed: 'phone_not_confirmed',
 
   // Validation (400)
-  ValidationFailed = 'validation_failed',
-  BadJson = 'bad_json',
-  WeakPassword = 'weak_password',
-  EmailAddressInvalid = 'email_address_invalid',
+  ValidationFailed: 'validation_failed',
+  BadJson: 'bad_json',
+  WeakPassword: 'weak_password',
+  EmailAddressInvalid: 'email_address_invalid',
 
   // Features & Providers (403, 501, 503)
-  FeatureNotSupported = 'feature_not_supported',
-  NotImplemented = 'not_implemented',
-  OAuthProviderNotSupported = 'oauth_provider_not_supported',
-  PhoneProviderDisabled = 'phone_provider_disabled',
-  SsoProviderDisabled = 'sso_provider_disabled',
-  AnonymousProviderDisabled = 'anonymous_provider_disabled',
-  Web3ProviderDisabled = 'web3_provider_disabled',
+  FeatureNotSupported: 'feature_not_supported',
+  NotImplemented: 'not_implemented',
+  OAuthProviderNotSupported: 'oauth_provider_not_supported',
+  PhoneProviderDisabled: 'phone_provider_disabled',
+  SsoProviderDisabled: 'sso_provider_disabled',
+  AnonymousProviderDisabled: 'anonymous_provider_disabled',
+  Web3ProviderDisabled: 'web3_provider_disabled',
 
   // OAuth Errors (400, 500)
-  BadOAuthCallback = 'bad_oauth_callback',
-  OAuthCallbackFailed = 'oauth_callback_failed',
+  BadOAuthCallback: 'bad_oauth_callback',
+  OAuthCallbackFailed: 'oauth_callback_failed',
 
   // Rate Limiting (429)
-  OverRequestRateLimit = 'over_request_rate_limit',
-  OverEmailSendRateLimit = 'over_email_send_rate_limit',
-  OverSmsSendRateLimit = 'over_sms_send_rate_limit',
+  OverRequestRateLimit: 'over_request_rate_limit',
+  OverEmailSendRateLimit: 'over_email_send_rate_limit',
+  OverSmsSendRateLimit: 'over_sms_send_rate_limit',
 
   // Server Errors (500)
-  UnexpectedFailure = 'unexpected_failure',
-  InternalError = 'internal_error',
+  UnexpectedFailure: 'unexpected_failure',
+  InternalError: 'internal_error',
 
   // Identity Management (404)
-  IdentityNotFound = 'identity_not_found',
+  IdentityNotFound: 'identity_not_found',
 
   // Generic (400)
-  UnknownError = 'unknown_error',
-}
+  UnknownError: 'unknown_error',
+} as const;
+
+export type AuthErrorCode = (typeof AuthErrorCode)[keyof typeof AuthErrorCode];
 
 /**
  * Error metadata including status codes and user-facing messages
@@ -291,7 +293,7 @@ export function getErrorDefinition(code: AuthErrorCode): ErrorDefinition {
 /**
  * Create an AuthError or AuthApiError with proper status and message
  *
- * @param code - The error code from AuthErrorCode enum
+ * @param code - The error code from AuthErrorCode
  * @param customMessage - Optional custom message (defaults to error definition message)
  * @returns AuthError for 5xx errors, AuthApiError for 4xx errors
  */
