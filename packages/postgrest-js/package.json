@@ -34,7 +34,7 @@
     "test:ci": "vitest run",
     "typecheck": "tsc --noEmit",
     "test:types": "tsc --noEmit",
-    "release": "bun run build && bumpp --tag 'postgrest-js-v%s' && npm publish --tag latest",
+    "release": "bun run build && bumpp --tag 'postgrest-js-v%s' && bun publish --tag latest",
     "lint": "eslint ."
   },
   "devDependencies": {

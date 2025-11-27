@@ -11,7 +11,7 @@
  *   bun scripts/release.ts neon-js      # Releases neon-js only (leaf package)
  */
 
-import { $ } from 'bun';
+import { $, spawn } from 'bun';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 
@@ -120,8 +120,16 @@ async function runBumpp(packageName: string): Promise<string> {
 
   console.log(`\n📦 Running bumpp for ${packageName}...`);
 
-  // Run bumpp interactively
-  await $`cd ${pkgPath} && bunx bumpp --tag ${tag}`.quiet();
+  // Run bumpp interactively - must use spawn with stdio inherit for TTY
+  const proc = spawn(['bunx', 'bumpp', '--tag', tag], {
+    cwd: pkgPath,
+    stdio: ['inherit', 'inherit', 'inherit'],
+  });
+
+  const exitCode = await proc.exited;
+  if (exitCode !== 0) {
+    throw new Error(`bumpp exited with code ${exitCode}`);
+  }
 
   // Read the new version from package.json
   const pkg = readPackageJson(packageName);
@@ -171,11 +179,19 @@ async function publishPackage(packageName: string): Promise<void> {
   const pkgPath = getPackagePath(packageName);
   console.log(`  🚀 Publishing @neondatabase/${packageName}...`);
 
-  // Use bun publish for neon-js, npm publish for others (matching existing scripts)
-  if (packageName === 'neon-js') {
-    await $`cd ${pkgPath} && bun publish --tag latest`;
-  } else {
-    await $`cd ${pkgPath} && npm publish --tag latest`;
+  // Use spawn with stdio inherit so npm can prompt for OTP interactively
+  const cmd = packageName === 'neon-js'
+    ? ['bun', 'publish', '--tag', 'latest']
+    : ['npm', 'publish', '--tag', 'latest'];
+
+  const proc = spawn(cmd, {
+    cwd: pkgPath,
+    stdio: ['inherit', 'inherit', 'inherit'],
+  });
+
+  const exitCode = await proc.exited;
+  if (exitCode !== 0) {
+    throw new Error(`publish failed for ${packageName} with code ${exitCode}`);
   }
 }
 
