@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-alpha.2] - 2025-11-27
+
+### Changed
+
+#### Breaking: Factory Function Pattern for Adapters
+- Replaced class-based adapter passing with factory functions
+- Adapters are now invoked as functions: `SupabaseAuthAdapter()`, `BetterAuthVanillaAdapter()`, `BetterAuthReactAdapter()`
+- Factory functions return builder functions that accept the URL internally
+- Old: `adapter: SupabaseAuthAdapter` → New: `adapter: SupabaseAuthAdapter()`
+
+#### API Rename
+- Renamed `createNeonAuth` to `createAuthClient` for clearer naming
+
+### Removed
+
+- Removed `NeonAuthAdapterClass` type (no longer needed with factory pattern)
+- Internal adapter classes are no longer exported (use factory functions instead)
+
 ## [0.1.0-alpha.1] - 2025-11-26
 
 ### Added
@@ -56,5 +74,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tests for authentication flows, session management, error handling
 - OAuth flows testing for both Node.js and browser environments
 
-[unreleased]: https://github.com/neondatabase-labs/neon-js/compare/v0.1.0-alpha.1...HEAD
+[unreleased]: https://github.com/neondatabase-labs/neon-js/compare/v0.1.0-alpha.2...HEAD
+[0.1.0-alpha.2]: https://github.com/neondatabase-labs/neon-js/compare/v0.1.0-alpha.1...v0.1.0-alpha.2
 [0.1.0-alpha.1]: https://github.com/neondatabase-labs/neon-js/releases/tag/v0.1.0-alpha.1

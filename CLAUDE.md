@@ -22,13 +22,13 @@ Generic PostgreSQL client for Neon Data API without authentication:
 
 ### `@neondatabase/neon-auth` (packages/neon-auth/)
 Authentication adapters for Neon Auth supporting multiple auth providers:
-- **createNeonAuth()**: Factory function for creating auth clients with configurable adapters
+- **createAuthClient()**: Factory function for creating auth clients with configurable adapters
 - **SupabaseAuthAdapter**: Supabase-compatible API for familiar auth patterns
 - **BetterAuthVanillaAdapter**: Direct Better Auth API for vanilla JS/TS
 - **BetterAuthReactAdapter**: Better Auth with React hooks support
 
 **Exports:**
-- `@neondatabase/neon-auth` - Main exports (createNeonAuth, adapters, utilities)
+- `@neondatabase/neon-auth` - Main exports (createAuthClient, adapters, utilities)
 
 ### `@neondatabase/neon-js` (packages/neon-js/)
 Main SDK package that combines authentication with PostgreSQL querying:
@@ -92,7 +92,7 @@ bun release           # Bump version and publish all three packages
 ### Authentication Layer (`packages/neon-auth/`)
 
 **Factory**: `src/neon-auth.ts`
-- `createNeonAuth()` - Public factory for creating auth clients
+- `createAuthClient()` - Public factory for creating auth clients
 - `createInternalNeonAuth()` - Internal factory for NeonClient integration
 - Type definitions for `NeonAuthAdapter`, `NeonAuthAdapterClass`
 
@@ -258,9 +258,9 @@ function MyComponent() {
 ### Using Auth Adapters Directly
 
 ```typescript
-import { createNeonAuth, SupabaseAuthAdapter } from '@neondatabase/neon-auth';
+import { createAuthClient, SupabaseAuthAdapter } from '@neondatabase/neon-auth';
 
-const auth = createNeonAuth('https://your-auth-server.com', {
+const auth = createAuthClient('https://your-auth-server.com', {
   adapter: SupabaseAuthAdapter,
 });
 

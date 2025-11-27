@@ -27,17 +27,17 @@ bun add @neondatabase/neon-auth
 
 ## Usage
 
-### Using createNeonAuth (Recommended)
+### Using createAuthClient (Recommended)
 
-The `createNeonAuth` factory function creates an auth client with the appropriate adapter:
+The `createAuthClient` factory function creates an auth client with the appropriate adapter:
 
 #### SupabaseAuthAdapter - Supabase-compatible API
 
 ```typescript
-import { createNeonAuth, SupabaseAuthAdapter } from '@neondatabase/neon-auth';
+import { createAuthClient, SupabaseAuthAdapter } from '@neondatabase/neon-auth';
 
-const auth = createNeonAuth('https://your-auth-server.com', {
-  adapter: SupabaseAuthAdapter,
+const auth = createAuthClient('https://your-auth-server.com', {
+  adapter: SupabaseAuthAdapter(),
 });
 
 // Supabase-compatible methods
@@ -61,10 +61,10 @@ await auth.signOut();
 #### BetterAuthVanillaAdapter - Direct Better Auth API
 
 ```typescript
-import { createNeonAuth, BetterAuthVanillaAdapter } from '@neondatabase/neon-auth';
+import { createAuthClient, BetterAuthVanillaAdapter } from '@neondatabase/neon-auth';
 
-const auth = createNeonAuth('https://your-auth-server.com', {
-  adapter: BetterAuthVanillaAdapter,
+const auth = createAuthClient('https://your-auth-server.com', {
+  adapter: BetterAuthVanillaAdapter(),
 });
 
 // Direct Better Auth API
@@ -86,10 +86,10 @@ await auth.signOut();
 #### BetterAuthReactAdapter - Better Auth with React Hooks
 
 ```typescript
-import { createNeonAuth, BetterAuthReactAdapter } from '@neondatabase/neon-auth';
+import { createAuthClient, BetterAuthReactAdapter } from '@neondatabase/neon-auth';
 
-const auth = createNeonAuth('https://your-auth-server.com', {
-  adapter: BetterAuthReactAdapter,
+const auth = createAuthClient('https://your-auth-server.com', {
+  adapter: BetterAuthReactAdapter(),
 });
 
 // Direct Better Auth API
@@ -112,10 +112,10 @@ function MyComponent() {
 ### OAuth Authentication (SupabaseAuthAdapter)
 
 ```typescript
-import { createNeonAuth, SupabaseAuthAdapter } from '@neondatabase/neon-auth';
+import { createAuthClient, SupabaseAuthAdapter } from '@neondatabase/neon-auth';
 
-const auth = createNeonAuth('https://your-auth-server.com', {
-  adapter: SupabaseAuthAdapter,
+const auth = createAuthClient('https://your-auth-server.com', {
+  adapter: SupabaseAuthAdapter(),
 });
 
 await auth.signInWithOAuth({
@@ -129,10 +129,10 @@ await auth.signInWithOAuth({
 ### OAuth Authentication (BetterAuth Adapters)
 
 ```typescript
-import { createNeonAuth, BetterAuthVanillaAdapter } from '@neondatabase/neon-auth';
+import { createAuthClient, BetterAuthVanillaAdapter } from '@neondatabase/neon-auth';
 
-const auth = createNeonAuth('https://your-auth-server.com', {
-  adapter: BetterAuthVanillaAdapter,
+const auth = createAuthClient('https://your-auth-server.com', {
+  adapter: BetterAuthVanillaAdapter(),
 });
 
 await auth.signIn.social({
@@ -143,14 +143,13 @@ await auth.signIn.social({
 
 ## API Reference
 
-### createNeonAuth(url, config)
+### createAuthClient(url, config)
 
 Factory function to create an auth client.
 
 **Parameters:**
 - `url` - The auth service URL
-- `config.adapter` - The adapter class to use
-- `config.options` - Additional adapter-specific options
+- `config.adapter` - The adapter factory function (e.g., `SupabaseAuthAdapter()`)
 
 **Returns:** The adapter's public API (varies by adapter type)
 
@@ -215,11 +214,11 @@ Multiple concurrent `getSession()` calls are automatically deduplicated:
 Full TypeScript support with strict typing:
 
 ```typescript
-import { createNeonAuth, SupabaseAuthAdapter } from '@neondatabase/neon-auth';
+import { createAuthClient, SupabaseAuthAdapter } from '@neondatabase/neon-auth';
 import type { Session, User } from '@neondatabase/neon-auth';
 
-const auth = createNeonAuth('https://your-auth-server.com', {
-  adapter: SupabaseAuthAdapter,
+const auth = createAuthClient('https://your-auth-server.com', {
+  adapter: SupabaseAuthAdapter(),
 });
 
 // Fully typed responses

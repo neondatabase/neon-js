@@ -32,7 +32,7 @@ import { createClient, SupabaseAuthAdapter } from '@neondatabase/neon-js';
 
 const client = createClient<Database>({
   auth: {
-    adapter: SupabaseAuthAdapter,
+    adapter: SupabaseAuthAdapter(),
     url: import.meta.env.VITE_NEON_AUTH_URL,
   },
   dataApi: {
@@ -60,7 +60,7 @@ import { createClient, BetterAuthVanillaAdapter } from '@neondatabase/neon-js';
 
 const client = createClient<Database>({
   auth: {
-    adapter: BetterAuthVanillaAdapter,
+    adapter: BetterAuthVanillaAdapter(),
     url: import.meta.env.VITE_NEON_AUTH_URL,
   },
   dataApi: {
@@ -87,7 +87,7 @@ import { createClient, BetterAuthReactAdapter } from '@neondatabase/neon-js';
 
 const client = createClient<Database>({
   auth: {
-    adapter: BetterAuthReactAdapter,
+    adapter: BetterAuthReactAdapter(),
     url: import.meta.env.VITE_NEON_AUTH_URL,
   },
   dataApi: {
@@ -301,11 +301,8 @@ import { createClient, SupabaseAuthAdapter } from '@neondatabase/neon-js';
 const client = createClient({
   // Auth configuration
   auth: {
-    adapter: SupabaseAuthAdapter,
+    adapter: SupabaseAuthAdapter(),
     url: 'https://your-auth-server.neon.tech/auth',
-    options: {
-      // Additional adapter-specific options
-    },
   },
 
   // Data API configuration
@@ -340,7 +337,7 @@ import { createClient, SupabaseAuthAdapter } from '@neondatabase/neon-js';
 
 const client = createClient({
   auth: {
-    adapter: SupabaseAuthAdapter,
+    adapter: SupabaseAuthAdapter(),
     url: process.env.NEON_AUTH_URL!,
   },
   dataApi: {
@@ -354,7 +351,7 @@ const client = createClient({
 Generate TypeScript types from your database schema:
 
 ```bash
-npx neon-js gen-types --connection-string "postgresql://user:pass@host/db"
+npx neon-js gen-types --db-url "postgresql://user:pass@host/db"
 ```
 
 Use generated types for full type safety:
@@ -365,7 +362,7 @@ import { createClient, SupabaseAuthAdapter } from '@neondatabase/neon-js';
 
 const client = createClient<Database>({
   auth: {
-    adapter: SupabaseAuthAdapter,
+    adapter: SupabaseAuthAdapter(),
     url: process.env.NEON_AUTH_URL!,
   },
   dataApi: {
@@ -387,18 +384,18 @@ Generate TypeScript types from your database:
 ```bash
 # Generate types
 npx neon-js gen-types \
-  --connection-string "postgresql://user:pass@host/db" \
+  --db-url "postgresql://user:pass@host/db" \
   --output ./types/database.ts
 
 # With schema filtering
 npx neon-js gen-types \
-  --connection-string "postgresql://user:pass@host/db" \
+  --db-url "postgresql://user:pass@host/db" \
   --schemas public,auth \
   --output ./types/database.ts
 ```
 
 **Options:**
-- `--connection-string`, `-c` - PostgreSQL connection string (required)
+- `--db-url`, `-c` - PostgreSQL connection string (required)
 - `--output`, `-o` - Output file path (default: `./types/database.ts`)
 - `--schemas`, `-s` - Comma-separated list of schemas (default: `public`)
 
@@ -457,7 +454,7 @@ import { createClient, SupabaseAuthAdapter } from '@neondatabase/neon-js';
 
 export const neon = createClient({
   auth: {
-    adapter: SupabaseAuthAdapter,
+    adapter: SupabaseAuthAdapter(),
     url: process.env.NEON_AUTH_URL!,
   },
   dataApi: {
@@ -481,7 +478,7 @@ import { createClient, BetterAuthReactAdapter } from '@neondatabase/neon-js';
 
 const client = createClient({
   auth: {
-    adapter: BetterAuthReactAdapter,
+    adapter: BetterAuthReactAdapter(),
     url: process.env.NEXT_PUBLIC_NEON_AUTH_URL!,
   },
   dataApi: {
@@ -525,7 +522,7 @@ import { createClient, SupabaseAuthAdapter } from '@neondatabase/neon-js';
 
 const client = createClient({
   auth: {
-    adapter: SupabaseAuthAdapter,
+    adapter: SupabaseAuthAdapter(),
     url: 'https://auth.example.com',
   },
   dataApi: {

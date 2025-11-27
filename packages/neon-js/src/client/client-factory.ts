@@ -1,9 +1,8 @@
 import {
-  type NeonAuthAdapterClass,
   type NeonAuthAdapter,
-  BetterAuthVanillaAdapter,
-  BetterAuthReactAdapter,
-  SupabaseAuthAdapter,
+  type BetterAuthVanillaAdapterInstance,
+  type BetterAuthReactAdapterInstance,
+  type SupabaseAuthAdapterInstance,
 } from '@neondatabase/neon-auth';
 import { fetchWithToken } from '@neondatabase/postgrest-js';
 import {
@@ -16,13 +15,11 @@ import { createInternalNeonAuth } from '@neondatabase/neon-auth';
 /**
  * Auth configuration for createClient
  */
-export type CreateClientAuthConfig<T extends NeonAuthAdapterClass> = {
-  /** The adapter class to use (e.g., SupabaseAuthAdapter, BetterAuthVanillaAdapter) */
-  adapter: T;
+export type CreateClientAuthConfig<T extends NeonAuthAdapter> = {
+  /** The adapter builder to use. Defaults to BetterAuthVanillaAdapter() if not specified. */
+  adapter?: (url: string) => T;
   /** The auth service URL */
   url: string;
-  /** Additional auth options (baseURL is set from url above) */
-  options?: Omit<ConstructorParameters<T>[0], 'baseURL'>;
 };
 
 /**
@@ -44,11 +41,11 @@ export type CreateClientDataApiConfig<
 /**
  * Configuration for createClient
  */
-export type CreateClientConfig<SchemaName, T extends NeonAuthAdapterClass> = {
+export type CreateClientConfig<SchemaName, T extends NeonAuthAdapter> = {
   /** Auth service configuration */
   auth: CreateClientAuthConfig<T>;
   /** Data API configuration */
-  dataApi: CreateClientDataApiConfig<SchemaName, InstanceType<T>>;
+  dataApi: CreateClientDataApiConfig<SchemaName, T>;
 };
 
 /**
@@ -60,6 +57,24 @@ export type CreateClientConfig<SchemaName, T extends NeonAuthAdapterClass> = {
  *
  * @example
  * ```typescript
+ * // Simple usage with default BetterAuthVanillaAdapter
+ * import { createClient } from '@neondatabase/neon-js';
+ *
+ * const client = createClient({
+ *   auth: { url: 'https://auth.example.com' },
+ *   dataApi: { url: 'https://data-api.example.com/rest/v1' },
+ * });
+ *
+ * // Better Auth API
+ * await client.auth.signIn.email({ email, password });
+ *
+ * // Database queries (automatic token injection)
+ * const { data: items } = await client.from('items').select();
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // With SupabaseAuthAdapter for Supabase-compatible API
  * import { createClient, SupabaseAuthAdapter } from '@neondatabase/neon-js';
  *
  * const client = createClient({
@@ -72,30 +87,8 @@ export type CreateClientConfig<SchemaName, T extends NeonAuthAdapterClass> = {
  *   },
  * });
  *
- * // Auth methods (API depends on adapter)
+ * // Supabase-compatible auth methods
  * await client.auth.signInWithPassword({ email, password });
- *
- * // Database queries (automatic token injection)
- * const { data: items } = await client.from('items').select();
- * ```
- *
- * @example
- * ```typescript
- * import { createClient, BetterAuthVanillaAdapter } from '@neondatabase/neon-js';
- *
- * const client = createClient({
- *   auth: {
- *     adapter: BetterAuthVanillaAdapter,
- *     url: 'https://auth.example.com',
- *   },
- *   dataApi: {
- *     url: 'https://data-api.example.com/rest/v1',
- *   },
- * });
- *
- * // Access raw Better Auth client
- * const betterAuth = client.auth.getBetterAuthInstance();
- * await betterAuth.signIn.email({ email, password });
  * ```
  */
 
@@ -108,44 +101,53 @@ type CreateClientResult<
   TAdapter extends NeonAuthAdapter,
 > = NeonClient<Database, DefaultSchemaName<Database>, TAdapter>;
 
+// Overload: No adapter specified (defaults to BetterAuthVanillaAdapter)
+export function createClient<Database = any>(config: {
+  auth: { url: string };
+  dataApi: CreateClientDataApiConfig<
+    DefaultSchemaName<Database>,
+    BetterAuthVanillaAdapterInstance
+  >;
+}): CreateClientResult<Database, BetterAuthVanillaAdapterInstance>;
+
 // Overload: SupabaseAuthAdapter
 export function createClient<Database = any>(
   config: CreateClientConfig<
     DefaultSchemaName<Database>,
-    typeof SupabaseAuthAdapter
+    SupabaseAuthAdapterInstance
   >
-): CreateClientResult<Database, SupabaseAuthAdapter>;
+): CreateClientResult<Database, SupabaseAuthAdapterInstance>;
 
 // Overload: BetterAuthVanillaAdapter
 export function createClient<Database = any>(
   config: CreateClientConfig<
     DefaultSchemaName<Database>,
-    typeof BetterAuthVanillaAdapter
+    BetterAuthVanillaAdapterInstance
   >
-): CreateClientResult<Database, BetterAuthVanillaAdapter>;
+): CreateClientResult<Database, BetterAuthVanillaAdapterInstance>;
 
 // Overload: BetterAuthReactAdapter
 export function createClient<Database = any>(
   config: CreateClientConfig<
     DefaultSchemaName<Database>,
-    typeof BetterAuthReactAdapter
+    BetterAuthReactAdapterInstance
   >
-): CreateClientResult<Database, BetterAuthReactAdapter>;
+): CreateClientResult<Database, BetterAuthReactAdapterInstance>;
 
 // Implementation signature
 export function createClient<
   Database = any,
   SchemaName extends string & keyof Database = DefaultSchemaName<Database>,
-  TAuthAdapter extends NeonAuthAdapterClass = NeonAuthAdapterClass,
+  TAuthAdapter extends NeonAuthAdapter = BetterAuthVanillaAdapterInstance,
 >(
   config: CreateClientConfig<SchemaName, TAuthAdapter>
-): NeonClient<Database, SchemaName, InstanceType<TAuthAdapter>> {
+): NeonClient<Database, SchemaName, TAuthAdapter> {
   const { auth: authConfig, dataApi: dataApiConfig } = config;
 
-  // Step 1: Instantiate auth adapter using createNeonAuth
+  // Step 1: Instantiate auth adapter using createAuthClient
+  // Default to BetterAuthVanillaAdapter if no adapter specified
   const auth = createInternalNeonAuth(authConfig.url, {
     adapter: authConfig.adapter,
-    options: authConfig.options,
   });
 
   // Step 2: Create lazy token accessor - called on every request
@@ -162,11 +164,7 @@ export function createClient<
   );
 
   // Step 4: Create client with auth integrated
-  const client = new NeonClient<
-    Database,
-    SchemaName,
-    InstanceType<TAuthAdapter>
-  >({
+  const client = new NeonClient<Database, SchemaName, TAuthAdapter>({
     dataApiUrl: dataApiConfig.url,
     authClient: auth,
     options: {

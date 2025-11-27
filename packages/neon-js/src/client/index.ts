@@ -6,13 +6,19 @@ export { fetchWithToken, AuthRequiredError } from '@neondatabase/postgrest-js';
 
 // Re-export auth adapters and utilities from neon-auth for convenience
 export {
-  createNeonAuth,
+  createAuthClient,
+  // Adapter factory functions
   SupabaseAuthAdapter,
   BetterAuthVanillaAdapter,
   BetterAuthReactAdapter,
+  // Types
   type NeonAuth,
   type NeonAuthAdapter,
-  type NeonAuthAdapterClass,
-  type NeonAuthConfig,
+  // Adapter instance types (for type annotations)
+  type SupabaseAuthAdapterInstance,
   type SupabaseAuthAdapterOptions,
+  type BetterAuthVanillaAdapterInstance,
+  type BetterAuthVanillaAdapterOptions,
+  type BetterAuthReactAdapterInstance,
+  type BetterAuthReactAdapterOptions,
 } from '@neondatabase/neon-auth';

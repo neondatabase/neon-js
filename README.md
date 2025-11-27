@@ -223,9 +223,9 @@ const { data } = await client.from('items').select();
 For building custom clients or integrations:
 
 ```typescript
-import { createNeonAuth, SupabaseAuthAdapter } from '@neondatabase/neon-auth';
+import { createAuthClient, SupabaseAuthAdapter } from '@neondatabase/neon-auth';
 
-const auth = createNeonAuth(import.meta.env.VITE_NEON_AUTH_URL, {
+const auth = createAuthClient(import.meta.env.VITE_NEON_AUTH_URL, {
   adapter: SupabaseAuthAdapter,
 });
 
