@@ -12,6 +12,9 @@
     "./css": {
       "types": "./dist/css.d.ts",
       "default": "./dist/style.css"
+    },
+    "./tailwind": {
+      "default": "./dist/tailwind.css"
     }
   },
   "files": [
@@ -28,13 +31,11 @@
     "test:ci": "vitest run",
     "typecheck": "tsc --noEmit",
     "test:types": "tsc --noEmit",
-    "release": "bumpp --tag 'neon-auth-ui-v%s' && npm publish dist/",
+    "release": "bun run build && bumpp --tag 'neon-auth-ui-v%s' && bun publish --tag latest",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },
   "devDependencies": {
-    "@bosh-code/tsdown-plugin-inject-css": "^2.0.0",
-    "@bosh-code/tsdown-plugin-tailwindcss": "^1.0.1",
     "@tailwindcss/cli": "^4.1.17",
     "@types/node": "^24.5.2",
     "@types/react": "^19.1.13",
@@ -49,7 +50,7 @@
   },
   "dependencies": {
     "@captchafox/react": "^1.10.0",
-    "@daveyplate/better-auth-ui": "3.2.11",
+    "@daveyplate/better-auth-ui": "3.2.13",
     "@hcaptcha/react-hcaptcha": "^1.12.1",
     "@hookform/resolvers": "^5.2.2",
     "@marsidev/react-turnstile": ">=1.1.0",
