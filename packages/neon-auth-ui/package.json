@@ -85,7 +85,7 @@
     "zod": "^4.1.12"
   },
   "peerDependencies": {
-    "@neondatabase/neon-auth": ">=0.1.0-alpha.1",
+    "@neondatabase/neon-auth": ">=0.1.0-alpha.2",
     "react": ">=18.0.0",
     "react-dom": ">=18.0.0"
   },
