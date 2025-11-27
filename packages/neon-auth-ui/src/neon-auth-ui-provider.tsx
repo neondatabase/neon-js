@@ -35,7 +35,12 @@ export function NeonAuthUIProvider({
 
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      <AuthUIProvider authClient={reactClient} {...props}>
+      <AuthUIProvider
+        authClient={reactClient}
+        {...props}
+        multiSession={false}
+        apiKey={false}
+      >
         {children}
         <Toaster />
       </AuthUIProvider>
