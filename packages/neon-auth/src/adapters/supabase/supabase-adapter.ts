@@ -44,7 +44,10 @@ import {
   magicLinkClient,
 } from 'better-auth/client/plugins';
 
-export type SupabaseAuthAdapterOptions = NeonAuthAdapterCoreAuthOptions;
+export type SupabaseAuthAdapterOptions = Omit<
+  NeonAuthAdapterCoreAuthOptions,
+  'baseURL'
+>;
 
 const _defaultBetterAuthClientOptions = {
   plugins: [
@@ -59,7 +62,10 @@ const _defaultBetterAuthClientOptions = {
   ],
 } satisfies BetterAuthClientOptions;
 
-export class SupabaseAuthAdapter
+/**
+ * Internal implementation class - use SupabaseAuthAdapter factory function instead
+ */
+class SupabaseAuthAdapterImpl
   extends NeonAuthAdapterCore
   implements SupabaseAuthClientInterface
 {
@@ -69,7 +75,7 @@ export class SupabaseAuthAdapter
   private _betterAuth: BetterAuthClient<typeof _defaultBetterAuthClientOptions>;
   private _stateChangeEmitters = new Map<string, Subscription>();
 
-  constructor(betterAuthClientOptions: SupabaseAuthAdapterOptions) {
+  constructor(betterAuthClientOptions: NeonAuthAdapterCoreAuthOptions) {
     super(betterAuthClientOptions);
     // @ts-expect-error - defaultBetterAuthClientOptions is not typed
     this._betterAuth = createAuthClient(this.betterAuthOptions);
@@ -1562,4 +1568,37 @@ export class SupabaseAuthAdapter
   }
 
   //#endregion
+}
+
+/** Instance type for SupabaseAuthAdapter */
+export type SupabaseAuthAdapterInstance = SupabaseAuthAdapterImpl;
+
+/** Builder type that creates adapter instances */
+export type SupabaseAuthAdapterBuilder = (
+  url: string
+) => SupabaseAuthAdapterInstance;
+
+/**
+ * Factory function that returns an adapter builder.
+ * The builder is called by createClient/createAuthClient with the URL.
+ *
+ * @param options - Optional adapter configuration (baseURL is injected separately)
+ * @returns A builder function that creates the adapter instance
+ *
+ * @example
+ * ```typescript
+ * const client = createClient({
+ *   auth: {
+ *     url: 'https://auth.example.com',
+ *     adapter: SupabaseAuthAdapter(),
+ *   },
+ *   dataApi: { url: 'https://data-api.example.com' },
+ * });
+ * ```
+ */
+export function SupabaseAuthAdapter(
+  options?: SupabaseAuthAdapterOptions
+): SupabaseAuthAdapterBuilder {
+  return (url: string) =>
+    new SupabaseAuthAdapterImpl({ baseURL: url, ...options });
 }
