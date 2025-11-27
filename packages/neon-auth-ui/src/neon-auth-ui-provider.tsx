@@ -5,8 +5,8 @@ import {
   type AuthUIProviderProps,
 } from '@daveyplate/better-auth-ui';
 import type {
-  VanillaBetterAuthClient,
-  ReactBetterAuthClient,
+  NeonAuthAdapter,
+  NeonAuthPublicApi,
 } from '@neondatabase/neon-auth';
 import { getReactClient } from './react-adapter';
 import { Toaster } from 'sonner';
@@ -18,20 +18,22 @@ import { ThemeProvider } from 'next-themes';
  * Accepts both vanilla and React Better Auth clients.
  * The vanilla client will be automatically converted to a React client.
  */
-export type NeonAuthUIProviderProps = Omit<
+export type NeonAuthUIProviderProps<T extends NeonAuthAdapter> = Omit<
   AuthUIProviderProps,
   'authClient'
 > & {
-  authClient: VanillaBetterAuthClient | ReactBetterAuthClient;
+  authClient: NeonAuthPublicApi<T>;
 };
 
-export function NeonAuthUIProvider({
+export function NeonAuthUIProvider<T extends NeonAuthAdapter>({
   authClient,
   children,
   ...props
-}: NeonAuthUIProviderProps) {
-  // Convert vanilla client to React client if needed
-  const reactClient = getReactClient(authClient);
+}: NeonAuthUIProviderProps<T>) {
+  const reactClient =
+    'getBetterAuthInstance' in authClient
+      ? getReactClient(authClient.getBetterAuthInstance())
+      : getReactClient(authClient);
 
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>

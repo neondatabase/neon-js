@@ -4,7 +4,9 @@ import {
   useBetterAuthStore,
 } from '@neondatabase/neon-auth';
 
-function isVanillaClient(client: any): client is VanillaBetterAuthClient {
+function isVanillaClient(
+  client: VanillaBetterAuthClient | ReactBetterAuthClient
+): client is VanillaBetterAuthClient {
   // React clients have useSession as a function
   // Vanilla clients have useSession as an atom (object with .get method)
   return typeof client.useSession !== 'function';
@@ -68,7 +70,9 @@ export function getReactClient(
   client: VanillaBetterAuthClient | ReactBetterAuthClient
 ): ReactBetterAuthClient {
   if (isVanillaClient(client)) {
+    console.log('Converting vanilla client to React client');
     return toReactClient(client);
   }
+  console.log('Client is already a React client');
   return client;
 }
