@@ -1,4 +1,3 @@
-
 const NEXT_AUTH_COOKIE_PREFIX = '__Secure-neon-auth';
 const PROXY_HEADERS = ['user-agent', 'authorization', 'referer'];
 

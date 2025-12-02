@@ -1,4 +1,4 @@
-### Neon Auth Nextjs
+# @neondatabase/neon-auth-next
 
 ### Create a Auth 
 

@@ -1,1 +1,0 @@
-export { toNextJsHandler } from "./handler";

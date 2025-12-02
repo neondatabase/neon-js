@@ -1,14 +1,14 @@
 {
-  "name": "@neondatabase/neon-auth",
+  "name": "@neondatabase/neon-auth-next",
   "version": "0.1.0-alpha.3",
-  "description": "Authentication adapters for Neon services",
+  "description": "Neon Auth Client for Next.js",
   "type": "module",
   "license": "Apache-2.0",
-  "main": "./src/index.ts",
-  "module": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./dist/index.mjs"
   },
   "publishConfig": {
     "access": "public"
@@ -23,7 +23,7 @@
     "typecheck": "tsc --noEmit",
     "test:types": "tsc --noEmit",
     "lint": "eslint .",
-    "release": "bun run build && bumpp --tag 'neon-auth-v%s' && bun publish --tag latest"
+    "release": "bun run build && bumpp --tag 'neon-auth-next-v%s' && bun publish --tag latest"
   },
   "devDependencies": {
     "tsdown": "0.16.0",
@@ -31,6 +31,9 @@
     "vitest": "4.0.7",
     "vite-tsconfig-paths": "5.1.4",
     "msw": "2.6.8"
+  },
+  "peerDependencies": {
+    "next": ">=15.0.0"
   },
   "dependencies": {
     "@supabase/auth-js": "2.79.0",
