@@ -8,7 +8,8 @@
   "module": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./next": "./src/integrations/next/index.ts"
   },
   "publishConfig": {
     "access": "public"
@@ -22,6 +23,7 @@
     "test:ci": "vitest run",
     "typecheck": "tsc --noEmit",
     "test:types": "tsc --noEmit",
+    "lint": "eslint .",
     "release": "bun run build && bumpp --tag 'neon-auth-v%s' && bun publish --tag latest"
   },
   "devDependencies": {

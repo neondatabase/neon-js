@@ -19,7 +19,7 @@
     },
     "packages/neon-auth": {
       "name": "@neondatabase/neon-auth",
-      "version": "0.1.0-alpha.2",
+      "version": "0.1.0-alpha.3",
       "dependencies": {
         "@supabase/auth-js": "2.79.0",
         "better-auth": "1.4.2",
@@ -94,7 +94,7 @@
     },
     "packages/neon-js": {
       "name": "@neondatabase/neon-js",
-      "version": "0.1.0-alpha.5",
+      "version": "0.1.0-alpha.6",
       "bin": {
         "neon-js": "dist/cli/index.mjs",
       },
