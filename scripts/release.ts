@@ -122,7 +122,7 @@ async function runBumpp(packageName: string): Promise<string> {
   console.log(`\n📦 Running bumpp for ${packageName}...`);
 
   // Run bumpp interactively - must use spawn with stdio inherit for TTY
-  const proc = spawn(['bunx', 'bumpp', '--tag', tag], {
+  const proc = spawn(['bunx', 'bumpp', '--tag', tag, '--c', `chore: release ${packageName}@-v%s`], {
     cwd: pkgPath,
     stdio: ['inherit', 'inherit', 'inherit'],
   });
@@ -225,25 +225,14 @@ async function release(packageName: string): Promise<void> {
     }
   }
 
-  // 5. Commit all changes
-  console.log(`\n📝 Committing changes...`);
-  await $`git add -A`.quiet();
-
-  const commitMessage =
-    dependents.length > 0
-      ? `chore: release ${packageName}@${newVersion} (+ ${dependents.join(', ')})`
-      : `chore: release ${packageName}@${newVersion}`;
-
-  await $`git commit -m ${commitMessage}`.quiet();
-
-  // 6. Publish packages
+  // 5. Publish packages
   console.log(`\n🚀 Publishing packages...`);
   await publishPackage(packageName);
   for (const dep of dependents) {
     await publishPackage(dep);
   }
 
-  // 7. Push commits and tags
+  // 6. Push commits and tags
   console.log(`\n📤 Pushing to remote...`);
   await $`git push --follow-tags`;
 
