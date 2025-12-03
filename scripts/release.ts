@@ -272,7 +272,7 @@ if (!VALID_PACKAGES.includes(packageName)) {
 }
 
 // Run the release
-release(packageName).catch((error) => {
-  console.error('\n❌ Release failed:', error.message);
+await release(packageName).catch((error) => {
+  console.error('\n❌ Release failed:', error);
   process.exit(1);
 });
