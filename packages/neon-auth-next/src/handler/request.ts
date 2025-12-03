@@ -2,7 +2,8 @@ import { NEXT_AUTH_COOKIE_PREFIX } from "../constants";
 
 const PROXY_HEADERS = ['user-agent', 'authorization', 'referer'];
 export const handleAuthRequest = async (baseUrl: string, request: Request, path: string) => {
-  const upstreamURL = `${baseUrl}/${path}`;
+  const url = new URL(request.url);
+  const upstreamURL = `${baseUrl}/${path}${url.search}`;
   const headers = prepareRequestHeaders(request);
   const body = await parseRequestBody(request);
 
