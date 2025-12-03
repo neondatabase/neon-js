@@ -7,19 +7,20 @@
     "packages/*"
   ],
   "scripts": {
-    "link:neon-js": "cd packages/neon-auth && bun link && cd ../postgrest-js && bun link && cd ../neon-auth-ui && bun link && cd ../neon-js && bun link",
-    "build": "bun run --filter '@neondatabase/postgrest-js' build && bun run --filter '@neondatabase/neon-auth' build && bun run --filter '@neondatabase/neon-js' build",
+    "link:neon-js": "cd packages/neon-auth && bun link && cd ../postgrest-js && bun link && cd ../neon-auth-ui && bun link && cd ../neon-js && bun link && cd ../neon-auth-next && bun link",
+    "build": "bun run --filter '@neondatabase/*' build",
     "dev": "bun run --filter '@neondatabase/postgrest-js' dev & bun run --filter '@neondatabase/neon-auth' dev & bun run --filter '@neondatabase/neon-auth-ui' dev & bun run --filter '@neondatabase/neon-js' dev",
     "test": "bun run --filter '@neondatabase/postgrest-js' test && bun run --filter '@neondatabase/neon-auth' test && bun run --filter '@neondatabase/neon-auth-ui' test && bun run --filter '@neondatabase/neon-js' test",
     "test:node": "bun run --filter '@neondatabase/postgrest-js' test:node && bun run --filter '@neondatabase/neon-auth' test:node && bun run --filter '@neondatabase/neon-auth-ui' test:node && bun run --filter '@neondatabase/neon-js' test:node",
     "test:ci": "bun run --filter '@neondatabase/postgrest-js' test:ci && bun run --filter '@neondatabase/neon-auth' test:ci && bun run --filter '@neondatabase/neon-auth-ui' test:ci && bun run --filter '@neondatabase/neon-js' test:ci",
     "typecheck": "bun run --filter '*' typecheck",
     "test:types": "bun run --filter '*' test:types",
-    "lint": "bun run --filter '@neondatabase/neon-js' lint",
+    "lint": "bun run --filter '@neondatabase/*' lint",
     "release": "bun run build && bun run --filter '@neondatabase/postgrest-js' release && bun run --filter '@neondatabase/neon-auth' release && bun run --filter '@neondatabase/neon-auth-ui' release && bun run --filter '@neondatabase/neon-js' release",
     "release:postgrest-js": "bun scripts/release.ts postgrest-js",
     "release:neon-auth": "bun scripts/release.ts neon-auth",
-    "release:neon-js": "bun scripts/release.ts neon-js"
+    "release:neon-js": "bun scripts/release.ts neon-js",
+    "release:neon-auth-next": "bun scripts/release.ts neon-auth-next"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
