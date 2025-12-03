@@ -1,5 +1,5 @@
 export { toNextJsHandler } from "./handler";
-
+export { neonAuthMiddleware } from "./middleware";
 import { createAuthClient as createNeonAuthClient, BetterAuthReactAdapter } from "@neondatabase/neon-auth"
 
 export * from "@neondatabase/neon-auth";
