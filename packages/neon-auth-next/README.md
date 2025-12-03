@@ -1,19 +1,21 @@
 # @neondatabase/neon-auth-next
 
-### Create a Auth 
+[![npm downloads](https://img.shields.io/npm/dm/@neondatabase/neon-auth-next.svg)](https://www.npmjs.com/package/@neondatabase/neon-auth-next)
+
+### Create an Auth Handler 
 
 To integrate Neon Auth with Next.js, we need to mount the auth handler to an API route. Create a route file
  inside `/api/auth/[...path]` directory and add the following code: 
 
- ```ts
+```ts
 // api/auth/[...path]/route.ts
 
-import { toNextJsHandler } from "@neondatabase/neon-auth/next"
+import { toNextJsHandler } from "@neondatabase/neon-auth-next"
 
 export const { GET, POST } = toNextJsHandler(
   process.env.NEON_AUTH_BASE_URL
 )
- ```
+```
 
 
  ### Create a Client
@@ -36,6 +38,3 @@ export const authClient =  createAuthClient({
 ### Server Actions
 
 TBD
-
-
- 

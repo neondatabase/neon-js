@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Anonymous Sign-In**: Implemented `signInAnonymously` method using Better Auth's `anonymousClient` plugin, enabling anonymous authentication flows
+
+### Changed
+
+- **Type Inference**: Improved TypeScript type inference for Better Auth client with properly typed plugins via `SupportedBetterAuthClientPlugins` export
+- **Error Handling**: Set `throw: false` in fetch options to ensure consistent error handling across all Better Auth calls
+
+### Temporarily Disabled
+
+- **Organization Client**: Disabled `organizationClient` plugin pending upstream Better Auth fix
+
 ## [0.1.0-alpha.2] - 2025-11-27
 
 ### Changed

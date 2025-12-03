@@ -1,19 +1,21 @@
 # @neondatabase/neon-auth
 
+[![npm downloads](https://img.shields.io/npm/dm/@neondatabase/neon-auth.svg)](https://www.npmjs.com/package/@neondatabase/neon-auth)
+
 Authentication adapters for Neon Auth, supporting multiple auth providers.
 
 ## Overview
 
-`@neondatabase/neon-auth` provides authentication adapters for applications using Neon Auth. It supports multiple auth providers through a unified adapter system:
+`@neondatabase/neon-auth` provides authentication for applications using Neon Auth. By default, it uses the Better Auth API, with optional adapters for different API styles:
 
-- **SupabaseAuthAdapter** - Supabase-compatible API for familiar auth patterns
-- **BetterAuthVanillaAdapter** - Direct Better Auth API for vanilla JS/TS
-- **BetterAuthReactAdapter** - Better Auth with React hooks support
+- **Default** - Better Auth API (`signIn.email`, `signUp.email`, etc.)
+- **SupabaseAuthAdapter** - Supabase-compatible API for migrations (`signInWithPassword`, `signUp`, etc.)
+- **BetterAuthReactAdapter** - Better Auth with React hooks (`useSession`)
 
 This package is designed to work seamlessly with Neon's authentication infrastructure while providing:
 
-- **Multiple adapter options** - Choose the API that fits your needs
-- **Better Auth foundation** - Built on Better Auth's robust architecture
+- **Simple default API** - Works out of the box with Better Auth patterns
+- **Optional adapters** - Switch API styles for migrations or preferences
 - **Performance optimizations** - Session caching and request deduplication
 - **TypeScript support** - Fully typed with strict type checking
 
@@ -27,16 +29,65 @@ bun add @neondatabase/neon-auth
 
 ## Usage
 
-### Using createAuthClient (Recommended)
+### Basic Usage (Default)
 
-The `createAuthClient` factory function creates an auth client with the appropriate adapter:
+The `createAuthClient` factory function creates an auth client. By default, it uses the Better Auth API:
 
-#### SupabaseAuthAdapter - Supabase-compatible API
+```typescript
+import { createAuthClient } from '@neondatabase/neon-auth';
+
+const auth = createAuthClient({
+  baseURL: 'https://your-auth-server.com',
+});
+
+// Sign up
+await auth.signUp.email({
+  email: 'user@example.com',
+  password: 'secure-password',
+  name: 'John Doe',
+});
+
+// Sign in
+await auth.signIn.email({
+  email: 'user@example.com',
+  password: 'secure-password',
+});
+
+// Get session
+const session = await auth.getSession();
+
+// Sign out
+await auth.signOut();
+```
+
+### OAuth Authentication
+
+```typescript
+import { createAuthClient } from '@neondatabase/neon-auth';
+
+const auth = createAuthClient({
+  baseURL: 'https://your-auth-server.com',
+});
+
+await auth.signIn.social({
+  provider: 'google',
+  callbackURL: '/dashboard',
+});
+```
+
+## Using Adapters
+
+You can optionally specify an adapter to change the API style. This is useful for migrations or if you prefer a different API.
+
+### SupabaseAuthAdapter - Supabase-compatible API
+
+Use this adapter if you're migrating from Supabase or prefer the Supabase API style:
 
 ```typescript
 import { createAuthClient, SupabaseAuthAdapter } from '@neondatabase/neon-auth';
 
-const auth = createAuthClient('https://your-auth-server.com', {
+const auth = createAuthClient({
+  baseURL: 'https://your-auth-server.com',
   adapter: SupabaseAuthAdapter(),
 });
 
@@ -56,49 +107,35 @@ await auth.signInWithPassword({
 
 const { data: session } = await auth.getSession();
 await auth.signOut();
+
+// OAuth with Supabase-style API
+await auth.signInWithOAuth({
+  provider: 'google',
+  options: {
+    redirectTo: '/dashboard',
+  },
+});
 ```
 
-#### BetterAuthVanillaAdapter - Direct Better Auth API
+### BetterAuthReactAdapter - React Hooks Support
 
-```typescript
-import { createAuthClient, BetterAuthVanillaAdapter } from '@neondatabase/neon-auth';
-
-const auth = createAuthClient('https://your-auth-server.com', {
-  adapter: BetterAuthVanillaAdapter(),
-});
-
-// Direct Better Auth API
-await auth.signUp.email({
-  email: 'user@example.com',
-  password: 'secure-password',
-  name: 'John Doe',
-});
-
-await auth.signIn.email({
-  email: 'user@example.com',
-  password: 'secure-password',
-});
-
-const session = await auth.getSession();
-await auth.signOut();
-```
-
-#### BetterAuthReactAdapter - Better Auth with React Hooks
+Use this adapter in React applications to get access to hooks like `useSession`:
 
 ```typescript
 import { createAuthClient, BetterAuthReactAdapter } from '@neondatabase/neon-auth';
 
-const auth = createAuthClient('https://your-auth-server.com', {
+const auth = createAuthClient({
+  baseURL: 'https://your-auth-server.com',
   adapter: BetterAuthReactAdapter(),
 });
 
-// Direct Better Auth API
+// Same API as default
 await auth.signIn.email({
   email: 'user@example.com',
   password: 'secure-password',
 });
 
-// React hooks
+// Plus React hooks
 function MyComponent() {
   const session = auth.useSession();
 
@@ -109,53 +146,27 @@ function MyComponent() {
 }
 ```
 
-### OAuth Authentication (SupabaseAuthAdapter)
-
-```typescript
-import { createAuthClient, SupabaseAuthAdapter } from '@neondatabase/neon-auth';
-
-const auth = createAuthClient('https://your-auth-server.com', {
-  adapter: SupabaseAuthAdapter(),
-});
-
-await auth.signInWithOAuth({
-  provider: 'google',
-  options: {
-    redirectTo: '/dashboard',
-  },
-});
-```
-
-### OAuth Authentication (BetterAuth Adapters)
-
-```typescript
-import { createAuthClient, BetterAuthVanillaAdapter } from '@neondatabase/neon-auth';
-
-const auth = createAuthClient('https://your-auth-server.com', {
-  adapter: BetterAuthVanillaAdapter(),
-});
-
-await auth.signIn.social({
-  provider: 'google',
-  callbackURL: '/dashboard',
-});
-```
-
 ## API Reference
 
-### createAuthClient(url, config)
+### createAuthClient(config)
 
 Factory function to create an auth client.
 
 **Parameters:**
-- `url` - The auth service URL
-- `config.adapter` - The adapter factory function (e.g., `SupabaseAuthAdapter()`)
+- `config.baseURL` - The auth service URL (required)
+- `config.adapter` - Optional adapter factory function (e.g., `SupabaseAuthAdapter()`)
 
 **Returns:** The adapter's public API (varies by adapter type)
 
-### Adapters
+### Default API (Better Auth)
 
-#### SupabaseAuthAdapter
+- `signIn.email(credentials)` - Sign in with email
+- `signIn.social(options)` - Sign in with OAuth
+- `signUp.email(credentials)` - Create new user
+- `signOut()` - Sign out current user
+- `getSession()` - Get current session
+
+### SupabaseAuthAdapter API
 
 Provides a Supabase-compatible API:
 
@@ -172,17 +183,10 @@ Provides a Supabase-compatible API:
 - `resetPasswordForEmail(email, options)` - Send password reset
 - `onAuthStateChange(callback)` - Listen to auth state changes
 
-#### BetterAuthVanillaAdapter / BetterAuthReactAdapter
+### BetterAuthReactAdapter API
 
-Exposes the Better Auth client directly:
+Same as default API, plus:
 
-- `signIn.email(credentials)` - Sign in with email
-- `signIn.social(options)` - Sign in with OAuth
-- `signUp.email(credentials)` - Create new user
-- `signOut()` - Sign out current user
-- `getSession()` - Get current session
-
-**React-specific (BetterAuthReactAdapter only):**
 - `useSession()` - React hook for session state
 
 ## Performance Features
@@ -214,27 +218,34 @@ Multiple concurrent `getSession()` calls are automatically deduplicated:
 Full TypeScript support with strict typing:
 
 ```typescript
-import { createAuthClient, SupabaseAuthAdapter } from '@neondatabase/neon-auth';
+import { createAuthClient } from '@neondatabase/neon-auth';
 import type { Session, User } from '@neondatabase/neon-auth';
 
-const auth = createAuthClient('https://your-auth-server.com', {
-  adapter: SupabaseAuthAdapter(),
+const auth = createAuthClient({
+  baseURL: 'https://your-auth-server.com',
 });
 
 // Fully typed responses
-const { data: session }: { data: Session | null } = await auth.getSession();
+const session: Session | null = await auth.getSession();
 ```
 
 ## Related Packages
 
 - [`@neondatabase/neon-js`](../neon-js) - Full SDK with database and auth integration
 - [`@neondatabase/postgrest-js`](../postgrest-js) - PostgreSQL client without auth
+- [`@neondatabase/neon-auth-next`](../neon-auth-next) - Next.js integration for Neon Auth
+- [`@neondatabase/neon-auth-ui`](../neon-auth-ui) - UI components for Neon Auth
 
 ## Resources
 
 - [Neon Auth Documentation](https://neon.tech/docs/neon-auth)
 - [Better Auth Documentation](https://www.better-auth.com/docs)
 - [Supabase Auth Reference](https://supabase.com/docs/reference/javascript/auth-signup)
+
+## Support
+
+- [GitHub Issues](https://github.com/neondatabase/neon-js/issues)
+- [Neon Community Discord](https://discord.gg/H24eC2UN)
 
 ## License
 
