@@ -5,24 +5,16 @@ export const handleAuthRequest = async (baseUrl: string, request: Request, path:
   const upstreamURL = `${baseUrl}/${path}`;
   const headers = prepareRequestHeaders(request);
   const body = await parseRequestBody(request);
-  console.debug("[Auth Proxy] Request:", request.method, upstreamURL, headers);
-
+  
   try {
-    const response = await fetch(upstreamURL, {
+    return await fetch(upstreamURL, {
       method: request.method,
       headers: headers,
       body: body,
     })
-    console.debug("[Auth Proxy] Response:", request.url, response.status, response.statusText);
-
-    const cookies = response.headers.get('set-cookie');
-    console.debug("[Auth Proxy] Cookies:", cookies);
-    console.debug("[Auth Proxy] Response Headers:", response.headers);
-
-    return response;
   } catch (error) {
-    console.error("[Auth Proxy] Error:", error);
-    return new Response("Internal Server Error", { status: 500 });
+    const message = error instanceof Error ? error.message : "Internal Server Error";
+    return new Response("[AuthError] " + message, { status: 500 });
   }
 }
 
