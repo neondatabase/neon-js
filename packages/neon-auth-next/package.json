@@ -30,19 +30,13 @@
   },
   "devDependencies": {
     "tsdown": "0.16.0",
-    "typescript": "^5.9.3",
-    "vitest": "4.0.7",
-    "vite-tsconfig-paths": "5.1.4",
-    "msw": "2.6.8"
+    "typescript": "^5.9.3"
+    
   },
   "peerDependencies": {
     "next": "^16.0.6"
   },
   "dependencies": {
-    "@neondatabase/neon-auth": "workspace:*",
-    "@supabase/auth-js": "2.79.0",
-    "better-auth": "1.4.2",
-    "zod": "4.1.12",
-    "jose": "6.1.2"
+    "@neondatabase/neon-auth": "workspace:*"
   }
 }

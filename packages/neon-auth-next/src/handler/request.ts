@@ -5,7 +5,6 @@ export const handleAuthRequest = async (baseUrl: string, request: Request, path:
   const upstreamURL = `${baseUrl}/${path}`;
   const headers = prepareRequestHeaders(request);
   const body = await parseRequestBody(request);
-  console.debug("[Auth Proxy] Request:", request.method, upstreamURL, headers);
 
   try {
     const response = await fetch(upstreamURL, {
@@ -13,16 +12,11 @@ export const handleAuthRequest = async (baseUrl: string, request: Request, path:
       headers: headers,
       body: body,
     })
-    console.debug("[Auth Proxy] Response:", request.url, response.status, response.statusText);
-
-    const cookies = response.headers.get('set-cookie');
-    console.debug("[Auth Proxy] Cookies:", cookies);
-    console.debug("[Auth Proxy] Response Headers:", response.headers);
-
     return response;
   } catch (error) {
-    console.error("[Auth Proxy] Error:", error);
-    return new Response("Internal Server Error", { status: 500 });
+    const message = error instanceof Error ? error.message : "Internal Server Error";
+    console.error(`[AuthError] ${message}`, error);
+    return new Response(`[AuthError] ${message}`, { status: 500 });
   }
 }
 
@@ -38,6 +32,7 @@ const prepareRequestHeaders = (request: Request) => {
   
   headers.set('Origin', getOrigin(request));
   headers.set('Cookie', extractRequestCookies(request));
+  headers.set('X-Neon-Auth-Next', 'true');     // Add for observability purpose
   return headers;
 }
 

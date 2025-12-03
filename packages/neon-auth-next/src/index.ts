@@ -5,7 +5,8 @@ import { createAuthClient as createNeonAuthClient, BetterAuthReactAdapter } from
 export * from "@neondatabase/neon-auth";
 
 export const createAuthClient = () => {
-  return createNeonAuthClient('/api/auth', {
+  // @ts-expect-error - for nextjs proxy we do not need the baseUrl
+  return createNeonAuthClient(undefined, {
     adapter: BetterAuthReactAdapter()
   })
 }
