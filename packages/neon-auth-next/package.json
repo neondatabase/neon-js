@@ -1,6 +1,6 @@
 {
   "name": "@neondatabase/neon-auth-next",
-  "version": "0.1.0-alpha.16",
+  "version": "0.1.0-alpha.18",
   "description": "Neon Auth Client for Next.js",
   "type": "module",
   "license": "Apache-2.0",
@@ -31,7 +31,6 @@
   "devDependencies": {
     "tsdown": "0.16.0",
     "typescript": "^5.9.3"
-    
   },
   "peerDependencies": {
     "next": "^16.0.6"
