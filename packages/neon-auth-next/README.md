@@ -17,6 +17,25 @@ export const { GET, POST } = toNextJsHandler(
 )
 ```
 
+### Add `neonAuthMiddleware` 
+
+`neonAuthMiddleware()` helper protects your app routes with authentication. Export the `neonAuthMiddleware()` helper in your `proxy.ts` ()
+
+```ts
+import { neonAuthMiddleware } from "@neondatabase/neon-auth-next"
+
+export default neonAuthMiddleware({
+  loginUrl: "/auth/sign-in",  // Redirect to user to this page, if not authenticated
+})
+
+export const config = {
+	matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|auth/*).*)", // Do not run the middleware for assets
+    
+    "/dashboard"  // Specify the routes the middleware applies to
+    ],
+};
+```
 
  ### Create a Client
 
