@@ -103,6 +103,7 @@ async function runBumpp(packageName: string): Promise<string> {
       'bumpp',
       '--tag',
       tag,
+      '--no-push',
       '--c',
       `chore: release ${packageName}@-v%s`,
     ],
