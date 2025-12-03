@@ -16,9 +16,6 @@
   "publishConfig": {
     "access": "public"
   },
-  "files": [
-    "dist"
-  ],
   "sideEffects": false,
   "scripts": {
     "build": "tsdown",
