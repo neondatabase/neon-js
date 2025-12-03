@@ -67,7 +67,7 @@ export abstract class NeonAuthAdapterCore {
           const url = request.url;
           const method = deriveBetterAuthMethodFromUrl(url.toString());
           if (method) {
-            BETTER_AUTH_METHODS_HOOKS[method].onRequest();
+            BETTER_AUTH_METHODS_HOOKS[method].onRequest(request);
           }
 
           userOnRequest?.(request);

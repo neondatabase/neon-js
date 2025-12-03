@@ -1,9 +1,14 @@
 import type { AuthChangeEvent, Session } from '@supabase/auth-js';
-import { getGlobalBroadcastChannel } from 'better-auth/client';
+import {
+  getGlobalBroadcastChannel,
+  type RequestContext,
+} from 'better-auth/client';
 import { InFlightRequestManager } from './in-flight-request-manager';
 import { SessionCacheManager } from './session-cache-manager';
 import { mapBetterAuthSession } from './better-auth-helpers';
 import type { BetterAuthSessionResponse } from './better-auth-types';
+import { NEON_AUTH_SESSION_VERIFIER_PARAM_NAME } from './constants';
+import { isBrowser } from '../utils/browser';
 
 export const BETTER_AUTH_METHODS_IN_FLIGHT_REQUESTS =
   new InFlightRequestManager();
@@ -18,7 +23,7 @@ type InternalAuthEvent =
   | { type: 'USER_UPDATE'; session: Session };
 
 type MethodHook = {
-  onRequest: () => void;
+  onRequest: (request: RequestContext) => void | RequestContext;
   onSuccess: (responseData: unknown) => void;
 };
 
@@ -76,15 +81,52 @@ export const BETTER_AUTH_METHODS_HOOKS = {
     },
   },
   getSession: {
-    onRequest: () => {},
+    onRequest: (ctx) => {
+      if (!isBrowser()) {
+        return;
+      }
+
+      const urlSearchParams = new URLSearchParams(
+        globalThis.window.location.search
+      );
+      const neonAuthSessionVerifierParam = urlSearchParams.get(
+        NEON_AUTH_SESSION_VERIFIER_PARAM_NAME
+      );
+
+      if (neonAuthSessionVerifierParam) {
+        const url = typeof ctx.url === 'string' ? new URL(ctx.url) : ctx.url;
+        url.searchParams.set(
+          NEON_AUTH_SESSION_VERIFIER_PARAM_NAME,
+          neonAuthSessionVerifierParam
+        );
+
+        return {
+          ...ctx,
+          url,
+        };
+      }
+    },
     onSuccess: (responseData) => {
       if (isSessionResponseData(responseData)) {
         const session = mapBetterAuthSession(
           responseData.session,
           responseData.user
         );
+
         if (session && BETTER_AUTH_METHODS_CACHE.wasTokenRefreshed(session)) {
           emitAuthEvent({ type: 'TOKEN_REFRESH', session });
+        }
+
+        // remove the session verifier parameter from the URL if it exists on success
+        if (isBrowser()) {
+          const url = new URL(globalThis.window.location.href);
+          const neonAuthSessionVerifierParam = url.searchParams.get(
+            NEON_AUTH_SESSION_VERIFIER_PARAM_NAME
+          );
+          if (neonAuthSessionVerifierParam) {
+            url.searchParams.delete(NEON_AUTH_SESSION_VERIFIER_PARAM_NAME);
+            history.replaceState(history.state, '', url.href);
+          }
         }
       }
     },

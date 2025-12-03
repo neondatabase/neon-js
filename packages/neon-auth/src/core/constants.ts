@@ -15,3 +15,7 @@ export const CLOCK_SKEW_BUFFER_MS = 10_000;
 
 /** Default session expiry duration in milliseconds (1 hour) */
 export const DEFAULT_SESSION_EXPIRY_MS = 3_600_000;
+
+/** Name of the session verifier parameter in the URL, used for the OAUTH flow */
+export const NEON_AUTH_SESSION_VERIFIER_PARAM_NAME =
+  'neon_auth_session_verifier';
