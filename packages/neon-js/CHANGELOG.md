@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [0.1.0-alpha.7] - 2025-12-03
+
+### Changed
+
+- Bump @neondatabase/neon-auth to 0.1.0-alpha.4
+
 ## [0.1.0-alpha.6] - 2025-11-27
 
 ### Changed
