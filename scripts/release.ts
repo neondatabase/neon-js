@@ -122,10 +122,20 @@ async function runBumpp(packageName: string): Promise<string> {
   console.log(`\n📦 Running bumpp for ${packageName}...`);
 
   // Run bumpp interactively - must use spawn with stdio inherit for TTY
-  const proc = spawn(['bunx', 'bumpp', '--tag', tag, '--c', `chore: release ${packageName}@-v%s`], {
-    cwd: pkgPath,
-    stdio: ['inherit', 'inherit', 'inherit'],
-  });
+  const proc = spawn(
+    [
+      'bunx',
+      'bumpp',
+      '--tag',
+      tag,
+      '--c',
+      `chore: release ${packageName}@-v%s`,
+    ],
+    {
+      cwd: pkgPath,
+      stdio: ['inherit', 'inherit', 'inherit'],
+    }
+  );
 
   const exitCode = await proc.exited;
   if (exitCode !== 0) {
@@ -222,13 +232,25 @@ async function release(packageName: string): Promise<void> {
     console.log(`\n🔨 Building dependent packages...`);
     for (const dep of dependents) {
       await buildPackage(dep);
-      await runBumpp(packageName);
+      await runBumpp(dep);
     }
   }
 
   // 5. Publish packages
   console.log(`\n🚀 Publishing packages...`);
   await publishPackage(packageName);
+
+  if (dependents.length > 0) {
+    // Refresh lock file to pick up newly published dependency
+    console.log(`  📦 Refreshing dependencies...`);
+    await $`bun install`.cwd(ROOT_DIR).quiet();
+
+    // Amend the last bumpp commit to include lock file changes
+    console.log(`  📝 Adding lock file to last commit...`);
+    await $`git add bun.lockb`.cwd(ROOT_DIR).quiet();
+    await $`git commit --amend --no-edit`.cwd(ROOT_DIR).quiet();
+  }
+
   for (const dep of dependents) {
     await publishPackage(dep);
   }
