@@ -115,7 +115,7 @@
     },
     "packages/neon-js": {
       "name": "@neondatabase/neon-js",
-      "version": "0.1.0-alpha.8",
+      "version": "0.1.0-alpha.9",
       "bin": {
         "neon-js": "dist/cli/index.mjs",
       },
