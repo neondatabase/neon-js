@@ -1,5 +1,7 @@
 # @neondatabase/postgrest-js
 
+[![npm downloads](https://img.shields.io/npm/dm/@neondatabase/postgrest-js.svg)](https://www.npmjs.com/package/@neondatabase/postgrest-js)
+
 Generic PostgreSQL client for Neon Data API without built-in authentication.
 
 ## Overview
@@ -260,6 +262,11 @@ const { data } = await client.from('users').select();
 
 - [`@neondatabase/neon-js`](../neon-js) - Full SDK with Neon Auth integration
 - [`@neondatabase/neon-auth`](../neon-auth) - Standalone auth adapters
+
+## Support
+
+- [GitHub Issues](https://github.com/neondatabase/neon-js/issues)
+- [Neon Community Discord](https://discord.gg/H24eC2UN)
 
 ## License
 

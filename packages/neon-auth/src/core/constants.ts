@@ -15,6 +15,3 @@ export const CLOCK_SKEW_BUFFER_MS = 10_000;
 
 /** Default session expiry duration in milliseconds (1 hour) */
 export const DEFAULT_SESSION_EXPIRY_MS = 3_600_000;
-
-/** BroadcastChannel name for cross-tab auth state sync */
-export const BROADCAST_CHANNEL_NAME = 'better-auth-state-changes';

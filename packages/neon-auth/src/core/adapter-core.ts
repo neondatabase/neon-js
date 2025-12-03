@@ -7,10 +7,10 @@ import type { createAuthClient } from 'better-auth/react';
 import {
   jwtClient,
   adminClient,
-  organizationClient,
   emailOTPClient,
   magicLinkClient,
   phoneNumberClient,
+  anonymousClient,
 } from 'better-auth/client/plugins';
 import {
   BETTER_AUTH_METHODS_HOOKS,
@@ -21,21 +21,30 @@ import {
 export interface NeonAuthAdapterCoreAuthOptions
   extends Omit<BetterAuthClientOptions, 'plugins'> {}
 
-const defaultBetterAuthClientOptions = {
-  plugins: [
-    jwtClient(),
-    adminClient(),
-    organizationClient(),
-    emailOTPClient(),
+const supportedBetterAuthClientPlugins = [
+  jwtClient(),
+  adminClient(),
 
-    // TODO: add these in
-    phoneNumberClient(),
-    magicLinkClient(),
-  ],
-} satisfies BetterAuthClientOptions;
+  // TODO: enable this when better auth fix is released
+  // organizationClient(),
+  emailOTPClient(),
+  anonymousClient(),
+
+  // TODO: add these in
+  phoneNumberClient(),
+  magicLinkClient(),
+] satisfies BetterAuthClientOptions['plugins'];
+
+export type SupportedBetterAuthClientPlugins =
+  typeof supportedBetterAuthClientPlugins;
 
 export abstract class NeonAuthAdapterCore {
-  protected betterAuthOptions: BetterAuthClientOptions;
+  protected betterAuthOptions: BetterAuthClientOptions & {
+    plugins: SupportedBetterAuthClientPlugins;
+    fetchOptions: {
+      throw: false;
+    };
+  };
 
   /**
    * Better Auth adapter implementing the NeonAuthClient interface.
@@ -50,9 +59,10 @@ export abstract class NeonAuthAdapterCore {
 
     this.betterAuthOptions = {
       ...betterAuthClientOptions,
-      ...defaultBetterAuthClientOptions,
+      plugins: supportedBetterAuthClientPlugins,
       fetchOptions: {
         ...betterAuthClientOptions.fetchOptions,
+        throw: false,
         onRequest: (request) => {
           const url = request.url;
           const method = deriveBetterAuthMethodFromUrl(url.toString());

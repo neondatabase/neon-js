@@ -1,5 +1,7 @@
 # @neondatabase/neon-auth-ui
 
+[![npm downloads](https://img.shields.io/npm/dm/@neondatabase/neon-auth-ui.svg)](https://www.npmjs.com/package/@neondatabase/neon-auth-ui)
+
 UI components for Neon Auth built on top of [better-auth-ui](https://better-auth-ui.com).
 
 ## Installation
@@ -8,8 +10,6 @@ UI components for Neon Auth built on top of [better-auth-ui](https://better-auth
 npm install @neondatabase/neon-auth-ui
 # or
 bun add @neondatabase/neon-auth-ui
-# or
-pnpm add @neondatabase/neon-auth-ui
 ```
 
 ## Usage
@@ -192,6 +192,16 @@ The CSS uses CSS custom properties for theming. Override them in your CSS:
 ## Documentation
 
 For component documentation, see the [better-auth-ui docs](https://better-auth-ui.com).
+
+## Related Packages
+
+- [`@neondatabase/neon-auth`](../neon-auth) - Authentication adapters for Neon Auth
+- [`@neondatabase/neon-js`](../neon-js) - Full SDK with database and auth integration
+
+## Support
+
+- [GitHub Issues](https://github.com/neondatabase/neon-js/issues)
+- [Neon Community Discord](https://discord.gg/H24eC2UN)
 
 ## License
 
