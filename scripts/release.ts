@@ -213,15 +213,16 @@ async function release(packageName: string): Promise<void> {
   const dependents = DEPENDENCY_GRAPH[packageName];
 
   if (dependents.length > 0) {
-    console.log(`\n📦 Patching dependent packages...`);
-    for (const dep of dependents) {
-      await patchDependent(dep, `Bump @neondatabase/${packageName} to ${newVersion}`);
-    }
+    // console.log(`\n📦 Patching dependent packages...`);
+    // for (const dep of dependents) {
+    //   await patchDependent(dep, `Bump @neondatabase/${packageName} to ${newVersion}`);
+    // }
 
-    // 4. Build dependents
+    // 4. Build dependents and bumpp them
     console.log(`\n🔨 Building dependent packages...`);
     for (const dep of dependents) {
       await buildPackage(dep);
+      await runBumpp(packageName);
     }
   }
 

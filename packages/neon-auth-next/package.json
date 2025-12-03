@@ -1,6 +1,6 @@
 {
   "name": "@neondatabase/neon-auth-next",
-  "version": "0.1.0-alpha.10",
+  "version": "0.1.0-alpha.11",
   "description": "Neon Auth Client for Next.js",
   "type": "module",
   "license": "Apache-2.0",
