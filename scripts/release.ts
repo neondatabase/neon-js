@@ -170,6 +170,7 @@ async function patchDependent(
  */
 async function buildPackage(packageName: string): Promise<void> {
   console.log(`  🔨 Building ${packageName}...`);
+  await $`bun install --filter @neondatabase/${packageName}`.quiet();
   await $`bun run --filter @neondatabase/${packageName} build`.quiet();
 }
 
@@ -271,8 +272,10 @@ if (!VALID_PACKAGES.includes(packageName)) {
   process.exit(1);
 }
 
-// Run the release
-await release(packageName).catch((error) => {
+try {
+  // Run the release
+  await release(packageName);
+} catch (error) {
   console.error('\n❌ Release failed:', error);
   process.exit(1);
-});
+}
