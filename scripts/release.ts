@@ -196,7 +196,7 @@ async function release(packageName: string): Promise<void> {
 
   // Amend the last commit to include lock file changes
   console.log(`  📝 Adding lock file to last commit...`);
-  await $`git add bun.lockb`.cwd(ROOT_DIR).quiet();
+  await $`git add bun.lock`.cwd(ROOT_DIR).quiet();
   await $`git commit --amend --no-edit`.cwd(ROOT_DIR).quiet();
 
   // ============================================
