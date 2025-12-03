@@ -62,12 +62,12 @@ function incrementPatchVersion(version: string): string {
   const preReleaseMatch = version.match(/^(.+)-([a-zA-Z]+)\.(\d+)$/);
   if (preReleaseMatch) {
     const [, base, tag, num] = preReleaseMatch;
-    return `${base}-${tag}.${parseInt(num, 10) + 1}`;
+    return `${base}-${tag}.${Number.parseInt(num, 10) + 1}`;
   }
 
   // Regular version (e.g., 0.1.0)
   const parts = version.split('.');
-  const patch = parseInt(parts[2], 10) + 1;
+  const patch = Number.parseInt(parts[2], 10) + 1;
   return `${parts[0]}.${parts[1]}.${patch}`;
 }
 
@@ -96,14 +96,14 @@ function updateChangelog(
   const lines = changelog.split('\n');
   let insertIndex = 0;
 
-  for (let i = 0; i < lines.length; i++) {
+  for (const [i, line] of lines.entries()) {
     // Find the first ## heading or the end of frontmatter
-    if (lines[i].startsWith('## ')) {
+    if (line.startsWith('## ')) {
       insertIndex = i;
       break;
     }
     // Skip past the main title and any intro text
-    if (lines[i].startsWith('# ') || lines[i].trim() === '') {
+    if (line.startsWith('# ') || line.trim() === '') {
       insertIndex = i + 1;
     }
   }
@@ -181,9 +181,7 @@ async function publishPackage(packageName: string): Promise<void> {
   console.log(`  🚀 Publishing @neondatabase/${packageName}...`);
 
   // Use spawn with stdio inherit so npm can prompt for OTP interactively
-  const cmd = packageName === 'neon-js'
-    ? ['bun', 'publish', '--tag', 'latest']
-    : ['npm', 'publish', '--tag', 'latest'];
+  const cmd = ['bun', 'publish', '--tag', 'latest'];
 
   const proc = spawn(cmd, {
     cwd: pkgPath,
