@@ -9,3 +9,4 @@ intelligence
 dist
 load-test.ts
 .history
+tsconfig.tsbuildinfo

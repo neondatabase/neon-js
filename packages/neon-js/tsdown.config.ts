@@ -6,10 +6,12 @@ export default defineConfig({
   entry: ['src/index.ts', 'src/cli/index.ts'],
   format: ['esm'],
   clean: true,
+  // Mark workspace packages as external so their types aren't inlined/duplicated
+  external: ['@neondatabase/neon-auth', '@neondatabase/postgrest-js'],
   dts: {
     build: true,
   },
-  // Transform package.json after build
+  // Transform package.json after build - this is only needed in development mode when sym linking
   hooks: {
     'build:done': async () => {
       // Read original package.json

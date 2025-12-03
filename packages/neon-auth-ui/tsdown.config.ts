@@ -6,6 +6,8 @@ export default defineConfig({
   entry: ['src/index.ts'],
   format: ['esm'],
   clean: false, // Don't clean dist since CSS is generated first by TailwindCSS CLI
+  // Mark neon-auth as external so its types aren't inlined/duplicated
+  external: ['@neondatabase/neon-auth'],
   dts: {
     build: true,
   },

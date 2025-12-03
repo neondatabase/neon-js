@@ -34,33 +34,13 @@ import {
 import {
   NeonAuthAdapterCore,
   type NeonAuthAdapterCoreAuthOptions,
+  type SupportedBetterAuthClientPlugins,
 } from '../../core/adapter-core';
-import {
-  jwtClient,
-  adminClient,
-  organizationClient,
-  emailOTPClient,
-  phoneNumberClient,
-  magicLinkClient,
-} from 'better-auth/client/plugins';
 
 export type SupabaseAuthAdapterOptions = Omit<
   NeonAuthAdapterCoreAuthOptions,
   'baseURL'
 >;
-
-const _defaultBetterAuthClientOptions = {
-  plugins: [
-    jwtClient(),
-    adminClient(),
-    organizationClient(),
-    emailOTPClient(),
-
-    // TODO: add these in
-    phoneNumberClient(),
-    magicLinkClient(),
-  ],
-} satisfies BetterAuthClientOptions;
 
 /**
  * Internal implementation class - use SupabaseAuthAdapter factory function instead
@@ -72,12 +52,13 @@ class SupabaseAuthAdapterImpl
   admin: SupabaseAuthClientInterface['admin'] = undefined as never;
   mfa: SupabaseAuthClientInterface['mfa'] = undefined as never;
   oauth: SupabaseAuthClientInterface['oauth'] = undefined as never;
-  private _betterAuth: BetterAuthClient<typeof _defaultBetterAuthClientOptions>;
+  private _betterAuth: BetterAuthClient<{
+    plugins: SupportedBetterAuthClientPlugins;
+  }>;
   private _stateChangeEmitters = new Map<string, Subscription>();
 
   constructor(betterAuthClientOptions: NeonAuthAdapterCoreAuthOptions) {
     super(betterAuthClientOptions);
-    // @ts-expect-error - defaultBetterAuthClientOptions is not typed
     this._betterAuth = createAuthClient(this.betterAuthOptions);
 
     /**
@@ -348,17 +329,46 @@ class SupabaseAuthAdapterImpl
     }
   };
 
-  // TODO: we need to add the anonymous() plugin to the server adapter
-  signInAnonymously: SupabaseAuthClientInterface['signInAnonymously'] =
-    async () => {
+  signInAnonymously: SupabaseAuthClientInterface['signInAnonymously'] = async (
+    credentials
+  ) => {
+    try {
+      const result = await this._betterAuth.signIn.anonymous({
+        query: credentials?.options?.data,
+      });
+
+      if (result.error) {
+        throw normalizeBetterAuthError(result.error);
+      }
+
+      const sessionResult = await this.getSession();
+      if (!sessionResult.data.session?.user) {
+        throw createAuthError(
+          AuthErrorCode.SessionNotFound,
+          'Failed to retrieve user session'
+        );
+      }
+
       return {
-        data: { user: null, session: null },
-        error: createAuthError(
-          AuthErrorCode.AnonymousProviderDisabled,
-          'Anonymous sign-in is not supported by Better Auth'
-        ),
+        data: {
+          user: sessionResult.data.session.user,
+          session: sessionResult.data.session,
+        },
+        error: null,
       };
-    };
+    } catch (error) {
+      if (isAuthError(error)) {
+        return { data: { user: null, session: null }, error };
+      }
+      if (error instanceof APIError) {
+        return {
+          data: { user: null, session: null },
+          error: normalizeBetterAuthError(error),
+        };
+      }
+      throw error;
+    }
+  };
 
   signInWithPassword: SupabaseAuthClientInterface['signInWithPassword'] =
     async (credentials) => {
@@ -1399,6 +1409,7 @@ class SupabaseAuthAdapterImpl
     }
 
     if (type === 'invite') {
+      // @ts-expect-error - organization plugin is not supported yet
       const result = await this._betterAuth.organization.acceptInvitation({
         invitationId: params.token, // The token is the invitation ID
       });

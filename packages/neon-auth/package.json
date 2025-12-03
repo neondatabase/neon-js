@@ -10,6 +10,9 @@
   "exports": {
     ".": "./dist/index.mjs"
   },
+  "files": [
+    "dist"
+  ],
   "publishConfig": {
     "access": "public"
   },
@@ -37,7 +40,7 @@
   },
   "dependencies": {
     "@supabase/auth-js": "2.79.0",
-    "better-auth": "1.4.2",
+    "better-auth": "1.4.5",
     "zod": "4.1.12",
     "jose": "6.1.2"
   }

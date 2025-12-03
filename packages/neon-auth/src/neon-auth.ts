@@ -6,17 +6,23 @@ import {
   type BetterAuthVanillaAdapterInstance,
 } from './adapters/better-auth-vanilla/better-auth-vanilla-adapter';
 import { type SupabaseAuthAdapterInstance } from './adapters/supabase/supabase-adapter';
-
+import { type SupportedBetterAuthClientPlugins } from './core/adapter-core';
 /**
  * Type representing the Better Auth React client
  */
-export type ReactBetterAuthClient = ReturnType<typeof createReactAuthClient>;
+export type ReactBetterAuthClient = ReturnType<
+  typeof createReactAuthClient<{
+    plugins: SupportedBetterAuthClientPlugins;
+  }>
+>;
 
-/**
+/**`
  * Type representing the Better Auth Vanilla client
  */
 export type VanillaBetterAuthClient = ReturnType<
-  typeof createVanillaAuthClient
+  typeof createVanillaAuthClient<{
+    plugins: SupportedBetterAuthClientPlugins;
+  }>
 >;
 
 /**

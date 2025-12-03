@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 export default defineConfig({
-  entry: ['src/index.ts', 'src/client/index.ts'],
+  entry: ['src/index.ts'],
   format: ['esm'],
   clean: true,
   dts: {
