@@ -31,7 +31,7 @@
     "msw": "2.6.8",
     "tsdown": "0.16.7",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.46.4",
+    "typescript-eslint": "^8.48.1",
     "vite-tsconfig-paths": "5.1.4",
     "vitest": "4.0.7"
   },

@@ -46,31 +46,6 @@ function readPackageJson(packageName: string): PackageJson {
   return JSON.parse(readFileSync(pkgPath, 'utf8'));
 }
 
-function writePackageJson(packageName: string, pkg: PackageJson): void {
-  const pkgPath = getPackageJsonPath(packageName);
-  writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
-}
-
-/**
- * Increments the patch version, handling pre-release versions.
- * Examples:
- *   0.1.0 -> 0.1.1
- *   0.1.0-alpha.4 -> 0.1.0-alpha.5
- */
-function incrementPatchVersion(version: string): string {
-  // Check if it's a pre-release version (e.g., 0.1.0-alpha.4)
-  const preReleaseMatch = version.match(/^(.+)-([a-zA-Z]+)\.(\d+)$/);
-  if (preReleaseMatch) {
-    const [, base, tag, num] = preReleaseMatch;
-    return `${base}-${tag}.${Number.parseInt(num, 10) + 1}`;
-  }
-
-  // Regular version (e.g., 0.1.0)
-  const parts = version.split('.');
-  const patch = Number.parseInt(parts[2], 10) + 1;
-  return `${parts[0]}.${parts[1]}.${patch}`;
-}
-
 /**
  * Updates the CHANGELOG.md for a package with a new entry.
  */
@@ -148,34 +123,6 @@ async function runBumpp(packageName: string): Promise<string> {
 }
 
 /**
- * Patches a dependent package's version.
- */
-async function patchDependent(
-  packageName: string,
-  reason: string
-): Promise<string> {
-  const pkg = readPackageJson(packageName);
-  const oldVersion = pkg.version;
-  const newVersion = incrementPatchVersion(oldVersion);
-
-  console.log(`  📝 ${packageName}: ${oldVersion} → ${newVersion}`);
-
-  // Update package.json
-  pkg.version = newVersion;
-  writePackageJson(packageName, pkg);
-
-  // Update CHANGELOG
-  updateChangelog(packageName, newVersion, reason);
-
-  // Create git tag
-  const tag = `${packageName}-v${newVersion}`;
-  await $`git tag ${tag}`.quiet();
-  console.log(`  🏷️  Created tag: ${tag}`);
-
-  return newVersion;
-}
-
-/**
  * Builds a package.
  */
 async function buildPackage(packageName: string): Promise<void> {
@@ -207,58 +154,72 @@ async function publishPackage(packageName: string): Promise<void> {
 
 /**
  * Main release function.
+ *
+ * Flow:
+ * 1. Version bumping phase - build & bumpp all packages (creates commits + tags)
+ * 2. Lock file update - run `bun update` and amend last commit
+ * 3. Publishing phase - publish all packages to npm
+ * 4. Push commits and tags
  */
 async function release(packageName: string): Promise<void> {
   console.log(`\n🎯 Starting release for: ${packageName}`);
   console.log('─'.repeat(50));
 
-  // 1. Build the package first
-  await buildPackage(packageName);
-
-  // 2. Run bumpp (interactive version selection)
-  const newVersion = await runBumpp(packageName);
-  console.log(`\n✅ ${packageName} version: ${newVersion}`);
-
-  // 3. Get dependents and patch them
   const dependents = DEPENDENCY_GRAPH[packageName];
+  const allPackages = [packageName, ...dependents];
 
-  if (dependents.length > 0) {
-    // console.log(`\n📦 Patching dependent packages...`);
-    // for (const dep of dependents) {
-    //   await patchDependent(dep, `Bump @neondatabase/${packageName} to ${newVersion}`);
-    // }
+  // ============================================
+  // Phase 1: Version bumping (build + bumpp)
+  // ============================================
+  console.log(`\n📦 Phase 1: Version bumping`);
+  console.log('─'.repeat(30));
 
-    // 4. Build dependents and bumpp them
-    console.log(`\n🔨 Building dependent packages...`);
-    for (const dep of dependents) {
-      await buildPackage(dep);
-      await runBumpp(dep);
-    }
-  }
+  // Build and bumpp main package
+  await buildPackage(packageName);
+  const newVersion = await runBumpp(packageName);
+  console.log(`✅ ${packageName} version: ${newVersion}`);
 
-  // 5. Publish packages
-  console.log(`\n🚀 Publishing packages...`);
-  await publishPackage(packageName);
-
-  if (dependents.length > 0) {
-    // Refresh lock file to pick up newly published dependency
-    console.log(`  📦 Refreshing dependencies...`);
-    await $`bun install`.cwd(ROOT_DIR).quiet();
-
-    // Amend the last bumpp commit to include lock file changes
-    console.log(`  📝 Adding lock file to last commit...`);
-    await $`git add bun.lockb`.cwd(ROOT_DIR).quiet();
-    await $`git commit --amend --no-edit`.cwd(ROOT_DIR).quiet();
-  }
-
+  // Build and bumpp dependents
   for (const dep of dependents) {
-    await publishPackage(dep);
+    await buildPackage(dep);
+    await runBumpp(dep);
   }
 
-  // 6. Push commits and tags
-  console.log(`\n📤 Pushing to remote...`);
+  // ============================================
+  // Phase 2: Lock file update
+  // ============================================
+  console.log(`\n🔄 Phase 2: Updating lock file`);
+  console.log('─'.repeat(30));
+
+  console.log(`  📦 Running bun update...`);
+  await $`bun update`.cwd(ROOT_DIR).quiet();
+
+  // Amend the last commit to include lock file changes
+  console.log(`  📝 Adding lock file to last commit...`);
+  await $`git add bun.lockb`.cwd(ROOT_DIR).quiet();
+  await $`git commit --amend --no-edit`.cwd(ROOT_DIR).quiet();
+
+  // ============================================
+  // Phase 3: Publishing
+  // ============================================
+  console.log(`\n🚀 Phase 3: Publishing packages`);
+  console.log('─'.repeat(30));
+
+  for (const pkg of allPackages) {
+    await publishPackage(pkg);
+  }
+
+  // ============================================
+  // Phase 4: Push to remote
+  // ============================================
+  console.log(`\n📤 Phase 4: Pushing to remote`);
+  console.log('─'.repeat(30));
+
   await $`git push --follow-tags`;
 
+  // ============================================
+  // Summary
+  // ============================================
   console.log(`\n✨ Release complete!`);
   console.log('─'.repeat(50));
   console.log(`Released packages:`);
