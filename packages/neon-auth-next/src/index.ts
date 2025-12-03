@@ -5,7 +5,8 @@ import { createAuthClient as createNeonAuthClient, BetterAuthReactAdapter } from
 export * from "@neondatabase/neon-auth";
 
 export const createAuthClient = () => {
-  return createNeonAuthClient('/api/auth', {
+  // @ts-expect-error - createAuthClient expects a string, but we don't need it here
+  return createNeonAuthClient(undefined, {
     adapter: BetterAuthReactAdapter()
   })
 }
