@@ -1,6 +1,6 @@
-const NEXT_AUTH_COOKIE_PREFIX = '__Secure-neon-auth';
-const PROXY_HEADERS = ['user-agent', 'authorization', 'referer'];
+import { NEXT_AUTH_COOKIE_PREFIX } from "../constants";
 
+const PROXY_HEADERS = ['user-agent', 'authorization', 'referer'];
 export const handleAuthRequest = async (baseUrl: string, request: Request, path: string) => {
   const upstreamURL = `${baseUrl}/${path}`;
   const headers = prepareRequestHeaders(request);
