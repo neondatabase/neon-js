@@ -1,4 +1,4 @@
-import { NEXT_AUTH_COOKIE_PREFIX } from "../constants";
+import { NEON_AUTH_COOKIE_PREFIX } from "../constants";
 
 const PROXY_HEADERS = ['user-agent', 'authorization', 'referer'];
 export const handleAuthRequest = async (baseUrl: string, request: Request, path: string) => {
@@ -32,7 +32,7 @@ const prepareRequestHeaders = (request: Request) => {
   }
   
   headers.set('Origin', getOrigin(request));
-  headers.set('Cookie', extractRequestCookies(request));
+  headers.set('Cookie', extractRequestCookies(request.headers));
   headers.set('X-Neon-Auth-Next', 'true');     // Add for observability purpose
   return headers;
 }
@@ -45,8 +45,8 @@ const getOrigin = (request: Request) => {
                    new URL(request.url).origin;
 }
 
-const extractRequestCookies = (request: Request) => {
-  const cookieHeader = request.headers.get('cookie');
+const extractRequestCookies = (headers: Headers) => {
+  const cookieHeader = headers.get('cookie');
   if (!cookieHeader) return '';
 
   const cookies = cookieHeader.split(';').map(c => c.trim());
@@ -54,7 +54,7 @@ const extractRequestCookies = (request: Request) => {
 
   for (const cookie of cookies) {
     const [name] = cookie.split('=');
-    if (name.startsWith(NEXT_AUTH_COOKIE_PREFIX)) {
+    if (name.startsWith(NEON_AUTH_COOKIE_PREFIX)) {
       result.push(cookie);
     }
   }
