@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [0.1.0-alpha.8] - 2025-12-04
+
+### Fixed
+
+- **Session Cache**: Fixed cache to store Better Auth native format (`{ session, user }`) instead of mapped Supabase format, ensuring consistent data across all adapters
+- **Cross-Tab Sync**: Fixed broadcast channel to use stable client ID per tab and filter own broadcasts, preventing duplicate event processing and infinite loops
+- **Cache Lifecycle**: Centralized cache management in core hooks (`signIn`, `signUp`, `getSession`, `signOut`) instead of scattered adapter-level caching
+- **Force Fetch**: Added `X-Force-Fetch` header support to bypass cache when explicit refresh is needed
+
+### Changed
+
+- **Type Definitions**: Simplified `better-auth-types.ts` to re-export Better Auth's native `Session` and `User` types instead of maintaining duplicate interfaces
+- **Broadcast Payload**: Cross-tab broadcasts now use Better Auth native `sessionData` format; adapters map to their specific format (e.g., Supabase) only at API boundaries
+- **Cache Read**: `getSession` now uses `beforeRequest` hook to return cached data as a Response, unifying cache behavior across all adapters
+
+
 ## [0.1.0-alpha.7] - 2025-12-03
 
 ### Fixed
@@ -94,6 +110,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tests for authentication flows, session management, error handling
 - OAuth flows testing for both Node.js and browser environments
 
-[unreleased]: https://github.com/neondatabase-labs/neon-js/compare/v0.1.0-alpha.2...HEAD
-[0.1.0-alpha.2]: https://github.com/neondatabase-labs/neon-js/compare/v0.1.0-alpha.1...v0.1.0-alpha.2
-[0.1.0-alpha.1]: https://github.com/neondatabase-labs/neon-js/releases/tag/v0.1.0-alpha.1
