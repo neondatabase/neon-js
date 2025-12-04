@@ -10,6 +10,8 @@ import type { BetterAuthSessionResponse } from './better-auth-types';
 import { NEON_AUTH_SESSION_VERIFIER_PARAM_NAME } from './constants';
 import { isBrowser } from '../utils/browser';
 
+export const CURRENT_TAB_CLIENT_ID = crypto.randomUUID();
+
 export const BETTER_AUTH_METHODS_IN_FLIGHT_REQUESTS =
   new InFlightRequestManager();
 
@@ -37,6 +39,7 @@ export const BETTER_AUTH_METHODS_HOOKS = {
           responseData.user
         );
         if (session) {
+          BETTER_AUTH_METHODS_CACHE.setCachedSession(session);
           emitAuthEvent({ type: 'SIGN_IN', session });
         }
       }
@@ -51,6 +54,7 @@ export const BETTER_AUTH_METHODS_HOOKS = {
           responseData.user
         );
         if (session) {
+          BETTER_AUTH_METHODS_CACHE.setCachedSession(session);
           emitAuthEvent({ type: 'SIGN_IN', session });
         }
       }
@@ -113,8 +117,11 @@ export const BETTER_AUTH_METHODS_HOOKS = {
           responseData.user
         );
 
-        if (session && BETTER_AUTH_METHODS_CACHE.wasTokenRefreshed(session)) {
-          emitAuthEvent({ type: 'TOKEN_REFRESH', session });
+        if (session) {
+          BETTER_AUTH_METHODS_CACHE.setCachedSession(session);
+          if (BETTER_AUTH_METHODS_CACHE.wasTokenRefreshed(session)) {
+            emitAuthEvent({ type: 'TOKEN_REFRESH', session });
+          }
         }
 
         // remove the session verifier parameter from the URL if it exists on success
@@ -154,14 +161,14 @@ export async function emitAuthEvent(event: InternalAuthEvent): Promise<void> {
     getGlobalBroadcastChannel().post({
       event: 'session',
       data: { trigger },
-      clientId: crypto.randomUUID(),
+      clientId: CURRENT_TAB_CLIENT_ID,
     });
   }
 
   getGlobalBroadcastChannel().post({
     event: 'session',
     data: { trigger: authEvent, session },
-    clientId: crypto.randomUUID(),
+    clientId: CURRENT_TAB_CLIENT_ID,
   });
 }
 

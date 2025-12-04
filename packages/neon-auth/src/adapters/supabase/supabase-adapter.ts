@@ -30,6 +30,7 @@ import { base64url, decodeJwt, decodeProtectedHeader } from 'jose';
 import {
   BETTER_AUTH_METHODS_HOOKS,
   BETTER_AUTH_METHODS_CACHE,
+  CURRENT_TAB_CLIENT_ID,
 } from '../../core/better-auth-methods';
 import {
   NeonAuthAdapterCore,
@@ -99,7 +100,12 @@ class SupabaseAuthAdapterImpl
 
     // Set up cross-tab event listener for Better Auth broadcasts
     // This listens to events from other tabs and notifies local subscribers
+    // triggers on: signOut | getSession | updateUser
     getGlobalBroadcastChannel().subscribe((message) => {
+      if (message.clientId === CURRENT_TAB_CLIENT_ID) {
+        return; // Skip - this is my own broadcast
+      }
+
       if (message.data && 'session' in message.data) {
         const session = message.data?.session as Session | null;
         const trigger = message.data?.trigger;
@@ -196,11 +202,6 @@ class SupabaseAuthAdapterImpl
         currentSession.data.session,
         currentSession.data.user
       );
-
-      // Cache immediately if we have a JWT (before useSession.subscribe can overwrite)
-      if (session?.access_token?.startsWith('eyJ')) {
-        BETTER_AUTH_METHODS_CACHE.setCachedSession(session);
-      }
 
       return {
         data: {
