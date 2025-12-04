@@ -36,7 +36,7 @@
     },
     "packages/neon-auth-next": {
       "name": "@neondatabase/neon-auth-next",
-      "version": "0.1.0-alpha.21",
+      "version": "0.1.0-alpha.22",
       "dependencies": {
         "@neondatabase/neon-auth": "workspace:*",
       },
@@ -50,7 +50,7 @@
     },
     "packages/neon-auth-ui": {
       "name": "@neondatabase/neon-auth-ui",
-      "version": "0.1.0-alpha.0",
+      "version": "0.1.0-alpha.2",
       "dependencies": {
         "@captchafox/react": "^1.10.0",
         "@daveyplate/better-auth-ui": "3.2.13",
