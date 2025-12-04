@@ -180,20 +180,12 @@ class SupabaseAuthAdapterImpl
     forceFetch?: boolean;
   }): ReturnType<SupabaseAuthClientInterface['getSession']> {
     try {
-      // Skip cache if forceFetch is true
-      if (!options?.forceFetch) {
-        const cachedSession = BETTER_AUTH_METHODS_CACHE.getCachedSession();
-        if (cachedSession) {
-          // Re-check cache to prevent stale data from concurrent signOut()
-          if (!BETTER_AUTH_METHODS_CACHE.getCachedSession()) {
-            return { data: { session: null }, error: null };
-          }
+      const currentSession = await this._betterAuth.getSession(
+        options?.forceFetch
+          ? { fetchOptions: { headers: { 'X-Force-Fetch': 'true' } } }
+          : undefined
+      );
 
-          return { data: { session: cachedSession }, error: null };
-        }
-      }
-
-      const currentSession = await this._betterAuth.getSession();
       if (!currentSession.data?.session) {
         return { data: { session: null }, error: null };
       }

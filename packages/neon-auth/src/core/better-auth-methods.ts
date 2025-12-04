@@ -25,11 +25,24 @@ type InternalAuthEvent =
   | { type: 'USER_UPDATE'; session: Session };
 
 type MethodHook = {
+  beforeRequest?: (
+    input: string | URL | globalThis.Request,
+    init?: RequestInit
+  ) => Promise<Response> | null | Response;
   onRequest: (request: RequestContext) => void | RequestContext;
   onSuccess: (responseData: unknown) => void;
 };
 
-export const BETTER_AUTH_METHODS_HOOKS = {
+export const BETTER_AUTH_ENDPOINTS = {
+  signUp: '/sign-up',
+  signIn: '/sign-in',
+  signOut: '/sign-out',
+  updateUser: '/update-user',
+  getSession: '/get-session',
+  token: '/token',
+} as const;
+
+export const BETTER_AUTH_METHODS_HOOKS: Record<string, MethodHook> = {
   signUp: {
     onRequest: () => {},
     onSuccess: (responseData) => {
@@ -85,6 +98,16 @@ export const BETTER_AUTH_METHODS_HOOKS = {
     },
   },
   getSession: {
+    beforeRequest: () => {
+      const cachedSession = BETTER_AUTH_METHODS_CACHE.getCachedSession();
+      if (!cachedSession) {
+        return null;
+      }
+
+      return Response.json(cachedSession, {
+        status: 200,
+      });
+    },
     onRequest: (ctx) => {
       if (!isBrowser()) {
         return;
@@ -138,7 +161,7 @@ export const BETTER_AUTH_METHODS_HOOKS = {
       }
     },
   },
-} satisfies Record<string, MethodHook>;
+};
 
 /**
  * Unified event emission method that handles both Better Auth broadcasts
@@ -226,19 +249,22 @@ function isSessionResponseData(
 export function deriveBetterAuthMethodFromUrl(
   url: string
 ): keyof typeof BETTER_AUTH_METHODS_HOOKS | undefined {
-  if (url.includes('/sign-in')) {
+  if (url.includes(BETTER_AUTH_ENDPOINTS.signIn)) {
     return 'signIn';
   }
-  if (url.includes('/sign-up')) {
+  if (url.includes(BETTER_AUTH_ENDPOINTS.signUp)) {
     return 'signUp';
   }
-  if (url.includes('/sign-out')) {
+  if (url.includes(BETTER_AUTH_ENDPOINTS.signOut)) {
     return 'signOut';
   }
-  if (url.includes('/update-user')) {
+  if (url.includes(BETTER_AUTH_ENDPOINTS.updateUser)) {
     return 'updateUser';
   }
-  if (url.includes('/get-session') || url.includes('/token')) {
+  if (
+    url.includes(BETTER_AUTH_ENDPOINTS.getSession) ||
+    url.includes(BETTER_AUTH_ENDPOINTS.token)
+  ) {
     return 'getSession';
   }
   return undefined;
