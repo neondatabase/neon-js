@@ -16,10 +16,13 @@ import {
   BETTER_AUTH_METHODS_HOOKS,
   BETTER_AUTH_METHODS_IN_FLIGHT_REQUESTS,
   deriveBetterAuthMethodFromUrl,
+  initBroadcastChannel,
 } from './better-auth-methods';
 
 export interface NeonAuthAdapterCoreAuthOptions
   extends Omit<BetterAuthClientOptions, 'plugins'> {}
+
+export const FORCE_FETCH_HEADER = 'X-Force-Fetch';
 
 const supportedBetterAuthClientPlugins = [
   jwtClient(),
@@ -74,9 +77,9 @@ export abstract class NeonAuthAdapterCore {
         },
         customFetchImpl: async (url, init) => {
           // Skip deduplication if X-Force-Fetch header is present
-          if (init?.headers && 'X-Force-Fetch' in init.headers) {
+          if (init?.headers && FORCE_FETCH_HEADER in init.headers) {
             const headers = { ...init.headers };
-            delete headers['X-Force-Fetch'];
+            delete headers[FORCE_FETCH_HEADER];
             const response = await fetch(url, { ...init, headers });
 
             // Check for HTTP errors
@@ -94,6 +97,18 @@ export abstract class NeonAuthAdapterCore {
             }
 
             return response;
+          }
+
+          const betterAuthMethod = deriveBetterAuthMethodFromUrl(
+            url.toString()
+          );
+          if (betterAuthMethod) {
+            const response = await BETTER_AUTH_METHODS_HOOKS[
+              betterAuthMethod
+            ].beforeRequest?.(url, init);
+            if (response) {
+              return response;
+            }
           }
 
           // Create body-aware deduplication key
@@ -155,6 +170,8 @@ export abstract class NeonAuthAdapterCore {
         },
       },
     };
+
+    initBroadcastChannel();
   }
 
   abstract getBetterAuthInstance?():

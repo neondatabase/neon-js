@@ -30,7 +30,10 @@ import { base64url, decodeJwt, decodeProtectedHeader } from 'jose';
 import {
   BETTER_AUTH_METHODS_HOOKS,
   BETTER_AUTH_METHODS_CACHE,
+  CURRENT_TAB_CLIENT_ID,
+  type NeonAuthChangeEvent,
 } from '../../core/better-auth-methods';
+import type { CachedSessionData } from '../../core/session-cache-manager';
 import {
   NeonAuthAdapterCore,
   type NeonAuthAdapterCoreAuthOptions,
@@ -99,24 +102,36 @@ class SupabaseAuthAdapterImpl
 
     // Set up cross-tab event listener for Better Auth broadcasts
     // This listens to events from other tabs and notifies local subscribers
+    // triggers on: signOut | getSession | updateUser
     getGlobalBroadcastChannel().subscribe((message) => {
-      if (message.data && 'session' in message.data) {
-        const session = message.data?.session as Session | null;
-        const trigger = message.data?.trigger;
+      if (message.clientId === CURRENT_TAB_CLIENT_ID) {
+        return; // Skip - this is my own broadcast
+      }
 
-        // Update cache with session from cross-tab event
-        if (session) {
-          BETTER_AUTH_METHODS_CACHE.setCachedSession(session);
+      // Handle broadcasts with Better Auth native format (sessionData)
+      if (message.data && 'sessionData' in message.data) {
+        const sessionData = message.data
+          .sessionData as CachedSessionData | null;
+        const trigger = message.data.trigger as NeonAuthChangeEvent;
+
+        // Update cache with session data (already in Better Auth format)
+        if (sessionData) {
+          BETTER_AUTH_METHODS_CACHE.setCachedSession(sessionData);
         } else {
           BETTER_AUTH_METHODS_CACHE.clearSessionCache();
         }
 
-        // 2. Notify all subscribers
+        // Map to Supabase format for onAuthStateChange callbacks
+        const supabaseSession = sessionData
+          ? mapBetterAuthSession(sessionData.session, sessionData.user)
+          : null;
+
+        // Notify all subscribers with Supabase format (for onAuthStateChange compatibility)
         const promises = [...this._stateChangeEmitters.values()].map(
           (subscription) => {
             try {
               return Promise.resolve(
-                subscription.callback(trigger as AuthChangeEvent, session)
+                subscription.callback(trigger, supabaseSession)
               );
             } catch {
               return Promise.resolve();
@@ -174,20 +189,12 @@ class SupabaseAuthAdapterImpl
     forceFetch?: boolean;
   }): ReturnType<SupabaseAuthClientInterface['getSession']> {
     try {
-      // Skip cache if forceFetch is true
-      if (!options?.forceFetch) {
-        const cachedSession = BETTER_AUTH_METHODS_CACHE.getCachedSession();
-        if (cachedSession) {
-          // Re-check cache to prevent stale data from concurrent signOut()
-          if (!BETTER_AUTH_METHODS_CACHE.getCachedSession()) {
-            return { data: { session: null }, error: null };
-          }
+      const currentSession = await this._betterAuth.getSession(
+        options?.forceFetch
+          ? { fetchOptions: { headers: { 'X-Force-Fetch': 'true' } } }
+          : undefined
+      );
 
-          return { data: { session: cachedSession }, error: null };
-        }
-      }
-
-      const currentSession = await this._betterAuth.getSession();
       if (!currentSession.data?.session) {
         return { data: { session: null }, error: null };
       }
@@ -196,11 +203,6 @@ class SupabaseAuthAdapterImpl
         currentSession.data.session,
         currentSession.data.user
       );
-
-      // Cache immediately if we have a JWT (before useSession.subscribe can overwrite)
-      if (session?.access_token?.startsWith('eyJ')) {
-        BETTER_AUTH_METHODS_CACHE.setCachedSession(session);
-      }
 
       return {
         data: {

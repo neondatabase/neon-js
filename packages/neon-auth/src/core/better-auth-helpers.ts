@@ -337,7 +337,7 @@ export function mapBetterAuthSession(
   // The adapter will replace this with the JWT token when available
   const session: Session = {
     access_token: betterAuthSession.token, // Opaque token (will be replaced with JWT by adapter)
-    refresh_token: betterAuthSession.refreshToken || '',
+    refresh_token: '', // Better Auth doesn't expose refresh token in session
     expires_at: expiresAt,
     expires_in: expiresIn,
     token_type: 'bearer' as const,
@@ -364,7 +364,9 @@ export function mapBetterAuthUser(betterAuthUser: BetterAuthUser): User {
   }
 
   // Extract any additional metadata from Better Auth user
-  for (const key of Object.keys(betterAuthUser)) {
+  // Cast to Record to access dynamic keys (plugins may add extra fields)
+  const userRecord = betterAuthUser as Record<string, unknown>;
+  for (const key of Object.keys(userRecord)) {
     if (
       ![
         'id',
@@ -376,7 +378,7 @@ export function mapBetterAuthUser(betterAuthUser: BetterAuthUser): User {
         'updatedAt',
       ].includes(key)
     ) {
-      userMetadata[key] = betterAuthUser[key];
+      userMetadata[key] = userRecord[key];
     }
   }
 
@@ -430,5 +432,72 @@ export function mapBetterAuthIdentity(
           provider_id: betterAuthUserIdentityAccount.accountId,
           scopes: betterAuthUserIdentityAccount.scopes,
         },
+  };
+}
+
+/**
+ * Map Supabase Session back to Better Auth format.
+ * Used for cross-tab sync where broadcasts contain Supabase format
+ * but cache needs Better Auth format.
+ *
+ * Note: Some Better Auth fields (ipAddress, userAgent) are not available
+ * in Supabase Session and will be set to null/defaults.
+ */
+export function mapSupabaseSessionToBetterAuth(
+  supabaseSession: Session
+): { session: BetterAuthSession; user: BetterAuthUser } | null {
+  if (!supabaseSession?.user) {
+    return null;
+  }
+
+  const user = supabaseSession.user;
+  const now = new Date();
+
+  // Convert expires_at (seconds since epoch) to Date
+  const expiresAt = supabaseSession.expires_at
+    ? new Date(supabaseSession.expires_at * 1000)
+    : new Date(Date.now() + DEFAULT_SESSION_EXPIRY_MS);
+
+  const betterAuthSession: BetterAuthSession = {
+    id: '', // Not available in Supabase Session, but not critical for cache
+    userId: user.id,
+    token: supabaseSession.access_token,
+    expiresAt,
+    createdAt: now,
+    updatedAt: now,
+    ipAddress: null,
+    userAgent: null,
+  };
+
+  // Extract name from user_metadata
+  const displayName =
+    (user.user_metadata?.displayName as string) ||
+    (user.user_metadata?.name as string) ||
+    (user.user_metadata?.full_name as string) ||
+    '';
+
+  // Extract image from user_metadata
+  const image =
+    (user.user_metadata?.profileImageUrl as string) ||
+    (user.user_metadata?.avatar_url as string) ||
+    (user.user_metadata?.picture as string);
+
+  // Parse dates from Supabase user
+  const createdAt = user.created_at ? new Date(user.created_at) : now;
+  const updatedAt = user.updated_at ? new Date(user.updated_at) : now;
+
+  const betterAuthUser: BetterAuthUser = {
+    id: user.id,
+    email: user.email || '',
+    emailVerified: !!user.email_confirmed_at,
+    name: displayName,
+    image: image || null,
+    createdAt,
+    updatedAt,
+  };
+
+  return {
+    session: betterAuthSession,
+    user: betterAuthUser,
   };
 }
