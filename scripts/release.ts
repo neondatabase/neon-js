@@ -18,7 +18,7 @@ import path from 'node:path';
 // Dependency graph: package -> packages that depend on it
 const DEPENDENCY_GRAPH: Record<string, string[]> = {
   'postgrest-js': ['neon-js'],
-  'neon-auth-ui': ['neon-auth-next'],
+  'neon-auth-ui': [],
   'neon-auth': ['neon-js', 'neon-auth-next'],
   'neon-js': [],
   'neon-auth-next': [],
