@@ -19,6 +19,7 @@
     "release": "bun run build && bun run --filter '@neondatabase/postgrest-js' release && bun run --filter '@neondatabase/neon-auth' release && bun run --filter '@neondatabase/neon-auth-ui' release && bun run --filter '@neondatabase/neon-js' release",
     "release:postgrest-js": "bun scripts/release.ts postgrest-js",
     "release:neon-auth": "bun scripts/release.ts neon-auth",
+    "release:neon-auth-ui": "bun scripts/release.ts neon-auth-ui",
     "release:neon-js": "bun scripts/release.ts neon-js",
     "release:neon-auth-next": "bun scripts/release.ts neon-auth-next"
   },
