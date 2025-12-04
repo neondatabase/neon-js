@@ -1,6 +1,6 @@
 {
   "name": "@neondatabase/neon-auth-ui",
-  "version": "0.1.0-alpha.0",
+  "version": "0.1.0-alpha.2",
   "description": "UI components for Neon Auth",
   "type": "module",
   "license": "Apache-2.0",
