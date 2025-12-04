@@ -70,9 +70,7 @@ export function getReactClient(
   client: VanillaBetterAuthClient | ReactBetterAuthClient
 ): ReactBetterAuthClient {
   if (isVanillaClient(client)) {
-    console.log('Converting vanilla client to React client');
     return toReactClient(client);
   }
-  console.log('Client is already a React client');
   return client;
 }

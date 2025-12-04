@@ -27,6 +27,7 @@ class BetterAuthVanillaAdapterImpl extends NeonAuthAdapterCore {
   getBetterAuthInstance(): AuthClient<BetterAuthClientOptions> {
     return this._betterAuth;
   }
+
   async getJWTToken() {
     const session = await this._betterAuth.getSession();
     if (session.error) {

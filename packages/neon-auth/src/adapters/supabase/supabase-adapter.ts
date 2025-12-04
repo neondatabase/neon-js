@@ -31,7 +31,9 @@ import {
   BETTER_AUTH_METHODS_HOOKS,
   BETTER_AUTH_METHODS_CACHE,
   CURRENT_TAB_CLIENT_ID,
+  type NeonAuthChangeEvent,
 } from '../../core/better-auth-methods';
+import type { CachedSessionData } from '../../core/session-cache-manager';
 import {
   NeonAuthAdapterCore,
   type NeonAuthAdapterCoreAuthOptions,
@@ -106,23 +108,30 @@ class SupabaseAuthAdapterImpl
         return; // Skip - this is my own broadcast
       }
 
-      if (message.data && 'session' in message.data) {
-        const session = message.data?.session as Session | null;
-        const trigger = message.data?.trigger;
+      // Handle broadcasts with Better Auth native format (sessionData)
+      if (message.data && 'sessionData' in message.data) {
+        const sessionData = message.data
+          .sessionData as CachedSessionData | null;
+        const trigger = message.data.trigger as NeonAuthChangeEvent;
 
-        // Update cache with session from cross-tab event
-        if (session) {
-          BETTER_AUTH_METHODS_CACHE.setCachedSession(session);
+        // Update cache with session data (already in Better Auth format)
+        if (sessionData) {
+          BETTER_AUTH_METHODS_CACHE.setCachedSession(sessionData);
         } else {
           BETTER_AUTH_METHODS_CACHE.clearSessionCache();
         }
 
-        // 2. Notify all subscribers
+        // Map to Supabase format for onAuthStateChange callbacks
+        const supabaseSession = sessionData
+          ? mapBetterAuthSession(sessionData.session, sessionData.user)
+          : null;
+
+        // Notify all subscribers with Supabase format (for onAuthStateChange compatibility)
         const promises = [...this._stateChangeEmitters.values()].map(
           (subscription) => {
             try {
               return Promise.resolve(
-                subscription.callback(trigger as AuthChangeEvent, session)
+                subscription.callback(trigger, supabaseSession)
               );
             } catch {
               return Promise.resolve();

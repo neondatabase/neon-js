@@ -16,6 +16,7 @@ import {
   BETTER_AUTH_METHODS_HOOKS,
   BETTER_AUTH_METHODS_IN_FLIGHT_REQUESTS,
   deriveBetterAuthMethodFromUrl,
+  initBroadcastChannel,
 } from './better-auth-methods';
 
 export interface NeonAuthAdapterCoreAuthOptions
@@ -169,6 +170,8 @@ export abstract class NeonAuthAdapterCore {
         },
       },
     };
+
+    initBroadcastChannel();
   }
 
   abstract getBetterAuthInstance?():

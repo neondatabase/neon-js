@@ -1,12 +1,13 @@
-import type { AuthChangeEvent, Session } from '@supabase/auth-js';
 import {
   getGlobalBroadcastChannel,
   type RequestContext,
 } from 'better-auth/client';
 import { InFlightRequestManager } from './in-flight-request-manager';
-import { SessionCacheManager } from './session-cache-manager';
-import { mapBetterAuthSession } from './better-auth-helpers';
-import type { BetterAuthSessionResponse } from './better-auth-types';
+import {
+  SessionCacheManager,
+  type CachedSessionData,
+} from './session-cache-manager';
+import type { BetterAuthSession, BetterAuthUser } from './better-auth-types';
 import { NEON_AUTH_SESSION_VERIFIER_PARAM_NAME } from './constants';
 import { isBrowser } from '../utils/browser';
 
@@ -17,12 +18,22 @@ export const BETTER_AUTH_METHODS_IN_FLIGHT_REQUESTS =
 
 export const BETTER_AUTH_METHODS_CACHE = new SessionCacheManager();
 
-/** Internal canonical auth event types */
+/**
+ * Auth change event types (adapter-agnostic).
+ * Each adapter maps these to their specific event types if needed.
+ */
+export type NeonAuthChangeEvent =
+  | 'SIGNED_IN'
+  | 'SIGNED_OUT'
+  | 'TOKEN_REFRESHED'
+  | 'USER_UPDATED';
+
+/** Internal canonical auth event types using Better Auth native format */
 type InternalAuthEvent =
-  | { type: 'SIGN_IN'; session: Session }
+  | { type: 'SIGN_IN'; data: CachedSessionData }
   | { type: 'SIGN_OUT' }
-  | { type: 'TOKEN_REFRESH'; session: Session }
-  | { type: 'USER_UPDATE'; session: Session };
+  | { type: 'TOKEN_REFRESH'; data: CachedSessionData }
+  | { type: 'USER_UPDATE'; data: CachedSessionData };
 
 type MethodHook = {
   beforeRequest?: (
@@ -47,14 +58,12 @@ export const BETTER_AUTH_METHODS_HOOKS: Record<string, MethodHook> = {
     onRequest: () => {},
     onSuccess: (responseData) => {
       if (isSessionResponseData(responseData)) {
-        const session = mapBetterAuthSession(
-          responseData.session,
-          responseData.user
-        );
-        if (session) {
-          BETTER_AUTH_METHODS_CACHE.setCachedSession(session);
-          emitAuthEvent({ type: 'SIGN_IN', session });
-        }
+        const sessionData = {
+          session: responseData.session,
+          user: responseData.user,
+        };
+        BETTER_AUTH_METHODS_CACHE.setCachedSession(sessionData);
+        emitAuthEvent({ type: 'SIGN_IN', data: sessionData });
       }
     },
   },
@@ -62,14 +71,12 @@ export const BETTER_AUTH_METHODS_HOOKS: Record<string, MethodHook> = {
     onRequest: () => {},
     onSuccess: (responseData) => {
       if (isSessionResponseData(responseData)) {
-        const session = mapBetterAuthSession(
-          responseData.session,
-          responseData.user
-        );
-        if (session) {
-          BETTER_AUTH_METHODS_CACHE.setCachedSession(session);
-          emitAuthEvent({ type: 'SIGN_IN', session });
-        }
+        const sessionData = {
+          session: responseData.session,
+          user: responseData.user,
+        };
+        BETTER_AUTH_METHODS_CACHE.setCachedSession(sessionData);
+        emitAuthEvent({ type: 'SIGN_IN', data: sessionData });
       }
     },
   },
@@ -87,24 +94,22 @@ export const BETTER_AUTH_METHODS_HOOKS: Record<string, MethodHook> = {
     onRequest: () => {},
     onSuccess: (responseData) => {
       if (isSessionResponseData(responseData)) {
-        const session = mapBetterAuthSession(
-          responseData.session,
-          responseData.user
-        );
-        if (session) {
-          emitAuthEvent({ type: 'USER_UPDATE', session });
-        }
+        const sessionData = {
+          session: responseData.session,
+          user: responseData.user,
+        };
+        emitAuthEvent({ type: 'USER_UPDATE', data: sessionData });
       }
     },
   },
   getSession: {
     beforeRequest: () => {
-      const cachedSession = BETTER_AUTH_METHODS_CACHE.getCachedSession();
-      if (!cachedSession) {
+      const cachedData = BETTER_AUTH_METHODS_CACHE.getCachedSession();
+      if (!cachedData) {
         return null;
       }
 
-      return Response.json(cachedSession, {
+      return Response.json(cachedData, {
         status: 200,
       });
     },
@@ -135,16 +140,16 @@ export const BETTER_AUTH_METHODS_HOOKS: Record<string, MethodHook> = {
     },
     onSuccess: (responseData) => {
       if (isSessionResponseData(responseData)) {
-        const session = mapBetterAuthSession(
-          responseData.session,
-          responseData.user
-        );
+        const sessionData = {
+          session: responseData.session,
+          user: responseData.user,
+        };
+        const wasRefreshed =
+          BETTER_AUTH_METHODS_CACHE.wasTokenRefreshed(sessionData);
+        BETTER_AUTH_METHODS_CACHE.setCachedSession(sessionData);
 
-        if (session) {
-          BETTER_AUTH_METHODS_CACHE.setCachedSession(session);
-          if (BETTER_AUTH_METHODS_CACHE.wasTokenRefreshed(session)) {
-            emitAuthEvent({ type: 'TOKEN_REFRESH', session });
-          }
+        if (wasRefreshed) {
+          emitAuthEvent({ type: 'TOKEN_REFRESH', data: sessionData });
         }
 
         // remove the session verifier parameter from the URL if it exists on success
@@ -164,21 +169,21 @@ export const BETTER_AUTH_METHODS_HOOKS: Record<string, MethodHook> = {
 };
 
 /**
- * Unified event emission method that handles both Better Auth broadcasts
- * and compatible event notifications from a single point.
+ * Unified event emission method that handles Better Auth broadcasts.
+ * Broadcasts use Better Auth native format - each adapter handles
+ * conversion to their specific format (e.g., Supabase Session).
  *
  * This ensures:
  * - Single source of truth for all event emissions
  * - Better Auth ecosystem compatibility via getGlobalBroadcastChannel()
- * - Compatible API via onAuthStateChange callbacks
+ * - Adapter-agnostic event format
  * - Cross-tab synchronization via Better Auth's broadcast system
  */
 export async function emitAuthEvent(event: InternalAuthEvent): Promise<void> {
-  // Map internal event to auth event and extract session
-  const authEvent = mapToAuthEvent(event);
-  const session = 'session' in event ? event.session : null;
+  const eventType = mapToEventType(event);
+  const sessionData = 'data' in event ? event.data : null;
 
-  // 1. Emit Better Auth broadcast for cross-tab sync + ecosystem compatibility
+  // Emit Better Auth broadcast for cross-tab sync + ecosystem compatibility
   const trigger = mapToTrigger(event);
   if (trigger) {
     getGlobalBroadcastChannel().post({
@@ -188,15 +193,16 @@ export async function emitAuthEvent(event: InternalAuthEvent): Promise<void> {
     });
   }
 
+  // Broadcast with Better Auth native format
   getGlobalBroadcastChannel().post({
     event: 'session',
-    data: { trigger: authEvent, session },
+    data: { trigger: eventType, sessionData },
     clientId: CURRENT_TAB_CLIENT_ID,
   });
 }
 
-/** Maps internal event types to compatible event names */
-function mapToAuthEvent(event: InternalAuthEvent): AuthChangeEvent {
+/** Maps internal event types to NeonAuthChangeEvent */
+function mapToEventType(event: InternalAuthEvent): NeonAuthChangeEvent {
   switch (event.type) {
     case 'SIGN_IN': {
       return 'SIGNED_IN';
@@ -233,9 +239,13 @@ function mapToTrigger(
   }
 }
 
+/**
+ * Type guard that validates response data has non-null session and user.
+ * Narrows the type to ensure session and user are not null.
+ */
 function isSessionResponseData(
   responseData: unknown
-): responseData is BetterAuthSessionResponse['data'] & {} {
+): responseData is { session: BetterAuthSession; user: BetterAuthUser } {
   return Boolean(
     responseData &&
       typeof responseData === 'object' &&
@@ -268,4 +278,24 @@ export function deriveBetterAuthMethodFromUrl(
     return 'getSession';
   }
   return undefined;
+}
+
+export function initBroadcastChannel() {
+  getGlobalBroadcastChannel().subscribe((message) => {
+    if (message.clientId === CURRENT_TAB_CLIENT_ID) {
+      return;
+    }
+
+    // Only clear cache for Better Auth triggers that cause internal getSession
+    // This ensures getSession makes a real request instead of returning cached data
+    const trigger = message.data?.trigger;
+    if (
+      trigger === 'signout' ||
+      trigger === 'updateUser' ||
+      trigger === 'getSession'
+    ) {
+      BETTER_AUTH_METHODS_CACHE.clearSessionCache();
+    }
+    // For 'SIGNED_IN', 'TOKEN_REFRESHED', etc. - let adapter set cache from sessionData
+  });
 }
