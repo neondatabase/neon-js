@@ -32,7 +32,7 @@ export const neonAuthMiddleware = ({ loginUrl = '/auth/sign-in' }: NeonAuthMiddl
     }
     const token = request.cookies.get(NEXT_AUTH_SESION_COOKIE_NAME);
     if (!token) {
-      return NextResponse.redirect(new URL('/login', request.url));
+      return NextResponse.redirect(new URL(loginUrl, request.url));
     }
     return NextResponse.next();
   }
