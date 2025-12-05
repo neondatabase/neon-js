@@ -6,7 +6,7 @@ import { needsSessionVerification, verifySession } from "./oauth";
 const AUTH_API_ROUTES = '/api/auth';
 const SKIP_ROUTES = [
   AUTH_API_ROUTES,
-  // Routes added by `neon-auth-ui`
+  // Routes added by `auth-ui`
   '/auth/callback',
   '/auth/sign-in',
   '/auth/sign-up',

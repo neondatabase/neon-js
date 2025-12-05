@@ -1,8 +1,5 @@
-import {
-  type VanillaBetterAuthClient,
-  type ReactBetterAuthClient,
-  useBetterAuthStore,
-} from '@neondatabase/auth';
+import type { ReactBetterAuthClient, VanillaBetterAuthClient } from '@/types';
+import { useStore as useBetterAuthStore } from 'better-auth/react';
 
 function isVanillaClient(
   client: VanillaBetterAuthClient | ReactBetterAuthClient

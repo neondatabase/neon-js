@@ -97,7 +97,6 @@ export {
   SessionsCard,
   PasskeysCard,
   ProvidersCard,
-  ApiKeysCard,
   TwoFactorCard,
   InputFieldSkeleton,
   SettingsCellSkeleton,

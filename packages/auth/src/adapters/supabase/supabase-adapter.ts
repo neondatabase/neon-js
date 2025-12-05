@@ -2,7 +2,6 @@ import {
   type SupabaseAuthClientInterface,
   isAuthError,
 } from './auth-interface';
-import { APIError } from 'better-auth/api';
 import {
   type Session,
   type AuthChangeEvent,
@@ -44,6 +43,21 @@ export type SupabaseAuthAdapterOptions = Omit<
   NeonAuthAdapterCoreAuthOptions,
   'baseURL'
 >;
+
+/**
+ * Duck-type check for Better Auth API errors.
+ * Replaces `instanceof APIError` to avoid importing server-side code.
+ */
+function isBetterAuthAPIError(
+  error: unknown
+): error is { status: number; body?: { message?: string; code?: string } } {
+  return (
+    error !== null &&
+    typeof error === 'object' &&
+    'status' in error &&
+    typeof (error as { status: unknown }).status === 'number'
+  );
+}
 
 /**
  * Internal implementation class - use SupabaseAuthAdapter factory function instead
@@ -173,7 +187,7 @@ class SupabaseAuthAdapterImpl
       if (isAuthError(error)) {
         return { data: { session: null }, error };
       }
-      if (error instanceof APIError) {
+      if (isBetterAuthAPIError(error)) {
         return {
           data: { session: null },
           error: normalizeBetterAuthError(error),
@@ -214,7 +228,7 @@ class SupabaseAuthAdapterImpl
       if (isAuthError(error)) {
         return { data: { session: null }, error };
       }
-      if (error instanceof APIError) {
+      if (isBetterAuthAPIError(error)) {
         return {
           data: { session: null },
           error: normalizeBetterAuthError(error),
@@ -243,7 +257,7 @@ class SupabaseAuthAdapterImpl
       if (isAuthError(error)) {
         return { data: { user: null, session: null }, error };
       }
-      if (error instanceof APIError) {
+      if (isBetterAuthAPIError(error)) {
         return {
           data: { user: null, session: null },
           error: normalizeBetterAuthError(error),
@@ -321,7 +335,7 @@ class SupabaseAuthAdapterImpl
       if (isAuthError(error)) {
         return { data: { user: null, session: null }, error };
       }
-      if (error instanceof APIError) {
+      if (isBetterAuthAPIError(error)) {
         return {
           data: { user: null, session: null },
           error: normalizeBetterAuthError(error),
@@ -362,7 +376,7 @@ class SupabaseAuthAdapterImpl
       if (isAuthError(error)) {
         return { data: { user: null, session: null }, error };
       }
-      if (error instanceof APIError) {
+      if (isBetterAuthAPIError(error)) {
         return {
           data: { user: null, session: null },
           error: normalizeBetterAuthError(error),
@@ -416,7 +430,7 @@ class SupabaseAuthAdapterImpl
         if (isAuthError(error)) {
           return { data: { user: null, session: null }, error };
         }
-        if (error instanceof APIError) {
+        if (isBetterAuthAPIError(error)) {
           return {
             data: { user: null, session: null },
             error: normalizeBetterAuthError(error),
@@ -456,7 +470,7 @@ class SupabaseAuthAdapterImpl
       if (isAuthError(error)) {
         return { data: { provider: credentials.provider, url: null }, error };
       }
-      if (error instanceof APIError) {
+      if (isBetterAuthAPIError(error)) {
         return {
           data: { provider: credentials.provider, url: null },
           error: normalizeBetterAuthError(error),
@@ -494,7 +508,7 @@ class SupabaseAuthAdapterImpl
           error,
         };
       }
-      if (error instanceof APIError) {
+      if (isBetterAuthAPIError(error)) {
         return {
           data: { user: null, session: null, messageId: undefined },
           error: normalizeBetterAuthError(error),
@@ -550,7 +564,7 @@ class SupabaseAuthAdapterImpl
       if (isAuthError(error)) {
         return { data: { user: null, session: null }, error };
       }
-      if (error instanceof APIError) {
+      if (isBetterAuthAPIError(error)) {
         return {
           data: { user: null, session: null },
           error: normalizeBetterAuthError(error),
@@ -609,7 +623,7 @@ class SupabaseAuthAdapterImpl
       if (isAuthError(error)) {
         return { error };
       }
-      if (error instanceof APIError) {
+      if (isBetterAuthAPIError(error)) {
         return { error: normalizeBetterAuthError(error) };
       }
       throw error;
@@ -642,7 +656,7 @@ class SupabaseAuthAdapterImpl
       if (isAuthError(error)) {
         return { data: { user: null }, error };
       }
-      if (error instanceof APIError) {
+      if (isBetterAuthAPIError(error)) {
         return { data: { user: null }, error: normalizeBetterAuthError(error) };
       }
       throw error;
@@ -705,7 +719,7 @@ class SupabaseAuthAdapterImpl
       if (isAuthError(error)) {
         return { data: null, error };
       }
-      if (error instanceof APIError) {
+      if (isBetterAuthAPIError(error)) {
         return { data: null, error: normalizeBetterAuthError(error) };
       }
       throw error;
@@ -761,7 +775,7 @@ class SupabaseAuthAdapterImpl
       if (isAuthError(error)) {
         return { data: { user: null }, error };
       }
-      if (error instanceof APIError) {
+      if (isBetterAuthAPIError(error)) {
         return { data: { user: null }, error: normalizeBetterAuthError(error) };
       }
       throw error;
@@ -825,7 +839,7 @@ class SupabaseAuthAdapterImpl
         if (isAuthError(error)) {
           return { data: null, error };
         }
-        if (error instanceof APIError) {
+        if (isBetterAuthAPIError(error)) {
           return { data: null, error: normalizeBetterAuthError(error) };
         }
         throw error;
@@ -913,7 +927,7 @@ class SupabaseAuthAdapterImpl
           error,
         };
       }
-      if (error instanceof APIError) {
+      if (isBetterAuthAPIError(error)) {
         return {
           data: { provider, url: null, user: null, session: null },
           error: normalizeBetterAuthError(error),
@@ -989,7 +1003,7 @@ class SupabaseAuthAdapterImpl
       if (isAuthError(error)) {
         return { data: null, error };
       }
-      if (error instanceof APIError) {
+      if (isBetterAuthAPIError(error)) {
         return { data: null, error: normalizeBetterAuthError(error) };
       }
       throw error;
@@ -1023,7 +1037,7 @@ class SupabaseAuthAdapterImpl
       if (isAuthError(error)) {
         return { data: { user: null, session: null }, error };
       }
-      if (error instanceof APIError) {
+      if (isBetterAuthAPIError(error)) {
         return {
           data: { user: null, session: null },
           error: normalizeBetterAuthError(error),
@@ -1058,7 +1072,7 @@ class SupabaseAuthAdapterImpl
         if (isAuthError(error)) {
           return { data: null, error };
         }
-        if (error instanceof APIError) {
+        if (isBetterAuthAPIError(error)) {
           return { data: null, error: normalizeBetterAuthError(error) };
         }
         throw error;
@@ -1088,7 +1102,7 @@ class SupabaseAuthAdapterImpl
       if (isAuthError(error)) {
         return { data: { user: null, session: null }, error };
       }
-      if (error instanceof APIError) {
+      if (isBetterAuthAPIError(error)) {
         return {
           data: { user: null, session: null },
           error: normalizeBetterAuthError(error),
@@ -1159,7 +1173,7 @@ class SupabaseAuthAdapterImpl
       if (isAuthError(error)) {
         return { data: { user: null, session: null }, error };
       }
-      if (error instanceof APIError) {
+      if (isBetterAuthAPIError(error)) {
         return {
           data: { user: null, session: null },
           error: normalizeBetterAuthError(error),
@@ -1192,7 +1206,7 @@ class SupabaseAuthAdapterImpl
         if (isAuthError(error)) {
           return { data: { session: null, user: null }, error };
         }
-        if (error instanceof APIError) {
+        if (isBetterAuthAPIError(error)) {
           return {
             data: { session: null, user: null },
             error: normalizeBetterAuthError(error),

@@ -62,7 +62,7 @@ Next.js integration for Neon Auth, providing server-side auth handling and middl
 - `@neondatabase/auth` (workspace)
 - `next` (peer dependency ^16.0.6)
 
-### `@neondatabase/auth-ui` (packages/neon-auth-ui/)
+### `@neondatabase/auth-ui` (packages/auth-ui/)
 UI components for Neon Auth built on top of [better-auth-ui](https://better-auth-ui.com):
 - **NeonAuthUIProvider**: React context provider for auth components
 - **SignInForm, SignUpForm, UserButton**: Pre-built auth UI components
@@ -110,7 +110,7 @@ bun release           # Bump version and publish all packages
 # Release individual packages
 bun release:postgrest-js
 bun release:auth
-bun release:neon-auth-ui
+bun release:auth-ui
 bun release:neon-js
 bun release:neon-auth-next
 ```
@@ -196,7 +196,7 @@ bun release:neon-auth-next
 - `createAuthClient()` - Pre-configured client with BetterAuthReactAdapter
 - Re-exports all `@neondatabase/auth` exports
 
-### UI Components Layer (`packages/neon-auth-ui/`)
+### UI Components Layer (`packages/auth-ui/`)
 
 **Provider**: `src/neon-auth-ui-provider.tsx`
 - `NeonAuthUIProvider` - React context provider for auth UI components
@@ -483,7 +483,7 @@ Following the [Better Auth Supabase Migration Guide](https://www.better-auth.com
 - `packages/auth/src/adapters/supabase/better-auth-docs.md` - Comprehensive adapter docs
 - `packages/auth/src/adapters/supabase/better-auth-plugins.md` - Plugin configuration
 - `packages/neon-auth-next/README.md` - Next.js integration guide
-- `packages/neon-auth-ui/README.md` - UI components documentation
+- `packages/auth-ui/README.md` - UI components documentation
 
 ## References
 

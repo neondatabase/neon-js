@@ -234,7 +234,7 @@ const session: Session | null = await auth.getSession();
 - [`@neondatabase/neon-js`](../neon-js) - Full SDK with database and auth integration
 - [`@neondatabase/postgrest-js`](../postgrest-js) - PostgreSQL client without auth
 - [`@neondatabase/auth-next`](../neon-auth-next) - Next.js integration for Neon Auth
-- [`@neondatabase/auth-ui`](../neon-auth-ui) - UI components for Neon Auth
+- [`@neondatabase/auth-ui`](../auth-ui) - UI components for Neon Auth
 
 ## Resources
 

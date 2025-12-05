@@ -4,10 +4,7 @@ import {
   AuthUIProvider,
   type AuthUIProviderProps,
 } from '@daveyplate/better-auth-ui';
-import type {
-  NeonAuthAdapter,
-  NeonAuthPublicApi,
-} from '@neondatabase/auth';
+import type { NeonAuthAdapter, NeonAuthPublicApi } from '@neondatabase/auth';
 import { getReactClient } from './react-adapter';
 import { Toaster } from 'sonner';
 import { ThemeProvider } from 'next-themes';

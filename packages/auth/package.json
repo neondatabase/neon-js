@@ -8,7 +8,30 @@
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
   "exports": {
-    ".": "./dist/index.mjs"
+    ".": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.mts",
+      "default": "./dist/react/index.mjs"
+    },
+    "./react/ui": {
+      "types": "./dist/react/ui/index.d.mts",
+      "default": "./dist/react/ui/index.mjs"
+    },
+    "./react/adapters": {
+      "types": "./dist/react/adapters/index.d.mts",
+      "default": "./dist/react/adapters/index.mjs"
+    },
+    "./vanilla": {
+      "types": "./dist/vanilla/index.d.mts",
+      "default": "./dist/vanilla/index.mjs"
+    },
+    "./vanilla/adapters": {
+      "types": "./dist/vanilla/adapters/index.d.mts",
+      "default": "./dist/vanilla/adapters/index.mjs"
+    }
   },
   "files": [
     "dist"
@@ -30,7 +53,7 @@
     "release": "bun run build && bumpp --tag 'auth-v%s' && bun publish --tag latest"
   },
   "devDependencies": {
-    "tsdown": "0.16.0",
+    "tsdown": "0.16.5",
     "typescript": "^5.9.3",
     "vitest": "4.0.7",
     "vite-tsconfig-paths": "5.1.4",
@@ -40,6 +63,19 @@
     "@supabase/auth-js": "2.79.0",
     "better-auth": "1.4.6-beta.3",
     "zod": "4.1.12",
-    "jose": "6.1.2"
+    "jose": "6.1.2",
+    "@neondatabase/auth-ui": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
   }
 }

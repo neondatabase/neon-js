@@ -1,5 +1,5 @@
 {
-  "name": "@neondatabase/neon-auth-ui",
+  "name": "@neondatabase/auth-ui",
   "version": "0.1.0-alpha.2",
   "description": "UI components for Neon Auth",
   "type": "module",
@@ -35,7 +35,7 @@
     "test:ci": "vitest run",
     "typecheck": "tsc --noEmit",
     "test:types": "tsc --noEmit",
-    "release": "bun run build && bumpp --tag 'neon-auth-ui-v%s' && bun publish --tag latest",
+    "release": "bun run build && bumpp --tag 'auth-ui-v%s' && bun publish --tag latest",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "clean": "rm -rf node_modules dist"
@@ -51,7 +51,8 @@
     "tsdown": "0.16.5",
     "typescript": "^5.9.3",
     "vite-tsconfig-paths": "5.1.4",
-    "vitest": "4.0.10"
+    "vitest": "4.0.10",
+    "@neondatabase/auth": "workspace:*"
   },
   "dependencies": {
     "@captchafox/react": "^1.10.0",
@@ -90,9 +91,9 @@
     "zod": "^4.1.12"
   },
   "peerDependencies": {
-    "@neondatabase/auth": ">=0.1.0-alpha.2",
     "react": ">=18.0.0",
-    "react-dom": ">=18.0.0"
+    "react-dom": ">=18.0.0",
+    "@neondatabase/auth": ">=0.1.0-alpha.8"
   },
   "peerDependenciesMeta": {
     "@neondatabase/auth": {

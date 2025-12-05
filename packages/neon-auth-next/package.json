@@ -37,6 +37,6 @@
     "next": "^16.0.6"
   },
   "dependencies": {
-    "@neondatabase/auth": "workspace:*"
+    "@neondatabase/neon-auth": "latest"
   }
 }
