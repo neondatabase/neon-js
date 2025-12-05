@@ -1,9 +1,26 @@
 import { defineConfig } from 'tsdown';
-import { readFileSync, writeFileSync } from 'node:fs';
+import {
+  readFileSync,
+  writeFileSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+} from 'node:fs';
 import path from 'node:path';
 
 export default defineConfig({
-  entry: ['src/index.ts', 'src/cli/index.ts'],
+  entry: [
+    'src/index.ts',
+    'src/cli/index.ts',
+    // Auth re-export entries
+    'src/auth/index.ts',
+    'src/auth/react/index.ts',
+    'src/auth/react/ui/index.ts',
+    'src/auth/react/adapters/index.ts',
+    'src/auth/vanilla/index.ts',
+    'src/auth/vanilla/adapters/index.ts',
+    'src/auth/next/index.ts',
+  ],
   format: ['esm'],
   clean: true,
   // Mark workspace packages as external so their types aren't inlined/duplicated
@@ -57,6 +74,47 @@ export default defineConfig({
       );
       writeFileSync(distPkgPath, JSON.stringify(pkg, null, 2));
       console.log('✅ Copied and transformed package.json to dist/');
+
+      // Copy CSS files from auth package dist
+      const authDistPath = path.resolve(
+        import.meta.dirname,
+        '..',
+        'auth',
+        'dist'
+      );
+      const distPath = path.resolve(import.meta.dirname, 'dist');
+
+      // Check if auth dist exists (it should be built first)
+      if (!existsSync(authDistPath)) {
+        console.warn(
+          '⚠️  auth dist not found. Run `bun run build` in auth first.'
+        );
+        return;
+      }
+
+      // Ensure target directory exists
+      const cssTargetDir = path.join(distPath, 'auth', 'react', 'ui');
+      mkdirSync(cssTargetDir, { recursive: true });
+
+      // Copy CSS files
+      const cssFiles = [
+        { src: 'css.css', dest: 'css.css' },
+        { src: 'tailwind.css', dest: 'tailwind.css' },
+        { src: 'css.d.ts', dest: 'css.d.ts' },
+        { src: 'theme.css', dest: 'theme.css' },
+      ];
+
+      for (const { src, dest } of cssFiles) {
+        try {
+          copyFileSync(
+            path.join(authDistPath, src),
+            path.join(cssTargetDir, dest)
+          );
+          console.log(`✅ Copied ${src} → dist/auth/react/ui/${dest}`);
+        } catch (error) {
+          console.warn(`⚠️  Could not copy ${src}:`, error);
+        }
+      }
     },
   },
 });
