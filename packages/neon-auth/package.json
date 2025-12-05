@@ -26,6 +26,7 @@
     "typecheck": "tsc --noEmit",
     "test:types": "tsc --noEmit",
     "lint": "eslint .",
+    "clean": "rm -rf node_modules dist",
     "release": "bun run build && bumpp --tag 'neon-auth-v%s' && bun publish --tag latest"
   },
   "devDependencies": {
@@ -37,7 +38,7 @@
   },
   "dependencies": {
     "@supabase/auth-js": "2.79.0",
-    "better-auth": "1.4.5",
+    "better-auth": "1.4.6-beta.3",
     "zod": "4.1.12",
     "jose": "6.1.2"
   }

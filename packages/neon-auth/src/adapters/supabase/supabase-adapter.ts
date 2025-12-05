@@ -1411,7 +1411,6 @@ class SupabaseAuthAdapterImpl
     }
 
     if (type === 'invite') {
-      // @ts-expect-error - organization plugin is not supported yet
       const result = await this._betterAuth.organization.acceptInvitation({
         invitationId: params.token, // The token is the invitation ID
       });

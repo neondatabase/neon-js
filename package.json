@@ -16,6 +16,7 @@
     "typecheck": "bun run --filter '*' typecheck",
     "test:types": "bun run --filter '*' test:types",
     "lint": "bun run --filter '@neondatabase/*' lint",
+    "clean": "bun run --filter '@neondatabase/*' clean && rm -rf node_modules",
     "release": "bun run build && bun run --filter '@neondatabase/postgrest-js' release && bun run --filter '@neondatabase/neon-auth' release && bun run --filter '@neondatabase/neon-auth-ui' release && bun run --filter '@neondatabase/neon-js' release",
     "release:postgrest-js": "bun scripts/release.ts postgrest-js",
     "release:neon-auth": "bun scripts/release.ts neon-auth",

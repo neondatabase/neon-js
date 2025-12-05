@@ -26,6 +26,7 @@
     "typecheck": "tsc --noEmit",
     "test:types": "tsc --noEmit",
     "lint": "eslint .",
+    "clean": "rm -rf node_modules dist",
     "release": "bun run build && bumpp --tag 'neon-auth-next-v%s' && bun publish --tag latest"
   },
   "devDependencies": {
