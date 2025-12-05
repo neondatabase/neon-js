@@ -3,14 +3,14 @@ import {
   type BetterAuthVanillaAdapterInstance,
   type BetterAuthReactAdapterInstance,
   type SupabaseAuthAdapterInstance,
-} from '@neondatabase/neon-auth';
+} from '@neondatabase/auth';
 import { fetchWithToken } from '@neondatabase/postgrest-js';
 import {
   NeonClient,
   type DefaultSchemaName,
   type NeonClientConstructorOptions,
 } from './neon-client';
-import { createInternalNeonAuth } from '@neondatabase/neon-auth';
+import { createInternalNeonAuth } from '@neondatabase/auth';
 
 /**
  * Auth configuration for createClient

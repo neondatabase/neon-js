@@ -1,5 +1,5 @@
 {
-  "name": "@neondatabase/neon-auth",
+  "name": "@neondatabase/auth",
   "version": "0.1.0-alpha.8",
   "description": "Authentication adapters for Neon services",
   "type": "module",
@@ -27,7 +27,7 @@
     "test:types": "tsc --noEmit",
     "lint": "eslint .",
     "clean": "rm -rf node_modules dist",
-    "release": "bun run build && bumpp --tag 'neon-auth-v%s' && bun publish --tag latest"
+    "release": "bun run build && bumpp --tag 'auth-v%s' && bun publish --tag latest"
   },
   "devDependencies": {
     "tsdown": "0.16.0",

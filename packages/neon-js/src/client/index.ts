@@ -21,4 +21,4 @@ export {
   type BetterAuthVanillaAdapterOptions,
   type BetterAuthReactAdapterInstance,
   type BetterAuthReactAdapterOptions,
-} from '@neondatabase/neon-auth';
+} from '@neondatabase/auth';

@@ -1,12 +1,12 @@
-# @neondatabase/neon-auth
+# @neondatabase/auth
 
-[![npm downloads](https://img.shields.io/npm/dm/@neondatabase/neon-auth.svg)](https://www.npmjs.com/package/@neondatabase/neon-auth)
+[![npm downloads](https://img.shields.io/npm/dm/@neondatabase/auth.svg)](https://www.npmjs.com/package/@neondatabase/auth)
 
 Authentication adapters for Neon Auth, supporting multiple auth providers.
 
 ## Overview
 
-`@neondatabase/neon-auth` provides authentication for applications using Neon Auth. By default, it uses the Better Auth API, with optional adapters for different API styles:
+`@neondatabase/auth` provides authentication for applications using Neon Auth. By default, it uses the Better Auth API, with optional adapters for different API styles:
 
 - **Default** - Better Auth API (`signIn.email`, `signUp.email`, etc.)
 - **SupabaseAuthAdapter** - Supabase-compatible API for migrations (`signInWithPassword`, `signUp`, etc.)
@@ -22,9 +22,9 @@ This package is designed to work seamlessly with Neon's authentication infrastru
 ## Installation
 
 ```bash
-npm install @neondatabase/neon-auth
+npm install @neondatabase/auth
 # or
-bun add @neondatabase/neon-auth
+bun add @neondatabase/auth
 ```
 
 ## Usage
@@ -34,7 +34,7 @@ bun add @neondatabase/neon-auth
 The `createAuthClient` factory function creates an auth client. By default, it uses the Better Auth API:
 
 ```typescript
-import { createAuthClient } from '@neondatabase/neon-auth';
+import { createAuthClient } from '@neondatabase/auth';
 
 const auth = createAuthClient({
   baseURL: 'https://your-auth-server.com',
@@ -63,7 +63,7 @@ await auth.signOut();
 ### OAuth Authentication
 
 ```typescript
-import { createAuthClient } from '@neondatabase/neon-auth';
+import { createAuthClient } from '@neondatabase/auth';
 
 const auth = createAuthClient({
   baseURL: 'https://your-auth-server.com',
@@ -84,7 +84,7 @@ You can optionally specify an adapter to change the API style. This is useful fo
 Use this adapter if you're migrating from Supabase or prefer the Supabase API style:
 
 ```typescript
-import { createAuthClient, SupabaseAuthAdapter } from '@neondatabase/neon-auth';
+import { createAuthClient, SupabaseAuthAdapter } from '@neondatabase/auth';
 
 const auth = createAuthClient({
   baseURL: 'https://your-auth-server.com',
@@ -122,7 +122,7 @@ await auth.signInWithOAuth({
 Use this adapter in React applications to get access to hooks like `useSession`:
 
 ```typescript
-import { createAuthClient, BetterAuthReactAdapter } from '@neondatabase/neon-auth';
+import { createAuthClient, BetterAuthReactAdapter } from '@neondatabase/auth';
 
 const auth = createAuthClient({
   baseURL: 'https://your-auth-server.com',
@@ -218,8 +218,8 @@ Multiple concurrent `getSession()` calls are automatically deduplicated:
 Full TypeScript support with strict typing:
 
 ```typescript
-import { createAuthClient } from '@neondatabase/neon-auth';
-import type { Session, User } from '@neondatabase/neon-auth';
+import { createAuthClient } from '@neondatabase/auth';
+import type { Session, User } from '@neondatabase/auth';
 
 const auth = createAuthClient({
   baseURL: 'https://your-auth-server.com',
@@ -233,8 +233,8 @@ const session: Session | null = await auth.getSession();
 
 - [`@neondatabase/neon-js`](../neon-js) - Full SDK with database and auth integration
 - [`@neondatabase/postgrest-js`](../postgrest-js) - PostgreSQL client without auth
-- [`@neondatabase/neon-auth-next`](../neon-auth-next) - Next.js integration for Neon Auth
-- [`@neondatabase/neon-auth-ui`](../neon-auth-ui) - UI components for Neon Auth
+- [`@neondatabase/auth-next`](../neon-auth-next) - Next.js integration for Neon Auth
+- [`@neondatabase/auth-ui`](../neon-auth-ui) - UI components for Neon Auth
 
 ## Resources
 

@@ -74,7 +74,7 @@ export type NeonAuth<T extends NeonAuthAdapter> = {
  *
  * @example SupabaseAuthAdapter - Supabase-compatible API
  * ```typescript
- * import { createAuthClient, SupabaseAuthAdapter } from '@neondatabase/neon-auth';
+ * import { createAuthClient, SupabaseAuthAdapter } from '@neondatabase/auth';
  *
  * const auth = createAuthClient('https://auth.example.com', {
  *   adapter: SupabaseAuthAdapter(),
@@ -87,7 +87,7 @@ export type NeonAuth<T extends NeonAuthAdapter> = {
  *
  * @example BetterAuthVanillaAdapter - Direct Better Auth API
  * ```typescript
- * import { createAuthClient, BetterAuthVanillaAdapter } from '@neondatabase/neon-auth';
+ * import { createAuthClient, BetterAuthVanillaAdapter } from '@neondatabase/auth';
  *
  * const auth = createAuthClient('https://auth.example.com', {
  *   adapter: BetterAuthVanillaAdapter(),
@@ -101,7 +101,7 @@ export type NeonAuth<T extends NeonAuthAdapter> = {
  *
  * @example BetterAuthReactAdapter - Better Auth with React hooks
  * ```typescript
- * import { createAuthClient, BetterAuthReactAdapter } from '@neondatabase/neon-auth';
+ * import { createAuthClient, BetterAuthReactAdapter } from '@neondatabase/auth';
  *
  * const auth = createAuthClient('https://auth.example.com', {
  *   adapter: BetterAuthReactAdapter(),

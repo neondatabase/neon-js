@@ -7,5 +7,5 @@ export default defineConfig({
   dts: {
     build: true,
   },
-  external: ['@neondatabase/neon-auth'],
+  external: ['@neondatabase/auth'],
 });

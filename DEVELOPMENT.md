@@ -19,7 +19,7 @@ bun run link:neon-js
 "dependencies": {
   "@neondatabase/neon-js": "link:@neondatabase/neon-js",
   "@neondatabase/postgrest-js": "link:@neondatabase/postgrest-js",
-  "@neondatabase/neon-auth": "link:@neondatabase/neon-auth"
+  "@neondatabase/auth": "link:@neondatabase/auth"
 }
 ```
 

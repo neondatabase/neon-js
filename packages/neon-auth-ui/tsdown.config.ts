@@ -6,8 +6,8 @@ export default defineConfig({
   entry: ['src/index.ts', 'src/server.ts'],
   format: ['esm'],
   clean: false, // Don't clean dist since CSS is generated first by TailwindCSS CLI
-  // Mark neon-auth as external so its types aren't inlined/duplicated
-  external: ['@neondatabase/neon-auth'],
+  // Mark auth as external so its types aren't inlined/duplicated
+  external: ['@neondatabase/auth'],
   dts: {
     build: true,
   },
@@ -23,7 +23,7 @@ export default defineConfig({
       if (pkg.dependencies) {
         for (const [name, version] of Object.entries(pkg.dependencies)) {
           if (typeof version === 'string' && version.startsWith('workspace:')) {
-            // Extract workspace package name (e.g., 'neon-auth' from '@neondatabase/neon-auth')
+            // Extract workspace package name (e.g., 'auth' from '@neondatabase/auth')
             const workspaceName = name.split('/').pop();
             const workspacePkgPath = path.resolve(
               import.meta.dirname,

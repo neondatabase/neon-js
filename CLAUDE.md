@@ -8,7 +8,7 @@ A unified TypeScript SDK monorepo for Neon services, providing seamless integrat
 
 ## Monorepo Structure
 
-This is a Bun workspaces monorepo with three published packages:
+This is a Bun workspaces monorepo with five published packages:
 
 ### `@neondatabase/postgrest-js` (packages/postgrest-js/)
 Generic PostgreSQL client for Neon Data API without authentication:
@@ -20,7 +20,7 @@ Generic PostgreSQL client for Neon Data API without authentication:
 - `@neondatabase/postgrest-js` - Main exports (client, utilities)
 - `@neondatabase/postgrest-js/client` - Client components
 
-### `@neondatabase/neon-auth` (packages/neon-auth/)
+### `@neondatabase/auth` (packages/auth/)
 Authentication adapters for Neon Auth supporting multiple auth providers:
 - **createAuthClient()**: Factory function for creating auth clients with configurable adapters
 - **SupabaseAuthAdapter**: Supabase-compatible API for familiar auth patterns
@@ -28,7 +28,7 @@ Authentication adapters for Neon Auth supporting multiple auth providers:
 - **BetterAuthReactAdapter**: Better Auth with React hooks support
 
 **Exports:**
-- `@neondatabase/neon-auth` - Main exports (createAuthClient, adapters, utilities)
+- `@neondatabase/auth` - Main exports (createAuthClient, adapters, utilities)
 
 ### `@neondatabase/neon-js` (packages/neon-js/)
 Main SDK package that combines authentication with PostgreSQL querying:
@@ -45,9 +45,39 @@ Main SDK package that combines authentication with PostgreSQL querying:
 **Dependencies:**
 ```
 @neondatabase/neon-js
-    ├── @neondatabase/neon-auth
+    ├── @neondatabase/auth
     └── @neondatabase/postgrest-js
 ```
+
+### `@neondatabase/auth-next` (packages/neon-auth-next/)
+Next.js integration for Neon Auth, providing server-side auth handling and middleware:
+- **toNextJsHandler()**: Creates Next.js API route handler that proxies to Neon Auth
+- **neonAuthMiddleware()**: Next.js middleware for auth protection and OAuth token exchange
+- **createAuthClient()**: Pre-configured client for Next.js with BetterAuthReactAdapter
+
+**Exports:**
+- `@neondatabase/auth-next` - Main exports (handler, middleware, client factory, re-exports neon-auth)
+
+**Dependencies:**
+- `@neondatabase/auth` (workspace)
+- `next` (peer dependency ^16.0.6)
+
+### `@neondatabase/auth-ui` (packages/neon-auth-ui/)
+UI components for Neon Auth built on top of [better-auth-ui](https://better-auth-ui.com):
+- **NeonAuthUIProvider**: React context provider for auth components
+- **SignInForm, SignUpForm, UserButton**: Pre-built auth UI components
+- **CSS Exports**: Pre-built CSS bundle or Tailwind-ready import
+
+**Exports:**
+- `@neondatabase/auth-ui` - Main exports (NeonAuthUIProvider, all better-auth-ui components)
+- `@neondatabase/auth-ui/css` - Pre-built CSS bundle (~47KB)
+- `@neondatabase/auth-ui/tailwind` - Tailwind-ready CSS (~3KB)
+- `@neondatabase/auth-ui/server` - Server-side utilities
+
+**Dependencies:**
+- `@neondatabase/auth` (peer dependency)
+- `react`, `react-dom` (peer dependencies)
+- `@daveyplate/better-auth-ui` (component library)
 
 ## Development Commands
 
@@ -64,7 +94,7 @@ bun dev
 bun build
 
 # Build specific package
-bun run --filter '@neondatabase/neon-auth' build
+bun run --filter '@neondatabase/auth' build
 
 # Run tests
 bun test              # Run all tests
@@ -75,7 +105,14 @@ bun test:ci           # CI mode (no watch)
 bun typecheck
 
 # Publishing
-bun release           # Bump version and publish all three packages
+bun release           # Bump version and publish all packages
+
+# Release individual packages
+bun release:postgrest-js
+bun release:auth
+bun release:neon-auth-ui
+bun release:neon-js
+bun release:neon-auth-next
 ```
 
 ## Architecture
@@ -89,7 +126,7 @@ bun release           # Bump version and publish all three packages
 
 **No Dependencies on Auth**: This package is completely independent and can be used for scenarios where authentication is handled externally or not required.
 
-### Authentication Layer (`packages/neon-auth/`)
+### Authentication Layer (`packages/auth/`)
 
 **Factory**: `src/neon-auth.ts`
 - `createAuthClient()` - Public factory for creating auth clients
@@ -142,7 +179,44 @@ bun release           # Bump version and publish all three packages
 - `commands/generate-types.ts` - Core logic using postgres-meta
 - `utils/parse-duration.ts` - Duration parsing
 
-**Dependencies**: Imports from `@neondatabase/postgrest-js` and `@neondatabase/neon-auth`
+**Dependencies**: Imports from `@neondatabase/postgrest-js` and `@neondatabase/auth`
+
+### Next.js Integration Layer (`packages/neon-auth-next/`)
+
+**Handler**: `src/handler/`
+- `index.ts` - `toNextJsHandler()` export
+- `request.ts` - Request proxying to upstream Neon Auth
+- `response.ts` - Response handling
+
+**Middleware**: `src/middleware/`
+- `index.ts` - `neonAuthMiddleware()` for route protection
+- `oauth.ts` - OAuth token exchange handling
+
+**Entry Point**: `src/index.ts`
+- `createAuthClient()` - Pre-configured client with BetterAuthReactAdapter
+- Re-exports all `@neondatabase/auth` exports
+
+### UI Components Layer (`packages/neon-auth-ui/`)
+
+**Provider**: `src/neon-auth-ui-provider.tsx`
+- `NeonAuthUIProvider` - React context provider for auth UI components
+- Wraps better-auth-ui's AuthUIProvider
+
+**Adapter**: `src/react-adapter.ts`
+- Converts neon-auth client to better-auth-ui compatible format
+- Handles session caching and auth state
+
+**Exports**: `src/index.ts`
+- Re-exports all `@daveyplate/better-auth-ui` components
+- `NeonAuthUIProvider`, `useNeonAuth` hooks
+
+**CSS**: `src/`
+- `theme.css` - CSS custom properties for theming
+- `tailwind.css` - Tailwind-ready CSS import
+- `index.css` - Entry point
+
+**Server**: `src/server.ts`
+- Server-side utilities for auth
 
 ## Usage
 
@@ -258,7 +332,7 @@ function MyComponent() {
 ### Using Auth Adapters Directly
 
 ```typescript
-import { createAuthClient, SupabaseAuthAdapter } from '@neondatabase/neon-auth';
+import { createAuthClient, SupabaseAuthAdapter } from '@neondatabase/auth';
 
 const auth = createAuthClient('https://your-auth-server.com', {
   adapter: SupabaseAuthAdapter,
@@ -266,6 +340,60 @@ const auth = createAuthClient('https://your-auth-server.com', {
 
 await auth.signInWithPassword({ email, password });
 const { data: session } = await auth.getSession();
+```
+
+### Using with Next.js
+
+```typescript
+// api/auth/[...path]/route.ts
+import { toNextJsHandler } from "@neondatabase/auth-next"
+
+export const { GET, POST } = toNextJsHandler(
+  process.env.NEON_AUTH_BASE_URL
+)
+
+// lib/auth/client.ts
+"use client"
+import { createAuthClient } from '@neondatabase/auth-next';
+export const authClient = createAuthClient()
+
+// middleware.ts
+import { neonAuthMiddleware } from '@neondatabase/auth-next';
+export default neonAuthMiddleware();
+```
+
+### Using Auth UI Components
+
+```typescript
+// app/provider.tsx
+'use client';
+import { NeonAuthUIProvider } from '@neondatabase/auth-ui';
+import { authClient } from '@/lib/client';
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  return (
+    <NeonAuthUIProvider authClient={authClient} redirectTo="/dashboard">
+      {children}
+    </NeonAuthUIProvider>
+  );
+}
+
+// app/auth/page.tsx
+import { SignInForm, SignUpForm } from '@neondatabase/auth-ui';
+
+export default function AuthPage() {
+  return <SignInForm />;
+}
+```
+
+**CSS Import Options:**
+```css
+/* Without Tailwind - import pre-built CSS */
+@import '@neondatabase/auth-ui/css';
+
+/* With Tailwind CSS v4 */
+@import 'tailwindcss';
+@import '@neondatabase/auth-ui/tailwind';
 ```
 
 ## Adapter Features
@@ -307,7 +435,7 @@ Works in both browser and Node.js:
 Tests use real SDKs with MSW for network mocking:
 - Verifies API compatibility and interface contracts
 - Catches breaking changes in Better Auth SDK versions
-- Located in `packages/neon-auth/src/__tests__/`
+- Located in `packages/auth/src/__tests__/`
 
 **Run tests:**
 ```bash
@@ -352,8 +480,10 @@ Following the [Better Auth Supabase Migration Guide](https://www.better-auth.com
 
 ## Additional Documentation
 
-- `packages/neon-auth/src/adapters/supabase/better-auth-docs.md` - Comprehensive adapter docs
-- `packages/neon-auth/src/adapters/supabase/better-auth-plugins.md` - Plugin configuration
+- `packages/auth/src/adapters/supabase/better-auth-docs.md` - Comprehensive adapter docs
+- `packages/auth/src/adapters/supabase/better-auth-plugins.md` - Plugin configuration
+- `packages/neon-auth-next/README.md` - Next.js integration guide
+- `packages/neon-auth-ui/README.md` - UI components documentation
 
 ## References
 

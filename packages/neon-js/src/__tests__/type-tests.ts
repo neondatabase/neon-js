@@ -10,7 +10,7 @@ import {
   SupabaseAuthAdapter,
   BetterAuthVanillaAdapter,
   BetterAuthReactAdapter,
-} from '@neondatabase/neon-auth';
+} from '@neondatabase/auth';
 
 // =============================================================================
 // Test 1: SupabaseAuthAdapter - should infer SupabaseAuthAdapter methods on client.auth
@@ -125,7 +125,7 @@ const _clientWithOptions = createClient({
 // Test 5: Verify type narrowing - client.auth should be the correct adapter type
 // =============================================================================
 
-import type { NeonAuth } from '@neondatabase/neon-auth';
+import type { NeonAuth } from '@neondatabase/auth';
 
 // Verify the auth types are correctly inferred
 type ExpectedSupabaseAuthType = NeonAuth<SupabaseAuthAdapter>;

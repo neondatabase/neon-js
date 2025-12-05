@@ -474,7 +474,7 @@ export function useAuth() {
 
 This package combines two underlying packages:
 
-- [`@neondatabase/neon-auth`](../neon-auth) - Authentication adapters (can be used standalone)
+- [`@neondatabase/auth`](../neon-auth) - Authentication adapters (can be used standalone)
 - [`@neondatabase/postgrest-js`](../postgrest-js) - PostgreSQL client (can be used standalone)
 
 ## Migration from Previous Version

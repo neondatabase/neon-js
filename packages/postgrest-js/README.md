@@ -261,7 +261,7 @@ const { data } = await client.from('users').select();
 ## Related Packages
 
 - [`@neondatabase/neon-js`](../neon-js) - Full SDK with Neon Auth integration
-- [`@neondatabase/neon-auth`](../neon-auth) - Standalone auth adapters
+- [`@neondatabase/auth`](../neon-auth) - Standalone auth adapters
 
 ## Support
 

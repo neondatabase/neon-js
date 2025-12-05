@@ -6,7 +6,7 @@
  *   bun scripts/release.ts <package-name>
  *
  * Examples:
- *   bun scripts/release.ts neon-auth    # Releases neon-auth and patches neon-js
+ *   bun scripts/release.ts auth          # Releases auth and patches neon-js
  *   bun scripts/release.ts postgrest-js # Releases postgrest-js and patches neon-js
  *   bun scripts/release.ts neon-js      # Releases neon-js only (leaf package)
  */
@@ -19,7 +19,7 @@ import path from 'node:path';
 const DEPENDENCY_GRAPH: Record<string, string[]> = {
   'postgrest-js': ['neon-js'],
   'neon-auth-ui': [],
-  'neon-auth': ['neon-js', 'neon-auth-next'],
+  'auth': ['neon-js', 'neon-auth-next'],
   'neon-js': [],
   'neon-auth-next': [],
 };

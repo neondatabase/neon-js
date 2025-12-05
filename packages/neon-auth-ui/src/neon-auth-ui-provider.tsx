@@ -7,7 +7,7 @@ import {
 import type {
   NeonAuthAdapter,
   NeonAuthPublicApi,
-} from '@neondatabase/neon-auth';
+} from '@neondatabase/auth';
 import { getReactClient } from './react-adapter';
 import { Toaster } from 'sonner';
 import { ThemeProvider } from 'next-themes';

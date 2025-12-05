@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to `@neondatabase/neon-auth-ui` will be documented in this file.
+All notable changes to `@neondatabase/auth-ui` will be documented in this file.
 
 ## Unreleased
 
@@ -8,11 +8,11 @@ All notable changes to `@neondatabase/neon-auth-ui` will be documented in this f
 
 ### Added
 
-- **NeonAuthUIProvider**: Custom provider component that integrates with `@neondatabase/neon-auth` adapters
+- **NeonAuthUIProvider**: Custom provider component that integrates with `@neondatabase/auth` adapters
 - **Multi-adapter support**: Works with all neon-auth adapters (SupabaseAuthAdapter, BetterAuthVanillaAdapter, BetterAuthReactAdapter)
 - **Dual CSS distribution**:
-  - `@neondatabase/neon-auth-ui/css` - Pre-built styles for non-Tailwind projects
-  - `@neondatabase/neon-auth-ui/tailwind` - Tailwind CSS source for projects using Tailwind
+  - `@neondatabase/auth-ui/css` - Pre-built styles for non-Tailwind projects
+  - `@neondatabase/auth-ui/tailwind` - Tailwind CSS source for projects using Tailwind
 - **Auth Forms**: SignInForm, SignUpForm, ForgotPasswordForm, MagicLinkForm, RecoverAccountForm, ResetPasswordForm, TwoFactorForm
 - **Auth Views**: AuthView, AccountView, AuthCallback, SignOut
 - **User Components**: UserButton, UserAvatar, UserView

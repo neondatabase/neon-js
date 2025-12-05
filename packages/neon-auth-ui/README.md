@@ -1,15 +1,15 @@
-# @neondatabase/neon-auth-ui
+# @neondatabase/auth-ui
 
-[![npm downloads](https://img.shields.io/npm/dm/@neondatabase/neon-auth-ui.svg)](https://www.npmjs.com/package/@neondatabase/neon-auth-ui)
+[![npm downloads](https://img.shields.io/npm/dm/@neondatabase/auth-ui.svg)](https://www.npmjs.com/package/@neondatabase/auth-ui)
 
 UI components for Neon Auth built on top of [better-auth-ui](https://better-auth-ui.com).
 
 ## Installation
 
 ```bash
-npm install @neondatabase/neon-auth-ui
+npm install @neondatabase/auth-ui
 # or
-bun add @neondatabase/neon-auth-ui
+bun add @neondatabase/auth-ui
 ```
 
 ## Usage
@@ -24,7 +24,7 @@ If your project doesn't use Tailwind CSS, import the pre-built CSS bundle:
 
 ```typescript
 // In your root layout or app entry point
-import '@neondatabase/neon-auth-ui/css';
+import '@neondatabase/auth-ui/css';
 ```
 
 This includes all necessary styles (~47KB minified) with no additional configuration required.
@@ -36,7 +36,7 @@ If your project already uses Tailwind CSS v4, import the Tailwind-ready CSS to a
 ```css
 /* In your main CSS file (e.g., globals.css, app.css) */
 @import 'tailwindcss';
-@import '@neondatabase/neon-auth-ui/tailwind';
+@import '@neondatabase/auth-ui/tailwind';
 ```
 
 This imports only the theme variables and component scanning directive. Your Tailwind build will generate the necessary utility classes, avoiding duplication with your existing Tailwind setup.
@@ -46,8 +46,8 @@ This imports only the theme variables and component scanning directive. Your Tai
 ```typescript
 'use client';
 
-import { NeonAuthUIProvider } from '@neondatabase/neon-auth-ui';
-import { createAuthClient } from '@neondatabase/neon-auth';
+import { NeonAuthUIProvider } from '@neondatabase/auth-ui';
+import { createAuthClient } from '@neondatabase/auth';
 
 const authClient = createAuthClient({
   baseURL: process.env.NEXT_PUBLIC_AUTH_URL,
@@ -72,7 +72,7 @@ import {
   SignUpForm, 
   UserButton,
   // ... all other components
-} from '@neondatabase/neon-auth-ui';
+} from '@neondatabase/auth-ui';
 ```
 
 ## Features
@@ -87,8 +87,8 @@ import {
 
 | Export | Size | Use Case |
 |--------|------|----------|
-| `@neondatabase/neon-auth-ui/css` | ~47KB | Projects without Tailwind |
-| `@neondatabase/neon-auth-ui/tailwind` | ~3KB | Projects with Tailwind CSS v4 |
+| `@neondatabase/auth-ui/css` | ~47KB | Projects without Tailwind |
+| `@neondatabase/auth-ui/tailwind` | ~3KB | Projects with Tailwind CSS v4 |
 
 ## Example (Next.js App Router)
 
@@ -96,7 +96,7 @@ import {
 
 **app/layout.tsx**
 ```typescript
-import '@neondatabase/neon-auth-ui/css';
+import '@neondatabase/auth-ui/css';
 import { AuthProvider } from './auth-provider';
 
 export default function RootLayout({ children }) {
@@ -117,7 +117,7 @@ export default function RootLayout({ children }) {
 **app/globals.css**
 ```css
 @import 'tailwindcss';
-@import '@neondatabase/neon-auth-ui/tailwind';
+@import '@neondatabase/auth-ui/tailwind';
 
 /* Your custom styles... */
 ```
@@ -146,7 +146,7 @@ export default function RootLayout({ children }) {
 ```typescript
 'use client';
 
-import { NeonAuthUIProvider } from '@neondatabase/neon-auth-ui';
+import { NeonAuthUIProvider } from '@neondatabase/auth-ui';
 import { authClient } from './auth';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -162,7 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 **app/auth/page.tsx**
 ```typescript
-import { SignInForm } from '@neondatabase/neon-auth-ui';
+import { SignInForm } from '@neondatabase/auth-ui';
 
 export default function AuthPage() {
   return <SignInForm />;
@@ -195,7 +195,7 @@ For component documentation, see the [better-auth-ui docs](https://better-auth-u
 
 ## Related Packages
 
-- [`@neondatabase/neon-auth`](../neon-auth) - Authentication adapters for Neon Auth
+- [`@neondatabase/auth`](../neon-auth) - Authentication adapters for Neon Auth
 - [`@neondatabase/neon-js`](../neon-js) - Full SDK with database and auth integration
 
 ## Support

@@ -6,10 +6,10 @@
     "composite": true,
     "paths": {
       "@neondatabase/postgrest-js": ["../postgrest-js/src"],
-      "@neondatabase/neon-auth": ["../neon-auth/src"]
+      "@neondatabase/auth": ["../auth/src"]
     }
   },
   "include": ["src"],
   "exclude": ["src/__tests__"],
-  "references": [{ "path": "../postgrest-js" }, { "path": "../neon-auth" }]
+  "references": [{ "path": "../postgrest-js" }, { "path": "../auth" }]
 }

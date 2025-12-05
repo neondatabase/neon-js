@@ -2,7 +2,7 @@ import type {
   NeonAuth,
   NeonAuthAdapter,
   NeonAuthPublicApi,
-} from '@neondatabase/neon-auth';
+} from '@neondatabase/auth';
 import {
   NeonPostgrestClient,
   type NeonPostgrestClientConstructorOptions,
