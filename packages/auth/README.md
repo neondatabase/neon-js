@@ -229,11 +229,19 @@ const auth = createAuthClient({
 const session: Session | null = await auth.getSession();
 ```
 
+## Next.js Integration
+
+For Next.js projects, this package provides built-in integration via `@neondatabase/auth/next`. See the [Next.js Setup Guide](./NEXT.md) for:
+
+- Creating API route handlers with `toNextJsHandler()`
+- Setting up the auth client for client components
+- Configuring the `NeonAuthUIProvider`
+- Importing styles (with or without Tailwind CSS)
+
 ## Related Packages
 
 - [`@neondatabase/neon-js`](../neon-js) - Full SDK with database and auth integration
 - [`@neondatabase/postgrest-js`](../postgrest-js) - PostgreSQL client without auth
-- [`@neondatabase/auth-next`](../neon-auth-next) - Next.js integration for Neon Auth
 - [`@neondatabase/auth-ui`](../auth-ui) - UI components for Neon Auth
 
 ## Resources
