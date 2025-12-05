@@ -35,7 +35,8 @@
     "typecheck": "tsc --noEmit",
     "test:types": "tsc --noEmit",
     "release": "bun run build && bumpp --tag 'postgrest-js-v%s' && bun publish --tag latest",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "clean": "rm -rf node_modules dist"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

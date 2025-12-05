@@ -11,6 +11,7 @@ import {
   magicLinkClient,
   phoneNumberClient,
   anonymousClient,
+  organizationClient,
 } from 'better-auth/client/plugins';
 import {
   BETTER_AUTH_METHODS_HOOKS,
@@ -27,9 +28,7 @@ export const FORCE_FETCH_HEADER = 'X-Force-Fetch';
 const supportedBetterAuthClientPlugins = [
   jwtClient(),
   adminClient(),
-
-  // TODO: enable this when better auth fix is released
-  // organizationClient(),
+  organizationClient(),
   emailOTPClient(),
   anonymousClient(),
 

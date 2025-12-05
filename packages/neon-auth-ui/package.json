@@ -37,7 +37,8 @@
     "test:types": "tsc --noEmit",
     "release": "bun run build && bumpp --tag 'neon-auth-ui-v%s' && bun publish --tag latest",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "clean": "rm -rf node_modules dist"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.1.17",
