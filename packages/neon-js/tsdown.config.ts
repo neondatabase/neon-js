@@ -103,14 +103,13 @@ export default defineConfig(
 
         // Copy CSS files from auth/dist/ui/ to neon-js/dist/ui/
         const authCssDir = path.join(authDistPath, 'ui');
-        const cssFiles = [
+        const cssFilesToCopy = [
           { src: 'css.css', dest: 'css.css' },
           { src: 'tailwind.css', dest: 'tailwind.css' },
-          { src: 'css.d.ts', dest: 'css.d.ts' },
           { src: 'theme.css', dest: 'theme.css' },
         ];
 
-        for (const { src, dest } of cssFiles) {
+        for (const { src, dest } of cssFilesToCopy) {
           try {
             copyFileSync(
               path.join(authCssDir, src),
@@ -120,6 +119,17 @@ export default defineConfig(
           } catch (error) {
             console.warn(`⚠️  Could not copy ${src}:`, error);
           }
+        }
+
+        // Generate css.d.ts with correct module declaration for this package
+        try {
+          writeFileSync(
+            path.join(cssTargetDir, 'css.d.ts'),
+            "declare module '@neondatabase/neon-js/ui/css';\n"
+          );
+          console.log('✅ Generated css.d.ts → dist/ui/css.d.ts');
+        } catch (error) {
+          console.warn('⚠️  Could not generate css.d.ts:', error);
         }
       },
     },

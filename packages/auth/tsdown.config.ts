@@ -1,5 +1,5 @@
 import { defineConfig } from 'tsdown';
-import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
+import { copyFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { createPackageConfig } from '../../build/tsdown-base.ts';
 import { preserveDirectives } from '../../build/preserve-directives.ts';
@@ -76,15 +76,15 @@ export default defineConfig(
           console.warn('⚠️  Could not copy tailwind.css:', error);
         }
 
-        // Copy css.d.ts for TypeScript types
+        // Generate css.d.ts with correct module declaration for this package
         try {
-          copyFileSync(
-            path.join(authUiDistPath, 'css.d.ts'),
-            path.join(cssTargetDir, 'css.d.ts')
+          writeFileSync(
+            path.join(cssTargetDir, 'css.d.ts'),
+            "declare module '@neondatabase/auth/ui/css';\n"
           );
-          console.log('✅ Copied css.d.ts → dist/ui/css.d.ts');
+          console.log('✅ Generated css.d.ts → dist/ui/css.d.ts');
         } catch (error) {
-          console.warn('⚠️  Could not copy css.d.ts:', error);
+          console.warn('⚠️  Could not generate css.d.ts:', error);
         }
 
         // Copy theme.css (required by tailwind.css)
