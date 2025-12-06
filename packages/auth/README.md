@@ -231,7 +231,7 @@ const session: Session | null = await auth.getSession();
 
 ## Next.js Integration
 
-For Next.js projects, this package provides built-in integration via `@neondatabase/auth/next`. See the [Next.js Setup Guide](./NEXT.md) for:
+For Next.js projects, this package provides built-in integration via `@neondatabase/auth/next`. See the [Next.js Setup Guide](./NEXT-JS.md) for:
 
 - Creating API route handlers with `toNextJsHandler()`
 - Setting up the auth client for client components

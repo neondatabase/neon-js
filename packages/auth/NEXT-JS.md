@@ -11,8 +11,7 @@ npm install @neondatabase/auth
 
 ### Create an Auth Handler 
 
-To integrate Neon Auth with Next.js, we need to mount the auth handler to an API route. Create a route file
- inside `/api/auth/[...path]` directory and add the following code: 
+To integrate Neon Auth with Next.js, we need to mount the auth handler to an API route. Create a route file inside `/api/auth/[...path]` directory and add the following code: 
 
 ```ts
 // api/auth/[...path]/route.ts
@@ -24,7 +23,7 @@ export const { GET, POST } = toNextJsHandler(
 ```
 
 
- ### Create a Client
+### Create a Client
 
 Create a client instance, that can be used in client components to sign up, sign in, and perform other auth related actions.
 
@@ -46,28 +45,42 @@ Setup `AuthProvider` in Root Layout to provide `authClient` to UI components fro
 'use client';
 
 import { NeonAuthUIProvider } from '@neondatabase/auth/react/ui';
-import { authClient } from '@/lib/client';
+import { authClient } from '@/lib/auth/client';
+import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
+
   return (
     <NeonAuthUIProvider
       authClient={authClient}
-      redirectTo="/dashboard"
+      navigate={router.push}
+      replace={router.replace}
+      onSessionChange={() => {
+        // Clear router cache (protected routes)
+        router.refresh()
+      }}
       social={{
         providers: ["google"]
       }}
+      Link={Link}
     >
       {children}
     </NeonAuthUIProvider>
   );
 }
+```
 
+Then wrap your app with the provider:
+
+```typescript
 // app/layout.tsx
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <AuthProvider> {children} </AuthProvider>
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   )

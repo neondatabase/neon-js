@@ -20,6 +20,10 @@
       "types": "./dist/react/ui/index.d.mts",
       "default": "./dist/react/ui/index.mjs"
     },
+    "./react/ui/server": {
+      "types": "./dist/react/ui/server.d.mts",
+      "default": "./dist/react/ui/server.mjs"
+    },
     "./react/adapters": {
       "types": "./dist/react/adapters/index.d.mts",
       "default": "./dist/react/adapters/index.mjs"
