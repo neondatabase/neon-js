@@ -117,6 +117,74 @@ bun release:neon-js
 bun release:neon-auth-next
 ```
 
+## Build Configuration
+
+All packages use [tsdown](https://tsdown.dev/) (Rolldown-powered bundler) with a shared base configuration.
+
+### Shared Config Helper
+
+Common settings are centralized in `build/tsdown-base.ts`:
+
+```typescript
+import { createPackageConfig } from '../../build/tsdown-base.ts';
+
+export default defineConfig(
+  createPackageConfig({
+    entry: ['src/index.ts'],
+    // Package-specific overrides...
+  })
+);
+```
+
+**Shared defaults:**
+- `format: ['esm']` - ESM-only output (modern standard)
+- `dts: { build: true }` - TypeScript declarations
+- `clean: true` - Clean dist before build (can be overridden)
+
+### Shared Plugins
+
+**`build/preserve-directives.ts`** - Preserves React `'use client'` and `'use server'` directives through bundling. Used by React packages (auth-ui, auth, neon-js).
+
+### CSS Build Chain
+
+CSS flows through packages in dependency order (handled by Bun's topological sort):
+
+```
+auth-ui (generates CSS via TailwindCSS CLI)
+   ↓
+auth (copies CSS from auth-ui/dist)
+   ↓
+neon-js (copies CSS from auth/dist)
+```
+
+### Adding a New Package
+
+1. Create `packages/<name>/tsdown.config.ts`:
+```typescript
+import { defineConfig } from 'tsdown';
+import { createPackageConfig } from '../../build/tsdown-base.ts';
+
+export default defineConfig(
+  createPackageConfig({
+    entry: ['src/index.ts'],
+    // Add external workspace deps if needed:
+    // external: ['@neondatabase/auth'],
+  })
+);
+```
+
+2. For React packages with client components, add the directive plugin:
+```typescript
+import { preserveDirectives } from '../../build/preserve-directives.ts';
+
+export default defineConfig(
+  createPackageConfig({
+    entry: ['src/index.ts'],
+    plugins: [preserveDirectives()],
+  })
+);
+```
+
 ## Architecture
 
 ### PostgreSQL Client Layer (`packages/postgrest-js/`)

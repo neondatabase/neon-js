@@ -41,6 +41,7 @@
     "clean": "rm -rf node_modules dist"
   },
   "devDependencies": {
+    "@neondatabase/auth": "workspace:*",
     "@tailwindcss/cli": "^4.1.17",
     "@types/node": "^24.5.2",
     "@types/react": "^19.1.13",
@@ -51,8 +52,7 @@
     "tsdown": "0.16.5",
     "typescript": "^5.9.3",
     "vite-tsconfig-paths": "5.1.4",
-    "vitest": "4.0.10",
-    "@neondatabase/auth": "workspace:*"
+    "vitest": "4.0.10"
   },
   "dependencies": {
     "@captchafox/react": "^1.10.0",
