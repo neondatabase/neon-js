@@ -97,7 +97,7 @@ If your project doesn't use Tailwind CSS, import the pre-built CSS bundle:
 
 ```typescript
 // In your root layout or app entry point
-import '@neondatabase/auth/react/ui/css';
+import '@neondatabase/auth/ui/css';
 ```
 
 This includes all necessary styles with no additional configuration required.
@@ -109,7 +109,7 @@ If your project already uses Tailwind CSS v4, import the Tailwind-ready CSS to a
 ```css
 /* In your main CSS file (e.g., globals.css, app.css) */
 @import 'tailwindcss';
-@import '@neondatabase/auth/react/ui/tailwind';
+@import '@neondatabase/auth/ui/tailwind';
 ```
 
 This imports only the theme variables and component scanning directive. Your Tailwind build will generate the necessary utility classes, avoiding duplication with your existing Tailwind setup.

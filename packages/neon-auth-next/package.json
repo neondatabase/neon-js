@@ -29,10 +29,6 @@
     "clean": "rm -rf node_modules dist",
     "release": "bun run build && bumpp --tag 'neon-auth-next-v%s' && bun publish --tag latest"
   },
-  "devDependencies": {
-    "tsdown": "0.16.0",
-    "typescript": "^5.9.3"
-  },
   "peerDependencies": {
     "next": "^16.0.6"
   },

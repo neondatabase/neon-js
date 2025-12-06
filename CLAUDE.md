@@ -74,7 +74,7 @@ UI components for Neon Auth built on top of [better-auth-ui](https://better-auth
 - `@neondatabase/auth-ui/tailwind` - Tailwind-ready CSS
 - `@neondatabase/auth-ui/server` - Server-side utilities
 
-**Note:** CSS is also re-exported from `@neondatabase/auth/react/ui/css` and `@neondatabase/auth/react/ui/tailwind` for convenience.
+**Note:** CSS is also re-exported from `@neondatabase/auth/ui/css` and `@neondatabase/auth/ui/tailwind` for convenience.
 
 **Dependencies:**
 - `@neondatabase/auth` (peer dependency)
@@ -459,11 +459,11 @@ export default function AuthPage() {
 **CSS Import Options:**
 ```css
 /* Without Tailwind - import pre-built CSS */
-@import '@neondatabase/auth/react/ui/css';
+@import '@neondatabase/auth/ui/css';
 
 /* With Tailwind CSS v4 */
 @import 'tailwindcss';
-@import '@neondatabase/auth/react/ui/tailwind';
+@import '@neondatabase/auth/ui/tailwind';
 ```
 
 ## Adapter Features

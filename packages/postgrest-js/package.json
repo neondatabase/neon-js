@@ -38,15 +38,7 @@
     "lint": "eslint .",
     "clean": "rm -rf node_modules dist"
   },
-  "devDependencies": {
-    "@eslint/js": "^9.39.1",
-    "eslint": "^9.39.1",
-    "eslint-plugin-unicorn": "^62.0.0",
-    "tsdown": "0.16.0",
-    "typescript": "^5.9.3",
-    "vitest": "4.0.7",
-    "vite-tsconfig-paths": "5.1.4"
-  },
+  "devDependencies": {},
   "dependencies": {
     "@supabase/postgrest-js": "2.79.0"
   }

@@ -40,12 +40,12 @@
       "types": "./dist/next/index.d.mts",
       "default": "./dist/next/index.mjs"
     },
-    "./react/ui/css": {
-      "types": "./dist/css.d.ts",
-      "default": "./dist/css.css"
+    "./ui/css": {
+      "types": "./dist/ui/css.d.ts",
+      "default": "./dist/ui/css.css"
     },
-    "./react/ui/tailwind": {
-      "default": "./dist/tailwind.css"
+    "./ui/tailwind": {
+      "default": "./dist/ui/tailwind.css"
     }
   },
   "files": [
@@ -68,10 +68,6 @@
     "release": "bun run build && bumpp --tag 'auth-v%s' && bun publish --tag latest"
   },
   "devDependencies": {
-    "tsdown": "0.16.5",
-    "typescript": "^5.9.3",
-    "vitest": "4.0.7",
-    "vite-tsconfig-paths": "5.1.4",
     "msw": "2.6.8"
   },
   "dependencies": {

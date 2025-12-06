@@ -43,16 +43,11 @@
   "devDependencies": {
     "@neondatabase/auth": "workspace:*",
     "@tailwindcss/cli": "^4.1.17",
-    "@types/node": "^24.5.2",
     "@types/react": "^19.1.13",
     "@types/react-dom": "^19.1.9",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.5.6",
-    "postcss-import": "^16.1.1",
-    "tsdown": "0.16.5",
-    "typescript": "^5.9.3",
-    "vite-tsconfig-paths": "5.1.4",
-    "vitest": "4.0.10"
+    "postcss-import": "^16.1.1"
   },
   "dependencies": {
     "@captchafox/react": "^1.10.0",

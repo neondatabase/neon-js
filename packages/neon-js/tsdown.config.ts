@@ -98,10 +98,11 @@ export default defineConfig(
         }
 
         // Ensure target directory exists
-        const cssTargetDir = path.join(distPath, 'auth', 'react', 'ui');
+        const cssTargetDir = path.join(distPath, 'ui');
         mkdirSync(cssTargetDir, { recursive: true });
 
-        // Copy CSS files
+        // Copy CSS files from auth/dist/ui/ to neon-js/dist/ui/
+        const authCssDir = path.join(authDistPath, 'ui');
         const cssFiles = [
           { src: 'css.css', dest: 'css.css' },
           { src: 'tailwind.css', dest: 'tailwind.css' },
@@ -112,10 +113,10 @@ export default defineConfig(
         for (const { src, dest } of cssFiles) {
           try {
             copyFileSync(
-              path.join(authDistPath, src),
+              path.join(authCssDir, src),
               path.join(cssTargetDir, dest)
             );
-            console.log(`✅ Copied ${src} → dist/auth/react/ui/${dest}`);
+            console.log(`✅ Copied ui/${src} → dist/ui/${dest}`);
           } catch (error) {
             console.warn(`⚠️  Could not copy ${src}:`, error);
           }

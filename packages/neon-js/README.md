@@ -319,6 +319,24 @@ const client = createClient({
 });
 ```
 
+## UI Component Styles
+
+If you're using `@neondatabase/auth-ui` components with the SDK, CSS is conveniently available:
+
+| Export | Use Case |
+|--------|----------|
+| `@neondatabase/neon-js/ui/css` | Pre-built styles (~47KB) |
+| `@neondatabase/neon-js/ui/tailwind` | Tailwind-ready CSS |
+
+```css
+/* Without Tailwind */
+@import '@neondatabase/neon-js/ui/css';
+
+/* With Tailwind CSS v4 */
+@import 'tailwindcss';
+@import '@neondatabase/neon-js/ui/tailwind';
+```
+
 ## TypeScript
 
 Generate TypeScript types from your database schema:

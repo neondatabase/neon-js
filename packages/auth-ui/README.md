@@ -90,6 +90,8 @@ import {
 | `@neondatabase/auth-ui/css` | ~47KB | Projects without Tailwind |
 | `@neondatabase/auth-ui/tailwind` | ~3KB | Projects with Tailwind CSS v4 |
 
+> **Note:** These CSS exports are also available from `@neondatabase/auth/ui/css` and `@neondatabase/neon-js/ui/css` for convenience. Choose whichever package you're already using.
+
 ## Example (Next.js App Router)
 
 ### Without Tailwind
