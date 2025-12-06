@@ -19,7 +19,6 @@ export default defineConfig(
 
       'src/next/index.ts',
     ],
-    external: ['@neondatabase/auth-ui'],
     skipNodeModulesBundle: true,
     plugins: [
       preserveDirectives({
