@@ -87,6 +87,47 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 }
 ```
 
+### Add Auth Pages
+
+Create a dynamic route file at `app/auth/[path]/page.tsx` to handle all authentication views:
+
+```typescript
+// app/auth/[path]/page.tsx
+import { AuthView } from "@neondatabase/auth/react/ui"
+import { authViewPaths } from "@neondatabase/auth/react/ui/server"
+
+export const dynamicParams = false
+
+export function generateStaticParams() {
+    return Object.values(authViewPaths).map((path) => ({ path }))
+}
+
+export default async function AuthPage({ params }: { params: Promise<{ path: string }> }) {
+    const { path } = await params
+
+    return (
+        <main className="container flex grow flex-col items-center justify-center self-center p-4 md:p-6">
+            <AuthView path={path} />
+        </main>
+    )
+}
+```
+
+This automatically handles the following authentication routes:
+- `/auth/sign-in` - Sign in page
+- `/auth/sign-up` - Sign up page
+- `/auth/magic-link` - Magic link authentication
+- `/auth/forgot-password` - Password reset request
+- `/auth/two-factor` - Two-factor authentication
+- `/auth/recover-account` - Account recovery
+- `/auth/reset-password` - Password reset
+- `/auth/sign-out` - Sign out
+- `/auth/callback` - OAuth callback
+- `/auth/accept-invitation` - Accept team invitation
+
+For advanced configuration options and to learn more about the UI library, see the [better-auth-ui documentation](https://better-auth-ui.com/integrations/next-js).
+
+
 ### Don't forget to import styles
 
 Choose the import method based on your project setup:
