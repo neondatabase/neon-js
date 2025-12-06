@@ -16,6 +16,7 @@
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "sideEffects": false,
   "bin": {
     "neon-js": "dist/cli/index.mjs"
   },

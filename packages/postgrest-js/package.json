@@ -20,6 +20,7 @@
     ".": "./dist/index.mjs",
     "./client": "./dist/client/index.mjs"
   },
+  "sideEffects": false,
   "files": [
     "dist"
   ],

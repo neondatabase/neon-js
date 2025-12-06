@@ -21,6 +21,7 @@
       "default": "./dist/server.mjs"
     }
   },
+  "sideEffects": false,
   "files": [
     "dist"
   ],

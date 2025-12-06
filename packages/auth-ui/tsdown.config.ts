@@ -1,8 +1,8 @@
 import { defineConfig } from 'tsdown';
-import { readFileSync, writeFileSync, copyFileSync } from 'node:fs';
 import path from 'node:path';
 import { createPackageConfig } from '../../build/tsdown-base.ts';
 import { preserveDirectives } from '../../build/preserve-directives.ts';
+import { copyPackageJsonToDist, copyFileSafe } from '../../build/build-utils.ts';
 
 export default defineConfig(
   createPackageConfig({
@@ -12,66 +12,15 @@ export default defineConfig(
     plugins: [preserveDirectives()],
     hooks: {
       'build:done': async () => {
-        // Read original package.json
-        const pkgPath = path.resolve(import.meta.dirname, 'package.json');
-        const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
-
-        // Transform workspace:* dependencies to actual versions
-        if (pkg.dependencies) {
-          for (const [name, version] of Object.entries(pkg.dependencies)) {
-            if (
-              typeof version === 'string' &&
-              version.startsWith('workspace:')
-            ) {
-              // Extract workspace package name (e.g., 'auth' from '@neondatabase/auth')
-              const workspaceName = name.split('/').pop();
-              const workspacePkgPath = path.resolve(
-                import.meta.dirname,
-                '..',
-                workspaceName as string,
-                'package.json'
-              );
-
-              try {
-                const workspacePkg = JSON.parse(
-                  readFileSync(workspacePkgPath, 'utf8')
-                );
-                // Replace with caret version (e.g., ^0.1.0)
-                pkg.dependencies[name] = `^${workspacePkg.version}`;
-                console.log(
-                  `✅ Resolved ${name}: ${version} → ^${workspacePkg.version}`
-                );
-              } catch {
-                console.warn(
-                  `⚠️  Could not resolve workspace dependency: ${name}`
-                );
-              }
-            }
-          }
-        }
-
-        // Write transformed package.json to dist/
-        const distPkgPath = path.resolve(
-          import.meta.dirname,
-          'dist',
-          'package.json'
-        );
-        writeFileSync(distPkgPath, JSON.stringify(pkg, null, 2));
-        console.log('✅ Copied and transformed package.json to dist/');
+        // Transform workspace:* deps and copy package.json to dist/
+        copyPackageJsonToDist(import.meta.dirname, { transform: true });
 
         // Copy CSS type declaration to dist/
-        const cssDtsPath = path.resolve(import.meta.dirname, 'src', 'css.d.ts');
-        const distCssDtsPath = path.resolve(
-          import.meta.dirname,
-          'dist',
-          'css.d.ts'
+        copyFileSafe(
+          path.resolve(import.meta.dirname, 'src', 'css.d.ts'),
+          path.resolve(import.meta.dirname, 'dist', 'css.d.ts'),
+          'css.d.ts → dist/css.d.ts'
         );
-        try {
-          copyFileSync(cssDtsPath, distCssDtsPath);
-          console.log('✅ Copied css.d.ts to dist/');
-        } catch (error) {
-          console.warn('⚠️  Could not copy css.d.ts:', error);
-        }
       },
     },
   })

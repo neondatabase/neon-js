@@ -11,14 +11,58 @@ export type PreserveDirectivesOptions = {
   clientPackages?: string[];
 };
 
+/** Maximum lines to scan for directives (they must be at the top) */
+const MAX_DIRECTIVE_LINES = 10;
+
+/** Supported directives */
+const DIRECTIVES = ['use client', 'use server'] as const;
+
+/**
+ * Check if code contains an import from any of the specified packages.
+ */
+function hasImportFrom(code: string, packages: string[]): boolean {
+  for (const pkg of packages) {
+    // Simple string matching - faster and safer than regex
+    if (code.includes(`from '${pkg}'`) || code.includes(`from "${pkg}"`)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Check if a line contains a directive statement.
+ * Matches: 'use client'; | "use client"; | 'use client' | "use client"
+ */
+function parseDirective(line: string): string | null {
+  const trimmed = line.trim();
+  for (const directive of DIRECTIVES) {
+    const patterns = [
+      `'${directive}';`,
+      `"${directive}";`,
+      `'${directive}'`,
+      `"${directive}"`,
+    ];
+    if (patterns.includes(trimmed)) {
+      return directive;
+    }
+  }
+  return null;
+}
+
 /**
  * A Rolldown plugin that preserves 'use client' and 'use server' directives.
  *
- * Unlike rollup-plugin-preserve-directives, this works with tsdown because:
- * 1. It runs in the `transform` hook AFTER TypeScript is transpiled
- * 2. It tracks which modules have directives
- * 3. It prepends directives to chunks in `renderChunk`
- * 4. It can also detect imports from known client packages
+ * Why this exists:
+ * - tsdown/rolldown strips directives during bundling
+ * - React Server Components require these directives at the top of files
+ * - This plugin detects directives in source files and re-adds them to output chunks
+ *
+ * How it works:
+ * 1. transform hook: Scans each source file for directives and clientPackage imports
+ * 2. Stores findings in a Map keyed by module ID
+ * 3. renderChunk hook: Collects directives for all modules in the chunk
+ * 4. Prepends directive statements to the output chunk
  */
 export function preserveDirectives(
   options: PreserveDirectivesOptions = {}
@@ -27,97 +71,66 @@ export function preserveDirectives(
 
   // Track which modules have which directives
   const moduleDirectives = new Map<string, Set<string>>();
-  const DIRECTIVES = ['use client', 'use server'];
 
   return {
     name: 'preserve-directives',
 
-    // Run after TypeScript transpilation to detect directives
     transform: {
-      // Run late so we see transpiled JS, not TS
-      order: 'post',
+      order: 'post', // Run after TypeScript transpilation
       handler(code: string, id: string) {
-        // Skip node_modules - we'll handle external deps separately
+        // Skip node_modules - external deps handled by renderChunk fallback
         if (id.includes('node_modules')) {
           return null;
         }
 
         const directives = new Set<string>();
 
-        // Check first few lines for directives (they must be at the top)
-        const lines = code.split('\n').slice(0, 10);
+        // Scan first N lines for directives
+        const lines = code.split('\n').slice(0, MAX_DIRECTIVE_LINES);
         for (const line of lines) {
-          const trimmed = line.trim();
-          // Match 'use client'; or "use client"; with optional semicolon
-          for (const directive of DIRECTIVES) {
-            if (
-              trimmed === `'${directive}';` ||
-              trimmed === `"${directive}";` ||
-              trimmed === `'${directive}'` ||
-              trimmed === `"${directive}"`
-            ) {
-              directives.add(directive);
-            }
+          const directive = parseDirective(line);
+          if (directive) {
+            directives.add(directive);
           }
         }
 
-        // Also check if this module imports from any known client packages
-        if (clientPackages.length > 0) {
-          for (const pkg of clientPackages) {
-            const importPattern = new RegExp(
-              String.raw`from\s+["']${pkg.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)}["']`
-            );
-            if (importPattern.test(code)) {
-              directives.add('use client');
-              break;
-            }
-          }
+        // Check for imports from known client packages
+        if (clientPackages.length > 0 && hasImportFrom(code, clientPackages)) {
+          directives.add('use client');
         }
 
         if (directives.size > 0) {
           moduleDirectives.set(id, directives);
         }
 
-        return null; // Don't modify the code in transform
+        return null; // Don't modify code in transform
       },
     },
 
-    // Prepend directives to output chunks
     renderChunk(code: string, chunk: RenderedChunk) {
       const chunkDirectives = new Set<string>();
 
-      // Check if any module in this chunk has directives
+      // Collect directives from all modules in this chunk
       for (const moduleId of Object.keys(chunk.modules)) {
-        const directives = moduleDirectives.get(moduleId);
-        if (directives) {
-          for (const d of directives) {
-            chunkDirectives.add(d);
-          }
-        }
+        moduleDirectives.get(moduleId)?.forEach((d) => chunkDirectives.add(d));
       }
 
-      // Also check facadeModuleId (entry point)
+      // Also check the entry point module
       if (chunk.facadeModuleId) {
-        const directives = moduleDirectives.get(chunk.facadeModuleId);
-        if (directives) {
-          for (const d of directives) {
-            chunkDirectives.add(d);
-          }
-        }
+        moduleDirectives
+          .get(chunk.facadeModuleId)
+          ?.forEach((d) => chunkDirectives.add(d));
       }
 
-      // Check if chunk imports from any known client packages
-      if (clientPackages.length > 0 && chunkDirectives.size === 0) {
-        for (const pkg of clientPackages) {
-          // Check for import statements from the client package
-          const importPattern = new RegExp(
-            String.raw`from\s+["']${pkg.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)}["']`
-          );
-          if (importPattern.test(code)) {
-            chunkDirectives.add('use client');
-            break;
-          }
-        }
+      // Fallback: If no directives found via Map lookup, scan the chunk code directly.
+      // This catches edge cases like virtual modules or bundler-restructured code
+      // where the module ID might not match what we saw in transform.
+      if (
+        clientPackages.length > 0 &&
+        chunkDirectives.size === 0 &&
+        hasImportFrom(code, clientPackages)
+      ) {
+        chunkDirectives.add('use client');
       }
 
       if (chunkDirectives.size === 0) {

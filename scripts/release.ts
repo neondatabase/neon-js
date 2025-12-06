@@ -20,9 +20,8 @@ import path from 'node:path';
 const DEPENDENCY_GRAPH: Record<string, string[]> = {
   'postgrest-js': ['neon-js'],
   'auth-ui': ['auth'],
-  auth: ['neon-js', 'neon-auth-next'],
+  auth: ['neon-js'],
   'neon-js': [],
-  'neon-auth-next': [],
 };
 
 const VALID_PACKAGES = Object.keys(DEPENDENCY_GRAPH);
@@ -46,7 +45,7 @@ const ROOT_DIR = path.resolve(import.meta.dirname, '..');
  *
  * @example
  *   getTransitiveDependents('auth-ui')
- *   // Returns: ['auth-ui', 'auth', 'neon-js', 'neon-auth-next']
+ *   // Returns: ['auth-ui', 'auth', 'neon-js']
  *
  * @example
  *   getTransitiveDependents('neon-js')
