@@ -1,6 +1,9 @@
 # neon-js
 
+[![npm version](https://img.shields.io/npm/v/@neondatabase/neon-js.svg)](https://www.npmjs.com/package/@neondatabase/neon-js)
 [![npm downloads](https://img.shields.io/npm/dm/@neondatabase/neon-js.svg)](https://www.npmjs.com/package/@neondatabase/neon-js)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0%2B-blue.svg)](https://www.typescriptlang.org/)
+[![License](https://img.shields.io/npm/l/@neondatabase/neon-js.svg)](https://github.com/neondatabase/neon-js/blob/main/LICENSE)
 
 A unified TypeScript SDK for Neon services, providing seamless integration with authentication and PostgreSQL database queries. Offers a familiar, type-safe API for building modern applications with Neon.
 

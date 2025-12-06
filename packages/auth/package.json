@@ -1,9 +1,36 @@
 {
   "name": "@neondatabase/auth",
   "version": "0.1.0-alpha.8",
-  "description": "Authentication adapters for Neon services",
+  "description": "TypeScript SDK for Neon Auth - authentication for PostgreSQL with multiple adapter support",
   "type": "module",
   "license": "Apache-2.0",
+  "keywords": [
+    "neon",
+    "neondb",
+    "postgresql",
+    "postgres",
+    "authentication",
+    "auth",
+    "typescript",
+    "sdk",
+    "better-auth",
+    "supabase",
+    "react",
+    "nextjs"
+  ],
+  "homepage": "https://github.com/neondatabase-labs/neon-js/tree/main/packages/auth#readme",
+  "bugs": {
+    "url": "https://github.com/neondatabase-labs/neon-js/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/neondatabase-labs/neon-js.git",
+    "directory": "packages/auth"
+  },
+  "funding": {
+    "url": "https://neon.tech"
+  },
+  "author": "Neon <info@neon.tech>",
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",

@@ -1,9 +1,36 @@
 {
   "name": "@neondatabase/auth-ui",
   "version": "0.1.0-alpha.2",
-  "description": "UI components for Neon Auth",
+  "description": "React UI components for Neon Auth - pre-built sign-in, sign-up, and user management forms",
   "type": "module",
   "license": "Apache-2.0",
+  "keywords": [
+    "neon",
+    "neondb",
+    "authentication",
+    "auth",
+    "ui",
+    "components",
+    "react",
+    "typescript",
+    "sign-in",
+    "sign-up",
+    "better-auth",
+    "tailwindcss"
+  ],
+  "homepage": "https://github.com/neondatabase-labs/neon-js/tree/main/packages/auth-ui#readme",
+  "bugs": {
+    "url": "https://github.com/neondatabase-labs/neon-js/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/neondatabase-labs/neon-js.git",
+    "directory": "packages/auth-ui"
+  },
+  "funding": {
+    "url": "https://neon.tech"
+  },
+  "author": "Neon <info@neon.tech>",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",

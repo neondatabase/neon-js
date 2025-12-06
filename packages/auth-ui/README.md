@@ -1,6 +1,9 @@
 # @neondatabase/auth-ui
 
+[![npm version](https://img.shields.io/npm/v/@neondatabase/auth-ui.svg)](https://www.npmjs.com/package/@neondatabase/auth-ui)
 [![npm downloads](https://img.shields.io/npm/dm/@neondatabase/auth-ui.svg)](https://www.npmjs.com/package/@neondatabase/auth-ui)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0%2B-blue.svg)](https://www.typescriptlang.org/)
+[![License](https://img.shields.io/npm/l/@neondatabase/auth-ui.svg)](https://github.com/neondatabase-labs/neon-js/blob/main/LICENSE)
 
 UI components for Neon Auth built on top of [better-auth-ui](https://better-auth-ui.com).
 

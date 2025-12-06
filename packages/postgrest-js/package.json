@@ -1,18 +1,34 @@
 {
   "name": "@neondatabase/postgrest-js",
   "version": "0.1.0-alpha.1",
-  "description": "Generic PostgreSQL client for Neon Data API (without authentication)",
+  "description": "PostgreSQL client for Neon Data API - query your database without authentication",
   "type": "module",
   "license": "Apache-2.0",
-  "homepage": "https://github.com/neondatabase-labs/neon-js/",
+  "keywords": [
+    "neon",
+    "neondb",
+    "postgresql",
+    "postgres",
+    "database",
+    "postgrest",
+    "data-api",
+    "typescript",
+    "sdk",
+    "query-builder"
+  ],
+  "homepage": "https://github.com/neondatabase-labs/neon-js/tree/main/packages/postgrest-js#readme",
   "bugs": {
     "url": "https://github.com/neondatabase-labs/neon-js/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/neondatabase-labs/neon-js.git"
+    "url": "git+https://github.com/neondatabase-labs/neon-js.git",
+    "directory": "packages/postgrest-js"
   },
-  "author": "Pedro Figueiredo <pedro.figueiredo@databricks.com>",
+  "funding": {
+    "url": "https://neon.tech"
+  },
+  "author": "Neon <info@neon.tech>",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",

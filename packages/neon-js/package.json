@@ -1,18 +1,36 @@
 {
   "name": "@neondatabase/neon-js",
   "version": "0.1.0-alpha.11",
-  "description": "A TypeScript SDK for Neon services",
+  "description": "TypeScript SDK for Neon Auth and Data API - authentication and PostgreSQL querying",
   "type": "module",
   "license": "Apache-2.0",
-  "homepage": "https://github.com/neondatabase-labs/neon-js/",
+  "keywords": [
+    "neon",
+    "neondb",
+    "postgresql",
+    "postgres",
+    "database",
+    "authentication",
+    "auth",
+    "typescript",
+    "sdk",
+    "better-auth",
+    "supabase",
+    "data-api"
+  ],
+  "homepage": "https://github.com/neondatabase-labs/neon-js/tree/main/packages/neon-js#readme",
   "bugs": {
     "url": "https://github.com/neondatabase-labs/neon-js/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/neondatabase-labs/neon-js.git"
+    "url": "git+https://github.com/neondatabase-labs/neon-js.git",
+    "directory": "packages/neon-js"
   },
-  "author": "Pedro Figueiredo <pedro.figueiredo@databricks.com>",
+  "funding": {
+    "url": "https://neon.tech"
+  },
+  "author": "Neon <info@neon.tech>",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
