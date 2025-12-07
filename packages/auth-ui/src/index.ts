@@ -6,7 +6,7 @@ export type { NeonAuthUIProviderProps } from './neon-auth-ui-provider';
 export { useTheme } from 'next-themes';
 
 // =============================================================================
-// RE-EXPORT ALL FROM better-auth-ui (EXPLICIT = TREE-SHAKEABLE)
+// RE-EXPORT ALL FROM better-auth-ui
 // =============================================================================
 
 export * from '@daveyplate/better-auth-ui';

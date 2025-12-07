@@ -28,7 +28,7 @@
   "funding": {
     "url": "https://neon.tech"
   },
-  "author": "Neon <info@neon.tech>",
+  "author": "Pedro Figueiredo <pedro.figueiredo@databricks.com>",
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
