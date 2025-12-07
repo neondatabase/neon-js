@@ -39,9 +39,7 @@ The `createAuthClient` factory function creates an auth client. By default, it u
 ```typescript
 import { createAuthClient } from '@neondatabase/auth';
 
-const auth = createAuthClient({
-  baseURL: 'https://your-auth-server.com',
-});
+const auth = createAuthClient('https://your-auth-server.com');
 
 // Sign up
 await auth.signUp.email({
@@ -68,9 +66,7 @@ await auth.signOut();
 ```typescript
 import { createAuthClient } from '@neondatabase/auth';
 
-const auth = createAuthClient({
-  baseURL: 'https://your-auth-server.com',
-});
+const auth = createAuthClient('https://your-auth-server.com');
 
 await auth.signIn.social({
   provider: 'google',
@@ -89,8 +85,7 @@ Use this adapter if you're migrating from Supabase or prefer the Supabase API st
 ```typescript
 import { createAuthClient, SupabaseAuthAdapter } from '@neondatabase/auth';
 
-const auth = createAuthClient({
-  baseURL: 'https://your-auth-server.com',
+const auth = createAuthClient('https://your-auth-server.com', {
   adapter: SupabaseAuthAdapter(),
 });
 
@@ -125,10 +120,10 @@ await auth.signInWithOAuth({
 Use this adapter in React applications to get access to hooks like `useSession`:
 
 ```typescript
-import { createAuthClient, BetterAuthReactAdapter } from '@neondatabase/auth';
+import { createAuthClient } from '@neondatabase/auth';
+import { BetterAuthReactAdapter } from '@neondatabase/auth/react/adapters';
 
-const auth = createAuthClient({
-  baseURL: 'https://your-auth-server.com',
+const auth = createAuthClient('https://your-auth-server.com', {
   adapter: BetterAuthReactAdapter(),
 });
 
@@ -151,12 +146,12 @@ function MyComponent() {
 
 ## API Reference
 
-### createAuthClient(config)
+### createAuthClient(url, config?)
 
 Factory function to create an auth client.
 
 **Parameters:**
-- `config.baseURL` - The auth service URL (required)
+- `url` - The auth service URL (required)
 - `config.adapter` - Optional adapter factory function (e.g., `SupabaseAuthAdapter()`)
 
 **Returns:** The adapter's public API (varies by adapter type)

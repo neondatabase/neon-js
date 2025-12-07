@@ -2,14 +2,8 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src",
-    "composite": true,
-    "paths": {
-      "@neondatabase/postgrest-js": ["../postgrest-js/src"],
-      "@neondatabase/auth": ["../auth/src"]
-    }
+    "rootDir": "./src"
   },
   "include": ["src"],
-  "exclude": ["src/__tests__"],
-  "references": [{ "path": "../postgrest-js" }, { "path": "../auth" }]
+  "exclude": ["src/__tests__"]
 }

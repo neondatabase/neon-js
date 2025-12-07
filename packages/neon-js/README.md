@@ -90,7 +90,8 @@ const { data: session } = await client.auth.getSession();
 Use this adapter in React applications to get access to hooks like `useSession`:
 
 ```typescript
-import { createClient, BetterAuthReactAdapter } from '@neondatabase/neon-js';
+import { createClient } from '@neondatabase/neon-js';
+import { BetterAuthReactAdapter } from '@neondatabase/neon-js/auth/react/adapters';
 
 const client = createClient<Database>({
   auth: {
@@ -466,7 +467,8 @@ export async function GET() {
 ### React Hook with BetterAuthReactAdapter
 
 ```typescript
-import { createClient, BetterAuthReactAdapter } from '@neondatabase/neon-js';
+import { createClient } from '@neondatabase/neon-js';
+import { BetterAuthReactAdapter } from '@neondatabase/neon-js/auth/react/adapters';
 
 const client = createClient({
   auth: {
@@ -495,7 +497,7 @@ export function useAuth() {
 
 This package combines two underlying packages:
 
-- [`@neondatabase/auth`](../neon-auth) - Authentication adapters (can be used standalone)
+- [`@neondatabase/auth`](../auth) - Authentication adapters (can be used standalone)
 - [`@neondatabase/postgrest-js`](../postgrest-js) - PostgreSQL client (can be used standalone)
 
 ## Migration from Previous Version

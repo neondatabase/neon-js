@@ -79,11 +79,10 @@ VITE_NEON_AUTH_URL=https://ep-withered-pond-w4e43v69.neonauth.c-2.us-east-2.aws.
 
 ## Which Package Should I Use?
 
-This monorepo contains five packages. Choose based on your needs:
+This monorepo contains four packages. Choose based on your needs:
 
 - **`@neondatabase/neon-js`** (Recommended): Full-featured SDK with auth + Neon Data API. Use this for most applications.
-- **`@neondatabase/auth`**: Authentication only. Use when you want to use Neon Auth for authentication and don't need to use the Neon Data API.
-- **`@neondatabase/auth-next`**: Next.js integration for Neon Auth. Use when building Next.js applications with Neon Auth.
+- **`@neondatabase/auth`**: Authentication only. Use when you want to use Neon Auth for authentication and don't need to use the Neon Data API. Includes Next.js integration via `@neondatabase/auth/next`.
 - **`@neondatabase/auth-ui`**: Pre-built UI components for Neon Auth. Use when you want ready-to-use sign-in/sign-up forms.
 - **`@neondatabase/postgrest-js`**: Database queries only. Use when you handle authentication externally or don't need auth.
 
@@ -235,9 +234,7 @@ For building custom clients or integrations:
 ```typescript
 import { createAuthClient } from '@neondatabase/auth';
 
-const auth = createAuthClient({
-  baseURL: import.meta.env.VITE_NEON_AUTH_URL,
-});
+const auth = createAuthClient(import.meta.env.VITE_NEON_AUTH_URL);
 
 // Use auth methods directly
 await auth.signIn.email({ email, password });
@@ -333,7 +330,7 @@ The auth adapters provide production-ready performance:
 
 ## Development
 
-This is a Bun workspaces monorepo with five packages. For detailed development instructions, see [CLAUDE.md](./CLAUDE.md).
+This is a Bun workspaces monorepo with four packages. For detailed development instructions, see [CLAUDE.md](./CLAUDE.md).
 
 **Quick start:**
 

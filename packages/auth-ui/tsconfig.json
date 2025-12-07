@@ -5,11 +5,9 @@
     "rootDir": "./src",
     "jsx": "react-jsx",
     "baseUrl": ".",
-    "composite": true,
     "paths": {
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src"],
-  "references": [{ "path": "../auth" }]
+  "include": ["src"]
 }

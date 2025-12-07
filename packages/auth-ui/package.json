@@ -33,7 +33,7 @@
   "author": "Neon <info@neon.tech>",
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
-  "types": "./dist/index.d.ts",
+  "types": "./dist/index.d.mts",
   "exports": {
     ".": "./dist/index.mjs",
     "./css": {
@@ -44,7 +44,7 @@
       "default": "./dist/tailwind.css"
     },
     "./server": {
-      "types": "./dist/server.d.ts",
+      "types": "./dist/server.d.mts",
       "default": "./dist/server.mjs"
     }
   },

@@ -8,7 +8,7 @@ A unified TypeScript SDK monorepo for Neon services, providing seamless integrat
 
 ## Monorepo Structure
 
-This is a Bun workspaces monorepo with five published packages:
+This is a Bun workspaces monorepo with four published packages:
 
 ### `@neondatabase/postgrest-js` (packages/postgrest-js/)
 Generic PostgreSQL client for Neon Data API without authentication:
@@ -17,8 +17,7 @@ Generic PostgreSQL client for Neon Data API without authentication:
 - No auth dependencies - can be used standalone for non-authenticated scenarios
 
 **Exports:**
-- `@neondatabase/postgrest-js` - Main exports (client, utilities)
-- `@neondatabase/postgrest-js/client` - Client components
+- `@neondatabase/postgrest-js` - Main exports (NeonPostgrestClient, fetchWithToken, AuthRequiredError)
 
 ### `@neondatabase/auth` (packages/auth/)
 Authentication adapters for Neon Auth supporting multiple auth providers:
@@ -26,9 +25,19 @@ Authentication adapters for Neon Auth supporting multiple auth providers:
 - **SupabaseAuthAdapter**: Supabase-compatible API for familiar auth patterns
 - **BetterAuthVanillaAdapter**: Direct Better Auth API for vanilla JS/TS
 - **BetterAuthReactAdapter**: Better Auth with React hooks support
+- **Next.js Integration**: Handler, middleware, and client factory for Next.js apps
 
 **Exports:**
-- `@neondatabase/auth` - Main exports (createAuthClient, adapters, utilities)
+- `@neondatabase/auth` - Main exports (createAuthClient, types)
+- `@neondatabase/auth/react` - React adapter exports
+- `@neondatabase/auth/react/ui` - Re-exports from auth-ui
+- `@neondatabase/auth/react/ui/server` - Server-side utilities
+- `@neondatabase/auth/react/adapters` - BetterAuthReactAdapter
+- `@neondatabase/auth/vanilla` - Vanilla adapter exports
+- `@neondatabase/auth/vanilla/adapters` - SupabaseAuthAdapter, BetterAuthVanillaAdapter
+- `@neondatabase/auth/next` - Next.js integration (toNextJsHandler, neonAuthMiddleware, createAuthClient)
+- `@neondatabase/auth/ui/css` - Pre-built CSS
+- `@neondatabase/auth/ui/tailwind` - Tailwind CSS
 
 ### `@neondatabase/neon-js` (packages/neon-js/)
 Main SDK package that combines authentication with PostgreSQL querying:
@@ -38,9 +47,18 @@ Main SDK package that combines authentication with PostgreSQL querying:
 - Re-exports all neon-auth exports for convenience
 
 **Exports:**
-- `@neondatabase/neon-js` - Main exports (createClient, all neon-auth exports)
-- `@neondatabase/neon-js/client` - Client components
+- `@neondatabase/neon-js` - Main exports (createClient, SupabaseAuthAdapter, BetterAuthVanillaAdapter, utilities)
 - `@neondatabase/neon-js/cli` - CLI tool
+- `@neondatabase/neon-js/auth` - Re-exports @neondatabase/auth
+- `@neondatabase/neon-js/auth/react` - Re-exports @neondatabase/auth/react
+- `@neondatabase/neon-js/auth/react/ui` - Re-exports @neondatabase/auth/react/ui
+- `@neondatabase/neon-js/auth/react/ui/server` - Re-exports @neondatabase/auth/react/ui/server
+- `@neondatabase/neon-js/auth/react/adapters` - Re-exports @neondatabase/auth/react/adapters (BetterAuthReactAdapter)
+- `@neondatabase/neon-js/auth/vanilla` - Re-exports @neondatabase/auth/vanilla
+- `@neondatabase/neon-js/auth/vanilla/adapters` - Re-exports @neondatabase/auth/vanilla/adapters
+- `@neondatabase/neon-js/auth/next` - Re-exports @neondatabase/auth/next
+- `@neondatabase/neon-js/ui/css` - Pre-built CSS
+- `@neondatabase/neon-js/ui/tailwind` - Tailwind CSS
 
 **Dependencies:**
 ```
@@ -48,19 +66,6 @@ Main SDK package that combines authentication with PostgreSQL querying:
     ├── @neondatabase/auth
     └── @neondatabase/postgrest-js
 ```
-
-### `@neondatabase/auth-next` (packages/neon-auth-next/)
-Next.js integration for Neon Auth, providing server-side auth handling and middleware:
-- **toNextJsHandler()**: Creates Next.js API route handler that proxies to Neon Auth
-- **neonAuthMiddleware()**: Next.js middleware for auth protection and OAuth token exchange
-- **createAuthClient()**: Pre-configured client for Next.js with BetterAuthReactAdapter
-
-**Exports:**
-- `@neondatabase/auth-next` - Main exports (handler, middleware, client factory, re-exports neon-auth)
-
-**Dependencies:**
-- `@neondatabase/auth` (workspace)
-- `next` (peer dependency ^16.0.6)
 
 ### `@neondatabase/auth-ui` (packages/auth-ui/)
 UI components for Neon Auth built on top of [better-auth-ui](https://better-auth-ui.com):
@@ -114,7 +119,6 @@ bun release:postgrest-js
 bun release:auth
 bun release:auth-ui
 bun release:neon-js
-bun release:neon-auth-next
 ```
 
 ## Build Configuration
@@ -251,20 +255,10 @@ export default defineConfig(
 
 **Dependencies**: Imports from `@neondatabase/postgrest-js` and `@neondatabase/auth`
 
-### Next.js Integration Layer (`packages/neon-auth-next/`)
-
-**Handler**: `src/handler/`
-- `index.ts` - `toNextJsHandler()` export
-- `request.ts` - Request proxying to upstream Neon Auth
-- `response.ts` - Response handling
-
-**Middleware**: `src/middleware/`
-- `index.ts` - `neonAuthMiddleware()` for route protection
-- `oauth.ts` - OAuth token exchange handling
-
-**Entry Point**: `src/index.ts`
-- `createAuthClient()` - Pre-configured client with BetterAuthReactAdapter
-- Re-exports all `@neondatabase/auth` exports
+**Next.js Integration** (in `packages/auth/src/next/`):
+- `handler/` - `toNextJsHandler()` for API routes
+- `middleware/` - `neonAuthMiddleware()` for route protection
+- `index.ts` - `createAuthClient()` pre-configured for Next.js
 
 ### UI Components Layer (`packages/auth-ui/`)
 
@@ -376,7 +370,8 @@ const { data: items } = await client.from('items').select();
 #### BetterAuthReactAdapter (With React Hooks)
 
 ```typescript
-import { createClient, BetterAuthReactAdapter } from '@neondatabase/neon-js';
+import { createClient } from '@neondatabase/neon-js';
+import { BetterAuthReactAdapter } from '@neondatabase/neon-js/auth/react/adapters';
 
 const client = createClient<Database>({
   auth: {
@@ -416,7 +411,7 @@ const { data: session } = await auth.getSession();
 
 ```typescript
 // api/auth/[...path]/route.ts
-import { toNextJsHandler } from "@neondatabase/auth-next"
+import { toNextJsHandler } from "@neondatabase/auth/next"
 
 export const { GET, POST } = toNextJsHandler(
   process.env.NEON_AUTH_BASE_URL
@@ -424,11 +419,11 @@ export const { GET, POST } = toNextJsHandler(
 
 // lib/auth/client.ts
 "use client"
-import { createAuthClient } from '@neondatabase/auth-next';
+import { createAuthClient } from '@neondatabase/auth/next';
 export const authClient = createAuthClient()
 
 // middleware.ts
-import { neonAuthMiddleware } from '@neondatabase/auth-next';
+import { neonAuthMiddleware } from '@neondatabase/auth/next';
 export default neonAuthMiddleware();
 ```
 
@@ -552,7 +547,7 @@ Following the [Better Auth Supabase Migration Guide](https://www.better-auth.com
 
 - `packages/auth/src/adapters/supabase/better-auth-docs.md` - Comprehensive adapter docs
 - `packages/auth/src/adapters/supabase/better-auth-plugins.md` - Plugin configuration
-- `packages/neon-auth-next/README.md` - Next.js integration guide
+- `packages/auth/NEXT-JS.md` - Next.js integration guide
 - `packages/auth-ui/README.md` - UI components documentation
 
 ## References
