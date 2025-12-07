@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-beta.1] - 2025-12-07
+
+### Changed
+
+#### Breaking: Package Renamed
+- Package renamed from `@neondatabase/neon-auth` to `@neondatabase/auth`
+- Update your imports: `@neondatabase/neon-auth` → `@neondatabase/auth`
+
+#### New Export Structure
+- Added subpath exports for better tree-shaking and organization:
+  - `@neondatabase/auth` - Main exports (createAuthClient, types)
+  - `@neondatabase/auth/react` - React adapter exports
+  - `@neondatabase/auth/react/ui` - UI components re-exported from auth-ui
+  - `@neondatabase/auth/react/ui/server` - Server-side utilities
+  - `@neondatabase/auth/react/adapters` - BetterAuthReactAdapter
+  - `@neondatabase/auth/vanilla` - Vanilla adapter exports
+  - `@neondatabase/auth/vanilla/adapters` - SupabaseAuthAdapter, BetterAuthVanillaAdapter
+  - `@neondatabase/auth/next` - Next.js integration (toNextJsHandler, neonAuthMiddleware, createAuthClient)
+  - `@neondatabase/auth/ui/css` - Pre-built CSS
+  - `@neondatabase/auth/ui/tailwind` - Tailwind CSS
+
+### Added
+
+- **Next.js Integration**: Added `toNextJsHandler`, `neonAuthMiddleware`, and `createAuthClient` for seamless Next.js support
+- **Server Entrypoint**: Added `@neondatabase/auth/react/ui/server` for server-side utilities
+- **CSS Distribution**: CSS files from auth-ui are now available via `@neondatabase/auth/ui/css` and `@neondatabase/auth/ui/tailwind`
+
+### Fixed
+
+- **ESM Exports**: Fixed `.mjs` exports for proper ESM module resolution
+- **Use Client Directives**: Fixed preservation of `'use client'` directives in bundled output
+- **Session/User Types**: Removed Supabase-specific type dependencies, now uses Better Auth native types
+- **OAuth Middleware**: Fixed URL handling in OAuth callback middleware
+
+### Removed
+
+- **Supabase Type Dependencies**: Removed `Session` and `User` type mappings that mimicked Supabase structure; adapters now use Better Auth native types directly
 
 ## [0.1.0-alpha.8] - 2025-12-04
 
