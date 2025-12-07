@@ -29,12 +29,11 @@
     "url": "https://neon.tech"
   },
   "author": "Neon <info@neon.tech>",
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
   "exports": {
-    ".": "./dist/index.mjs",
-    "./client": "./dist/client/index.mjs"
+    ".": "./dist/index.mjs"
   },
   "sideEffects": false,
   "files": [

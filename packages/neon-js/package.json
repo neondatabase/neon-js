@@ -31,8 +31,8 @@
     "url": "https://neon.tech"
   },
   "author": "Neon <info@neon.tech>",
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "sideEffects": false,
   "bin": {
