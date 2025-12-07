@@ -1,6 +1,9 @@
 # @neondatabase/neon-js
 
+[![npm version](https://img.shields.io/npm/v/@neondatabase/neon-js.svg)](https://www.npmjs.com/package/@neondatabase/neon-js)
 [![npm downloads](https://img.shields.io/npm/dm/@neondatabase/neon-js.svg)](https://www.npmjs.com/package/@neondatabase/neon-js)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0%2B-blue.svg)](https://www.typescriptlang.org/)
+[![License](https://img.shields.io/npm/l/@neondatabase/neon-js.svg)](https://github.com/neondatabase-labs/neon-js/blob/main/LICENSE)
 
 The official TypeScript SDK for Neon, combining authentication and database querying in a familiar interface.
 
@@ -87,7 +90,8 @@ const { data: session } = await client.auth.getSession();
 Use this adapter in React applications to get access to hooks like `useSession`:
 
 ```typescript
-import { createClient, BetterAuthReactAdapter } from '@neondatabase/neon-js';
+import { createClient } from '@neondatabase/neon-js';
+import { BetterAuthReactAdapter } from '@neondatabase/neon-js/auth/react/adapters';
 
 const client = createClient<Database>({
   auth: {
@@ -319,6 +323,24 @@ const client = createClient({
 });
 ```
 
+## UI Component Styles
+
+If you're using `@neondatabase/auth-ui` components with the SDK, CSS is conveniently available:
+
+| Export | Use Case |
+|--------|----------|
+| `@neondatabase/neon-js/ui/css` | Pre-built styles (~47KB) |
+| `@neondatabase/neon-js/ui/tailwind` | Tailwind-ready CSS |
+
+```css
+/* Without Tailwind */
+@import '@neondatabase/neon-js/ui/css';
+
+/* With Tailwind CSS v4 */
+@import 'tailwindcss';
+@import '@neondatabase/neon-js/ui/tailwind';
+```
+
 ## TypeScript
 
 Generate TypeScript types from your database schema:
@@ -445,7 +467,8 @@ export async function GET() {
 ### React Hook with BetterAuthReactAdapter
 
 ```typescript
-import { createClient, BetterAuthReactAdapter } from '@neondatabase/neon-js';
+import { createClient } from '@neondatabase/neon-js';
+import { BetterAuthReactAdapter } from '@neondatabase/neon-js/auth/react/adapters';
 
 const client = createClient({
   auth: {
@@ -474,7 +497,7 @@ export function useAuth() {
 
 This package combines two underlying packages:
 
-- [`@neondatabase/neon-auth`](../neon-auth) - Authentication adapters (can be used standalone)
+- [`@neondatabase/auth`](../auth) - Authentication adapters (can be used standalone)
 - [`@neondatabase/postgrest-js`](../postgrest-js) - PostgreSQL client (can be used standalone)
 
 ## Migration from Previous Version

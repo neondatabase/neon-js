@@ -1,25 +1,41 @@
 {
   "name": "@neondatabase/postgrest-js",
   "version": "0.1.0-alpha.1",
-  "description": "Generic PostgreSQL client for Neon Data API (without authentication)",
+  "description": "PostgreSQL client for Neon Data API - query your database without authentication",
   "type": "module",
   "license": "Apache-2.0",
-  "homepage": "https://github.com/neondatabase-labs/neon-js/",
+  "keywords": [
+    "neon",
+    "neondb",
+    "postgresql",
+    "postgres",
+    "database",
+    "postgrest",
+    "data-api",
+    "typescript",
+    "sdk",
+    "query-builder"
+  ],
+  "homepage": "https://github.com/neondatabase-labs/neon-js/tree/main/packages/postgrest-js#readme",
   "bugs": {
     "url": "https://github.com/neondatabase-labs/neon-js/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/neondatabase-labs/neon-js.git"
+    "url": "git+https://github.com/neondatabase-labs/neon-js.git",
+    "directory": "packages/postgrest-js"
+  },
+  "funding": {
+    "url": "https://neon.tech"
   },
   "author": "Pedro Figueiredo <pedro.figueiredo@databricks.com>",
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
   "exports": {
-    ".": "./dist/index.mjs",
-    "./client": "./dist/client/index.mjs"
+    ".": "./dist/index.mjs"
   },
+  "sideEffects": false,
   "files": [
     "dist"
   ],
@@ -38,15 +54,7 @@
     "lint": "eslint .",
     "clean": "rm -rf node_modules dist"
   },
-  "devDependencies": {
-    "@eslint/js": "^9.39.1",
-    "eslint": "^9.39.1",
-    "eslint-plugin-unicorn": "^62.0.0",
-    "tsdown": "0.16.0",
-    "typescript": "^5.9.3",
-    "vitest": "4.0.7",
-    "vite-tsconfig-paths": "5.1.4"
-  },
+  "devDependencies": {},
   "dependencies": {
     "@supabase/postgrest-js": "2.79.0"
   }

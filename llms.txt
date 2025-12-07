@@ -1,0 +1,412 @@
+# Neon JavaScript SDK
+
+> TypeScript SDK for Neon services - authentication (Neon Auth) and PostgreSQL database queries (Neon Data API). Provides a unified, type-safe API with multiple authentication adapters and automatic token management.
+
+## Package Selection (Read First)
+
+| Use Case | Package |
+|----------|---------|
+| Auth + Data API (any framework) | `@neondatabase/neon-js` |
+| Auth only (no database queries) | `@neondatabase/auth` |
+| Data API only (external auth system) | `@neondatabase/postgrest-js` |
+
+**Key point**: `@neondatabase/neon-js` includes everything - auth, Next.js integration, UI components, and Data API. If you need both auth and database queries, just install this one package.
+
+## Quick Start: Next.js (Most Common)
+
+```typescript
+// 1. Install: npm install @neondatabase/neon-js
+
+// 2. Create API route handler: app/api/auth/[...path]/route.ts
+import { toNextJsHandler } from "@neondatabase/neon-js/auth/next";
+export const { GET, POST } = toNextJsHandler(process.env.NEON_AUTH_BASE_URL!);
+
+// 3. Create auth client: lib/auth/client.ts
+"use client";
+import { createAuthClient } from "@neondatabase/neon-js/auth/next";
+export const authClient = createAuthClient();
+
+// 4. Create database client: lib/db/client.ts
+import { createClient } from "@neondatabase/neon-js";
+import type { Database } from "./database.types"; // Generated types (optional)
+
+export const dbClient = createClient<Database>({
+  auth: {
+    url: process.env.NEXT_PUBLIC_NEON_AUTH_URL!,
+  },
+  dataApi: {
+    url: process.env.NEON_DATA_API_URL!,
+  },
+});
+
+// 5. Use in components
+"use client";
+import { authClient } from "@/lib/auth/client";
+
+function SignInButton() {
+  const session = authClient.useSession();
+
+  if (session.isPending) return <div>Loading...</div>;
+  if (session.data) return <p>Hello, {session.data.user.name}</p>;
+
+  return (
+    <button onClick={() => authClient.signIn.email({
+      email: "user@example.com",
+      password: "password123"
+    })}>
+      Sign In
+    </button>
+  );
+}
+
+// 6. Query database (tokens injected automatically)
+const { data: items } = await dbClient.from("items").select("*");
+await dbClient.from("items").insert({ name: "New Item" });
+await dbClient.from("items").update({ status: "done" }).eq("id", 1);
+await dbClient.from("items").delete().eq("id", 1);
+```
+
+## Quick Start: React SPA
+
+```typescript
+// 1. Install: npm install @neondatabase/neon-js
+
+// 2. Create client with React adapter
+import { createClient, BetterAuthReactAdapter } from "@neondatabase/neon-js";
+
+const client = createClient<Database>({
+  auth: {
+    adapter: BetterAuthReactAdapter,
+    url: import.meta.env.VITE_NEON_AUTH_URL,
+  },
+  dataApi: {
+    url: import.meta.env.VITE_NEON_DATA_API_URL,
+  },
+});
+
+// 3. Use React hooks
+function App() {
+  const session = client.auth.useSession();
+
+  if (session.isPending) return <div>Loading...</div>;
+  if (!session.data) return <LoginForm />;
+
+  return <Dashboard user={session.data.user} />;
+}
+
+// 4. Auth methods
+await client.auth.signIn.email({ email, password });
+await client.auth.signUp.email({ email, password, name });
+await client.auth.signOut();
+const session = await client.auth.getSession();
+
+// 5. Database queries
+const { data } = await client.from("items").select();
+```
+
+## Quick Start: Node.js Backend
+
+```typescript
+// 1. Install: npm install @neondatabase/neon-js
+
+// 2. Create client with vanilla adapter (default)
+import { createClient } from "@neondatabase/neon-js";
+
+const client = createClient<Database>({
+  auth: {
+    url: process.env.NEON_AUTH_URL!,
+  },
+  dataApi: {
+    url: process.env.NEON_DATA_API_URL!,
+  },
+});
+
+// 3. Sign in and query
+await client.auth.signIn.email({ email, password });
+const { data } = await client.from("users").select("id, name, email");
+```
+
+## Quick Start: Auth Only (No Database)
+
+```typescript
+// 1. Install: npm install @neondatabase/auth
+
+// 2. Create auth client
+import { createAuthClient } from "@neondatabase/auth";
+
+const auth = createAuthClient({
+  baseURL: process.env.NEON_AUTH_URL!,
+});
+
+// 3. Use auth methods
+await auth.signIn.email({ email, password });
+const session = await auth.getSession();
+```
+
+## Quick Start: Data API Only (No Auth)
+
+```typescript
+// 1. Install: npm install @neondatabase/postgrest-js
+
+// 2. Create client with manual token
+import { NeonPostgrestClient, fetchWithToken } from "@neondatabase/postgrest-js";
+
+const client = new NeonPostgrestClient({
+  dataApiUrl: process.env.NEON_DATA_API_URL!,
+  options: {
+    global: {
+      fetch: fetchWithToken(async () => getTokenFromYourAuthSystem()),
+    },
+  },
+});
+
+// 3. Query database
+const { data } = await client.from("items").select("*");
+```
+
+## Auth UI Components (Next.js)
+
+```typescript
+// All UI components are included in @neondatabase/neon-js
+
+// 1. Import CSS in layout.tsx (choose one):
+// Without Tailwind:
+import "@neondatabase/neon-js/ui/css";
+// With Tailwind v4 (in globals.css):
+// @import 'tailwindcss';
+// @import '@neondatabase/neon-js/ui/tailwind';
+
+// 2. Create provider: app/auth-provider.tsx
+"use client";
+import { NeonAuthUIProvider } from "@neondatabase/neon-js/auth/react/ui";
+import { authClient } from "@/lib/auth/client";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  return (
+    <NeonAuthUIProvider
+      authClient={authClient}
+      navigate={router.push}
+      replace={router.replace}
+      onSessionChange={() => router.refresh()}
+      Link={Link}
+    >
+      {children}
+    </NeonAuthUIProvider>
+  );
+}
+
+// 3. Wrap app in layout.tsx
+<AuthProvider>{children}</AuthProvider>
+
+// 4. Create auth page: app/auth/[path]/page.tsx
+import { AuthView } from "@neondatabase/neon-js/auth/react/ui";
+import { authViewPaths } from "@neondatabase/neon-js/auth/react/ui/server";
+
+export const dynamicParams = false;
+export function generateStaticParams() {
+  return Object.values(authViewPaths).map((path) => ({ path }));
+}
+
+export default async function AuthPage({ params }: { params: Promise<{ path: string }> }) {
+  const { path } = await params;
+  return <AuthView path={path} />;
+}
+
+// Provides these routes automatically:
+// /auth/sign-in, /auth/sign-up, /auth/forgot-password, /auth/reset-password,
+// /auth/magic-link, /auth/two-factor, /auth/callback, /auth/sign-out
+```
+
+## Authentication Adapters
+
+Three adapters available for different API styles:
+
+### BetterAuthVanillaAdapter (Default)
+```typescript
+import { createClient } from "@neondatabase/neon-js";
+// Default adapter, no need to specify
+const client = createClient({ auth: { url }, dataApi: { url } });
+
+await client.auth.signIn.email({ email, password });
+await client.auth.signUp.email({ email, password, name });
+const session = await client.auth.getSession();
+```
+
+### BetterAuthReactAdapter (React Hooks)
+```typescript
+import { createClient, BetterAuthReactAdapter } from "@neondatabase/neon-js";
+
+const client = createClient({
+  auth: { adapter: BetterAuthReactAdapter, url },
+  dataApi: { url },
+});
+
+// React hook available
+const session = client.auth.useSession();
+```
+
+### SupabaseAuthAdapter (Supabase-compatible API)
+```typescript
+import { createClient, SupabaseAuthAdapter } from "@neondatabase/neon-js";
+
+const client = createClient({
+  auth: { adapter: SupabaseAuthAdapter, url },
+  dataApi: { url },
+});
+
+// Supabase-compatible methods
+await client.auth.signInWithPassword({ email, password });
+await client.auth.signUp({ email, password });
+const { data: { session } } = await client.auth.getSession();
+client.auth.onAuthStateChange((event, session) => { /* ... */ });
+```
+
+## Database Query Patterns
+
+All query methods follow PostgREST syntax (same as Supabase):
+
+```typescript
+// Select with filters
+const { data } = await client.from("items")
+  .select("id, name, status")
+  .eq("status", "active")
+  .order("created_at", { ascending: false })
+  .limit(10);
+
+// Select with relationships
+const { data } = await client.from("posts")
+  .select("id, title, author:users(name, email)");
+
+// Insert
+const { data, error } = await client.from("items")
+  .insert({ name: "New Item", status: "pending" })
+  .select()
+  .single();
+
+// Update
+await client.from("items")
+  .update({ status: "completed" })
+  .eq("id", 1);
+
+// Delete
+await client.from("items")
+  .delete()
+  .eq("id", 1);
+
+// Upsert
+await client.from("items")
+  .upsert({ id: 1, name: "Updated Item" });
+```
+
+## CLI: Generate Database Types
+
+```bash
+# Generate TypeScript types from database schema
+npx neon-js gen-types --db-url "postgresql://user:pass@host:5432/db"
+
+# Custom output path
+npx neon-js gen-types --db-url "..." --output src/types/database.ts
+
+# Multiple schemas
+npx neon-js gen-types --db-url "..." -s public -s auth
+
+# Use generated types
+import type { Database } from "./database.types";
+const client = createClient<Database>({ ... });
+// Now client.from("items") is fully typed!
+```
+
+## Environment Variables
+
+```bash
+# .env.local (Next.js)
+NEON_AUTH_BASE_URL=https://ep-xxx.neonauth.c-2.us-east-2.aws.neon.build/dbname/auth
+NEXT_PUBLIC_NEON_AUTH_URL=https://ep-xxx.neonauth.c-2.us-east-2.aws.neon.build/dbname/auth
+NEON_DATA_API_URL=https://ep-xxx.apirest.c-2.us-east-2.aws.neon.build/dbname/rest/v1
+
+# .env (Vite/React)
+VITE_NEON_AUTH_URL=https://ep-xxx.neonauth.c-2.us-east-2.aws.neon.build/dbname/auth
+VITE_NEON_DATA_API_URL=https://ep-xxx.apirest.c-2.us-east-2.aws.neon.build/dbname/rest/v1
+```
+
+## Common Mistakes to Avoid
+
+1. **Installing multiple packages unnecessarily**: Just use `@neondatabase/neon-js` for auth + data API - it includes everything
+2. **Missing "use client" directive**: Auth client components need `"use client"` at the top
+3. **Exposing server URLs in client code**: Use `NEXT_PUBLIC_` prefix only for URLs that should be public
+4. **Forgetting CSS import for auth-ui**: Auth UI components need CSS imported from `@neondatabase/neon-js/ui/css`
+5. **Using wrong adapter**: Use `BetterAuthReactAdapter` for React hooks, `SupabaseAuthAdapter` for Supabase-compatible API
+6. **Not generating types**: Use `npx neon-js gen-types` for full type safety
+
+## Supabase Migration
+
+```diff
+- import { createClient } from "@supabase/supabase-js";
++ import { createClient, SupabaseAuthAdapter } from "@neondatabase/neon-js";
+
+- const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
++ const client = createClient({
++   auth: { adapter: SupabaseAuthAdapter, url: NEON_AUTH_URL },
++   dataApi: { url: NEON_DATA_API_URL },
++ });
+
+// Auth methods work the same
+await client.auth.signInWithPassword({ email, password });
+const { data: { session } } = await client.auth.getSession();
+
+// Database queries work the same
+const { data } = await client.from("items").select();
+```
+
+## Optional
+
+### Import Paths Reference
+
+From `@neondatabase/neon-js`:
+- `@neondatabase/neon-js` - Main client (createClient, adapters)
+- `@neondatabase/neon-js/auth/next` - Next.js handler and client (toNextJsHandler, createAuthClient)
+- `@neondatabase/neon-js/auth/react/ui` - UI components (NeonAuthUIProvider, AuthView, SignInForm, etc.)
+- `@neondatabase/neon-js/auth/react/ui/server` - Server utilities (authViewPaths)
+- `@neondatabase/neon-js/ui/css` - Pre-built CSS bundle
+- `@neondatabase/neon-js/ui/tailwind` - Tailwind-ready CSS
+
+From `@neondatabase/auth` (auth only, same subpaths):
+- `@neondatabase/auth` - Auth client
+- `@neondatabase/auth/next` - Next.js integration
+- `@neondatabase/auth/react/ui` - UI components
+- `@neondatabase/auth/ui/css` - CSS bundle
+
+### Error Handling Pattern
+
+```typescript
+// Auth errors
+const { error } = await client.auth.signIn.email({ email, password });
+if (error) {
+  switch (error.code) {
+    case "INVALID_EMAIL_OR_PASSWORD":
+      showError("Invalid email or password");
+      break;
+    case "EMAIL_NOT_VERIFIED":
+      showError("Please verify your email");
+      break;
+    default:
+      showError("Authentication failed");
+  }
+}
+
+// Database errors
+const { data, error } = await client.from("items").select();
+if (error) {
+  console.error("Database error:", error.message);
+}
+```
+
+## Links
+
+- [GitHub Repository](https://github.com/neondatabase-labs/neon-js)
+- [Neon Documentation](https://neon.tech/docs)
+- [Better Auth Documentation](https://www.better-auth.com/docs)
+- [Better Auth UI](https://better-auth-ui.com)

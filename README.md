@@ -1,6 +1,9 @@
 # neon-js
 
+[![npm version](https://img.shields.io/npm/v/@neondatabase/neon-js.svg)](https://www.npmjs.com/package/@neondatabase/neon-js)
 [![npm downloads](https://img.shields.io/npm/dm/@neondatabase/neon-js.svg)](https://www.npmjs.com/package/@neondatabase/neon-js)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0%2B-blue.svg)](https://www.typescriptlang.org/)
+[![License](https://img.shields.io/npm/l/@neondatabase/neon-js.svg)](https://github.com/neondatabase/neon-js/blob/main/LICENSE)
 
 A unified TypeScript SDK for Neon services, providing seamless integration with authentication and PostgreSQL database queries. Offers a familiar, type-safe API for building modern applications with Neon.
 
@@ -20,7 +23,7 @@ A unified TypeScript SDK for Neon services, providing seamless integration with 
   - [Usage Examples](#usage-examples)
     - [Using @neondatabase/neon-js (Recommended)](#using-neondatabaseneon-js-recommended)
     - [Using @neondatabase/postgrest-js (No Auth)](#using-neondatabasepostgrest-js-no-auth)
-    - [Using @neondatabase/neon-auth (Custom Integrations)](#using-neondatabaseneon-auth-custom-integrations)
+    - [Using @neondatabase/auth (Custom Integrations)](#using-neondatabaseauth-custom-integrations)
   - [Supabase Migration Guide](#supabase-migration-guide)
     - [Quick Migration Steps](#quick-migration-steps)
   - [Authentication Methods](#authentication-methods)
@@ -76,12 +79,11 @@ VITE_NEON_AUTH_URL=https://ep-withered-pond-w4e43v69.neonauth.c-2.us-east-2.aws.
 
 ## Which Package Should I Use?
 
-This monorepo contains five packages. Choose based on your needs:
+This monorepo contains four packages. Choose based on your needs:
 
 - **`@neondatabase/neon-js`** (Recommended): Full-featured SDK with auth + Neon Data API. Use this for most applications.
-- **`@neondatabase/neon-auth`**: Authentication only. Use when you want to use Neon Auth for authentication and don't need to use the Neon Data API.
-- **`@neondatabase/neon-auth-next`**: Next.js integration for Neon Auth. Use when building Next.js applications with Neon Auth.
-- **`@neondatabase/neon-auth-ui`**: Pre-built UI components for Neon Auth. Use when you want ready-to-use sign-in/sign-up forms.
+- **`@neondatabase/auth`**: Authentication only. Use when you want to use Neon Auth for authentication and don't need to use the Neon Data API. Includes Next.js integration via `@neondatabase/auth/next`.
+- **`@neondatabase/auth-ui`**: Pre-built UI components for Neon Auth. Use when you want ready-to-use sign-in/sign-up forms.
 - **`@neondatabase/postgrest-js`**: Database queries only. Use when you handle authentication externally or don't need auth.
 
 ## Quick Start
@@ -225,16 +227,14 @@ const client = new NeonPostgrestClient({
 const { data } = await client.from('items').select();
 ```
 
-### Using @neondatabase/neon-auth (Custom Integrations)
+### Using @neondatabase/auth (Custom Integrations)
 
 For building custom clients or integrations:
 
 ```typescript
-import { createAuthClient } from '@neondatabase/neon-auth';
+import { createAuthClient } from '@neondatabase/auth';
 
-const auth = createAuthClient({
-  baseURL: import.meta.env.VITE_NEON_AUTH_URL,
-});
+const auth = createAuthClient(import.meta.env.VITE_NEON_AUTH_URL);
 
 // Use auth methods directly
 await auth.signIn.email({ email, password });
@@ -330,7 +330,7 @@ The auth adapters provide production-ready performance:
 
 ## Development
 
-This is a Bun workspaces monorepo with five packages. For detailed development instructions, see [CLAUDE.md](./CLAUDE.md).
+This is a Bun workspaces monorepo with four packages. For detailed development instructions, see [CLAUDE.md](./CLAUDE.md).
 
 **Quick start:**
 

@@ -6,7 +6,7 @@
  *   bun scripts/release.ts <package-name>
  *
  * Examples:
- *   bun scripts/release.ts neon-auth    # Releases neon-auth and patches neon-js
+ *   bun scripts/release.ts auth          # Releases auth and patches neon-js
  *   bun scripts/release.ts postgrest-js # Releases postgrest-js and patches neon-js
  *   bun scripts/release.ts neon-js      # Releases neon-js only (leaf package)
  */
@@ -15,18 +15,70 @@ import { $, spawn } from 'bun';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 
-// Dependency graph: package -> packages that depend on it
+// Dependency graph: package -> direct dependents (packages that depend on it)
+// The release script will automatically resolve transitive dependents.
 const DEPENDENCY_GRAPH: Record<string, string[]> = {
   'postgrest-js': ['neon-js'],
-  'neon-auth-ui': [],
-  'neon-auth': ['neon-js', 'neon-auth-next'],
+  'auth-ui': ['auth'],
+  auth: ['neon-js'],
   'neon-js': [],
-  'neon-auth-next': [],
 };
 
 const VALID_PACKAGES = Object.keys(DEPENDENCY_GRAPH);
 
 const ROOT_DIR = path.resolve(import.meta.dirname, '..');
+
+/**
+ * Resolves all transitive dependents of a package using BFS.
+ *
+ * State machine:
+ *   States: { queue, visited, result }
+ *   Transitions:
+ *     1. Dequeue package from queue
+ *     2. If visited → skip (prevents cycles & duplicates)
+ *     3. Mark visited, add to result
+ *     4. Enqueue all direct dependents
+ *     5. Repeat until queue empty
+ *
+ * BFS guarantees correct release order: a package is always
+ * processed before its dependents (children in the graph).
+ *
+ * @example
+ *   getTransitiveDependents('auth-ui')
+ *   // Returns: ['auth-ui', 'auth', 'neon-js']
+ *
+ * @example
+ *   getTransitiveDependents('neon-js')
+ *   // Returns: ['neon-js'] (leaf node, no dependents)
+ */
+function getTransitiveDependents(packageName: string): string[] {
+  const result: string[] = [];
+  const visited = new Set<string>();
+  const queue: string[] = [packageName];
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+
+    // State check: skip if already processed (handles cycles & duplicates)
+    if (visited.has(current)) {
+      continue;
+    }
+
+    // State transition: mark as visited and add to result
+    visited.add(current);
+    result.push(current);
+
+    // Enqueue direct dependents for processing
+    const dependents = DEPENDENCY_GRAPH[current] ?? [];
+    for (const dep of dependents) {
+      if (!visited.has(dep)) {
+        queue.push(dep);
+      }
+    }
+  }
+
+  return result;
+}
 
 interface PackageJson {
   name: string;
@@ -167,8 +219,15 @@ async function release(packageName: string): Promise<void> {
   console.log(`\n🎯 Starting release for: ${packageName}`);
   console.log('─'.repeat(50));
 
-  const dependents = DEPENDENCY_GRAPH[packageName];
-  const allPackages = [packageName, ...dependents];
+  // Resolve all transitive dependents (includes the starting package)
+  const allPackages = getTransitiveDependents(packageName);
+  const dependents = allPackages.slice(1); // Everything except the starting package
+
+  console.log(`\n📋 Release plan (${allPackages.length} packages):`);
+  for (const [i, pkg] of allPackages.entries()) {
+    const marker = i === 0 ? '→' : '  →';
+    console.log(`  ${marker} ${pkg}`);
+  }
 
   // ============================================
   // Phase 1: Version bumping (build + bumpp)

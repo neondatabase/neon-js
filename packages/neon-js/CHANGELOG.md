@@ -10,32 +10,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Bump @neondatabase/neon-auth to 0.1.0-alpha.6
+- Bump @neondatabase/auth to 0.1.0-alpha.6
 
 
 ## [0.1.0-alpha.8] - 2025-12-03
 
 ### Changed
 
-- Bump @neondatabase/neon-auth to 0.1.0-alpha.5
+- Bump @neondatabase/auth to 0.1.0-alpha.5
 
 ## [0.1.0-alpha.7] - 2025-12-03
 
 ### Changed
 
-- Bump @neondatabase/neon-auth to 0.1.0-alpha.4
+- Bump @neondatabase/auth to 0.1.0-alpha.4
 
 ## [0.1.0-alpha.6] - 2025-11-27
 
 ### Changed
 
-- Bump @neondatabase/neon-auth to 0.1.0-alpha.3
+- Bump @neondatabase/auth to 0.1.0-alpha.3
 
 ## [0.1.0-alpha.5] - 2025-11-27
 
 ### Changed
 
-- Bump @neondatabase/neon-auth to 0.1.0-alpha.2
+- Bump @neondatabase/auth to 0.1.0-alpha.2
 
 ## [0.1.0-alpha.4] - 2025-11-26
 
@@ -60,7 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Renamed dependency from `@neondatabase/auth-js` to `@neondatabase/neon-auth`
+- Renamed dependency from `@neondatabase/auth-js` to `@neondatabase/auth`
 - Updated `NeonClient` to work with new auth adapter architecture
 - Improved `client-factory.ts` with better type inference
 - Updated documentation with dual URL mode examples
