@@ -216,22 +216,6 @@ Multiple concurrent `getSession()` calls are automatically deduplicated:
 - Edge Runtime (Vercel, Cloudflare Workers, etc.)
 - Bun
 
-## TypeScript
-
-Full TypeScript support with strict typing:
-
-```typescript
-import { createAuthClient } from '@neondatabase/auth';
-import type { Session, User } from '@neondatabase/auth';
-
-const auth = createAuthClient({
-  baseURL: 'https://your-auth-server.com',
-});
-
-// Fully typed responses
-const session: Session | null = await auth.getSession();
-```
-
 ## Next.js Integration
 
 For Next.js projects, this package provides built-in integration via `@neondatabase/auth/next`. See the [Next.js Setup Guide](./NEXT-JS.md) for:
