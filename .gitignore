@@ -10,4 +10,7 @@ dist
 load-test.ts
 .history
 tsconfig.tsbuildinfo
+
+# Claude/Cursor plans and todos
 plans/
+todos/

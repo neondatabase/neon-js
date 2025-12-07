@@ -17,7 +17,7 @@ export const toNextJsHandler = (baseUrl: string) => {
   ) => {
     const resolvedParams = await params;
     const path = resolvedParams.path.join('/');
-    const response = await handleAuthRequest(baseUrl, request, path);
+    const response = await handleAuthRequest(baseURL, request, path);
     return await handleAuthResponse(response);
   };
 

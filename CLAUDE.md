@@ -189,6 +189,44 @@ export default defineConfig(
 );
 ```
 
+## Build Artifacts & Design Decisions
+
+### Side-Effect Imports in Bundle Output
+
+You may notice `import "@neondatabase/auth/react/adapters"` in `packages/neon-js/dist/index.mjs`.
+This is a **bundler artifact from type-only imports**, NOT actual React code being bundled.
+
+- **Source:** Type import for function overloads in `client-factory.ts`
+- **Impact:** Zero runtime bytes - the import is externalized
+- **Verification:** Main bundle is 1.48KB with no React code
+
+The `external` config correctly externalizes `@neondatabase/auth`, and tsdown extends this to all subpaths. The import statement tells bundlers "this is an external dependency" - it does not include the code.
+
+### CSS Build Chain & Distribution
+
+CSS is intentionally duplicated across packages for convenience imports:
+
+```
+auth-ui (generates via Tailwind) → auth (copies) → neon-js (copies)
+```
+
+**Why triplication?** Enables users to import CSS from whichever package they use:
+- `@neondatabase/auth-ui/css` - Direct from source
+- `@neondatabase/auth/ui/css` - Convenience for auth-only users
+- `@neondatabase/neon-js/ui/css` - Convenience for full SDK users
+
+**End-user impact:** Minimal. npm deduplicates identical files during download. End users get ~47KB of CSS, not 141KB.
+
+### Re-export File Structure
+
+The 8 re-export files in `packages/neon-js/src/auth/` are **mandatory**, not optional complexity.
+
+**Why they exist:** npm's `exports` field cannot reference external packages. Only relative
+paths within the package are valid (per Node.js ESM specification). Wrapper files are the only way to provide the unified
+`@neondatabase/neon-js/auth/*` import paths.
+
+**Reference:** [Node.js Packages Documentation](https://nodejs.org/api/packages.html)
+
 ## Architecture
 
 ### PostgreSQL Client Layer (`packages/postgrest-js/`)
