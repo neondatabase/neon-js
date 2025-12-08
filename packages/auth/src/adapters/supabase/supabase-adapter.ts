@@ -9,7 +9,6 @@ import {
   type JwtHeader,
   type JwtPayload,
   type Provider,
-  type VerifyMobileOtpParams,
   type VerifyEmailOtpParams,
 } from '@supabase/auth-js';
 import {
@@ -480,11 +479,20 @@ class SupabaseAuthAdapterImpl
     }
   };
 
-  // TODO: we need to setup this up with `phone` type
   signInWithOtp: SupabaseAuthClientInterface['signInWithOtp'] = async (
     credentials
   ) => {
     try {
+      if ('phone' in credentials) {
+        return {
+          data: { user: null, session: null, messageId: undefined },
+          error: createAuthError(
+            AuthErrorCode.PhoneProviderDisabled,
+            'Phone OTP authentication is not supported. Use email-based authentication instead.'
+          ),
+        };
+      }
+
       if ('email' in credentials) {
         await this._betterAuth.emailOtp.sendVerificationOtp({
           email: credentials.email,
@@ -498,8 +506,8 @@ class SupabaseAuthAdapterImpl
       }
 
       throw createAuthError(
-        AuthErrorCode.NotImplemented,
-        `We haven't implemented this type of otp authentication.`
+        AuthErrorCode.ValidationFailed,
+        'Invalid OTP credentials format'
       );
     } catch (error) {
       if (isAuthError(error)) {
@@ -1011,19 +1019,36 @@ class SupabaseAuthAdapterImpl
   };
   //#endregion
 
-  // TODO: add twoFactor plugin to the server adapter
-  // TODO: add magiclink plugin to the server adapter
   //#region PUBLIC API - Verification & Password Reset
   verifyOtp: SupabaseAuthClientInterface['verifyOtp'] = async (params) => {
     try {
+      // Phone/SMS verification is not supported
+      if ('phone' in params && params.phone) {
+        return {
+          data: { user: null, session: null },
+          error: createAuthError(
+            AuthErrorCode.PhoneProviderDisabled,
+            'Phone OTP verification is not supported. Use email-based authentication instead.'
+          ),
+        };
+      }
+
+      // Magic link verification is not supported
+      if ('email' in params && params.type === 'magiclink') {
+        return {
+          data: { user: null, session: null },
+          error: createAuthError(
+            AuthErrorCode.MagicLinkNotSupported,
+            'Magic link verification is not supported. Use email OTP authentication instead.'
+          ),
+        };
+      }
+
       if ('email' in params && params.email) {
         return await this.verifyEmailOtp(params);
       }
-      if ('phone' in params && params.phone) {
-        return await this.verifyPhoneOtp(params);
-      }
+
       if ('token_hash' in params && params.token_hash) {
-        // TODO: this will fail, we need handlers for this in this code
         throw createAuthError(
           AuthErrorCode.FeatureNotSupported,
           'Token hash verification not supported'
@@ -1144,25 +1169,13 @@ class SupabaseAuthAdapterImpl
       }
 
       if ('phone' in credentials) {
-        const { phone, type } = credentials;
-
-        if (type === 'sms' || type === 'phone_change') {
-          const result = await this._betterAuth.phoneNumber.sendOtp({
-            phoneNumber: phone,
-          });
-
-          if (result?.error) {
-            throw normalizeBetterAuthError(result.error);
-          }
-
-          const messageId =
-            type === 'sms' ? 'sms-otp-sent' : 'phone-change-otp-sent';
-
-          return {
-            data: { messageId: messageId, user: null, session: null },
-            error: null,
-          };
-        }
+        return {
+          data: { user: null, session: null },
+          error: createAuthError(
+            AuthErrorCode.PhoneProviderDisabled,
+            'SMS resend is not supported. Use email-based authentication instead.'
+          ),
+        };
       }
 
       throw createAuthError(
@@ -1298,39 +1311,12 @@ class SupabaseAuthAdapterImpl
     }
 
     if (type === 'magiclink') {
-      const result = await this._betterAuth.magicLink.verify({
-        query: {
-          token: params.token,
-          callbackURL:
-            params.options?.redirectTo ||
-            (globalThis.window === undefined ? '' : globalThis.location.origin),
-        },
-      });
-      if (result?.error) {
-        return {
-          data: { user: null, session: null },
-          error: normalizeBetterAuthError(result.error),
-        };
-      }
-
-      // Get session after magic link verification
-      const sessionResult = await this.getSession({ forceFetch: true });
-      if (!sessionResult.data?.session) {
-        return {
-          data: { user: null, session: null },
-          error: createAuthError(
-            AuthErrorCode.SessionNotFound,
-            'Failed to retrieve session after magic link verification'
-          ),
-        };
-      }
-
       return {
-        data: {
-          user: sessionResult.data.session?.user || null,
-          session: sessionResult.data.session,
-        },
-        error: null,
+        data: { user: null, session: null },
+        error: createAuthError(
+          AuthErrorCode.MagicLinkNotSupported,
+          'Magic link verification is not supported. Use email OTP authentication instead.'
+        ),
       };
     }
 
@@ -1468,108 +1454,6 @@ class SupabaseAuthAdapterImpl
     };
   }
 
-  private async verifyPhoneOtp(params: VerifyMobileOtpParams) {
-    // SMS OTP (phone verification)
-    if (params.type === 'sms') {
-      // Verify phone number with OTP
-      // This creates a session by default
-      const result = await this._betterAuth.phoneNumber.verify({
-        phoneNumber: params.phone,
-        code: params.token,
-        disableSession: false, // Create session after verification
-        updatePhoneNumber: false, // This is a new verification, not an update
-      });
-
-      if (result.error) {
-        return {
-          data: { user: null, session: null },
-          error: normalizeBetterAuthError(result.error),
-        };
-      }
-
-      // Get current session
-      const sessionResult = await this.getSession({ forceFetch: true });
-      if (sessionResult.error || !sessionResult.data) {
-        return {
-          data: { user: null, session: null },
-          error:
-            sessionResult.error ||
-            createAuthError(
-              AuthErrorCode.InternalError,
-              'Failed to get session'
-            ),
-        };
-      }
-
-      return {
-        data: {
-          user: sessionResult.data?.session?.user || null,
-          session: sessionResult.data?.session || null,
-        },
-        error: null,
-      };
-    }
-
-    if (params.type === 'phone_change') {
-      // Check if user is authenticated
-      const currentSession = await this._betterAuth.getSession();
-      if (currentSession.error || !currentSession.data?.session) {
-        return {
-          data: { user: null, session: null },
-          error: createAuthError(
-            AuthErrorCode.SessionNotFound,
-            'You must be signed in to change your phone number'
-          ),
-        };
-      }
-
-      // Verify phone number and update it
-      const result = await this._betterAuth.phoneNumber.verify({
-        phoneNumber: params.phone,
-        code: params.token,
-        disableSession: false,
-        updatePhoneNumber: true, // This updates the user's phone number
-      });
-
-      if (result.error) {
-        return {
-          data: { user: null, session: null },
-          error: normalizeBetterAuthError(result.error),
-        };
-      }
-
-      // Get updated session with new phone number
-      const sessionResult = await this.getSession({ forceFetch: true });
-
-      if (sessionResult.error || !sessionResult.data) {
-        return {
-          data: { user: null, session: null },
-          error:
-            sessionResult.error ||
-            createAuthError(
-              AuthErrorCode.InternalError,
-              'Failed to get updated session'
-            ),
-        };
-      }
-
-      return {
-        data: {
-          user: sessionResult.data.session?.user || null,
-          session: sessionResult.data.session,
-        },
-        error: null,
-      };
-    }
-
-    return {
-      data: { user: null, session: null },
-      error: createAuthError(
-        AuthErrorCode.ValidationFailed,
-        `Unsupported phone OTP type: ${params.type}`
-      ),
-    };
-  }
   //#endregion
 
   //#region PRIVATE HELPERS - Event System

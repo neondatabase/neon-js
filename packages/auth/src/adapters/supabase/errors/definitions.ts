@@ -32,6 +32,7 @@ export const AuthErrorCode = {
   NotImplemented: 'not_implemented',
   OAuthProviderNotSupported: 'oauth_provider_not_supported',
   PhoneProviderDisabled: 'phone_provider_disabled',
+  MagicLinkNotSupported: 'magic_link_not_supported',
   SsoProviderDisabled: 'sso_provider_disabled',
   AnonymousProviderDisabled: 'anonymous_provider_disabled',
   Web3ProviderDisabled: 'web3_provider_disabled',
@@ -198,6 +199,12 @@ export const ERROR_DEFINITIONS: Record<AuthErrorCode, ErrorDefinition> = {
     status: 403,
     message: 'Phone authentication not available',
     description: 'Phone number authentication is not enabled',
+  },
+  [AuthErrorCode.MagicLinkNotSupported]: {
+    code: AuthErrorCode.MagicLinkNotSupported,
+    status: 403,
+    message: 'Magic link authentication not available',
+    description: 'Magic link authentication is not supported',
   },
   [AuthErrorCode.SsoProviderDisabled]: {
     code: AuthErrorCode.SsoProviderDisabled,
