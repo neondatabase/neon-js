@@ -8,8 +8,6 @@ import {
   jwtClient,
   adminClient,
   emailOTPClient,
-  magicLinkClient,
-  phoneNumberClient,
   anonymousClient,
   organizationClient,
 } from 'better-auth/client/plugins';
@@ -31,10 +29,6 @@ const supportedBetterAuthClientPlugins = [
   organizationClient(),
   emailOTPClient(),
   anonymousClient(),
-
-  // TODO: add these in
-  phoneNumberClient(),
-  magicLinkClient(),
 ] satisfies BetterAuthClientOptions['plugins'];
 
 export type SupportedBetterAuthClientPlugins =
