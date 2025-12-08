@@ -102,7 +102,7 @@
     "better-auth": "1.4.6-beta.3",
     "zod": "4.1.12",
     "jose": "6.1.2",
-    "@neondatabase/auth-ui": "file:../auth-ui"
+    "@neondatabase/auth-ui": "workspace:*"
   },
   "peerDependencies": {
     "react": ">=18.0.0",
