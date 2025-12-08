@@ -1,18 +1,19 @@
-import { NEON_AUTH_COOKIE_PREFIX } from "../constants";
+import { extractRequestCookies } from "../auth/cookies";
+import { NEON_AUTH_HEADER_MIDDLEWARE_NAME } from "../constants";
 
-const PROXY_HEADERS = ['user-agent', 'authorization', 'referer'];
+const PROXY_HEADERS = ['user-agent', 'authorization', 'referer', 'content-type'];
 export const handleAuthRequest = async (baseUrl: string, request: Request, path: string) => {
-  const url = new URL(request.url);
-  const upstreamURL = `${baseUrl}/${path}${url.search}`;
   const headers = prepareRequestHeaders(request);
   const body = await parseRequestBody(request);
 
   try {
-    const response = await fetch(upstreamURL, {
+    const upstreamURL = getUpstreamURL(baseUrl, path, { originalUrl: new URL(request.url) });
+    const response = await fetch(upstreamURL.toString(), {
       method: request.method,
       headers: headers,
       body: body,
     })
+
     return response;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Internal Server Error";
@@ -21,19 +22,30 @@ export const handleAuthRequest = async (baseUrl: string, request: Request, path:
   }
 }
 
+export const getUpstreamURL = (baseUrl: string, path: string, {
+  originalUrl
+}: {
+  originalUrl?: URL;
+}) => {
+  const url = new URL(`${baseUrl}/${path}`);
+  if (originalUrl) {
+    url.search = originalUrl.search;
+    return url;
+  }
+  return url;
+}
+
 const prepareRequestHeaders = (request: Request) => {
   const headers = new Headers();
-  headers.set('Content-Type', 'application/json');
   
   for (const header of PROXY_HEADERS) {
     if (request.headers.get(header)) {
       headers.set(header, request.headers.get(header)!);
     }
   }
-  
   headers.set('Origin', getOrigin(request));
   headers.set('Cookie', extractRequestCookies(request.headers));
-  headers.set('X-Neon-Auth-Next', 'true');     // Add for observability purpose
+  headers.set(NEON_AUTH_HEADER_MIDDLEWARE_NAME, 'true');    
   return headers;
 }
 
@@ -45,22 +57,6 @@ const getOrigin = (request: Request) => {
                    new URL(request.url).origin;
 }
 
-const extractRequestCookies = (headers: Headers) => {
-  const cookieHeader = headers.get('cookie');
-  if (!cookieHeader) return '';
-
-  const cookies = cookieHeader.split(';').map(c => c.trim());
-  const result: string[] = [];
-
-  for (const cookie of cookies) {
-    const [name] = cookie.split('=');
-    if (name.startsWith(NEON_AUTH_COOKIE_PREFIX)) {
-      result.push(cookie);
-    }
-  }
-
-  return result.join(';');
-}
 
 const parseRequestBody = async (request: Request) => {
   if (request.body) {
