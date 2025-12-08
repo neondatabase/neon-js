@@ -1,14 +1,32 @@
+import { ERRORS } from '../errors';
 import { handleAuthRequest } from './request';
 import { handleAuthResponse } from './response';
 
 type Params = { path: string[] };
 
-export const toNextJsHandler = (baseUrl: string) => {
-  const baseURL = baseUrl || process.env.NEON_AUTH_BASE_URL;
+/**
+ * 
+ * An API route handler to handle the auth requests from the client and proxy them to the Neon Auth.
+ * 
+ * @returns A Next.js API handler functions those can be used in a Next.js route.
+ *
+ * @example
+ * 
+ * Mount the `authApiHandler` to an API route. Create a route file inside `/api/auth/[...all]/route.ts` directory. 
+ *  And add the following code:
+ * 
+ * ```ts 
+ * 
+ * import { authApiHandler } from '@neondatabase/auth/next';
+ * 
+ * export const { GET, POST } = authApiHandler();
+ * ```
+ * 
+ */
+export function authApiHandler() {
+  const baseURL = process.env.NEON_AUTH_BASE_URL;
   if (!baseURL) {
-    throw new Error(
-      'You must provide a Neon Auth base URL in the handler options or in the environment variables'
-    );
+    throw new Error(ERRORS.MISSING_AUTH_BASE_URL);
   }
 
   const handler = async (

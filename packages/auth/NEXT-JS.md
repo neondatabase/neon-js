@@ -8,6 +8,11 @@
 npm install @neondatabase/auth
 ```
 
+### Set environment variables
+
+```properties
+NEON_AUTH_BASE_URL='https://endpoint-id.neonauth.aws.neon.tech/neondb/auth'
+```
 
 ### Create an Auth Handler 
 
@@ -15,13 +20,22 @@ To integrate Neon Auth with Next.js, we need to mount the auth handler to an API
 
 ```ts
 // api/auth/[...path]/route.ts
-import { toNextJsHandler } from "@neondatabase/auth/next"
+import { authApiHandler } from "@neondatabase/auth/next"
 
-export const { GET, POST } = toNextJsHandler(
-  process.env.NEON_AUTH_BASE_URL
-)
+export const { GET, POST } = authApiHandler()
 ```
 
+### Create a auth middleware
+
+Add a `neonAuthMiddleware()` to protect routes from unauthenticated users. In your `proxy.ts` (`middleware.ts` for Next.js <= 15) file, export the middleware
+
+```ts
+import { neonAuthMiddleware } from "@neondatabase/auth/next"
+
+export default neonAuthMiddleware({
+  loginUrl: "/auth/sign-in",
+})
+```
 
 ### Create a Client
 
@@ -156,6 +170,18 @@ If your project already uses Tailwind CSS v4, import the Tailwind-ready CSS to a
 This imports only the theme variables and component scanning directive. Your Tailwind build will generate the necessary utility classes, avoiding duplication with your existing Tailwind setup.
 
 
-### Server Actions
+### React Server Components
 
-TBD
+The `@neondatabse/auth/next` provides with api function `neonAuth()` to retrieve the session and user details on protected routes. 
+
+```ts
+import { neonAuth } from '@neondatabase/auth/next`;
+
+export async function Profile() {
+  const { user } = await neonAuth()
+
+  if (user == null) return null;
+  
+  return (<span>{user.name}</span>);
+}
+```

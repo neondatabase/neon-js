@@ -1,5 +1,4 @@
-// This is allowlist of headers that we want to proxy to the client
-// We can proxy all headers, but its safer to only proxy the headers we need
+// Allowlist of response headers that we want to proxy to the client from Neon Auth.
 const RESPONSE_HEADERS_ALLOWLIST = ['content-type', 'content-length', 'content-encoding', 'transfer-encoding',
     'connection', 'date',
    'set-cookie', 'set-auth-jwt', 'set-auth-token', 'x-neon-ret-request-id'];
@@ -21,12 +20,4 @@ const prepareResponseHeaders = (response: Response) => {
     }
   }
   return headers;
-}
-
-export const extractResponseCookies = (headers: Headers) => {
-  const cookieHeader = headers.get('set-cookie');
-  if (!cookieHeader) return [];
-
-  const cookies = cookieHeader.split(', ').map(c => c.trim());
-  return cookies;
 }

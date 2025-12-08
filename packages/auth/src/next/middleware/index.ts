@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { NEON_AUTH_SESSION_COOKIE_NAME } from '../constants';
-import { needsSessionVerification, verifySession } from './oauth';
+import { needsSessionVerification, exchangeOAuthToken } from './oauth';
+import { NEON_AUTH_BASE_URL } from '../env-variables';
+import { ERRORS } from '../errors';
+import { fetchSession } from '../auth/session';
+import { NEON_AUTH_HEADER_MIDDLEWARE_NAME } from '../constants';
 
 const AUTH_API_ROUTES = '/api/auth';
 const SKIP_ROUTES = [
@@ -20,27 +23,29 @@ type NeonAuthMiddlewareOptions = {
    *  Defaults to `/auth/sign-in`
    */
   loginUrl?: string;
-
-  /**
-   * The Neon Auth base URL
-   *  Defaults to `process.env.NEON_AUTH_BASE_URL`
-   *
-   * If not provided, and if not in the environment, the middleware will throw an error.
-   *
-   * @throws {Error} If the authURL is not provided and not in the environment.
-   */
-  authBaseUrl?: string;
 };
 
-export const neonAuthMiddleware = ({
+/** 
+ * A Next.js middleware to protect routes from unauthenticated requests and refresh the session if required.
+ * 
+ * @param loginUrl - The URL to redirect to when the user is not authenticated.
+ * @returns A middleware function that can be used in the Next.js app.
+ * 
+ * @example
+ * ```ts
+ * import { neonAuthMiddleware } from "@neondatabase/auth/next"
+ * 
+ * export default neonAuthMiddleware({
+ *   loginUrl: '/auth/sign-in',
+ * });
+ * ```
+ */
+export function neonAuthMiddleware({
   loginUrl = '/auth/sign-in',
-  authBaseUrl,
-}: NeonAuthMiddlewareOptions) => {
-  const baseURL = authBaseUrl || process.env.NEON_AUTH_BASE_URL;
-  if (!baseURL) {
-    throw new Error(
-      'You must provide a Neon Auth base URL in the middleware options or in the environment variables'
-    );
+}: NeonAuthMiddlewareOptions) {
+  const baseUrl = NEON_AUTH_BASE_URL
+  if (!baseUrl) {
+    throw new Error(ERRORS.MISSING_AUTH_BASE_URL);
   }
 
   return async (request: NextRequest) => {
@@ -55,7 +60,7 @@ export const neonAuthMiddleware = ({
     // We need to exchange the verifier token and session challenge for the session cookie
     const verification = needsSessionVerification(request);
     if (verification) {
-      const response = await verifySession(request, baseURL);
+      const response = await exchangeOAuthToken(request, baseUrl);
       if (response !== null) {
         return response;
       }
@@ -64,10 +69,19 @@ export const neonAuthMiddleware = ({
     if (SKIP_ROUTES.some((route) => pathname.startsWith(route))) {
       return NextResponse.next();
     }
-    const token = request.cookies.get(NEON_AUTH_SESSION_COOKIE_NAME);
-    if (!token) {
-      return NextResponse.redirect(new URL(loginUrl, request.url));
+
+    const session = await fetchSession();
+    if (session.session === null) {
+      return NextResponse.redirect(new URL(loginUrl, request.url))
     }
-    return NextResponse.next();
+
+    const reqHeaders = new Headers(request.headers)
+    reqHeaders.set(NEON_AUTH_HEADER_MIDDLEWARE_NAME, 'true');
+    
+    return NextResponse.next({
+      request: {
+        headers: reqHeaders,
+      },
+    });
   };
 };
