@@ -8,6 +8,7 @@ export default defineConfig(
   createPackageConfig({
     entry: [
       'src/index.ts',
+      'src/types/index.ts',
 
       'src/react/index.ts',
       'src/react/ui/index.ts',

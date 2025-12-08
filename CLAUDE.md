@@ -36,6 +36,7 @@ Authentication adapters for Neon Auth supporting multiple auth providers:
 - `@neondatabase/auth/vanilla` - Vanilla adapter exports
 - `@neondatabase/auth/vanilla/adapters` - SupabaseAuthAdapter, BetterAuthVanillaAdapter
 - `@neondatabase/auth/next` - Next.js integration (toNextJsHandler, neonAuthMiddleware, createAuthClient)
+- `@neondatabase/auth/types` - Better Auth types (Session, User, Organization, etc.)
 - `@neondatabase/auth/ui/css` - Pre-built CSS
 - `@neondatabase/auth/ui/tailwind` - Tailwind CSS
 
@@ -50,6 +51,7 @@ Main SDK package that combines authentication with PostgreSQL querying:
 - `@neondatabase/neon-js` - Main exports (createClient, SupabaseAuthAdapter, BetterAuthVanillaAdapter, utilities)
 - `@neondatabase/neon-js/cli` - CLI tool
 - `@neondatabase/neon-js/auth` - Re-exports @neondatabase/auth
+- `@neondatabase/neon-js/auth/types` - Re-exports @neondatabase/auth/types
 - `@neondatabase/neon-js/auth/react` - Re-exports @neondatabase/auth/react
 - `@neondatabase/neon-js/auth/react/ui` - Re-exports @neondatabase/auth/react/ui
 - `@neondatabase/neon-js/auth/react/ui/server` - Re-exports @neondatabase/auth/react/ui/server

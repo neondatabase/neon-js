@@ -11,6 +11,7 @@ export default defineConfig(
       'src/cli/index.ts',
       // Auth re-export entries
       'src/auth/index.ts',
+      'src/auth/types/index.ts',
       'src/auth/react/index.ts',
       'src/auth/react/ui/index.ts',
       'src/auth/react/ui/server.ts',
