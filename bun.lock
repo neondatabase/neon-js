@@ -21,9 +21,9 @@
     },
     "packages/auth": {
       "name": "@neondatabase/auth",
-      "version": "0.1.0-beta.3",
+      "version": "0.1.0-beta.4",
       "dependencies": {
-        "@neondatabase/auth-ui": "file:../auth-ui",
+        "@neondatabase/auth-ui": "workspace:*",
         "@supabase/auth-js": "2.79.0",
         "better-auth": "1.4.6-beta.3",
         "jose": "6.1.2",
@@ -83,7 +83,7 @@
         "zod": "^4.1.12",
       },
       "devDependencies": {
-        "@neondatabase/auth": "file:../auth",
+        "@neondatabase/auth": "workspace:*",
         "@tailwindcss/cli": "^4.1.17",
         "@types/react": "^19.1.13",
         "@types/react-dom": "^19.1.9",
@@ -99,7 +99,7 @@
     },
     "packages/neon-js": {
       "name": "@neondatabase/neon-js",
-      "version": "0.1.0-beta.3",
+      "version": "0.1.0-beta.4",
       "bin": {
         "neon-js": "dist/cli/index.mjs",
       },
