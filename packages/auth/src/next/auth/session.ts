@@ -2,10 +2,8 @@ import { cookies, headers } from "next/headers";
 import type { BetterAuthSession as Session, BetterAuthUser as User } from "../../core/better-auth-types";
 import { getUpstreamURL } from "../handler/request";
 import { NEON_AUTH_BASE_URL } from "../env-variables";
-import { ERRORS } from "../errors";
 
 import { extractRequestCookies, parseSetCookies } from "./cookies";
-import { NEON_AUTH_HEADER_MIDDLEWARE_NAME } from "../constants";
 
 export type SessionData = {
   session: Session;
@@ -28,10 +26,6 @@ export type SessionData = {
  * ```
  */
 export const neonAuth = async (): Promise<SessionData> => {
-  const reqHeaders = await headers()
-  if (!reqHeaders.has(NEON_AUTH_HEADER_MIDDLEWARE_NAME)) {
-    throw new Error(ERRORS.NEON_AUTH_MIDDLEWARE_NOT_FOUND);
-  }
   return await fetchSession();
 }
 
