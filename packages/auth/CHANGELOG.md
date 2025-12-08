@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## UNRELEASED
 
-## [0.1.0-beta.3] - 2025-12-08
+## [0.1.0-beta.6] - 2025-12-08
 
 ### New exports
 - **Type Definitions**: Re-exported all Better Auth plugin types from `@neondatabase/auth/types`
@@ -16,10 +16,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Phone Number Client**: Removed `phoneNumberClient` plugin from supported plugins
 - **Magic Link Client**: Removed `magicLinkClient` plugin from supported plugins
-
-## [0.1.0-beta.2] - 2025-12-07
-
-- Bumped `auth-ui` dependency
 
 
 ## [0.1.0-beta.1] - 2025-12-07
