@@ -40,8 +40,8 @@ Do NOT install `@neondatabase/neon-js` if you only need authentication - use `@n
 // 1. Install: npm install @neondatabase/neon-js
 
 // 2. Create API route handler: app/api/auth/[...path]/route.ts
-import { toNextJsHandler } from "@neondatabase/neon-js/auth/next";
-export const { GET, POST } = toNextJsHandler(process.env.NEON_AUTH_BASE_URL!);
+import { authApiHandler } from "@neondatabase/neon-js/auth/next";
+export const { GET, POST } = authApiHandler();
 
 // 3. Create auth client: lib/auth/client.ts
 "use client";
@@ -795,7 +795,7 @@ const { data } = await client.from("items").select();
 From `@neondatabase/neon-js`:
 - `@neondatabase/neon-js` - Main client (createClient, SupabaseAuthAdapter, BetterAuthVanillaAdapter)
 - `@neondatabase/neon-js/auth/react/adapters` - BetterAuthReactAdapter
-- `@neondatabase/neon-js/auth/next` - Next.js handler and client (toNextJsHandler, createAuthClient)
+- `@neondatabase/neon-js/auth/next` - Next.js handler and client (authApiHandler, createAuthClient, neonAuth)
 - `@neondatabase/neon-js/auth/react/ui` - UI components (NeonAuthUIProvider, AuthView, SignInForm, etc.)
 - `@neondatabase/neon-js/auth/react/ui/server` - Server utilities (authViewPaths)
 - `@neondatabase/neon-js/ui/css` - Pre-built CSS bundle

@@ -29,8 +29,8 @@ Do NOT install `@neondatabase/neon-js` if you only need authentication - use `@n
 // 1. Install: npm install @neondatabase/neon-js
 
 // 2. Create API route handler: app/api/auth/[...path]/route.ts
-import { toNextJsHandler } from "@neondatabase/neon-js/auth/next";
-export const { GET, POST } = toNextJsHandler(process.env.NEON_AUTH_BASE_URL!);
+import { authApiHandler } from "@neondatabase/neon-js/auth/next";
+export const { GET, POST } = authApiHandler();
 
 // 3. Create auth client: lib/auth/client.ts
 "use client";
@@ -217,14 +217,14 @@ import "@neondatabase/neon-js/ui/css";
 // @import 'tailwindcss';
 // @import '@neondatabase/neon-js/ui/tailwind';
 
-// 2. Create provider: app/auth-provider.tsx
+// 2. Create provider: app/providers.tsx
 "use client";
 import { NeonAuthUIProvider } from "@neondatabase/neon-js/auth/react/ui";
 import { authClient } from "@/lib/auth/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function Providers({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   return (
     <NeonAuthUIProvider
@@ -233,6 +233,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       replace={router.replace}
       onSessionChange={() => router.refresh()}
       Link={Link}
+      emailOTP                            // Enable email OTP login
+      social={{ providers: ["google"] }} // Enable Google OAuth
+      redirectTo="/dashboard"            // Post-login redirect
+      organization={{}}                  // Enable organizations
     >
       {children}
     </NeonAuthUIProvider>
@@ -240,7 +244,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 }
 
 // 3. Wrap app in layout.tsx
-<AuthProvider>{children}</AuthProvider>
+<Providers>{children}</Providers>
 
 // 4. Create auth page: app/auth/[path]/page.tsx
 import { AuthView } from "@neondatabase/neon-js/auth/react/ui";
@@ -259,6 +263,54 @@ export default async function AuthPage({ params }: { params: Promise<{ path: str
 // Provides these routes automatically:
 // /auth/sign-in, /auth/sign-up, /auth/forgot-password, /auth/reset-password,
 // /auth/magic-link, /auth/two-factor, /auth/callback, /auth/sign-out
+
+// 5. Create account page: app/account/[path]/page.tsx
+import { AccountView } from "@neondatabase/neon-js/auth/react/ui";
+import { accountViewPaths } from "@neondatabase/neon-js/auth/react/ui/server";
+
+export const dynamicParams = false;
+export function generateStaticParams() {
+  return Object.values(accountViewPaths).map((path) => ({ path }));
+}
+
+export default async function AccountPage({ params }: { params: Promise<{ path: string }> }) {
+  const { path } = await params;
+  return <AccountView path={path} />;
+}
+
+// 6. Create organization page: app/organization/[path]/page.tsx
+import { OrganizationView } from "@neondatabase/neon-js/auth/react/ui";
+import { organizationViewPaths } from "@neondatabase/neon-js/auth/react/ui/server";
+
+export const dynamicParams = false;
+export function generateStaticParams() {
+  return Object.values(organizationViewPaths).map((path) => ({ path }));
+}
+
+export default async function OrganizationPage({ params }: { params: Promise<{ path: string }> }) {
+  const { path } = await params;
+  return <OrganizationView path={path} />;
+}
+
+// 7. Access session in server components
+import { neonAuth } from "@neondatabase/neon-js/auth/next";
+
+export async function Profile() {
+  const { session, user } = await neonAuth();
+  if (!session || !user) return <div>Not logged in</div>;
+  return <div>Welcome, {user.name || user.email}</div>;
+}
+
+// 8. Use session in client components
+"use client";
+import { authClient } from "@/lib/auth/client";
+
+function Dashboard() {
+  const { data: session, isPending } = authClient.useSession();
+  if (isPending) return <div>Loading...</div>;
+  if (!session) return <div>Not authenticated</div>;
+  return <h1>Welcome, {session.user.name}</h1>;
+}
 ```
 
 ## Social Sign-In (Google, GitHub)
@@ -470,7 +522,7 @@ Quick override example:
 From `@neondatabase/neon-js`:
 - `@neondatabase/neon-js` - Main client (createClient, SupabaseAuthAdapter, BetterAuthVanillaAdapter)
 - `@neondatabase/neon-js/auth/react/adapters` - BetterAuthReactAdapter
-- `@neondatabase/neon-js/auth/next` - Next.js handler and client (toNextJsHandler, createAuthClient)
+- `@neondatabase/neon-js/auth/next` - Next.js handler and client (authApiHandler, createAuthClient, neonAuth)
 - `@neondatabase/neon-js/auth/react/ui` - UI components (NeonAuthUIProvider, AuthView, SignInForm, etc.)
 - `@neondatabase/neon-js/auth/react/ui/server` - Server utilities (authViewPaths)
 - `@neondatabase/neon-js/ui/css` - Pre-built CSS bundle

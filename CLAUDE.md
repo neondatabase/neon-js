@@ -35,7 +35,7 @@ Authentication adapters for Neon Auth supporting multiple auth providers:
 - `@neondatabase/auth/react/adapters` - BetterAuthReactAdapter
 - `@neondatabase/auth/vanilla` - Vanilla adapter exports
 - `@neondatabase/auth/vanilla/adapters` - SupabaseAuthAdapter, BetterAuthVanillaAdapter
-- `@neondatabase/auth/next` - Next.js integration (toNextJsHandler, neonAuthMiddleware, createAuthClient)
+- `@neondatabase/auth/next` - Next.js integration (authApiHandler, neonAuthMiddleware, createAuthClient, neonAuth)
 - `@neondatabase/auth/types` - Better Auth types (Session, User, Organization, etc.)
 - `@neondatabase/auth/ui/css` - Pre-built CSS
 - `@neondatabase/auth/ui/tailwind` - Tailwind CSS
@@ -296,8 +296,9 @@ paths within the package are valid (per Node.js ESM specification). Wrapper file
 **Dependencies**: Imports from `@neondatabase/postgrest-js` and `@neondatabase/auth`
 
 **Next.js Integration** (in `packages/auth/src/next/`):
-- `handler/` - `toNextJsHandler()` for API routes
+- `handler/` - `authApiHandler()` for API routes
 - `middleware/` - `neonAuthMiddleware()` for route protection
+- `auth/` - `neonAuth()` for server-side session access
 - `index.ts` - `createAuthClient()` pre-configured for Next.js
 
 ### UI Components Layer (`packages/auth-ui/`)
@@ -455,11 +456,9 @@ const { data: session } = await auth.getSession();
 
 ```typescript
 // api/auth/[...path]/route.ts
-import { toNextJsHandler } from "@neondatabase/auth/next"
+import { authApiHandler } from "@neondatabase/auth/next"
 
-export const { GET, POST } = toNextJsHandler(
-  process.env.NEON_AUTH_BASE_URL
-)
+export const { GET, POST } = authApiHandler()
 
 // lib/auth/client.ts
 "use client"
@@ -469,6 +468,15 @@ export const authClient = createAuthClient()
 // middleware.ts
 import { neonAuthMiddleware } from '@neondatabase/auth/next';
 export default neonAuthMiddleware();
+
+// Server Components - access session
+import { neonAuth } from '@neondatabase/auth/next';
+
+export async function Profile() {
+  const { user } = await neonAuth();
+  if (!user) return null;
+  return <span>{user.name}</span>;
+}
 ```
 
 ### Using Auth UI Components
