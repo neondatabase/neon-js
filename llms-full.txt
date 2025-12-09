@@ -1,14 +1,21 @@
-# Neon JavaScript SDK
+# Neon JavaScript SDK - Complete Reference
 
-> TypeScript SDK for Neon services - authentication (Neon Auth) and PostgreSQL database queries (Neon Data API). Provides a unified, type-safe API with multiple authentication adapters and automatic token management.
+> Complete documentation for @neondatabase/neon-js, @neondatabase/auth, and @neondatabase/postgrest-js.
+> For quick start only, see [llms.txt](llms.txt). For theming only, see [llms-theming.txt](llms-theming.txt).
 
-## Documentation Files
+## Table of Contents
 
-- [llms.txt](llms.txt) - Quick start and core usage (this file)
-- [llms-theming.txt](llms-theming.txt) - CSS theming and customization
-- [llms-full.txt](llms-full.txt) - Complete reference (all content)
+1. [Package Selection](#package-selection)
+2. [Quick Start Guides](#quick-start-guides)
+3. [Auth UI Components](#auth-ui-components)
+4. [Authentication Adapters](#authentication-adapters)
+5. [Database Query Patterns](#database-query-patterns)
+6. [Theming & Customization](#theming--customization)
+7. [Advanced Topics](#advanced-topics)
 
-## Package Selection (Read First)
+---
+
+## Package Selection
 
 | Use Case | Package |
 |----------|---------|
@@ -23,7 +30,11 @@
 
 Do NOT install `@neondatabase/neon-js` if you only need authentication - use `@neondatabase/auth` instead.
 
-## Quick Start: Next.js (Most Common)
+---
+
+## Quick Start Guides
+
+### Next.js (Most Common)
 
 ```typescript
 // 1. Install: npm install @neondatabase/neon-js
@@ -77,7 +88,7 @@ await dbClient.from("items").update({ status: "done" }).eq("id", 1);
 await dbClient.from("items").delete().eq("id", 1);
 ```
 
-## Quick Start: React SPA
+### React SPA
 
 ```typescript
 // 1. Install: npm install @neondatabase/neon-js
@@ -117,7 +128,7 @@ const session = await client.auth.getSession();
 const { data } = await client.from("items").select();
 ```
 
-## Quick Start: Node.js Backend
+### Node.js Backend
 
 ```typescript
 // 1. Install: npm install @neondatabase/neon-js
@@ -139,7 +150,7 @@ await client.auth.signIn.email({ email, password });
 const { data } = await client.from("users").select("id, name, email");
 ```
 
-## Quick Start: Auth Only (No Database)
+### Auth Only (No Database)
 
 ```typescript
 // 1. Install: npm install @neondatabase/auth
@@ -155,7 +166,7 @@ await auth.signIn.email({ email, password });
 const session = await auth.getSession();
 ```
 
-## Quick Start: React SPA (Auth Only, No Database)
+### React SPA (Auth Only, No Database)
 
 ```typescript
 // 1. Install: npm install @neondatabase/auth
@@ -184,7 +195,7 @@ await auth.signUp.email({ email, password, name });
 await auth.signOut();
 ```
 
-## Quick Start: Data API Only (No Auth)
+### Data API Only (No Auth)
 
 ```typescript
 // 1. Install: npm install @neondatabase/postgrest-js
@@ -205,7 +216,11 @@ const client = new NeonPostgrestClient({
 const { data } = await client.from("items").select("*");
 ```
 
-## Auth UI Components (Next.js)
+---
+
+## Auth UI Components
+
+### Setup (Next.js)
 
 ```typescript
 // All UI components are included in @neondatabase/neon-js
@@ -261,7 +276,7 @@ export default async function AuthPage({ params }: { params: Promise<{ path: str
 // /auth/magic-link, /auth/two-factor, /auth/callback, /auth/sign-out
 ```
 
-## Social Sign-In (Google, GitHub)
+### Social Sign-In (Google, GitHub)
 
 Google and GitHub sign-in are **enabled by default** in Neon Auth. To show social login buttons in the Auth UI, add the `social` prop to `NeonAuthUIProvider`:
 
@@ -299,6 +314,8 @@ await client.auth.signInWithOAuth({
   options: { redirectTo: '/dashboard' },
 });
 ```
+
+---
 
 ## Authentication Adapters
 
@@ -346,6 +363,8 @@ const { data: { session } } = await client.auth.getSession();
 client.auth.onAuthStateChange((event, session) => { /* ... */ });
 ```
 
+---
+
 ## Database Query Patterns
 
 All query methods follow PostgREST syntax (same as Supabase):
@@ -383,7 +402,327 @@ await client.from("items")
   .upsert({ id: 1, name: "Updated Item" });
 ```
 
-## CLI: Generate Database Types
+---
+
+## Theming & Customization
+
+### CSS Import Decision
+
+| Your Setup | Import Path | Bundle Size |
+|------------|-------------|-------------|
+| No Tailwind | `@import '@neondatabase/neon-js/ui/css'` | ~47KB |
+| Tailwind v4 | `@import '@neondatabase/neon-js/ui/tailwind'` | ~2KB (tokens only) |
+
+**Rule:** Never import both. Causes duplicate styles.
+
+**Without Tailwind (pre-built CSS):**
+```typescript
+// In layout.tsx or _app.tsx
+import "@neondatabase/neon-js/ui/css";
+```
+
+**With Tailwind v4:**
+```css
+/* globals.css */
+@import 'tailwindcss';
+@import '@neondatabase/neon-js/ui/tailwind';
+
+/* Your overrides go here */
+```
+
+### Theme Tokens
+
+#### Core Colors
+
+Override in `:root` (light) and `.dark` (dark mode):
+
+```css
+:root {
+  /* Primary - buttons, links, focus rings */
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+
+  /* Secondary - secondary buttons */
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+
+  /* Background/Foreground - page colors */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+
+  /* Muted - placeholders, disabled states */
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+
+  /* Accent - hover states */
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+
+  /* Destructive - errors, delete actions */
+  --destructive: oklch(0.577 0.245 27.325);
+
+  /* UI Elements */
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --radius: 0.625rem;
+}
+
+.dark {
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+}
+```
+
+#### Token Pairing Rules
+
+**CRITICAL:** Always override pairs together to maintain contrast.
+
+| Background Token | Foreground Token | Min Contrast |
+|-----------------|------------------|--------------|
+| `--primary` | `--primary-foreground` | 4.5:1 |
+| `--secondary` | `--secondary-foreground` | 4.5:1 |
+| `--background` | `--foreground` | 4.5:1 |
+| `--muted` | `--muted-foreground` | 4.5:1 |
+| `--accent` | `--accent-foreground` | 4.5:1 |
+| `--destructive` | `--destructive-foreground` | 4.5:1 |
+
+#### Additional Tokens
+
+```css
+:root {
+  /* Cards and Popovers */
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+
+  /* Border Radius Scale */
+  --radius: 0.625rem;           /* Base (10px) */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* Sidebar (if using sidebar components) */
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+
+  /* Charts (if using data visualization) */
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+}
+```
+
+### OKLCH Color Format
+
+Neon Auth UI uses OKLCH for perceptually uniform colors.
+
+**Format:** `oklch(L C H)` or `oklch(L C H / alpha)`
+
+| Parameter | Range | Description |
+|-----------|-------|-------------|
+| L (Lightness) | 0-1 | 0 = black, 1 = white |
+| C (Chroma) | 0-0.4 | 0 = gray, higher = more vivid |
+| H (Hue) | 0-360 | Color wheel degrees |
+| alpha | 0-1 or 0%-100% | Opacity |
+
+**Examples:**
+```css
+--primary: oklch(0.55 0.25 250);        /* Vivid blue */
+--primary: oklch(0.55 0.25 250 / 50%);  /* 50% opacity */
+--muted: oklch(0.5 0 0);                /* Neutral gray (no chroma) */
+```
+
+**Convert HEX/RGB to OKLCH:** https://oklch.com
+
+### Dark Mode Implementation
+
+#### Option 1: next-themes (Recommended for Next.js)
+
+```bash
+npm install next-themes
+```
+
+```typescript
+// app/layout.tsx
+import { ThemeProvider } from "next-themes";
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          {children}
+        </ThemeProvider>
+      </body>
+    </html>
+  );
+}
+```
+
+```typescript
+// components/theme-toggle.tsx
+"use client";
+import { useTheme } from "next-themes";
+
+export function ThemeToggle() {
+  const { theme, setTheme } = useTheme();
+  return (
+    <button onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+      Toggle theme
+    </button>
+  );
+}
+```
+
+#### Option 2: Vanilla JavaScript
+
+```typescript
+// Check system preference
+const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+// Apply dark mode
+document.documentElement.classList.toggle("dark", prefersDark);
+
+// Toggle manually
+function toggleDarkMode() {
+  document.documentElement.classList.toggle("dark");
+}
+```
+
+#### Option 3: CSS Only (System Preference)
+
+```css
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Dark mode values applied automatically */
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+    /* ... other dark tokens */
+  }
+}
+```
+
+### Common Theming Mistakes
+
+#### 1. Importing Both CSS Paths
+```css
+/* WRONG - duplicate styles, ~94KB */
+@import '@neondatabase/neon-js/ui/css';
+@import '@neondatabase/neon-js/ui/tailwind';
+
+/* CORRECT - pick one */
+@import '@neondatabase/neon-js/ui/css';
+```
+
+#### 2. Missing Foreground Pairs
+```css
+/* WRONG - white text on light background */
+:root {
+  --primary: oklch(0.9 0.1 250);
+}
+
+/* CORRECT - ensure contrast */
+:root {
+  --primary: oklch(0.9 0.1 250);
+  --primary-foreground: oklch(0.1 0 0);
+}
+```
+
+#### 3. Using HEX/RGB Instead of OKLCH
+```css
+/* WRONG - may not work correctly */
+:root {
+  --primary: #3b82f6;
+}
+
+/* CORRECT - use OKLCH format */
+:root {
+  --primary: oklch(0.59 0.2 262);
+}
+```
+
+#### 4. Wrong CSS Import Order
+```css
+/* WRONG - overrides load before Neon CSS */
+@import './my-overrides.css';
+@import '@neondatabase/neon-js/ui/css';
+
+/* CORRECT - Neon CSS first, then overrides */
+@import '@neondatabase/neon-js/ui/css';
+@import './my-overrides.css';
+```
+
+#### 5. Forgetting Dark Mode Tokens
+```css
+/* WRONG - light mode only */
+:root {
+  --primary: oklch(0.55 0.25 250);
+  --primary-foreground: oklch(0.98 0 0);
+}
+
+/* CORRECT - both modes */
+:root {
+  --primary: oklch(0.55 0.25 250);
+  --primary-foreground: oklch(0.98 0 0);
+}
+.dark {
+  --primary: oklch(0.75 0.2 250);
+  --primary-foreground: oklch(0.1 0 0);
+}
+```
+
+### Component-Specific Styling
+
+All UI components accept `classNames` props for targeted customization:
+
+```typescript
+import { SignInForm } from "@neondatabase/neon-js/auth/react/ui";
+
+<SignInForm
+  className="mx-auto max-w-md"
+  classNames={{
+    card: "border-primary/20",
+    button: "rounded-full",
+    input: "bg-muted/50",
+  }}
+/>
+```
+
+**Available classNames interfaces:**
+- `AuthViewClassNames`
+- `AuthFormClassNames`
+- `UserAvatarClassNames`
+- `UserButtonClassNames`
+- `SettingsCardClassNames`
+
+---
+
+## Advanced Topics
+
+### CLI: Generate Database Types
 
 ```bash
 # Generate TypeScript types from database schema
@@ -401,7 +740,7 @@ const client = createClient<Database>({ ... });
 // Now client.from("items") is fully typed!
 ```
 
-## Environment Variables
+### Environment Variables
 
 ```bash
 # .env.local (Next.js)
@@ -414,7 +753,7 @@ VITE_NEON_AUTH_URL=https://ep-xxx.neonauth.c-2.us-east-2.aws.neon.build/dbname/a
 VITE_NEON_DATA_API_URL=https://ep-xxx.apirest.c-2.us-east-2.aws.neon.build/dbname/rest/v1
 ```
 
-## Common Mistakes to Avoid
+### Common Mistakes to Avoid
 
 1. **Installing wrong package**: Use `@neondatabase/neon-js` for auth + data API, use `@neondatabase/auth` for auth only. Don't install neon-js if you don't need database queries.
 2. **Missing "use client" directive**: Auth client components need `"use client"` at the top
@@ -426,7 +765,7 @@ VITE_NEON_DATA_API_URL=https://ep-xxx.apirest.c-2.us-east-2.aws.neon.build/dbnam
 8. **Not calling adapter as function**: Adapters are factory functions. Use `SupabaseAuthAdapter()` not `SupabaseAuthAdapter`
 9. **Wrong createAuthClient signature**: First arg is URL string: `createAuthClient(url, { adapter })` not `createAuthClient({ baseURL })`
 
-## Supabase Migration
+### Supabase Migration
 
 ```diff
 - import { createClient } from "@supabase/supabase-js";
@@ -444,20 +783,6 @@ const { data: { session } } = await client.auth.getSession();
 
 // Database queries work the same
 const { data } = await client.from("items").select();
-```
-
-## Optional
-
-### Theming
-
-For custom themes (colors, radius, dark mode), see [llms-theming.txt](llms-theming.txt).
-
-Quick override example:
-```css
-:root {
-  --primary: oklch(0.55 0.25 250);
-  --primary-foreground: oklch(0.98 0 0);
-}
 ```
 
 ### Import Paths Reference
@@ -509,9 +834,14 @@ if (error) {
 }
 ```
 
+---
+
 ## Links
 
 - [GitHub Repository](https://github.com/neondatabase-labs/neon-js)
 - [Neon Documentation](https://neon.tech/docs)
 - [Better Auth Documentation](https://www.better-auth.com/docs)
 - [Better Auth UI](https://better-auth-ui.com)
+- [OKLCH Color Converter](https://oklch.com)
+- [shadcn/ui Theming Guide](https://ui.shadcn.com/docs/theming)
+- [next-themes](https://github.com/pacocoursey/next-themes)

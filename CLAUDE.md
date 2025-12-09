@@ -366,7 +366,7 @@ import { createClient, SupabaseAuthAdapter } from '@neondatabase/neon-js';
 
 const client = createClient<Database>({
   auth: {
-    adapter: SupabaseAuthAdapter,
+    adapter: SupabaseAuthAdapter(), // Adapters are factory functions - must call with ()
     url: 'https://auth.example.com',
   },
   dataApi: {
@@ -390,7 +390,7 @@ import { createClient, BetterAuthVanillaAdapter } from '@neondatabase/neon-js';
 
 const client = createClient<Database>({
   auth: {
-    adapter: BetterAuthVanillaAdapter,
+    adapter: BetterAuthVanillaAdapter(), // Adapters are factory functions - must call with ()
     url: 'https://auth.example.com',
   },
   dataApi: {
@@ -411,11 +411,12 @@ const { data: items } = await client.from('items').select();
 
 ```typescript
 import { createClient } from '@neondatabase/neon-js';
+// BetterAuthReactAdapter is NOT exported from main entry - must import from subpath
 import { BetterAuthReactAdapter } from '@neondatabase/neon-js/auth/react/adapters';
 
 const client = createClient<Database>({
   auth: {
-    adapter: BetterAuthReactAdapter,
+    adapter: BetterAuthReactAdapter(), // Adapters are factory functions - must call with ()
     url: 'https://auth.example.com',
   },
   dataApi: {
@@ -437,10 +438,13 @@ function MyComponent() {
 ### Using Auth Adapters Directly
 
 ```typescript
-import { createAuthClient, SupabaseAuthAdapter } from '@neondatabase/auth';
+import { createAuthClient } from '@neondatabase/auth';
+import { SupabaseAuthAdapter } from '@neondatabase/auth/vanilla/adapters';
 
+// createAuthClient signature: (url: string, config?: { adapter })
+// First arg is URL string, NOT an object with baseURL
 const auth = createAuthClient('https://your-auth-server.com', {
-  adapter: SupabaseAuthAdapter,
+  adapter: SupabaseAuthAdapter(), // Adapters are factory functions - must call with ()
 });
 
 await auth.signInWithPassword({ email, password });
