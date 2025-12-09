@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { execSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 // eslint-disable-next-line unicorn/import-style
-import { resolve, dirname } from 'node:path';
+import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -15,6 +15,57 @@ const betterAuthUiSrc = resolve(
 );
 
 console.log(`🔍 Scanning: ${betterAuthUiSrc}`);
+
+/**
+ * Extract all Tailwind classes from better-auth-ui source files
+ * This allows us to generate utilities without shipping the @source directive
+ */
+function extractTailwindClasses(dir) {
+  const classSet = new Set();
+  const classNameRegex = /className\s*[:=]\s*["'`]([^"'`]+)["'`]/g;
+  const cnRegex = /cn\s*\(\s*["'`]([^"'`]+)["'`]/g;
+
+  function scanDirectory(directory) {
+    const entries = readdirSync(directory);
+
+    for (const entry of entries) {
+      const fullPath = join(directory, entry);
+      const stat = statSync(fullPath);
+
+      if (stat.isDirectory()) {
+        scanDirectory(fullPath);
+      } else if (entry.endsWith('.tsx') || entry.endsWith('.ts')) {
+        const content = readFileSync(fullPath, 'utf8');
+
+        // Extract from className="..."
+        let match;
+        while ((match = classNameRegex.exec(content)) !== null) {
+          const classes = match[1].split(/\s+/).filter(Boolean);
+          for (const cls of classes) classSet.add(cls);
+        }
+
+        // Extract from cn("...")
+        classNameRegex.lastIndex = 0;
+        while ((match = cnRegex.exec(content)) !== null) {
+          const classes = match[1].split(/\s+/).filter(Boolean);
+          for (const cls of classes) classSet.add(cls);
+        }
+      }
+    }
+  }
+
+  try {
+    scanDirectory(dir);
+  } catch (error) {
+    console.warn(`⚠️  Could not scan directory: ${error.message}`);
+  }
+
+  return [...classSet].sort();
+}
+
+console.log('🔍 Extracting Tailwind classes from better-auth-ui...');
+const extractedClasses = extractTailwindClasses(betterAuthUiSrc);
+console.log(`✅ Found ${extractedClasses.length} unique Tailwind classes`);
 
 // Build pre-built CSS (for consumers WITHOUT Tailwind)
 const indexCssPath = resolve(__dirname, 'src/index.css');
@@ -56,11 +107,23 @@ try {
   });
   console.log('✅ Theme CSS (theme.css) built successfully');
 
-  // Write tailwind.css WITHOUT @source directive
-  // Consumers use style.css for pre-built utilities, theme.css for variables
+  // Create a safelist file with all extracted classes
+  // This allows Tailwind to generate utilities without @source directive
+  const safelistContent = `<!-- Auto-generated safelist for better-auth-ui classes -->
+<!-- This file ensures all necessary utilities are generated -->
+<div class="${extractedClasses.join(' ')}"></div>
+`;
+  const safelistPath = resolve(__dirname, 'dist/.safelist.html');
+  writeFileSync(safelistPath, safelistContent, 'utf-8');
+
+  // Write tailwind.css WITH @source pointing to our safelist
+  // This avoids referencing the @daveyplate package
   const distTailwindCss = `/* Tailwind-ready CSS for consumers WITH Tailwind */
 /* Import this AFTER @import 'tailwindcss' in your CSS */
 @import './theme.css';
+
+/* Safelist: All Tailwind classes used by better-auth-ui components */
+@source "./.safelist.html";
 `;
   writeFileSync(
     resolve(__dirname, 'dist/tailwind.css'),
@@ -68,6 +131,9 @@ try {
     'utf-8'
   );
   console.log('✅ Tailwind-ready CSS (tailwind.css) created successfully');
+  console.log(
+    `✅ Safelist file created with ${extractedClasses.length} classes`
+  );
 } catch (error) {
   console.error('❌ Failed to build CSS:', error.message);
   process.exit(1);
