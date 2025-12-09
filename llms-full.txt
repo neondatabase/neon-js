@@ -74,7 +74,7 @@ function SignInButton() {
   return (
     <button onClick={() => authClient.signIn.email({
       email: "user@example.com",
-      password: "password123"
+      password: "<your-password>"
     })}>
       Sign In
     </button>
@@ -726,7 +726,7 @@ import { SignInForm } from "@neondatabase/neon-js/auth/react/ui";
 
 ```bash
 # Generate TypeScript types from database schema
-npx neon-js gen-types --db-url "postgresql://user:pass@host:5432/db"
+npx neon-js gen-types --db-url "postgresql://<user>:<password>@<host>:5432/<db>"
 
 # Custom output path
 npx neon-js gen-types --db-url "..." --output src/types/database.ts
@@ -771,7 +771,7 @@ VITE_NEON_DATA_API_URL=https://ep-xxx.apirest.c-2.us-east-2.aws.neon.build/dbnam
 - import { createClient } from "@supabase/supabase-js";
 + import { createClient, SupabaseAuthAdapter } from "@neondatabase/neon-js";
 
-- const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+- const client = createClient(SUPABASE_URL, SUPABASE_KEY);
 + const client = createClient({
 +   auth: { adapter: SupabaseAuthAdapter(), url: NEON_AUTH_URL }, // Call adapter as function
 +   dataApi: { url: NEON_DATA_API_URL },

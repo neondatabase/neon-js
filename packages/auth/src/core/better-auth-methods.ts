@@ -51,6 +51,7 @@ export const BETTER_AUTH_ENDPOINTS = {
   updateUser: '/update-user',
   getSession: '/get-session',
   token: '/token',
+  anonymousSignIn: '/sign-in/anonymous',
 } as const;
 
 export const BETTER_AUTH_METHODS_HOOKS: Record<string, MethodHook> = {
@@ -259,6 +260,9 @@ function isSessionResponseData(
 export function deriveBetterAuthMethodFromUrl(
   url: string
 ): keyof typeof BETTER_AUTH_METHODS_HOOKS | undefined {
+  if (url.includes('/sign-in/anonymous')) {
+    return 'anonymousSignIn';
+  }
   if (url.includes(BETTER_AUTH_ENDPOINTS.signIn)) {
     return 'signIn';
   }

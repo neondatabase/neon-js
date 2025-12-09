@@ -22,8 +22,25 @@ console.log(`🔍 Scanning: ${betterAuthUiSrc}`);
  */
 function extractTailwindClasses(dir) {
   const classSet = new Set();
-  const classNameRegex = /className\s*[:=]\s*["'`]([^"'`]+)["'`]/g;
-  const cnRegex = /cn\s*\(\s*["'`]([^"'`]+)["'`]/g;
+
+  // Separate regexes for each quote type to properly handle nested quotes
+  // Pattern (?:\\.|[^X\\])* matches: escaped chars (\.) OR non-quote/non-backslash chars
+  const classNameDoubleQuoteRegex = /className\s*[:=]\s*"((?:\\.|[^"\\])*)"/g;
+  const classNameSingleQuoteRegex = /className\s*[:=]\s*'((?:\\.|[^'\\])*)'/g;
+  const classNameBacktickRegex = /className\s*[:=]\s*`((?:\\.|[^`\\])*)`/g;
+
+  const cnDoubleQuoteRegex = /cn\s*\(\s*"((?:\\.|[^"\\])*)"/g;
+  const cnSingleQuoteRegex = /cn\s*\(\s*'((?:\\.|[^'\\])*)'/g;
+  const cnBacktickRegex = /cn\s*\(\s*`((?:\\.|[^`\\])*)`/g;
+
+  const allRegexes = [
+    classNameDoubleQuoteRegex,
+    classNameSingleQuoteRegex,
+    classNameBacktickRegex,
+    cnDoubleQuoteRegex,
+    cnSingleQuoteRegex,
+    cnBacktickRegex,
+  ];
 
   function scanDirectory(directory) {
     const entries = readdirSync(directory);
@@ -37,18 +54,14 @@ function extractTailwindClasses(dir) {
       } else if (entry.endsWith('.tsx') || entry.endsWith('.ts')) {
         const content = readFileSync(fullPath, 'utf8');
 
-        // Extract from className="..."
-        let match;
-        while ((match = classNameRegex.exec(content)) !== null) {
-          const classes = match[1].split(/\s+/).filter(Boolean);
-          for (const cls of classes) classSet.add(cls);
-        }
-
-        // Extract from cn("...")
-        classNameRegex.lastIndex = 0;
-        while ((match = cnRegex.exec(content)) !== null) {
-          const classes = match[1].split(/\s+/).filter(Boolean);
-          for (const cls of classes) classSet.add(cls);
+        // Extract classes using all regex patterns
+        for (const regex of allRegexes) {
+          regex.lastIndex = 0;
+          let match;
+          while ((match = regex.exec(content)) !== null) {
+            const classes = match[1].split(/\s+/).filter(Boolean);
+            for (const cls of classes) classSet.add(cls);
+          }
         }
       }
     }
