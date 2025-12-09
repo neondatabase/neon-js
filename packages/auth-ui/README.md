@@ -46,22 +46,64 @@ This imports only the theme variables and component scanning directive. Your Tai
 
 ### 2. Use the Provider
 
+#### With Next.js (Recommended)
+
 ```typescript
-'use client';
+// lib/auth-client.ts
+"use client"
 
-import { NeonAuthUIProvider } from '@neondatabase/auth-ui';
-import { createAuthClient } from '@neondatabase/auth';
+import { createAuthClient } from "@neondatabase/auth/next"
 
-const authClient = createAuthClient({
-  baseURL: process.env.NEXT_PUBLIC_AUTH_URL,
-});
+export const authClient = createAuthClient()
+```
+
+```typescript
+// app/providers.tsx
+"use client"
+
+import { NeonAuthUIProvider } from "@neondatabase/auth-ui"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+
+import { authClient } from "@/lib/auth-client"
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
+
+  return (
+    <NeonAuthUIProvider
+      authClient={authClient}
+      navigate={router.push}
+      replace={router.replace}
+      onSessionChange={() => router.refresh()}
+      emailOTP
+      social={{ providers: ["google"] }}
+      redirectTo="/dashboard"
+      Link={Link}
+      organization={{}}
+    >
+      {children}
+    </NeonAuthUIProvider>
+  )
+}
+```
+
+#### With Other Frameworks
+
+```typescript
+"use client"
+
+import { NeonAuthUIProvider } from "@neondatabase/auth-ui"
+import { createAuthClient } from "@neondatabase/auth"
+
+const authClient = createAuthClient(process.env.NEXT_PUBLIC_AUTH_URL!)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <NeonAuthUIProvider authClient={authClient}>
       {children}
     </NeonAuthUIProvider>
-  );
+  )
 }
 ```
 
@@ -147,30 +189,71 @@ export default function RootLayout({ children }) {
 
 ### Provider Setup
 
-**app/auth-provider.tsx**
+**lib/auth-client.ts**
 ```typescript
-'use client';
+"use client"
 
-import { NeonAuthUIProvider } from '@neondatabase/auth-ui';
-import { authClient } from './auth';
+import { createAuthClient } from "@neondatabase/auth/next"
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export const authClient = createAuthClient()
+```
+
+**app/providers.tsx**
+```typescript
+"use client"
+
+import { NeonAuthUIProvider } from "@neondatabase/auth-ui"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+
+import { authClient } from "@/lib/auth-client"
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
+
   return (
-    <NeonAuthUIProvider authClient={authClient}>
+    <NeonAuthUIProvider
+      authClient={authClient}
+      navigate={router.push}
+      replace={router.replace}
+      onSessionChange={() => router.refresh()}
+      emailOTP
+      social={{ providers: ["google"] }}
+      redirectTo="/dashboard"
+      Link={Link}
+      organization={{}}
+    >
       {children}
     </NeonAuthUIProvider>
-  );
+  )
 }
 ```
 
 ### Using Components
 
-**app/auth/page.tsx**
+**app/auth/[path]/page.tsx**
 ```typescript
-import { SignInForm } from '@neondatabase/auth-ui';
+import { AuthView } from "@neondatabase/auth-ui"
+import { authViewPaths } from "@neondatabase/auth-ui/server"
 
-export default function AuthPage() {
-  return <SignInForm />;
+export const dynamicParams = false
+
+export function generateStaticParams() {
+  return Object.values(authViewPaths).map((path) => ({ path }))
+}
+
+export default async function AuthPage({
+  params,
+}: {
+  params: Promise<{ path: string }>
+}) {
+  const { path } = await params
+
+  return (
+    <main className="container flex grow flex-col items-center justify-center p-4">
+      <AuthView path={path} />
+    </main>
+  )
 }
 ```
 
