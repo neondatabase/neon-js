@@ -224,7 +224,7 @@ For Next.js projects, this package provides built-in integration via `@neondatab
 
 ## CSS for UI Components
 
-If you're using `@neondatabase/auth-ui` components, CSS is conveniently re-exported from this package:
+Styles for Neon Auth UI components are available from this package:
 
 | Export | Use Case |
 |--------|----------|
@@ -244,13 +244,11 @@ If you're using `@neondatabase/auth-ui` components, CSS is conveniently re-expor
 
 - [`@neondatabase/neon-js`](../neon-js) - Full SDK with database and auth integration
 - [`@neondatabase/postgrest-js`](../postgrest-js) - PostgreSQL client without auth
-- [`@neondatabase/auth-ui`](../auth-ui) - UI components for Neon Auth
 
 ## Resources
 
 - [Neon Auth Documentation](https://neon.tech/docs/neon-auth)
 - [Better Auth Documentation](https://www.better-auth.com/docs)
-- [Supabase Auth Reference](https://supabase.com/docs/reference/javascript/auth-signup)
 
 ## Support
 

@@ -20,6 +20,12 @@ The official TypeScript SDK for Neon, combining authentication and database quer
 - **TypeScript First** - Fully typed with strict type checking
 - **Universal** - Works in Node.js, browsers, and edge runtimes
 
+## How to query your Neon Serverless Postgres database?
+
+It's up to you how you want to query your Postgres database! Neon Data API is a PostgREST-compatible REST service for your Neon database. `neon-js` exposes the REST-based query functions to leverage Data API. However, you can also use Data API directly with [PostgREST](https://postgrest.org) and we also maintain a simple Postgres client [here](https://github.com/neondatabase/serverless).
+
+That said, you don't need Data API or `neon-js` to query Neon. Neon works great with all major ORMs ([Drizzle](https://orm.drizzle.team/), [Prisma](https://www.prisma.io/), [Kysely](https://kysely.dev/)) and Postgres clients ([node-postgres](https://node-postgres.com/), [postgres.js](https://github.com/porsager/postgres)). We also offer a [serverless driver](https://github.com/neondatabase/serverless) for edge and serverless environments without TCP client or connection pooling support (which also is available as a Drizzle and Prisma adapter).
+
 ## Installation
 
 ```bash
@@ -33,6 +39,8 @@ bun add @neondatabase/neon-js
 ```typescript
 import { createClient } from '@neondatabase/neon-js';
 
+// Database type generated via: npx neon-js gen-types --db-url "..."
+// See "TypeScript" section below for details
 const client = createClient<Database>({
   auth: {
     url: import.meta.env.VITE_NEON_AUTH_URL,
@@ -66,6 +74,8 @@ Use this adapter if you're migrating from Supabase or prefer the Supabase API st
 ```typescript
 import { createClient, SupabaseAuthAdapter } from '@neondatabase/neon-js';
 
+// Database type generated via: npx neon-js gen-types --db-url "..."
+// See "TypeScript" section below for details
 const client = createClient<Database>({
   auth: {
     adapter: SupabaseAuthAdapter(),
@@ -93,6 +103,8 @@ Use this adapter in React applications to get access to hooks like `useSession`:
 import { createClient } from '@neondatabase/neon-js';
 import { BetterAuthReactAdapter } from '@neondatabase/neon-js/auth/react/adapters';
 
+// Database type generated via: npx neon-js gen-types --db-url "..."
+// See "TypeScript" section below for details
 const client = createClient<Database>({
   auth: {
     adapter: BetterAuthReactAdapter(),
@@ -325,7 +337,7 @@ const client = createClient({
 
 ## UI Component Styles
 
-If you're using `@neondatabase/auth-ui` components with the SDK, CSS is conveniently available:
+Styles for Neon Auth UI components are available from this package:
 
 | Export | Use Case |
 |--------|----------|
