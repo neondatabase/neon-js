@@ -41,6 +41,7 @@ export default defineConfig(
             { src: 'style.css', dest: 'css.css' },
             { src: 'tailwind.css', dest: 'tailwind.css' },
             { src: 'theme.css', dest: 'theme.css' },
+            { src: '.safelist.html', dest: '.safelist.html' },
           ],
           packageName: '@neondatabase/auth',
         });

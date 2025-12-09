@@ -2,7 +2,10 @@ import { defineConfig } from 'tsdown';
 import path from 'node:path';
 import { createPackageConfig } from '../../build/tsdown-base.ts';
 import { preserveDirectives } from '../../build/preserve-directives.ts';
-import { copyPackageJsonToDist, copyCssBundle } from '../../build/build-utils.ts';
+import {
+  copyPackageJsonToDist,
+  copyCssBundle,
+} from '../../build/build-utils.ts';
 
 export default defineConfig(
   createPackageConfig({
@@ -33,12 +36,19 @@ export default defineConfig(
 
         // Copy CSS bundle from auth package
         copyCssBundle({
-          sourceDir: path.resolve(import.meta.dirname, '..', 'auth', 'dist', 'ui'),
+          sourceDir: path.resolve(
+            import.meta.dirname,
+            '..',
+            'auth',
+            'dist',
+            'ui'
+          ),
           targetDir: path.resolve(import.meta.dirname, 'dist', 'ui'),
           files: [
             { src: 'css.css', dest: 'css.css' },
             { src: 'tailwind.css', dest: 'tailwind.css' },
             { src: 'theme.css', dest: 'theme.css' },
+            { src: '.safelist.html', dest: '.safelist.html' },
           ],
           packageName: '@neondatabase/neon-js',
         });
