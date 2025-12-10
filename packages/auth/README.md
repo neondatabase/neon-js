@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@neondatabase/auth.svg)](https://www.npmjs.com/package/@neondatabase/auth)
 [![npm downloads](https://img.shields.io/npm/dm/@neondatabase/auth.svg)](https://www.npmjs.com/package/@neondatabase/auth)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0%2B-blue.svg)](https://www.typescriptlang.org/)
-[![License](https://img.shields.io/npm/l/@neondatabase/auth.svg)](https://github.com/neondatabase-labs/neon-js/blob/main/LICENSE)
+[![License](https://img.shields.io/npm/l/@neondatabase/auth.svg)](https://github.com/neondatabase/neon-js/blob/main/LICENSE)
 
 Authentication adapters for Neon Auth, supporting multiple auth providers.
 

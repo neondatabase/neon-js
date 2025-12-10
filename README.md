@@ -377,4 +377,4 @@ Apache-2.0
 
 - [Neon Documentation](https://neon.tech/docs)
 - [Better Auth Documentation](https://www.better-auth.com/docs)
-- [GitHub Repository](https://github.com/neondatabase-labs/neon-js)
+- [GitHub Repository](https://github.com/neondatabase/neon-js)

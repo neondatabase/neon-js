@@ -16,13 +16,13 @@
     "sdk",
     "query-builder"
   ],
-  "homepage": "https://github.com/neondatabase-labs/neon-js/tree/main/packages/postgrest-js#readme",
+  "homepage": "https://github.com/neondatabase/neon-js/tree/main/packages/postgrest-js#readme",
   "bugs": {
-    "url": "https://github.com/neondatabase-labs/neon-js/issues"
+    "url": "https://github.com/neondatabase/neon-js/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/neondatabase-labs/neon-js.git",
+    "url": "git+https://github.com/neondatabase/neon-js.git",
     "directory": "packages/postgrest-js"
   },
   "funding": {

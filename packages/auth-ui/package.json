@@ -18,13 +18,13 @@
     "better-auth",
     "tailwindcss"
   ],
-  "homepage": "https://github.com/neondatabase-labs/neon-js/tree/main/packages/auth-ui#readme",
+  "homepage": "https://github.com/neondatabase/neon-js/tree/main/packages/auth-ui#readme",
   "bugs": {
-    "url": "https://github.com/neondatabase-labs/neon-js/issues"
+    "url": "https://github.com/neondatabase/neon-js/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/neondatabase-labs/neon-js.git",
+    "url": "git+https://github.com/neondatabase/neon-js.git",
     "directory": "packages/auth-ui"
   },
   "funding": {
