@@ -252,8 +252,6 @@ paths within the package are valid (per Node.js ESM specification). Wrapper file
   - `supabase-adapter.ts` - Supabase-compatible API implementation
   - `auth-interface.ts` - AuthError, AuthApiError types
   - `errors/` - Error definitions and mappings
-  - `better-auth-docs.md` - Adapter documentation
-  - `better-auth-plugins.md` - Plugin configuration
 
 - **Better Auth Vanilla**: `adapters/better-auth-vanilla/`
   - `better-auth-vanilla-adapter.ts` - Direct Better Auth API
@@ -262,13 +260,17 @@ paths within the package are valid (per Node.js ESM specification). Wrapper file
   - `better-auth-react-adapter.ts` - Better Auth with React hooks (`useSession`)
 
 **Core**: `src/core/`
-- `adapter-core.ts` - Base adapter class with shared functionality
+- `adapter-core.ts` - Base adapter class with shared functionality (includes `getJWTToken(allowAnonymous)`)
 - `session-cache-manager.ts` - Session caching with TTL
+- `token-cache.ts` - Generic token caching with JWT-based TTL
 - `in-flight-request-manager.ts` - Request deduplication
 - `better-auth-helpers.ts` - Session mapping and error handling
 - `better-auth-types.ts` - Type definitions
 - `better-auth-methods.ts` - Shared method implementations
 - `constants.ts` - Configuration (TTLs, intervals, buffers)
+
+**Plugins**: `src/plugins/`
+- `anonymous-token.ts` - Better Auth client plugin for anonymous token retrieval
 
 **Utilities**: `src/utils/`
 - `jwt.ts` - JWT parsing and expiration utilities
@@ -369,6 +371,7 @@ const client = createClient<Database>({
   auth: {
     adapter: SupabaseAuthAdapter(), // Adapters are factory functions - must call with ()
     url: 'https://auth.example.com',
+    allowAnonymous: true, // Optional: enable anonymous token for RLS access
   },
   dataApi: {
     url: 'https://data-api.example.com/rest/v1',
@@ -442,10 +445,11 @@ function MyComponent() {
 import { createAuthClient } from '@neondatabase/auth';
 import { SupabaseAuthAdapter } from '@neondatabase/auth/vanilla/adapters';
 
-// createAuthClient signature: (url: string, config?: { adapter })
+// createAuthClient signature: (url: string, config?: { adapter, allowAnonymous })
 // First arg is URL string, NOT an object with baseURL
 const auth = createAuthClient('https://your-auth-server.com', {
   adapter: SupabaseAuthAdapter(), // Adapters are factory functions - must call with ()
+  allowAnonymous: true, // Optional: enable anonymous token for RLS access
 });
 
 await auth.signInWithPassword({ email, password });
@@ -514,6 +518,13 @@ export default function AuthPage() {
 ```
 
 ## Adapter Features
+
+### Anonymous Access
+- `allowAnonymous: true` in config enables anonymous token for unauthenticated users
+- Uses Better Auth plugin `anonymousTokenClient()` to fetch `/token/anonymous`
+- Enables RLS-based data access with anonymous role
+- Token flow: authenticated session JWT → anonymous token → null
+- Cached using `TokenCache` with JWT-based TTL
 
 ### Session Caching
 - In-memory cache with 60s TTL (or until JWT expires)
@@ -597,8 +608,6 @@ Following the [Better Auth Supabase Migration Guide](https://www.better-auth.com
 
 ## Additional Documentation
 
-- `packages/auth/src/adapters/supabase/better-auth-docs.md` - Comprehensive adapter docs
-- `packages/auth/src/adapters/supabase/better-auth-plugins.md` - Plugin configuration
 - `packages/auth/NEXT-JS.md` - Next.js integration guide
 - `packages/auth-ui/README.md` - UI components documentation
 

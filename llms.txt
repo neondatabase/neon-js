@@ -264,7 +264,18 @@ export default async function AuthPage({ params }: { params: Promise<{ path: str
 // /auth/sign-in, /auth/sign-up, /auth/forgot-password, /auth/reset-password,
 // /auth/magic-link, /auth/two-factor, /auth/callback, /auth/sign-out
 
-// 5. Create account page: app/account/[path]/page.tsx
+// 5. (Optional) Add middleware for protected routes: middleware.ts
+import { neonAuthMiddleware } from "@neondatabase/neon-js/auth/next";
+
+export default neonAuthMiddleware({
+  loginUrl: '/auth/sign-in', // Redirect here if not authenticated
+});
+
+export const config = {
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|public).*)'],
+};
+
+// 6. Create account page: app/account/[path]/page.tsx
 import { AccountView } from "@neondatabase/neon-js/auth/react/ui";
 import { accountViewPaths } from "@neondatabase/neon-js/auth/react/ui/server";
 
@@ -278,7 +289,7 @@ export default async function AccountPage({ params }: { params: Promise<{ path: 
   return <AccountView path={path} />;
 }
 
-// 6. Create organization page: app/organization/[path]/page.tsx
+// 7. Create organization page: app/organization/[path]/page.tsx
 import { OrganizationView } from "@neondatabase/neon-js/auth/react/ui";
 import { organizationViewPaths } from "@neondatabase/neon-js/auth/react/ui/server";
 
@@ -292,7 +303,7 @@ export default async function OrganizationPage({ params }: { params: Promise<{ p
   return <OrganizationView path={path} />;
 }
 
-// 7. Access session in server components
+// 8. Access session in server components
 import { neonAuth } from "@neondatabase/neon-js/auth/next";
 
 export async function Profile() {
@@ -301,7 +312,7 @@ export async function Profile() {
   return <div>Welcome, {user.name || user.email}</div>;
 }
 
-// 8. Use session in client components
+// 9. Use session in client components
 "use client";
 import { authClient } from "@/lib/auth/client";
 
@@ -522,7 +533,7 @@ Quick override example:
 From `@neondatabase/neon-js`:
 - `@neondatabase/neon-js` - Main client (createClient, SupabaseAuthAdapter, BetterAuthVanillaAdapter)
 - `@neondatabase/neon-js/auth/react/adapters` - BetterAuthReactAdapter
-- `@neondatabase/neon-js/auth/next` - Next.js handler and client (authApiHandler, createAuthClient, neonAuth)
+- `@neondatabase/neon-js/auth/next` - Next.js integration (authApiHandler, createAuthClient, neonAuth, neonAuthMiddleware)
 - `@neondatabase/neon-js/auth/react/ui` - UI components (NeonAuthUIProvider, AuthView, SignInForm, etc.)
 - `@neondatabase/neon-js/auth/react/ui/server` - Server utilities (authViewPaths)
 - `@neondatabase/neon-js/ui/css` - Pre-built CSS bundle
@@ -532,7 +543,7 @@ From `@neondatabase/auth` (auth only, same subpaths):
 - `@neondatabase/auth` - Auth client (createAuthClient)
 - `@neondatabase/auth/vanilla/adapters` - SupabaseAuthAdapter, BetterAuthVanillaAdapter
 - `@neondatabase/auth/react/adapters` - BetterAuthReactAdapter
-- `@neondatabase/auth/next` - Next.js integration
+- `@neondatabase/auth/next` - Next.js integration (authApiHandler, createAuthClient, neonAuth, neonAuthMiddleware)
 - `@neondatabase/auth/react/ui` - UI components
 - `@neondatabase/auth/ui/css` - CSS bundle
 

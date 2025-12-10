@@ -19,6 +19,7 @@ This package is designed to work seamlessly with Neon's authentication infrastru
 
 - **Simple default API** - Works out of the box with Better Auth patterns
 - **Optional adapters** - Switch API styles for migrations or preferences
+- **Anonymous access** - Optional RLS-based data access for unauthenticated users
 - **Performance optimizations** - Session caching and request deduplication
 - **TypeScript support** - Fully typed with strict type checking
 
@@ -144,6 +145,23 @@ function MyComponent() {
 }
 ```
 
+## Anonymous Access
+
+Enable `allowAnonymous` to let unauthenticated users access data via RLS policies:
+
+```typescript
+import { createAuthClient } from '@neondatabase/auth';
+
+const auth = createAuthClient('https://your-auth-server.com', {
+  allowAnonymous: true, // Enable anonymous data access
+});
+
+// Get token - returns anonymous token if no user session exists
+const token = await auth.getJWTToken?.();
+```
+
+This is useful when you want to allow read-only public access to certain data while still enforcing RLS policies.
+
 ## API Reference
 
 ### createAuthClient(url, config?)
@@ -153,6 +171,7 @@ Factory function to create an auth client.
 **Parameters:**
 - `url` - The auth service URL (required)
 - `config.adapter` - Optional adapter factory function (e.g., `SupabaseAuthAdapter()`)
+- `config.allowAnonymous` - When `true`, returns an anonymous token if no user session exists (default: `false`)
 
 **Returns:** The adapter's public API (varies by adapter type)
 

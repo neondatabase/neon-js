@@ -2,6 +2,7 @@ import { createAuthClient } from 'better-auth/react';
 import {
   NeonAuthAdapterCore,
   type NeonAuthAdapterCoreAuthOptions,
+  type SupportedBetterAuthClientPlugins,
 } from '../../core/adapter-core';
 
 export type BetterAuthReactAdapterOptions = Omit<
@@ -13,21 +14,17 @@ export type BetterAuthReactAdapterOptions = Omit<
  * Internal implementation class - use BetterAuthReactAdapter factory function instead
  */
 class BetterAuthReactAdapterImpl extends NeonAuthAdapterCore {
-  private _betterAuth: ReturnType<typeof createAuthClient>;
+  private _betterAuth: ReturnType<
+    typeof createAuthClient<{ plugins: SupportedBetterAuthClientPlugins }>
+  >;
 
   constructor(betterAuthClientOptions: NeonAuthAdapterCoreAuthOptions) {
     super(betterAuthClientOptions);
     this._betterAuth = createAuthClient(this.betterAuthOptions);
   }
+
   getBetterAuthInstance() {
     return this._betterAuth;
-  }
-  async getJWTToken() {
-    const session = await this._betterAuth.getSession();
-    if (session.error) {
-      throw session.error;
-    }
-    return session.data?.session?.token ?? null;
   }
 }
 

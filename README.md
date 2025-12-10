@@ -42,6 +42,7 @@ A unified TypeScript SDK for Neon services, providing seamless integration with 
 - **Familiar API**: Drop-in replacement with minimal code changes for migration
 - **Adapter Pattern**: Pluggable authentication providers (Better Auth)
 - **Automatic Token Injection**: Seamless authentication for all database calls
+- **Anonymous Access**: Optional RLS-based data access for unauthenticated users
 - **TypeScript**: Full type safety with strict mode enabled
 - **Performance Optimized**: Cross-tab sync and automatic token refresh
 - **CLI Tool**: Generate TypeScript types from your database schema
@@ -82,7 +83,7 @@ VITE_NEON_AUTH_URL=https://ep-withered-pond-w4e43v69.neonauth.c-2.us-east-2.aws.
 This monorepo contains four packages. Choose based on your needs:
 
 - **`@neondatabase/neon-js`** (Recommended): Full-featured SDK with auth + Neon Data API. Use this for most applications.
-- **`@neondatabase/auth`**: Authentication only. Use when you want to use Neon Auth for authentication and don't need to use the Neon Data API. Includes Next.js integration via `@neondatabase/auth/next`. See the [Next.js Setup Guide](./packages/auth/NEXT-JS.md).
+- **`@neondatabase/auth`**: Authentication only. Use when you want to use Neon Auth for authentication and don't need to use the Neon Data API. Includes Next.js integration via `@neondatabase/auth/next` (handler, client, middleware). See the [Next.js Setup Guide](./packages/auth/NEXT-JS.md).
 - **`@neondatabase/auth-ui`**: Pre-built UI components for Neon Auth. Use when you want ready-to-use sign-in/sign-up forms.
 - **`@neondatabase/postgrest-js`**: Database queries only. Use when you handle authentication externally or don't need auth.
 
@@ -100,6 +101,8 @@ import type { Database } from './types/database.types';
 const client = createClient<Database>({
   auth: {
     url: import.meta.env.VITE_NEON_AUTH_URL,
+    // Optional: allow unauthenticated users to query data via RLS
+    // allowAnonymous: true,
   },
   dataApi: {
     url: import.meta.env.VITE_NEON_DATA_API_URL,
@@ -136,6 +139,25 @@ You can optionally specify an adapter for different API styles:
 - **`SupabaseAuthAdapter`** - Supabase-compatible API (familiar patterns like `signInWithPassword`)
 - **`BetterAuthVanillaAdapter`** - Direct Better Auth API (`signIn.email`) - **default**
 - **`BetterAuthReactAdapter`** - Better Auth with React hooks (`useSession`)
+
+### Anonymous Access
+
+Enable `allowAnonymous` to let unauthenticated users query data. This uses an anonymous token for RLS-based access control:
+
+```typescript
+const client = createClient<Database>({
+  auth: {
+    url: import.meta.env.VITE_NEON_AUTH_URL,
+    allowAnonymous: true, // Enable anonymous data access
+  },
+  dataApi: {
+    url: import.meta.env.VITE_NEON_DATA_API_URL,
+  },
+});
+
+// Works without signing in - uses anonymous token for RLS
+const { data: publicItems } = await client.from('public_items').select();
+```
 
 ## CLI Tool: Generate Types
 

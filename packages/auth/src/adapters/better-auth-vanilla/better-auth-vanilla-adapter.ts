@@ -1,13 +1,10 @@
-import {
-  type BetterAuthClientOptions,
-  createAuthClient,
-} from 'better-auth/client';
+import { createAuthClient } from 'better-auth/client';
 
 import {
   NeonAuthAdapterCore,
   type NeonAuthAdapterCoreAuthOptions,
+  type SupportedBetterAuthClientPlugins,
 } from '../../core/adapter-core';
-import type { AuthClient } from 'better-auth/client';
 
 export type BetterAuthVanillaAdapterOptions = Omit<
   NeonAuthAdapterCoreAuthOptions,
@@ -18,22 +15,17 @@ export type BetterAuthVanillaAdapterOptions = Omit<
  * Internal implementation class - use BetterAuthVanillaAdapter factory function instead
  */
 class BetterAuthVanillaAdapterImpl extends NeonAuthAdapterCore {
-  private _betterAuth: AuthClient<BetterAuthClientOptions>;
+  private _betterAuth: ReturnType<
+    typeof createAuthClient<{ plugins: SupportedBetterAuthClientPlugins }>
+  >;
 
   constructor(betterAuthClientOptions: NeonAuthAdapterCoreAuthOptions) {
     super(betterAuthClientOptions);
     this._betterAuth = createAuthClient(this.betterAuthOptions);
   }
-  getBetterAuthInstance(): AuthClient<BetterAuthClientOptions> {
-    return this._betterAuth;
-  }
 
-  async getJWTToken() {
-    const session = await this._betterAuth.getSession();
-    if (session.error) {
-      throw session.error;
-    }
-    return session.data?.session?.token ?? null;
+  getBetterAuthInstance() {
+    return this._betterAuth;
   }
 }
 

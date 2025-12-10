@@ -1,6 +1,5 @@
 import type { BetterAuthSession, BetterAuthUser } from './better-auth-types';
-import { SESSION_CACHE_TTL_MS, CLOCK_SKEW_BUFFER_MS } from './constants';
-import { getJwtExpiration } from '../utils/jwt';
+import { TokenCache } from './token-cache';
 
 /**
  * Cached session data in Better Auth native format.
@@ -11,20 +10,12 @@ export type CachedSessionData = {
   user: BetterAuthUser;
 };
 
-type SessionCache = {
-  data: CachedSessionData;
-  expiresAt: number;
-  invalidated?: boolean;
-} | null;
-
 /**
  * Manages in-memory session cache with TTL expiration.
  *
- * Features:
- * - Stores sessions in Better Auth native format
- * - Automatic expiration based on JWT token expiration
+ * Built on TokenCache, adding session-specific features:
  * - Invalidation flag for sign-out scenarios
- * - TTL calculation with clock skew buffer
+ * - Token refresh detection via lastSessionData comparison
  *
  * Example:
  * ```typescript
@@ -34,47 +25,36 @@ type SessionCache = {
  * ```
  */
 export class SessionCacheManager {
-  private cache: SessionCache = null;
+  private cache = new TokenCache<CachedSessionData>();
   private lastSessionData: CachedSessionData | null = null;
+  private invalidated = false;
 
   /**
    * Get cached session if valid and not expired.
    * Returns null if cache is invalid, expired, or doesn't exist.
    */
   getCachedSession(): CachedSessionData | null {
-    if (!this.cache || this.cache.invalidated) {
+    if (this.invalidated) {
       return null;
     }
 
-    if (Date.now() > this.cache.expiresAt) {
-      this.clearSessionCache();
-      return null;
-    }
-
-    return this.cache.data;
+    return this.cache.get();
   }
 
   /**
-   * Set cached session with optional TTL.
-   * If TTL not provided, calculates from JWT expiration.
+   * Set cached session with JWT-based TTL.
    * Skips caching if cache was invalidated (sign-out scenario).
    */
-  setCachedSession(data: CachedSessionData, ttl?: number): void {
+  setCachedSession(data: CachedSessionData): void {
     // Check if cache was invalidated (signOut called during in-flight request)
-    if (this.cache?.invalidated) {
+    if (this.invalidated) {
       return;
     }
 
     // Store current cache data as lastSessionData before updating
-    this.lastSessionData = this.cache?.data ?? null;
+    this.lastSessionData = this.cache.get();
 
-    const calculatedTtl = ttl ?? this.calculateCacheTTL(data.session.token);
-
-    this.cache = {
-      data,
-      expiresAt: Date.now() + calculatedTtl,
-      invalidated: false,
-    };
+    this.cache.set(data, data.session.token);
   }
 
   /**
@@ -82,17 +62,16 @@ export class SessionCacheManager {
    * Useful for sign-out scenarios where in-flight requests should not cache.
    */
   invalidateSessionCache(): void {
-    if (this.cache) {
-      this.cache.invalidated = true;
-    }
+    this.invalidated = true;
   }
 
   /**
    * Clear cache completely.
    */
   clearSessionCache(): void {
-    this.cache = null;
+    this.cache.clear();
     this.lastSessionData = null;
+    this.invalidated = false;
   }
 
   /**
@@ -104,26 +83,5 @@ export class SessionCacheManager {
       return false;
     }
     return this.lastSessionData.session.token !== data.session.token;
-  }
-
-  /**
-   * Calculate cache TTL from JWT expiration.
-   * Falls back to default TTL if JWT is invalid or missing.
-   */
-  private calculateCacheTTL(jwt: string | undefined): number {
-    if (!jwt) {
-      return SESSION_CACHE_TTL_MS;
-    }
-
-    const exp = getJwtExpiration(jwt);
-    if (!exp) {
-      return SESSION_CACHE_TTL_MS;
-    }
-
-    const now = Date.now();
-    const expiresAtMs = exp * 1000;
-    const ttl = expiresAtMs - now - CLOCK_SKEW_BUFFER_MS;
-
-    return Math.max(ttl, 1000);
   }
 }
