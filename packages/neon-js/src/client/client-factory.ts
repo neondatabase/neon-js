@@ -1,6 +1,7 @@
 import {
   type NeonAuthAdapter,
   createInternalNeonAuth,
+  type NeonAuthConfig,
 } from '@neondatabase/auth';
 import {
   type BetterAuthVanillaAdapterInstance,
@@ -18,11 +19,9 @@ import {
  * Auth configuration for createClient
  */
 export type CreateClientAuthConfig<T extends NeonAuthAdapter> = {
-  /** The adapter builder to use. Defaults to BetterAuthVanillaAdapter() if not specified. */
-  adapter?: (url: string) => T;
   /** The auth service URL */
   url: string;
-};
+} & NeonAuthConfig<T>;
 
 /**
  * Data API configuration for createClient
@@ -105,7 +104,7 @@ type CreateClientResult<
 
 // Overload: No adapter specified (defaults to BetterAuthVanillaAdapter)
 export function createClient<Database = any>(config: {
-  auth: { url: string };
+  auth: { url: string; allowAnonymous?: boolean };
   dataApi: CreateClientDataApiConfig<
     DefaultSchemaName<Database>,
     BetterAuthVanillaAdapterInstance
@@ -150,13 +149,13 @@ export function createClient<
   // Default to BetterAuthVanillaAdapter if no adapter specified
   const auth = createInternalNeonAuth(authConfig.url, {
     adapter: authConfig.adapter,
+    allowAnonymous: authConfig.allowAnonymous ?? false,
   });
 
   // Step 2: Create lazy token accessor - called on every request
   // Returns null if no session (will throw AuthRequiredError in fetchWithToken)
   const getAccessToken = async (): Promise<string | null> => {
-    const jwt = await auth.getJWTToken();
-    return jwt;
+    return auth.getJWTToken();
   };
 
   // Step 3: Create auth-aware fetch wrapper

@@ -156,18 +156,12 @@ class SupabaseAuthAdapterImpl
       }
     });
   }
-  getBetterAuthInstance(): BetterAuthClient<BetterAuthClientOptions> {
+  getBetterAuthInstance(): ReturnType<
+    typeof createAuthClient<{
+      plugins: SupportedBetterAuthClientPlugins;
+    }>
+  > {
     return this._betterAuth;
-  }
-
-  async getJWTToken(): Promise<string | null> {
-    const session = await this.getSession();
-
-    if (session.error) {
-      return null;
-    }
-
-    return session.data.session?.access_token ?? null;
   }
 
   initialize: SupabaseAuthClientInterface['initialize'] = async () => {

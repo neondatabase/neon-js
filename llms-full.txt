@@ -276,6 +276,28 @@ export default async function AuthPage({ params }: { params: Promise<{ path: str
 // /auth/magic-link, /auth/two-factor, /auth/callback, /auth/sign-out
 ```
 
+### Middleware for Protected Routes (Optional)
+
+Add route protection with automatic redirect to login:
+
+```typescript
+// middleware.ts
+import { neonAuthMiddleware } from "@neondatabase/neon-js/auth/next";
+
+export default neonAuthMiddleware({
+  loginUrl: '/auth/sign-in', // Redirect here if not authenticated
+});
+
+export const config = {
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|public).*)'],
+};
+```
+
+The middleware automatically:
+- Skips auth routes (`/api/auth`, `/auth/sign-in`, `/auth/sign-up`, etc.)
+- Handles OAuth callback token exchange
+- Redirects unauthenticated users to the login page
+
 ### Social Sign-In (Google, GitHub)
 
 Google and GitHub sign-in are **enabled by default** in Neon Auth. To show social login buttons in the Auth UI, add the `social` prop to `NeonAuthUIProvider`:
@@ -795,7 +817,7 @@ const { data } = await client.from("items").select();
 From `@neondatabase/neon-js`:
 - `@neondatabase/neon-js` - Main client (createClient, SupabaseAuthAdapter, BetterAuthVanillaAdapter)
 - `@neondatabase/neon-js/auth/react/adapters` - BetterAuthReactAdapter
-- `@neondatabase/neon-js/auth/next` - Next.js handler and client (authApiHandler, createAuthClient, neonAuth)
+- `@neondatabase/neon-js/auth/next` - Next.js integration (authApiHandler, createAuthClient, neonAuth, neonAuthMiddleware)
 - `@neondatabase/neon-js/auth/react/ui` - UI components (NeonAuthUIProvider, AuthView, SignInForm, etc.)
 - `@neondatabase/neon-js/auth/react/ui/server` - Server utilities (authViewPaths)
 - `@neondatabase/neon-js/ui/css` - Pre-built CSS bundle
@@ -805,7 +827,7 @@ From `@neondatabase/auth` (auth only, same subpaths):
 - `@neondatabase/auth` - Auth client (createAuthClient)
 - `@neondatabase/auth/vanilla/adapters` - SupabaseAuthAdapter, BetterAuthVanillaAdapter
 - `@neondatabase/auth/react/adapters` - BetterAuthReactAdapter
-- `@neondatabase/auth/next` - Next.js integration
+- `@neondatabase/auth/next` - Next.js integration (authApiHandler, createAuthClient, neonAuth, neonAuthMiddleware)
 - `@neondatabase/auth/react/ui` - UI components
 - `@neondatabase/auth/ui/css` - CSS bundle
 
@@ -838,7 +860,7 @@ if (error) {
 
 ## Links
 
-- [GitHub Repository](https://github.com/neondatabase-labs/neon-js)
+- [GitHub Repository](https://github.com/neondatabase/neon-js)
 - [Neon Documentation](https://neon.tech/docs)
 - [Better Auth Documentation](https://www.better-auth.com/docs)
 - [Better Auth UI](https://better-auth-ui.com)

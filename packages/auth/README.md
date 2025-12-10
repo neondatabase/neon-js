@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@neondatabase/auth.svg)](https://www.npmjs.com/package/@neondatabase/auth)
 [![npm downloads](https://img.shields.io/npm/dm/@neondatabase/auth.svg)](https://www.npmjs.com/package/@neondatabase/auth)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0%2B-blue.svg)](https://www.typescriptlang.org/)
-[![License](https://img.shields.io/npm/l/@neondatabase/auth.svg)](https://github.com/neondatabase-labs/neon-js/blob/main/LICENSE)
+[![License](https://img.shields.io/npm/l/@neondatabase/auth.svg)](https://github.com/neondatabase/neon-js/blob/main/LICENSE)
 
 Authentication adapters for Neon Auth, supporting multiple auth providers.
 
@@ -19,6 +19,7 @@ This package is designed to work seamlessly with Neon's authentication infrastru
 
 - **Simple default API** - Works out of the box with Better Auth patterns
 - **Optional adapters** - Switch API styles for migrations or preferences
+- **Anonymous access** - Optional RLS-based data access for unauthenticated users
 - **Performance optimizations** - Session caching and request deduplication
 - **TypeScript support** - Fully typed with strict type checking
 
@@ -144,6 +145,23 @@ function MyComponent() {
 }
 ```
 
+## Anonymous Access
+
+Enable `allowAnonymous` to let unauthenticated users access data via RLS policies:
+
+```typescript
+import { createAuthClient } from '@neondatabase/auth';
+
+const auth = createAuthClient('https://your-auth-server.com', {
+  allowAnonymous: true, // Enable anonymous data access
+});
+
+// Get token - returns anonymous token if no user session exists
+const token = await auth.getJWTToken?.();
+```
+
+This is useful when you want to allow read-only public access to certain data while still enforcing RLS policies.
+
 ## API Reference
 
 ### createAuthClient(url, config?)
@@ -153,6 +171,7 @@ Factory function to create an auth client.
 **Parameters:**
 - `url` - The auth service URL (required)
 - `config.adapter` - Optional adapter factory function (e.g., `SupabaseAuthAdapter()`)
+- `config.allowAnonymous` - When `true`, returns an anonymous token if no user session exists (default: `false`)
 
 **Returns:** The adapter's public API (varies by adapter type)
 

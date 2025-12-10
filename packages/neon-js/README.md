@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@neondatabase/neon-js.svg)](https://www.npmjs.com/package/@neondatabase/neon-js)
 [![npm downloads](https://img.shields.io/npm/dm/@neondatabase/neon-js.svg)](https://www.npmjs.com/package/@neondatabase/neon-js)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0%2B-blue.svg)](https://www.typescriptlang.org/)
-[![License](https://img.shields.io/npm/l/@neondatabase/neon-js.svg)](https://github.com/neondatabase-labs/neon-js/blob/main/LICENSE)
+[![License](https://img.shields.io/npm/l/@neondatabase/neon-js.svg)](https://github.com/neondatabase/neon-js/blob/main/LICENSE)
 
 The official TypeScript SDK for Neon, combining authentication and database querying in a familiar interface.
 
@@ -15,6 +15,7 @@ The official TypeScript SDK for Neon, combining authentication and database quer
 
 - **Integrated Authentication** - Works out of the box with optional adapters (Supabase-compatible, React hooks)
 - **PostgreSQL Querying** - Full PostgREST client with type-safe queries
+- **Anonymous Access** - Optional RLS-based data access for unauthenticated users
 - **High Performance** - Session caching, request deduplication
 - **Automatic Token Management** - Seamless token injection for database queries
 - **TypeScript First** - Fully typed with strict type checking
@@ -44,6 +45,8 @@ import { createClient } from '@neondatabase/neon-js';
 const client = createClient<Database>({
   auth: {
     url: import.meta.env.VITE_NEON_AUTH_URL,
+    // Optional: allow unauthenticated users to query data via RLS
+    // allowAnonymous: true,
   },
   dataApi: {
     url: import.meta.env.VITE_NEON_DATA_API_URL,
@@ -124,6 +127,27 @@ function MyComponent() {
 
   return <div>Hello, {session.data.user.name}</div>;
 }
+```
+
+### Anonymous Access
+
+Enable `allowAnonymous` to let unauthenticated users query data. This uses an anonymous token for RLS-based access control:
+
+```typescript
+import { createClient } from '@neondatabase/neon-js';
+
+const client = createClient<Database>({
+  auth: {
+    url: import.meta.env.VITE_NEON_AUTH_URL,
+    allowAnonymous: true, // Enable anonymous data access
+  },
+  dataApi: {
+    url: import.meta.env.VITE_NEON_DATA_API_URL,
+  },
+});
+
+// Works without signing in - uses anonymous token for RLS
+const { data: publicItems } = await client.from('public_items').select();
 ```
 
 ## Authentication
@@ -293,6 +317,7 @@ const client = createClient({
   // Auth configuration
   auth: {
     url: 'https://your-auth-server.neon.tech/auth',
+    allowAnonymous: true, // Optional: enable anonymous data access
   },
 
   // Data API configuration

@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@neondatabase/postgrest-js.svg)](https://www.npmjs.com/package/@neondatabase/postgrest-js)
 [![npm downloads](https://img.shields.io/npm/dm/@neondatabase/postgrest-js.svg)](https://www.npmjs.com/package/@neondatabase/postgrest-js)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0%2B-blue.svg)](https://www.typescriptlang.org/)
-[![License](https://img.shields.io/npm/l/@neondatabase/postgrest-js.svg)](https://github.com/neondatabase-labs/neon-js/blob/main/LICENSE)
+[![License](https://img.shields.io/npm/l/@neondatabase/postgrest-js.svg)](https://github.com/neondatabase/neon-js/blob/main/LICENSE)
 
 Generic PostgreSQL client for Neon Data API without built-in authentication.
 
@@ -268,7 +268,7 @@ const { data } = await client.from('users').select();
 
 ## Support
 
-- [GitHub Issues](https://github.com/neondatabase-labs/neon-js/issues)
+- [GitHub Issues](https://github.com/neondatabase/neon-js/issues)
 - [Neon Community Discord](https://discord.gg/H24eC2UN)
 
 ## License

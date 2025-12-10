@@ -39,6 +39,12 @@ export type NeonAuthAdapter =
 export interface NeonAuthConfig<T extends NeonAuthAdapter> {
   /** The adapter builder to use. Defaults to BetterAuthVanillaAdapter() if not specified. */
   adapter?: (url: string) => T;
+  /**
+   * When true, automatically uses an anonymous token when no user session exists.
+   * This enables RLS-based data access for users with the anonymous role.
+   * @default false
+   */
+  allowAnonymous?: boolean;
 }
 
 /**
@@ -121,19 +127,22 @@ export function createInternalNeonAuth<
   // Call the builder with the URL to create the adapter instance
   const adapter = adapterBuilder(url) as T;
 
+  // Capture allowAnonymous at creation time
+  const allowAnonymous = config?.allowAnonymous ?? false;
+
   // Check if this is a SupabaseAuthAdapter by checking for its unique initialize method
   const isSupabaseAuthAdapter =
     typeof (adapter as any).initialize === 'function';
 
   if (!isSupabaseAuthAdapter) {
     return {
-      getJWTToken: adapter.getJWTToken.bind(adapter),
+      getJWTToken: () => adapter.getJWTToken(allowAnonymous),
       adapter: adapter.getBetterAuthInstance(),
     } as NeonAuth<T>;
   }
 
   return {
-    getJWTToken: adapter.getJWTToken.bind(adapter),
+    getJWTToken: () => adapter.getJWTToken(allowAnonymous),
     adapter,
   } as NeonAuth<T>;
 }

@@ -76,6 +76,11 @@ Create a client instance that can be used in client components to sign up, sign 
 import { createAuthClient } from "@neondatabase/auth/next"
 
 export const authClient = createAuthClient()
+
+// Or with anonymous access for unauthenticated users
+export const authClient = createAuthClient({
+  allowAnonymous: true, // Enable anonymous token for RLS
+})
 ```
 
 ### 6. Set Up the Neon Auth UI Provider

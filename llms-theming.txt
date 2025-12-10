@@ -323,7 +323,7 @@ import { SignInForm } from "@neondatabase/neon-js/auth/react/ui";
 
 ## Links
 
-- [Full theme.css source](https://github.com/neondatabase-labs/neon-js/blob/main/packages/auth-ui/src/theme.css)
+- [Full theme.css source](https://github.com/neondatabase/neon-js/blob/main/packages/auth-ui/src/theme.css)
 - [OKLCH Color Converter](https://oklch.com)
 - [shadcn/ui Theming Guide](https://ui.shadcn.com/docs/theming)
 - [better-auth-ui Documentation](https://better-auth-ui.com)

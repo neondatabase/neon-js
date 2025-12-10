@@ -129,5 +129,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Architecture documentation
 - Performance benchmarks
 
-[unreleased]: https://github.com/neondatabase-labs/neon-js/compare/v0.1.0-alpha.1...HEAD
-[0.1.0-alpha.1]: https://github.com/neondatabase-labs/neon-js/releases/tag/v0.1.0-alpha.1
+[unreleased]: https://github.com/neondatabase/neon-js/compare/v0.1.0-alpha.1...HEAD
+[0.1.0-alpha.1]: https://github.com/neondatabase/neon-js/releases/tag/v0.1.0-alpha.1
