@@ -15,7 +15,6 @@ import {
   createAuthClient,
   type AuthClient as BetterAuthClient,
   getGlobalBroadcastChannel,
-  type BetterAuthClientOptions,
 } from 'better-auth/client';
 import {
   normalizeBetterAuthError,
@@ -338,46 +337,19 @@ class SupabaseAuthAdapterImpl
     }
   };
 
-  signInAnonymously: SupabaseAuthClientInterface['signInAnonymously'] = async (
-    credentials
-  ) => {
-    try {
-      const result = await this._betterAuth.signIn.anonymous({
-        query: credentials?.options?.data,
-      });
-
-      if (result.error) {
-        throw normalizeBetterAuthError(result.error);
-      }
-
-      const sessionResult = await this.getSession();
-      if (!sessionResult.data.session?.user) {
-        throw createAuthError(
-          AuthErrorCode.SessionNotFound,
-          'Failed to retrieve user session'
-        );
-      }
-
+  signInAnonymously: SupabaseAuthClientInterface['signInAnonymously'] =
+    async () => {
       return {
         data: {
-          user: sessionResult.data.session.user,
-          session: sessionResult.data.session,
+          user: null,
+          session: null,
         },
-        error: null,
+        error: createAuthError(
+          AuthErrorCode.AnonymousProviderDisabled,
+          `Anonymous sign-in is not supported. To allow unauthenticated access with an anonymous JWT, use the allowAnonymous option in your Auth configuration instead.`
+        ),
       };
-    } catch (error) {
-      if (isAuthError(error)) {
-        return { data: { user: null, session: null }, error };
-      }
-      if (isBetterAuthAPIError(error)) {
-        return {
-          data: { user: null, session: null },
-          error: normalizeBetterAuthError(error),
-        };
-      }
-      throw error;
-    }
-  };
+    };
 
   signInWithPassword: SupabaseAuthClientInterface['signInWithPassword'] =
     async (credentials) => {

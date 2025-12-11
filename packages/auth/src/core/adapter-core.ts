@@ -6,7 +6,6 @@ import {
   jwtClient,
   adminClient,
   emailOTPClient,
-  anonymousClient,
   organizationClient,
 } from 'better-auth/client/plugins';
 import {
@@ -29,7 +28,6 @@ const supportedBetterAuthClientPlugins = [
   adminClient(),
   organizationClient(),
   emailOTPClient(),
-  anonymousClient(),
   anonymousTokenClient(),
 ] satisfies BetterAuthClientOptions['plugins'];
 

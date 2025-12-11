@@ -76,6 +76,19 @@ function extractTailwindClasses(dir) {
   return [...classSet].sort();
 }
 
+
+/**
+ * Extract the @theme inline { ... } block from CSS content
+ * This preserves the theme configuration for consumers with their own Tailwind
+ */
+function extractThemeInline(cssContent) {
+  // Match @theme inline { ... } block (handles nested braces)
+  const match = cssContent.match(
+    /@theme\s+inline\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/
+  );
+  return match ? match[0] : null;
+}
+
 console.log('🔍 Extracting Tailwind classes from better-auth-ui...');
 const extractedClasses = extractTailwindClasses(betterAuthUiSrc);
 console.log(`✅ Found ${extractedClasses.length} unique Tailwind classes`);
@@ -120,6 +133,20 @@ try {
   });
   console.log('✅ Theme CSS (theme.css) built successfully');
 
+  // Extract @theme inline block for consumers with their own Tailwind
+  const themeInlineBlock = extractThemeInline(themeCss);
+  if (themeInlineBlock) {
+    const themeInlinePath = resolve(__dirname, 'dist/theme-inline.css');
+    writeFileSync(
+      themeInlinePath,
+      `/* Extracted from src/theme.css */\n${themeInlineBlock}\n`,
+      'utf-8'
+    );
+    console.log('✅ Theme inline block extracted to theme-inline.css');
+  } else {
+    console.warn('⚠️  No @theme inline block found in theme.css');
+  }
+
   // Create a safelist file with all extracted classes
   // This allows Tailwind to generate utilities without @source directive
   const safelistContent = `<!-- Auto-generated safelist for better-auth-ui classes -->
@@ -134,6 +161,7 @@ try {
   const distTailwindCss = `/* Tailwind-ready CSS for consumers WITH Tailwind */
 /* Import this AFTER @import 'tailwindcss' in your CSS */
 @import './theme.css';
+@import './theme-inline.css';
 
 /* Safelist: All Tailwind classes used by better-auth-ui components */
 @source "./.safelist.html";
