@@ -42,7 +42,6 @@ function extractClassesFromCSS(cssPath) {
   return [...classSet].toSorted();
 }
 
-
 /**
  * Extract the @theme inline { ... } block from CSS content using PostCSS.
  * Uses proper CSS AST parsing for robustness (handles nested braces, comments, etc.)
@@ -125,11 +124,15 @@ try {
   const extractedClasses = extractClassesFromCSS(
     resolve(__dirname, 'dist/style.css')
   );
-  console.log(`✅ Extracted ${extractedClasses.length} classes from generated CSS`);
+  console.log(
+    `✅ Extracted ${extractedClasses.length} classes from generated CSS`
+  );
 
   // Strip @layer wrappers for Tailwind v3 compatibility
   await stripLayerWrappers(resolve(__dirname, 'dist/style.css'));
-  console.log('✅ Stripped @layer wrappers from style.css for v3 compatibility');
+  console.log(
+    '✅ Stripped @layer wrappers from style.css for v3 compatibility'
+  );
 
   // Build theme.css through Tailwind to resolve @imports and inline external CSS
   // This resolves @import '@daveyplate/better-auth-ui/css' at build time
@@ -141,6 +144,8 @@ try {
 
   // Extract @theme inline block for consumers with their own Tailwind
   const themeInlineBlock = extractThemeInline(themeCss, themeCssPath);
+  let themeInlineImport = '';
+
   if (themeInlineBlock) {
     const themeInlinePath = resolve(__dirname, 'dist/theme-inline.css');
     writeFileSync(
@@ -149,6 +154,7 @@ try {
       'utf-8'
     );
     console.log('✅ Theme inline block extracted to theme-inline.css');
+    themeInlineImport = "@import './theme-inline.css';\n";
   } else {
     console.warn('⚠️  No @theme inline block found in theme.css');
   }
@@ -167,8 +173,7 @@ try {
   const distTailwindCss = `/* Tailwind-ready CSS for consumers WITH Tailwind */
 /* Import this AFTER @import 'tailwindcss' in your CSS */
 @import './theme.css';
-@import './theme-inline.css';
-
+${themeInlineImport}
 /* Safelist: All Tailwind classes used by better-auth-ui components */
 @source "./.safelist.html";
 `;

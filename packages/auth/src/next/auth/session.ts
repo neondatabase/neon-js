@@ -1,9 +1,12 @@
+import { cookies, headers } from 'next/headers';
 import type {
   BetterAuthSession as Session,
   BetterAuthUser as User,
 } from '../../core/better-auth-types';
 import { getUpstreamURL } from '../handler/request';
 import { NEON_AUTH_BASE_URL } from '../env-variables';
+
+import { extractRequestCookies, parseSetCookies } from './cookies';
 
 export type SessionData =
   | {
@@ -38,15 +41,26 @@ export const neonAuth = async (): Promise<SessionData> => {
  */
 export const fetchSession = async (): Promise<SessionData> => {
   const baseUrl = NEON_AUTH_BASE_URL!;
+  const requestHeaders = await headers();
   const upstreamURL = getUpstreamURL(baseUrl, 'get-session', {
     originalUrl: new URL('get-session', baseUrl),
   });
 
   const response = await fetch(upstreamURL.toString(), {
     method: 'GET',
+    headers: {
+      Cookie: extractRequestCookies(requestHeaders),
+    },
   });
 
   const body = await response.json();
+  const cookieHeader = response.headers.get('set-cookie');
+  if (cookieHeader) {
+    const cookieStore = await cookies();
+    parseSetCookies(cookieHeader).map((cookie) => {
+      cookieStore.set(cookie.name, cookie.value, cookie);
+    });
+  }
 
   if (!response.ok || body === null) {
     return { session: null, user: null };
