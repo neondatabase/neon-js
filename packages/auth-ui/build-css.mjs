@@ -28,9 +28,14 @@ function extractClassesFromCSS(cssPath) {
 
   root.walkRules((rule) => {
     // Parse selector to extract class names
-    // Handle: .flex, .hover\:bg-blue-500:hover, .md\:flex
+    // CSS class names can contain:
+    // - Simple chars: a-z, A-Z, 0-9, -, _ (unescaped)
+    // - Escaped chars: \X where X is any non-whitespace character
+    // The regex stops at unescaped combinator/pseudo chars like >, ), space, etc.
     for (const selector of rule.selectors) {
-      const classMatches = selector.matchAll(/\.([a-zA-Z0-9_\-[\]\\:/%!.]+)/g);
+      const classMatches = selector.matchAll(
+        /\.((?:[a-zA-Z0-9_-]|\\[^\s])+)/g
+      );
       for (const match of classMatches) {
         // Unescape CSS escapes (e.g., \: → :, \[ → [)
         const className = match[1].replaceAll(/\\(.)/g, '$1');

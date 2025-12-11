@@ -20,8 +20,14 @@ function extractClassesFromCSS(css: string): string[] {
   const classSet = new Set<string>();
 
   root.walkRules((rule) => {
+    // CSS class names can contain:
+    // - Simple chars: a-z, A-Z, 0-9, -, _ (unescaped)
+    // - Escaped chars: \X where X is any non-whitespace character
+    // The regex stops at unescaped combinator/pseudo chars like >, ), space, etc.
     for (const selector of rule.selectors) {
-      const classMatches = selector.matchAll(/\.([a-zA-Z0-9_\-[\]\\:/%!.]+)/g);
+      const classMatches = selector.matchAll(
+        /\.((?:[a-zA-Z0-9_-]|\\[^\s])+)/g
+      );
       for (const match of classMatches) {
         // Unescape CSS escapes (e.g., \: → :, \[ → [)
         const className = match[1].replaceAll(/\\(.)/g, '$1');
@@ -277,6 +283,41 @@ describe('CSS Build Output', () => {
         existsSync(resolve(srcDir, '.theme.css.tmp')),
         '.theme.css.tmp should be deleted'
       ).toBe(false);
+    });
+  });
+
+  describe('backwards compatibility', () => {
+    it('has no CSS nesting syntax (flattened for browser compatibility)', () => {
+      const stylePath = resolve(distDir, 'style.css');
+      const css = readFileSync(stylePath, 'utf8');
+
+      // CSS nesting (& selector) requires modern browser support
+      // All selectors should be flattened for maximum compatibility
+      // Pattern matches: { & (nested selector start)
+      expect(css).not.toMatch(/\{\s*&\s/);
+    });
+
+    it('contains flattened SVG sizing utilities', () => {
+      const stylePath = resolve(distDir, 'style.css');
+      const css = readFileSync(stylePath, 'utf8');
+
+      // These SVG utilities must be properly flattened (not using CSS nesting)
+      // The selector pattern should be: .escaped-class-name svg:not(...)
+      // Not: .escaped-class-name { & svg:not(...) }
+      expect(css).toMatch(/svg:not\(\[class\*=size-\]\)/);
+      expect(css).toMatch(/svg\{pointer-events:none\}/);
+      expect(css).toMatch(/svg\{flex-shrink:0\}/);
+    });
+
+    it('SVG utilities have explicit size declarations', () => {
+      const stylePath = resolve(distDir, 'style.css');
+      const css = readFileSync(stylePath, 'utf8');
+
+      // SVG sizing should use calc(var(--spacing)*4) for size-4
+      // This ensures icons are properly sized (16px with default spacing)
+      expect(css).toMatch(
+        /svg:not\(\[class\*=size-\]\)\{width:calc\(var\(--spacing\)\*4\)/
+      );
     });
   });
 });
