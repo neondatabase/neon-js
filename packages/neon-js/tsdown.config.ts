@@ -48,6 +48,7 @@ export default defineConfig(
             { src: 'css.css', dest: 'css.css' },
             { src: 'tailwind.css', dest: 'tailwind.css' },
             { src: 'theme.css', dest: 'theme.css' },
+            { src: 'theme-inline.css', dest: 'theme-inline.css' },
             { src: '.safelist.html', dest: '.safelist.html' },
           ],
           packageName: '@neondatabase/neon-js',

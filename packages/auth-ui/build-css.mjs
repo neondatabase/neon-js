@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 import { execSync } from 'node:child_process';
-import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 // eslint-disable-next-line unicorn/import-style
-import { resolve, dirname, join } from 'node:path';
+import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import postcss from 'postcss';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -14,71 +15,82 @@ const betterAuthUiSrc = resolve(
   '../../node_modules/@daveyplate/better-auth-ui/src'
 );
 
-console.log(`🔍 Scanning: ${betterAuthUiSrc}`);
+console.log(`📦 Building CSS with source: ${betterAuthUiSrc}`);
 
 /**
- * Extract all Tailwind classes from better-auth-ui source files
- * This allows us to generate utilities without shipping the @source directive
+ * Extract class selectors from generated CSS using PostCSS.
+ * This leverages Tailwind's own class extraction by parsing its output.
  */
-function extractTailwindClasses(dir) {
+function extractClassesFromCSS(cssPath) {
+  const css = readFileSync(cssPath, 'utf8');
+  const root = postcss.parse(css, { from: cssPath });
   const classSet = new Set();
 
-  // Separate regexes for each quote type to properly handle nested quotes
-  // Pattern (?:\\.|[^X\\])* matches: escaped chars (\.) OR non-quote/non-backslash chars
-  const classNameDoubleQuoteRegex = /className\s*[:=]\s*"((?:\\.|[^"\\])*)"/g;
-  const classNameSingleQuoteRegex = /className\s*[:=]\s*'((?:\\.|[^'\\])*)'/g;
-  const classNameBacktickRegex = /className\s*[:=]\s*`((?:\\.|[^`\\])*)`/g;
-
-  const cnDoubleQuoteRegex = /cn\s*\(\s*"((?:\\.|[^"\\])*)"/g;
-  const cnSingleQuoteRegex = /cn\s*\(\s*'((?:\\.|[^'\\])*)'/g;
-  const cnBacktickRegex = /cn\s*\(\s*`((?:\\.|[^`\\])*)`/g;
-
-  const allRegexes = [
-    classNameDoubleQuoteRegex,
-    classNameSingleQuoteRegex,
-    classNameBacktickRegex,
-    cnDoubleQuoteRegex,
-    cnSingleQuoteRegex,
-    cnBacktickRegex,
-  ];
-
-  function scanDirectory(directory) {
-    const entries = readdirSync(directory);
-
-    for (const entry of entries) {
-      const fullPath = join(directory, entry);
-      const stat = statSync(fullPath);
-
-      if (stat.isDirectory()) {
-        scanDirectory(fullPath);
-      } else if (entry.endsWith('.tsx') || entry.endsWith('.ts')) {
-        const content = readFileSync(fullPath, 'utf8');
-
-        // Extract classes using all regex patterns
-        for (const regex of allRegexes) {
-          regex.lastIndex = 0;
-          let match;
-          while ((match = regex.exec(content)) !== null) {
-            const classes = match[1].split(/\s+/).filter(Boolean);
-            for (const cls of classes) classSet.add(cls);
-          }
-        }
+  root.walkRules((rule) => {
+    // Parse selector to extract class names
+    // CSS class names can contain:
+    // - Simple chars: a-z, A-Z, 0-9, -, _ (unescaped)
+    // - Escaped chars: \X where X is any non-whitespace character
+    // The regex stops at unescaped combinator/pseudo chars like >, ), space, etc.
+    for (const selector of rule.selectors) {
+      const classMatches = selector.matchAll(
+        /\.((?:[a-zA-Z0-9_-]|\\[^\s])+)/g
+      );
+      for (const match of classMatches) {
+        // Unescape CSS escapes (e.g., \: → :, \[ → [)
+        const className = match[1].replaceAll(/\\(.)/g, '$1');
+        classSet.add(className);
       }
     }
-  }
+  });
 
-  try {
-    scanDirectory(dir);
-  } catch (error) {
-    console.warn(`⚠️  Could not scan directory: ${error.message}`);
-  }
-
-  return [...classSet].sort();
+  return [...classSet].toSorted();
 }
 
-console.log('🔍 Extracting Tailwind classes from better-auth-ui...');
-const extractedClasses = extractTailwindClasses(betterAuthUiSrc);
-console.log(`✅ Found ${extractedClasses.length} unique Tailwind classes`);
+/**
+ * Extract the @theme inline { ... } block from CSS content using PostCSS.
+ * Uses proper CSS AST parsing for robustness (handles nested braces, comments, etc.)
+ * This preserves the theme configuration for consumers with their own Tailwind.
+ */
+function extractThemeInline(cssContent, fromPath) {
+  const root = postcss.parse(cssContent, { from: fromPath });
+  let themeInlineBlock = null;
+
+  root.walkAtRules('theme', (rule) => {
+    if (rule.params === 'inline') {
+      themeInlineBlock = rule.toString();
+    }
+  });
+
+  return themeInlineBlock;
+}
+
+/**
+ * Strip @layer wrappers from CSS for Tailwind v3 compatibility.
+ * Uses PostCSS for proper CSS parsing (handles all edge cases).
+ * - @layer X { content } -> content (unwrapped)
+ * - @layer X; -> removed entirely
+ */
+async function stripLayerWrappers(cssPath) {
+  const css = readFileSync(cssPath, 'utf8');
+
+  const result = await postcss([
+    {
+      postcssPlugin: 'strip-layer-wrappers',
+      AtRule: {
+        layer(atRule) {
+          if (atRule.nodes && atRule.nodes.length > 0) {
+            atRule.replaceWith(atRule.nodes);
+          } else {
+            atRule.remove();
+          }
+        },
+      },
+    },
+  ]).process(css, { from: cssPath });
+
+  writeFileSync(cssPath, result.css, 'utf-8');
+}
 
 // Build pre-built CSS (for consumers WITHOUT Tailwind)
 const indexCssPath = resolve(__dirname, 'src/index.css');
@@ -112,6 +124,21 @@ try {
   );
   console.log('✅ Pre-built CSS (style.css) built successfully');
 
+  // Extract class selectors from generated CSS using PostCSS
+  // This leverages Tailwind's own class extraction via its output
+  const extractedClasses = extractClassesFromCSS(
+    resolve(__dirname, 'dist/style.css')
+  );
+  console.log(
+    `✅ Extracted ${extractedClasses.length} classes from generated CSS`
+  );
+
+  // Strip @layer wrappers for Tailwind v3 compatibility
+  await stripLayerWrappers(resolve(__dirname, 'dist/style.css'));
+  console.log(
+    '✅ Stripped @layer wrappers from style.css for v3 compatibility'
+  );
+
   // Build theme.css through Tailwind to resolve @imports and inline external CSS
   // This resolves @import '@daveyplate/better-auth-ui/css' at build time
   execSync(`bunx tailwindcss -i ${tempThemeCssPath} -o ./dist/theme.css`, {
@@ -119,6 +146,23 @@ try {
     stdio: 'inherit',
   });
   console.log('✅ Theme CSS (theme.css) built successfully');
+
+  // Extract @theme inline block for consumers with their own Tailwind
+  const themeInlineBlock = extractThemeInline(themeCss, themeCssPath);
+  let themeInlineImport = '';
+
+  if (themeInlineBlock) {
+    const themeInlinePath = resolve(__dirname, 'dist/theme-inline.css');
+    writeFileSync(
+      themeInlinePath,
+      `/* Extracted from src/theme.css */\n${themeInlineBlock}\n`,
+      'utf-8'
+    );
+    console.log('✅ Theme inline block extracted to theme-inline.css');
+    themeInlineImport = "@import './theme-inline.css';\n";
+  } else {
+    console.warn('⚠️  No @theme inline block found in theme.css');
+  }
 
   // Create a safelist file with all extracted classes
   // This allows Tailwind to generate utilities without @source directive
@@ -134,7 +178,7 @@ try {
   const distTailwindCss = `/* Tailwind-ready CSS for consumers WITH Tailwind */
 /* Import this AFTER @import 'tailwindcss' in your CSS */
 @import './theme.css';
-
+${themeInlineImport}
 /* Safelist: All Tailwind classes used by better-auth-ui components */
 @source "./.safelist.html";
 `;
