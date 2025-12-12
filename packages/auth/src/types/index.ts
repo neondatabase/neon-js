@@ -6,6 +6,10 @@
  * See adapter-core.ts for the list of supported plugins.
  */
 
+import type { SupportedBetterAuthClientPlugins } from '../core/adapter-core';
+import type { createAuthClient as createReactAuthClient } from 'better-auth/react';
+import type { createAuthClient as createVanillaAuthClient } from 'better-auth/client';
+
 // ============================================
 // Core types from better-auth/types
 // ============================================
@@ -63,3 +67,12 @@ export type {
   BetterAuthUser,
   BetterAuthErrorResponse,
 } from '../core/better-auth-types';
+
+export type BetterAuthInstance = ReturnType<
+  | typeof createVanillaAuthClient<{
+      plugins: SupportedBetterAuthClientPlugins;
+    }>
+  | typeof createReactAuthClient<{
+      plugins: SupportedBetterAuthClientPlugins;
+    }>
+>;

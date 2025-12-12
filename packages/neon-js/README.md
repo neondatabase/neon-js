@@ -536,30 +536,6 @@ This package combines two underlying packages:
 
 - [`@neondatabase/auth`](../auth) - Authentication adapters (can be used standalone)
 - [`@neondatabase/postgrest-js`](../postgrest-js) - PostgreSQL client (can be used standalone)
-
-## Migration from Previous Version
-
-If you're migrating from the old API that used `dataApiUrl` and `authUrl` directly:
-
-```typescript
-// Before (old API)
-const client = createClient({
-  dataApiUrl: 'https://data-api.example.com/rest/v1',
-  authUrl: 'https://auth.example.com',
-});
-
-// After (new API with adapters)
-import { createClient, SupabaseAuthAdapter } from '@neondatabase/neon-js';
-
-const client = createClient({
-  auth: {
-    adapter: SupabaseAuthAdapter(),
-    url: 'https://auth.example.com',
-  },
-  dataApi: {
-    url: 'https://data-api.example.com/rest/v1',
-  },
-});
 ```
 
 ## Resources
