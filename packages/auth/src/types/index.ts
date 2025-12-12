@@ -62,12 +62,6 @@ export type { EmailOTPOptions } from 'better-auth/plugins/email-otp';
 // ============================================
 // Backwards compatibility aliases
 // ============================================
-export type {
-  BetterAuthSession,
-  BetterAuthUser,
-  BetterAuthErrorResponse,
-} from '../core/better-auth-types';
-
 export type BetterAuthInstance = ReturnType<
   | typeof createVanillaAuthClient<{
       plugins: SupportedBetterAuthClientPlugins;
@@ -76,3 +70,9 @@ export type BetterAuthInstance = ReturnType<
       plugins: SupportedBetterAuthClientPlugins;
     }>
 >;
+
+export {
+  type BetterAuthErrorResponse,
+  type BetterAuthSession,
+  type BetterAuthUser,
+} from '../core/better-auth-types';

@@ -97,7 +97,7 @@ export abstract class NeonAuthAdapterCore {
           if (betterAuthMethod) {
             const response = await BETTER_AUTH_METHODS_HOOKS[
               betterAuthMethod
-            ].beforeRequest?.(url, init, this.getBetterAuthInstance());
+            ].beforeRequest?.(url, init);
             if (response) {
               return response;
             }

@@ -17,7 +17,6 @@ import {
 import { openOAuthPopup } from './oauth-popup';
 import { isBrowser, isIframe } from '../utils/browser';
 import { anonymousTokenResponseSchema } from '../plugins/anonymous-token';
-import type { BetterAuthInstance } from '../types';
 
 interface SocialSignInResponse {
   redirect: boolean;
@@ -56,8 +55,7 @@ type InternalAuthEvent =
 type MethodHook = {
   beforeRequest?: (
     input: string | URL | globalThis.Request,
-    init?: RequestInit,
-    betterAuthInstance?: BetterAuthInstance
+    init?: RequestInit
   ) => Promise<Response> | null | Response;
   onRequest: (request: RequestContext) => void | RequestContext;
   onSuccess: (responseData: unknown) => void;
@@ -83,22 +81,20 @@ export const BETTER_AUTH_ENDPOINTS = {
  * 1. Request OAuth URL from server (with disableRedirect)
  * 2. Open popup window with the OAuth URL
  * 3. Wait for popup to complete and send back the session verifier
- * 4. Set verifier in URL and call getSession to establish session
- * 5. Return session data so signIn.onSuccess can emit SIGN_IN event
+ * 4. Navigate to callbackURL with verifier - normal page load handles session
  */
 async function handleSocialSignInViaPopup(
   input: string | URL | globalThis.Request,
-  init: RequestInit | undefined,
-  betterAuthInstance: BetterAuthInstance | undefined
+  init: RequestInit | undefined
 ): Promise<Response> {
   const body = JSON.parse((init?.body as string) || '{}');
 
+  // Store original callbackURL before modification
+  const originalCallbackURL = body.callbackURL || '/';
+
   // Add popup marker to callbackURL (survives middleware redirects)
   // Use origin as base to handle relative paths like "/dashboard"
-  const callbackUrl = new URL(
-    body.callbackURL || '/',
-    globalThis.location.origin
-  );
+  const callbackUrl = new URL(originalCallbackURL, globalThis.location.origin);
   callbackUrl.searchParams.set(NEON_AUTH_POPUP_PARAM_NAME, '1');
   body.callbackURL = callbackUrl.toString();
 
@@ -124,28 +120,23 @@ async function handleSocialSignInViaPopup(
     throw new Error('OAuth completed but no session verifier received');
   }
 
-  // Set verifier in parent's URL for getSession.onRequest to pick up
-  const currentUrl = new URL(globalThis.location.href);
-  currentUrl.searchParams.set(
+  // Build navigation URL with the session verifier
+  // The normal page load flow will handle session verification
+  const navigationUrl = new URL(
+    originalCallbackURL,
+    globalThis.location.origin
+  );
+  navigationUrl.searchParams.set(
     NEON_AUTH_SESSION_VERIFIER_PARAM_NAME,
     popupResult.verifier
   );
-  history.replaceState(history.state, '', currentUrl.href);
 
-  // Call getSession through proper better-auth hooks to cache session
-  // This ensures onRequest adds the verifier and onSuccess caches the session
-  let sessionData = null;
-  if (betterAuthInstance) {
-    const sessionResult = await betterAuthInstance.getSession();
-    sessionData = sessionResult.data;
-  }
+  // Navigate to the callbackURL with verifier
+  // The page will verify the session on load via the normal OAuth flow
+  globalThis.location.href = navigationUrl.toString();
 
-  // Return session data so signIn.onSuccess triggers SIGN_IN event
-  // Also include redirect: false to prevent navigation
-  return Response.json(
-    { ...data, ...sessionData, url: undefined, redirect: false },
-    { status: response.status }
-  );
+  // Return empty response (page will navigate away before this matters)
+  return Response.json(data, { status: response.status });
 }
 
 export const BETTER_AUTH_METHODS_HOOKS: Record<string, MethodHook> = {
@@ -163,7 +154,7 @@ export const BETTER_AUTH_METHODS_HOOKS: Record<string, MethodHook> = {
     },
   },
   signIn: {
-    beforeRequest: (input, init, betterAuthInstance) => {
+    beforeRequest: (input, init) => {
       const url = typeof input === 'string' ? input : input.toString();
 
       // Only intercept social sign-in when in iframe
@@ -172,7 +163,7 @@ export const BETTER_AUTH_METHODS_HOOKS: Record<string, MethodHook> = {
       }
 
       // In iframe - use popup flow instead
-      return handleSocialSignInViaPopup(input, init, betterAuthInstance);
+      return handleSocialSignInViaPopup(input, init);
     },
     onRequest: () => {},
     onSuccess: (responseData) => {
@@ -450,6 +441,5 @@ export function initBroadcastChannel() {
     ) {
       BETTER_AUTH_METHODS_CACHE.clearSessionCache();
     }
-    // For 'SIGNED_IN', 'TOKEN_REFRESHED', etc. - let adapter set cache from sessionData
   });
 }
