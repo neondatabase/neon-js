@@ -19,6 +19,13 @@ import { isBrowser, isIframe } from '../utils/browser';
 import { anonymousTokenResponseSchema } from '../plugins/anonymous-token';
 import type { BetterAuthInstance } from '../types';
 
+interface SocialSignInResponse {
+  redirect: boolean;
+  url?: string;
+  token?: string;
+  user?: BetterAuthUser;
+}
+
 export const CURRENT_TAB_CLIENT_ID = crypto.randomUUID();
 
 export const BETTER_AUTH_METHODS_IN_FLIGHT_REQUESTS =
@@ -103,7 +110,7 @@ async function handleSocialSignInViaPopup(
     ...init,
     body: JSON.stringify(body),
   });
-  const data = await response.json();
+  const data: SocialSignInResponse = await response.json();
   const oauthUrl = data.url;
 
   if (!oauthUrl) {
