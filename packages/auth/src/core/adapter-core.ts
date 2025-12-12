@@ -1,6 +1,4 @@
 import { type BetterAuthClientOptions } from 'better-auth/client';
-import type { createAuthClient as createReactAuthClient } from 'better-auth/react';
-import type { createAuthClient as createVanillaAuthClient } from 'better-auth/client';
 
 import {
   jwtClient,
@@ -15,6 +13,7 @@ import {
   initBroadcastChannel,
 } from './better-auth-methods';
 import { anonymousTokenClient } from '../plugins/anonymous-token';
+import type { BetterAuthInstance } from '../types';
 
 export interface NeonAuthAdapterCoreAuthOptions extends Omit<
   BetterAuthClientOptions,
@@ -167,14 +166,7 @@ export abstract class NeonAuthAdapterCore {
     initBroadcastChannel();
   }
 
-  abstract getBetterAuthInstance(): ReturnType<
-    | typeof createVanillaAuthClient<{
-        plugins: SupportedBetterAuthClientPlugins;
-      }>
-    | typeof createReactAuthClient<{
-        plugins: SupportedBetterAuthClientPlugins;
-      }>
-  >;
+  abstract getBetterAuthInstance(): BetterAuthInstance;
 
   /**
    * Get JWT token for authenticated or anonymous access.

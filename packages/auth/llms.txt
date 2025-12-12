@@ -1,0 +1,157 @@
+# @neondatabase/auth
+
+> TypeScript SDK for Neon Auth - authentication adapters for PostgreSQL with session caching, request deduplication, and optional anonymous access.
+
+`@neondatabase/auth` provides authentication for applications using Neon Auth. It uses the Better Auth API by default, with optional adapters for different API styles (Supabase-compatible, React hooks).
+
+## Installation
+
+```bash
+npm install @neondatabase/auth
+```
+
+## Quick Start
+
+```typescript
+import { createAuthClient } from '@neondatabase/auth';
+
+const auth = createAuthClient('https://your-auth-server.com');
+
+// Sign up
+await auth.signUp.email({
+  email: 'user@example.com',
+  password: 'secure-password',
+  name: 'John Doe',
+});
+
+// Sign in
+await auth.signIn.email({
+  email: 'user@example.com',
+  password: 'secure-password',
+});
+
+// Get session
+const session = await auth.getSession();
+
+// Sign out
+await auth.signOut();
+```
+
+## OAuth Authentication
+
+```typescript
+await auth.signIn.social({
+  provider: 'google',
+  callbackURL: '/dashboard',
+});
+```
+
+## Adapters
+
+### SupabaseAuthAdapter
+
+Supabase-compatible API for migrations:
+
+```typescript
+import { createAuthClient, SupabaseAuthAdapter } from '@neondatabase/auth';
+
+const auth = createAuthClient('https://your-auth-server.com', {
+  adapter: SupabaseAuthAdapter(),
+});
+
+await auth.signUp({
+  email: 'user@example.com',
+  password: 'secure-password',
+  options: { data: { name: 'John Doe' } },
+});
+
+await auth.signInWithPassword({
+  email: 'user@example.com',
+  password: 'secure-password',
+});
+
+await auth.signInWithOAuth({
+  provider: 'google',
+  options: { redirectTo: '/dashboard' },
+});
+
+const { data: session } = await auth.getSession();
+```
+
+### BetterAuthReactAdapter
+
+React hooks support:
+
+```typescript
+import { createAuthClient } from '@neondatabase/auth';
+import { BetterAuthReactAdapter } from '@neondatabase/auth/react/adapters';
+
+const auth = createAuthClient('https://your-auth-server.com', {
+  adapter: BetterAuthReactAdapter(),
+});
+
+function MyComponent() {
+  const session = auth.useSession();
+
+  if (session.isPending) return <div>Loading...</div>;
+  if (!session.data) return <div>Not logged in</div>;
+
+  return <div>Hello, {session.data.user.name}</div>;
+}
+```
+
+## Anonymous Access
+
+Enable RLS-based data access for unauthenticated users:
+
+```typescript
+const auth = createAuthClient('https://your-auth-server.com', {
+  allowAnonymous: true,
+});
+
+// Returns anonymous token if no user session exists
+const token = await auth.getJWTToken?.();
+```
+
+## API Reference
+
+### createAuthClient(url, config?)
+
+- `url` - Auth service URL (required)
+- `config.adapter` - Optional adapter factory (`SupabaseAuthAdapter()`, `BetterAuthReactAdapter()`)
+- `config.allowAnonymous` - Enable anonymous tokens (default: `false`)
+
+### Default API (Better Auth)
+
+- `signIn.email(credentials)` - Sign in with email/password
+- `signIn.social(options)` - Sign in with OAuth provider
+- `signUp.email(credentials)` - Create new user account
+- `signOut()` - Sign out current user
+- `getSession()` - Get current session
+
+### SupabaseAuthAdapter API
+
+- `signUp(credentials)` - Create user with Supabase-style options
+- `signInWithPassword(credentials)` - Email/password sign in
+- `signInWithOAuth(options)` - OAuth with Supabase-style options
+- `getSession()` - Returns `{ data: session }`
+- `getUser()` - Returns `{ data: user }`
+- `updateUser(attributes)` - Update user metadata
+- `resetPasswordForEmail(email, options)` - Password reset
+- `onAuthStateChange(callback)` - Auth state listener
+
+### BetterAuthReactAdapter API
+
+Same as default API, plus:
+- `useSession()` - React hook for session state
+
+## Performance
+
+- **Session Caching**: 60-second TTL, automatic JWT expiration handling
+- **Request Deduplication**: Concurrent calls share single network request
+- **Cold start**: ~200ms (single request) vs ~2000ms (without deduplication)
+
+## Optional
+
+- [Next.js Integration](https://github.com/neondatabase/neon-js/blob/main/packages/auth/NEXT-JS.md): Setup guide for Next.js 15+ with middleware and RSC support
+- [Better Auth Documentation](https://www.better-auth.com/docs): Underlying auth library documentation

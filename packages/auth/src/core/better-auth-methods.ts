@@ -9,9 +9,23 @@ import {
 } from './session-cache-manager';
 import { AnonymousTokenCacheManager } from './anonymous-token-cache-manager';
 import type { BetterAuthSession, BetterAuthUser } from './better-auth-types';
-import { NEON_AUTH_SESSION_VERIFIER_PARAM_NAME } from './constants';
-import { isBrowser } from '../utils/browser';
+import {
+  NEON_AUTH_SESSION_VERIFIER_PARAM_NAME,
+  NEON_AUTH_POPUP_PARAM_NAME,
+  NEON_AUTH_POPUP_CALLBACK_PARAM_NAME,
+  NEON_AUTH_POPUP_CALLBACK_ROUTE,
+  OAUTH_POPUP_MESSAGE_TYPE,
+} from './constants';
+import { openOAuthPopup } from './oauth-popup';
+import { isBrowser, isIframe } from '../utils/browser';
 import { anonymousTokenResponseSchema } from '../plugins/anonymous-token';
+
+interface SocialSignInResponse {
+  redirect: boolean;
+  url?: string;
+  token?: string;
+  user?: BetterAuthUser;
+}
 
 export const CURRENT_TAB_CLIENT_ID = crypto.randomUUID();
 
@@ -60,6 +74,66 @@ export const BETTER_AUTH_ENDPOINTS = {
   anonymousToken: '/token/anonymous',
 } as const;
 
+/**
+ * Handles social sign-in via popup when running inside an iframe.
+ * This is necessary because OAuth redirects don't work in iframes due to
+ * X-Frame-Options/CSP restrictions from OAuth providers.
+ *
+ * Flow:
+ * 1. Request OAuth URL from server (with disableRedirect)
+ * 2. Open popup window with the OAuth URL
+ * 3. Wait for popup to complete and send back the session verifier
+ * 4. Navigate to callbackURL with verifier - normal page load handles session
+ */
+async function handleSocialSignInViaPopup(
+  input: string | URL | globalThis.Request,
+  init: RequestInit | undefined
+): Promise<Response> {
+  const body = JSON.parse((init?.body as string) || '{}');
+  const originalCallbackURL = body.callbackURL || '/';
+
+  // Use /auth/callback (in middleware SKIP_ROUTES) so popup can send verifier via postMessage
+  const popupCallbackUrl = new URL(
+    NEON_AUTH_POPUP_CALLBACK_ROUTE,
+    globalThis.location.origin
+  );
+  popupCallbackUrl.searchParams.set(NEON_AUTH_POPUP_PARAM_NAME, '1');
+  popupCallbackUrl.searchParams.set(
+    NEON_AUTH_POPUP_CALLBACK_PARAM_NAME,
+    originalCallbackURL
+  );
+  body.callbackURL = popupCallbackUrl.toString();
+  body.disableRedirect = true;
+
+  const response = await fetch(input, {
+    ...init,
+    body: JSON.stringify(body),
+  });
+  const data: SocialSignInResponse = await response.json();
+  const oauthUrl = data.url;
+
+  if (!oauthUrl) {
+    throw new Error('Failed to get OAuth URL');
+  }
+
+  const popupResult = await openOAuthPopup(oauthUrl);
+  if (!popupResult.verifier) {
+    throw new Error('OAuth completed but no session verifier received');
+  }
+
+  const navigationUrl = new URL(
+    originalCallbackURL,
+    globalThis.location.origin
+  );
+  navigationUrl.searchParams.set(
+    NEON_AUTH_SESSION_VERIFIER_PARAM_NAME,
+    popupResult.verifier
+  );
+
+  globalThis.location.href = navigationUrl.toString();
+  return Response.json(data, { status: response.status });
+}
+
 export const BETTER_AUTH_METHODS_HOOKS: Record<string, MethodHook> = {
   signUp: {
     onRequest: () => {},
@@ -75,6 +149,17 @@ export const BETTER_AUTH_METHODS_HOOKS: Record<string, MethodHook> = {
     },
   },
   signIn: {
+    beforeRequest: (input, init) => {
+      const url = typeof input === 'string' ? input : input.toString();
+
+      // Only intercept social sign-in when in iframe
+      if (!url.includes('/sign-in/social') || !isIframe()) {
+        return null; // Proceed with normal redirect flow
+      }
+
+      // In iframe - use popup flow instead
+      return handleSocialSignInViaPopup(input, init);
+    },
     onRequest: () => {},
     onSuccess: (responseData) => {
       if (isSessionResponseData(responseData)) {
@@ -313,6 +398,21 @@ export function deriveBetterAuthMethodFromUrl(
 }
 
 export function initBroadcastChannel() {
+  // Handle OAuth popup completion - send verifier to parent and close
+  if (isBrowser() && globalThis.opener && globalThis.opener !== globalThis) {
+    const params = new URLSearchParams(globalThis.location.search);
+    if (params.has(NEON_AUTH_POPUP_PARAM_NAME)) {
+      const verifier = params.get(NEON_AUTH_SESSION_VERIFIER_PARAM_NAME);
+      const originalCallback = params.get(NEON_AUTH_POPUP_CALLBACK_PARAM_NAME);
+      globalThis.opener.postMessage(
+        { type: OAUTH_POPUP_MESSAGE_TYPE, verifier, originalCallback },
+        '*'
+      );
+      globalThis.close();
+      return;
+    }
+  }
+
   getGlobalBroadcastChannel().subscribe((message) => {
     if (message.clientId === CURRENT_TAB_CLIENT_ID) {
       return;
@@ -328,6 +428,5 @@ export function initBroadcastChannel() {
     ) {
       BETTER_AUTH_METHODS_CACHE.clearSessionCache();
     }
-    // For 'SIGNED_IN', 'TOKEN_REFRESHED', etc. - let adapter set cache from sessionData
   });
 }

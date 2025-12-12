@@ -1,11 +1,9 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import {
-  NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME,
-  NEON_AUTH_SESSION_VERIFIER_PARAM_NAME,
-} from '../constants';
+import { NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME } from '../constants';
 import { handleAuthRequest } from '../handler/request';
 import { handleAuthResponse } from '../handler/response';
 import { extractResponseCookies } from '../auth/cookies';
+import { NEON_AUTH_SESSION_VERIFIER_PARAM_NAME } from '../../core/constants';
 
 export const needsSessionVerification = (request: NextRequest) => {
   const url = request.nextUrl;
@@ -19,7 +17,10 @@ export const needsSessionVerification = (request: NextRequest) => {
   return hasVerifier && hasChallenge;
 };
 
-export const exchangeOAuthToken = async (request: NextRequest, baseUrl: string) => {
+export const exchangeOAuthToken = async (
+  request: NextRequest,
+  baseUrl: string
+) => {
   const url = request.nextUrl;
   const verifier = url.searchParams.get(NEON_AUTH_SESSION_VERIFIER_PARAM_NAME);
   const challenge = request.cookies.get(

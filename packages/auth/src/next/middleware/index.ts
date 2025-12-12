@@ -25,16 +25,16 @@ type NeonAuthMiddlewareOptions = {
   loginUrl?: string;
 };
 
-/** 
+/**
  * A Next.js middleware to protect routes from unauthenticated requests and refresh the session if required.
- * 
+ *
  * @param loginUrl - The URL to redirect to when the user is not authenticated.
  * @returns A middleware function that can be used in the Next.js app.
- * 
+ *
  * @example
  * ```ts
  * import { neonAuthMiddleware } from "@neondatabase/auth/next"
- * 
+ *
  * export default neonAuthMiddleware({
  *   loginUrl: '/auth/sign-in',
  * });
@@ -43,7 +43,7 @@ type NeonAuthMiddlewareOptions = {
 export function neonAuthMiddleware({
   loginUrl = '/auth/sign-in',
 }: NeonAuthMiddlewareOptions) {
-  const baseUrl = NEON_AUTH_BASE_URL
+  const baseUrl = NEON_AUTH_BASE_URL;
   if (!baseUrl) {
     throw new Error(ERRORS.MISSING_AUTH_BASE_URL);
   }
@@ -72,16 +72,16 @@ export function neonAuthMiddleware({
 
     const session = await fetchSession();
     if (session.session === null) {
-      return NextResponse.redirect(new URL(loginUrl, request.url))
+      return NextResponse.redirect(new URL(loginUrl, request.url));
     }
 
-    const reqHeaders = new Headers(request.headers)
+    const reqHeaders = new Headers(request.headers);
     reqHeaders.set(NEON_AUTH_HEADER_MIDDLEWARE_NAME, 'true');
-    
+
     return NextResponse.next({
       request: {
         headers: reqHeaders,
       },
     });
   };
-};
+}

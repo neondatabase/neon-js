@@ -1,0 +1,264 @@
+# @neondatabase/neon-js
+
+> The official TypeScript SDK for Neon - unified client combining authentication and PostgreSQL database querying with automatic token management.
+
+`@neondatabase/neon-js` brings together Neon Auth and Neon Data API in a single client. It provides a familiar interface for authentication and type-safe database queries with PostgREST.
+
+## Installation
+
+```bash
+npm install @neondatabase/neon-js
+```
+
+## Quick Start
+
+```typescript
+import { createClient } from '@neondatabase/neon-js';
+
+const client = createClient<Database>({
+  auth: {
+    url: import.meta.env.VITE_NEON_AUTH_URL,
+  },
+  dataApi: {
+    url: import.meta.env.VITE_NEON_DATA_API_URL,
+  },
+});
+
+// Authenticate
+await client.auth.signIn.email({
+  email: 'user@example.com',
+  password: 'secure-password',
+});
+
+// Query database (token automatically injected)
+const { data: users } = await client
+  .from('users')
+  .select('*')
+  .eq('status', 'active');
+```
+
+## Authentication
+
+### Sign Up & Sign In
+
+```typescript
+// Sign up
+await client.auth.signUp.email({
+  email: 'user@example.com',
+  password: 'secure-password',
+  name: 'John Doe',
+});
+
+// Sign in with email
+await client.auth.signIn.email({
+  email: 'user@example.com',
+  password: 'secure-password',
+});
+
+// Sign in with OAuth
+await client.auth.signIn.social({
+  provider: 'google',
+  callbackURL: '/dashboard',
+});
+
+// Get session
+const session = await client.auth.getSession();
+
+// Sign out
+await client.auth.signOut();
+```
+
+### Adapters
+
+```typescript
+// SupabaseAuthAdapter - Supabase-compatible API
+import { createClient, SupabaseAuthAdapter } from '@neondatabase/neon-js';
+
+const client = createClient<Database>({
+  auth: {
+    adapter: SupabaseAuthAdapter(),
+    url: import.meta.env.VITE_NEON_AUTH_URL,
+  },
+  dataApi: {
+    url: import.meta.env.VITE_NEON_DATA_API_URL,
+  },
+});
+
+await client.auth.signInWithPassword({ email, password });
+const { data: session } = await client.auth.getSession();
+```
+
+```typescript
+// BetterAuthReactAdapter - React hooks
+import { createClient } from '@neondatabase/neon-js';
+import { BetterAuthReactAdapter } from '@neondatabase/neon-js/auth/react/adapters';
+
+const client = createClient<Database>({
+  auth: {
+    adapter: BetterAuthReactAdapter(),
+    url: import.meta.env.VITE_NEON_AUTH_URL,
+  },
+  dataApi: {
+    url: import.meta.env.VITE_NEON_DATA_API_URL,
+  },
+});
+
+function MyComponent() {
+  const session = client.auth.useSession();
+  if (session.isPending) return <div>Loading...</div>;
+  return <div>Hello, {session.data?.user.name}</div>;
+}
+```
+
+### Anonymous Access
+
+```typescript
+const client = createClient<Database>({
+  auth: {
+    url: import.meta.env.VITE_NEON_AUTH_URL,
+    allowAnonymous: true, // Enable anonymous data access via RLS
+  },
+  dataApi: {
+    url: import.meta.env.VITE_NEON_DATA_API_URL,
+  },
+});
+
+// Works without signing in - uses anonymous token for RLS
+const { data: publicItems } = await client.from('public_items').select();
+```
+
+## Database Querying
+
+### SELECT
+
+```typescript
+// Simple select
+const { data } = await client.from('users').select('id, name, email');
+
+// With filters
+const { data } = await client
+  .from('posts')
+  .select('*')
+  .eq('status', 'published')
+  .gt('views', 100)
+  .order('created_at', { ascending: false })
+  .limit(10);
+
+// Joins
+const { data } = await client
+  .from('posts')
+  .select(`
+    id,
+    title,
+    author:users(name, email)
+  `)
+  .eq('status', 'published');
+```
+
+### INSERT
+
+```typescript
+// Single row
+const { data } = await client
+  .from('users')
+  .insert({ name: 'Alice', email: 'alice@example.com' })
+  .select();
+
+// Multiple rows
+const { data } = await client
+  .from('users')
+  .insert([
+    { name: 'Bob', email: 'bob@example.com' },
+    { name: 'Carol', email: 'carol@example.com' },
+  ])
+  .select();
+```
+
+### UPDATE
+
+```typescript
+const { data } = await client
+  .from('users')
+  .update({ status: 'inactive' })
+  .eq('last_login', null)
+  .select();
+```
+
+### DELETE
+
+```typescript
+const { data } = await client
+  .from('users')
+  .delete()
+  .eq('status', 'deleted')
+  .select();
+```
+
+### RPC (Stored Procedures)
+
+```typescript
+const { data } = await client.rpc('get_user_stats', {
+  user_id: 123,
+  start_date: '2024-01-01',
+});
+```
+
+## TypeScript
+
+Generate types from your database schema:
+
+```bash
+npx neon-js gen-types --db-url "postgresql://user:pass@host/db"
+```
+
+Use generated types:
+
+```typescript
+import type { Database } from './types/database';
+
+const client = createClient<Database>({
+  auth: { url: process.env.NEON_AUTH_URL! },
+  dataApi: { url: process.env.NEON_DATA_API_URL! },
+});
+
+// Fully typed queries with autocomplete
+const { data } = await client
+  .from('users')
+  .select('id, name, email')
+  .eq('status', 'active');
+```
+
+## Configuration
+
+```typescript
+const client = createClient({
+  auth: {
+    url: 'https://your-auth-server.neon.tech/auth',
+    allowAnonymous: true,
+  },
+  dataApi: {
+    url: 'https://your-data-api.neon.tech/rest/v1',
+    options: {
+      db: { schema: 'public' },
+      global: { headers: { 'X-Custom-Header': 'value' } },
+    },
+  },
+});
+```
+
+## CSS for UI Components
+
+```css
+/* Without Tailwind */
+@import '@neondatabase/neon-js/ui/css';
+
+/* With Tailwind CSS v4 */
+@import 'tailwindcss';
+@import '@neondatabase/neon-js/ui/tailwind';
+```
+
+## Optional
+
+- [CLI Tool](https://github.com/neondatabase/neon-js/tree/main/packages/neon-js#cli-tool): Generate TypeScript types from database
+- [PostgREST Documentation](https://postgrest.org): Query syntax reference
+- [Better Auth Documentation](https://www.better-auth.com/docs): Authentication library docs
