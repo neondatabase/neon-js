@@ -20,7 +20,6 @@ export const DEFAULT_SESSION_EXPIRY_MS = 3_600_000;
 export const NEON_AUTH_SESSION_VERIFIER_PARAM_NAME =
   'neon_auth_session_verifier';
 
-
 /** Name of the popup marker parameter in the URL, used for OAuth popup flow in iframes */
 export const NEON_AUTH_POPUP_PARAM_NAME = 'neon_popup';
 

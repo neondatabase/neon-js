@@ -15,7 +15,6 @@ export const supportsBroadcastChannel = (): boolean => {
   return isBrowser() && globalThis.BroadcastChannel !== undefined;
 };
 
-
 /**
  * Checks if the code is running inside an iframe
  * Used to detect embedded contexts where OAuth redirect won't work

@@ -34,18 +34,16 @@ export async function openOAuthPopup(url: string): Promise<OAuthPopupResult> {
       return;
     }
 
-    // Set up timeout - reject after timeout period
     const timeoutId = setTimeout(() => {
       cleanup();
       try {
         popup.close();
       } catch {
-        // Ignore errors closing popup (may already be closed)
+        // Popup may already be closed
       }
       reject(new Error('OAuth popup timed out. Please try again.'));
     }, timeout);
 
-    // Poll for popup closure - detect if user closes popup manually
     const pollId = setInterval(() => {
       try {
         if (popup.closed) {
@@ -53,35 +51,27 @@ export async function openOAuthPopup(url: string): Promise<OAuthPopupResult> {
           reject(new Error('OAuth popup was closed. Please try again.'));
         }
       } catch {
-        // Cross-origin access error when popup navigates to OAuth provider
-        // This is expected during the OAuth flow, continue waiting
+        // Cross-origin error when popup navigates to OAuth provider - expected
       }
     }, pollInterval);
 
-    // Cleanup function - removes all listeners and timers
     function cleanup() {
       clearTimeout(timeoutId);
       clearInterval(pollId);
       globalThis.removeEventListener('message', handleMessage);
     }
 
-    // Handle postMessage from popup
     function handleMessage(event: MessageEvent) {
-      // Security: Validate origin matches current origin
       if (event.origin !== globalThis.location.origin) {
-        return; // Ignore messages from other origins
+        return;
       }
-
-      // Validate message format
       if (event.data?.type !== OAUTH_POPUP_MESSAGE_TYPE) {
-        return; // Ignore unrelated messages
+        return;
       }
-
       cleanup();
       resolve({ verifier: event.data.verifier || null });
     }
 
-    // Listen for completion message from popup
     globalThis.addEventListener('message', handleMessage);
   });
 }

@@ -426,15 +426,11 @@ export function initBroadcastChannel() {
         '*'
       );
 
-      // Clean up the popup param from URL
+      // Clean up the popup param from URL and close popup
       const url = new URL(globalThis.location.href);
       url.searchParams.delete(NEON_AUTH_POPUP_PARAM_NAME);
       history.replaceState(history.state, '', url.href);
-
-      // Close the popup
       globalThis.close();
-
-      // Don't initialize broadcast channel in popup - it's closing
       return;
     }
   }
