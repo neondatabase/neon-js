@@ -208,7 +208,7 @@ const { data } = await client.rpc('get_user_stats', {
 Generate types from your database schema:
 
 ```bash
-npx neon-js gen-types --db-url "postgresql://user:pass@host/db"
+npx @neondatabase/neon-js gen-types --db-url "postgresql://user:pass@host/db"
 ```
 
 Use generated types:

@@ -40,7 +40,7 @@ bun add @neondatabase/neon-js
 ```typescript
 import { createClient } from '@neondatabase/neon-js';
 
-// Database type generated via: npx neon-js gen-types --db-url "..."
+// Database type generated via: npx @neondatabase/neon-js gen-types --db-url "..."
 // See "TypeScript" section below for details
 const client = createClient<Database>({
   auth: {
@@ -77,7 +77,7 @@ Use this adapter if you're migrating from Supabase or prefer the Supabase API st
 ```typescript
 import { createClient, SupabaseAuthAdapter } from '@neondatabase/neon-js';
 
-// Database type generated via: npx neon-js gen-types --db-url "..."
+// Database type generated via: npx @neondatabase/neon-js gen-types --db-url "..."
 // See "TypeScript" section below for details
 const client = createClient<Database>({
   auth: {
@@ -106,7 +106,7 @@ Use this adapter in React applications to get access to hooks like `useSession`:
 import { createClient } from '@neondatabase/neon-js';
 import { BetterAuthReactAdapter } from '@neondatabase/neon-js/auth/react/adapters';
 
-// Database type generated via: npx neon-js gen-types --db-url "..."
+// Database type generated via: npx @neondatabase/neon-js gen-types --db-url "..."
 // See "TypeScript" section below for details
 const client = createClient<Database>({
   auth: {
@@ -383,7 +383,7 @@ Styles for Neon Auth UI components are available from this package:
 Generate TypeScript types from your database schema:
 
 ```bash
-npx neon-js gen-types --db-url "postgresql://user:pass@host/db"
+npx @neondatabase/neon-js gen-types --db-url "postgresql://user:pass@host/db"
 ```
 
 Use generated types for full type safety:
@@ -414,12 +414,12 @@ Generate TypeScript types from your database:
 
 ```bash
 # Generate types
-npx neon-js gen-types \
+npx @neondatabase/neon-js gen-types \
   --db-url "postgresql://user:pass@host/db" \
   --output ./types/database.ts
 
 # With schema filtering
-npx neon-js gen-types \
+npx @neondatabase/neon-js gen-types \
   --db-url "postgresql://user:pass@host/db" \
   --schemas public,auth \
   --output ./types/database.ts

@@ -169,16 +169,16 @@ No installation required! Use via npx:
 
 ```bash
 # Generate types from your database
-npx neon-js gen-types --db-url "postgresql://user:pass@host:5432/db"
+npx @neondatabase/neon-js gen-types --db-url "postgresql://user:pass@host:5432/db"
 
 # Custom output path
-npx neon-js gen-types --db-url "postgresql://..." --output src/types/database.ts
+npx @neondatabase/neon-js gen-types --db-url "postgresql://..." --output src/types/database.ts
 
 # Multiple schemas
-npx neon-js gen-types --db-url "postgresql://..." -s public -s auth
+npx @neondatabase/neon-js gen-types --db-url "postgresql://..." -s public -s auth
 
 # Custom timeout
-npx neon-js gen-types --db-url "postgresql://..." --query-timeout 30s
+npx @neondatabase/neon-js gen-types --db-url "postgresql://..." --query-timeout 30s
 ```
 
 ### Flags

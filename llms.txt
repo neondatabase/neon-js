@@ -450,13 +450,13 @@ await client.from("items")
 
 ```bash
 # Generate TypeScript types from database schema
-npx neon-js gen-types --db-url "postgresql://user:pass@host:5432/db"
+npx @neondatabase/neon-js gen-types --db-url "postgresql://user:pass@host:5432/db"
 
 # Custom output path
-npx neon-js gen-types --db-url "..." --output src/types/database.ts
+npx @neondatabase/neon-js gen-types --db-url "..." --output src/types/database.ts
 
 # Multiple schemas
-npx neon-js gen-types --db-url "..." -s public -s auth
+npx @neondatabase/neon-js gen-types --db-url "..." -s public -s auth
 
 # Use generated types
 import type { Database } from "./database.types";
@@ -484,7 +484,7 @@ VITE_NEON_DATA_API_URL=https://ep-xxx.apirest.c-2.us-east-2.aws.neon.build/dbnam
 3. **Exposing server URLs in client code**: Use `NEXT_PUBLIC_` prefix only for URLs that should be public
 4. **Forgetting CSS import for auth-ui**: Auth UI components need CSS imported from `@neondatabase/neon-js/ui/css`
 5. **Using wrong adapter**: Use `BetterAuthReactAdapter` for React hooks, `SupabaseAuthAdapter` for Supabase-compatible API
-6. **Not generating types**: Use `npx neon-js gen-types` for full type safety
+6. **Not generating types**: Use `npx @neondatabase/neon-js gen-types` for full type safety
 7. **Wrong import for BetterAuthReactAdapter**: It's NOT exported from main entry point. Import from `@neondatabase/neon-js/auth/react/adapters`
 8. **Not calling adapter as function**: Adapters are factory functions. Use `SupabaseAuthAdapter()` not `SupabaseAuthAdapter`
 9. **Wrong createAuthClient signature**: First arg is URL string: `createAuthClient(url, { adapter })` not `createAuthClient({ baseURL })`

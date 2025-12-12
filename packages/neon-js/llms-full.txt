@@ -43,7 +43,7 @@ npm install @neondatabase/auth
 ```typescript
 import { createClient } from '@neondatabase/neon-js';
 
-// Database type generated via: npx neon-js gen-types --db-url "..."
+// Database type generated via: npx @neondatabase/neon-js gen-types --db-url "..."
 const client = createClient<Database>({
   auth: {
     url: import.meta.env.VITE_NEON_AUTH_URL,
@@ -602,12 +602,12 @@ console.log(data);
 
 ```bash
 # Generate types
-npx neon-js gen-types \
+npx @neondatabase/neon-js gen-types \
   --db-url "postgresql://user:pass@host/db" \
   --output ./types/database.ts
 
 # With schema filtering
-npx neon-js gen-types \
+npx @neondatabase/neon-js gen-types \
   --db-url "postgresql://user:pass@host/db" \
   --schemas public,auth \
   --output ./types/database.ts
