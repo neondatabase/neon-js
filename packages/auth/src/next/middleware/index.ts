@@ -4,10 +4,6 @@ import { NEON_AUTH_BASE_URL } from '../env-variables';
 import { ERRORS } from '../errors';
 import { fetchSession } from '../auth/session';
 import { NEON_AUTH_HEADER_MIDDLEWARE_NAME } from '../constants';
-import {
-  NEON_AUTH_POPUP_PARAM_NAME,
-  NEON_AUTH_SESSION_VERIFIER_PARAM_NAME,
-} from '../../core/constants';
 
 const AUTH_API_ROUTES = '/api/auth';
 const SKIP_ROUTES = [
@@ -53,23 +49,10 @@ export function neonAuthMiddleware({
   }
 
   return async (request: NextRequest) => {
-    const { pathname, searchParams } = request.nextUrl;
+    const { pathname } = request.nextUrl;
 
     // Always skip session check for login URL to prevent infinite redirect loop
     if (pathname.startsWith(loginUrl)) {
-      return NextResponse.next();
-    }
-
-    // OAuth popup completion: skip entire middleware
-    // The popup window needs to read the verifier and send it to the parent via postMessage.
-    // This is secure because:
-    // 1. Requires BOTH neon_popup AND neon_auth_session_verifier params
-    // 2. The verifier is cryptographically signed and one-time use
-    // 3. Without a valid verifier, an attacker can't establish a session
-    const isPopupOAuthCompletion =
-      searchParams.has(NEON_AUTH_POPUP_PARAM_NAME) &&
-      searchParams.has(NEON_AUTH_SESSION_VERIFIER_PARAM_NAME);
-    if (isPopupOAuthCompletion) {
       return NextResponse.next();
     }
 
