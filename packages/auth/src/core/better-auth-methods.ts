@@ -90,14 +90,9 @@ async function handleSocialSignInViaPopup(
   init: RequestInit | undefined
 ): Promise<Response> {
   const body = JSON.parse((init?.body as string) || '{}');
-
-  // Store original callbackURL before modification
   const originalCallbackURL = body.callbackURL || '/';
 
-  // Use a fixed callback route for popup OAuth completion.
-  // This route is in the middleware's SKIP_ROUTES, so the popup can load
-  // the page without authentication to send the verifier via postMessage.
-  // The original callback URL is passed as a query parameter.
+  // Use /auth/callback (in middleware SKIP_ROUTES) so popup can send verifier via postMessage
   const popupCallbackUrl = new URL(
     NEON_AUTH_POPUP_CALLBACK_ROUTE,
     globalThis.location.origin
@@ -108,11 +103,8 @@ async function handleSocialSignInViaPopup(
     originalCallbackURL
   );
   body.callbackURL = popupCallbackUrl.toString();
-
-  // Tell server to return OAuth URL instead of redirecting (invisible to user)
   body.disableRedirect = true;
 
-  // Make the request ourselves to get the OAuth URL
   const response = await fetch(input, {
     ...init,
     body: JSON.stringify(body),
@@ -124,15 +116,11 @@ async function handleSocialSignInViaPopup(
     throw new Error('Failed to get OAuth URL');
   }
 
-  // Open popup with the OAuth URL and wait for completion
   const popupResult = await openOAuthPopup(oauthUrl);
-
   if (!popupResult.verifier) {
     throw new Error('OAuth completed but no session verifier received');
   }
 
-  // Build navigation URL with the session verifier
-  // The normal page load flow will handle session verification
   const navigationUrl = new URL(
     originalCallbackURL,
     globalThis.location.origin
@@ -142,11 +130,7 @@ async function handleSocialSignInViaPopup(
     popupResult.verifier
   );
 
-  // Navigate to the callbackURL with verifier
-  // The page will verify the session on load via the normal OAuth flow
   globalThis.location.href = navigationUrl.toString();
-
-  // Return empty response (page will navigate away before this matters)
   return Response.json(data, { status: response.status });
 }
 
@@ -414,23 +398,16 @@ export function deriveBetterAuthMethodFromUrl(
 }
 
 export function initBroadcastChannel() {
-  // Handle OAuth popup completion (runs before broadcast setup)
-  // The popup lands on /auth/callback (a public route) with the verifier and original callback URL.
-  // We send the verifier to the parent window via postMessage, then close the popup.
+  // Handle OAuth popup completion - send verifier to parent and close
   if (isBrowser() && globalThis.opener && globalThis.opener !== globalThis) {
     const params = new URLSearchParams(globalThis.location.search);
     if (params.has(NEON_AUTH_POPUP_PARAM_NAME)) {
-      // Get the session verifier and original callback URL
       const verifier = params.get(NEON_AUTH_SESSION_VERIFIER_PARAM_NAME);
       const originalCallback = params.get(NEON_AUTH_POPUP_CALLBACK_PARAM_NAME);
-
-      // Send completion message with verifier and original callback to parent window
       globalThis.opener.postMessage(
         { type: OAUTH_POPUP_MESSAGE_TYPE, verifier, originalCallback },
         '*'
       );
-
-      // Close the popup immediately - no need to clean up URL since we're closing
       globalThis.close();
       return;
     }

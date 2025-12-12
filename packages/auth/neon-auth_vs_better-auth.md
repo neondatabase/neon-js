@@ -12,6 +12,7 @@
   - sending a `token_verifier` on the OAuth flow callback
   - pre-configured plugins that works with Neon Auth
   - automatic JWT extraction from the session when the `getSession` method is called
+  - automatic popup-based OAuth flow when running inside iframes
 
 ### Built-in Enhancements
 - The `@neondatabase/auth` package also offers other small features that we decided to include out-of-the-box in the package, such as:
