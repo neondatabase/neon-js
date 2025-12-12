@@ -536,7 +536,6 @@ This package combines two underlying packages:
 
 - [`@neondatabase/auth`](../auth) - Authentication adapters (can be used standalone)
 - [`@neondatabase/postgrest-js`](../postgrest-js) - PostgreSQL client (can be used standalone)
-```
 
 ## Resources
 

@@ -93,9 +93,8 @@
   },
   "files": [
     "dist",
-    "llms-full.txt",
     "llms.txt",
-    "llms-theming.txt"
+    "llms-full.txt"
   ],
   "publishConfig": {
     "access": "public"
