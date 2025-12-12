@@ -21,7 +21,7 @@
     },
     "packages/auth": {
       "name": "@neondatabase/auth",
-      "version": "0.1.0-beta.14",
+      "version": "0.1.0-beta.15",
       "dependencies": {
         "@neondatabase/auth-ui": "workspace:*",
         "@supabase/auth-js": "2.79.0",
@@ -99,7 +99,7 @@
     },
     "packages/neon-js": {
       "name": "@neondatabase/neon-js",
-      "version": "0.1.0-beta.14",
+      "version": "0.1.0-beta.15",
       "bin": {
         "neon-js": "dist/cli/index.mjs",
       },
