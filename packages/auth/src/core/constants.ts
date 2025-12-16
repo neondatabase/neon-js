@@ -31,3 +31,6 @@ export const NEON_AUTH_POPUP_CALLBACK_ROUTE = '/auth/callback';
 
 /** Message type for OAuth popup completion postMessage */
 export const OAUTH_POPUP_MESSAGE_TYPE = 'neon-auth:oauth-complete';
+
+/** Prefix for all Neon Auth cookies */
+export const NEON_AUTH_COOKIE_PREFIX = '__Secure-neon-auth';

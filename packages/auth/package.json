@@ -71,6 +71,10 @@
       "types": "./dist/next/index.d.mts",
       "default": "./dist/next/index.mjs"
     },
+    "./next/server": {
+      "types": "./dist/next/server/index.d.mts",
+      "default": "./dist/next/server/index.mjs"
+    },
     "./ui/css": {
       "types": "./dist/ui/css.d.ts",
       "default": "./dist/ui/css.css"
