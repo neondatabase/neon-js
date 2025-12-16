@@ -20,31 +20,46 @@ export function createAuthServerInternal(
 ): NeonAuthServer {
   const { baseUrl, context: getContext } = config;
 
-  const fetchWithAuth = async (path: string, data?: unknown) => {
+  const fetchWithAuth = async (
+    path: string,
+    method: 'GET' | 'POST',
+    args?: Record<string, unknown>
+  ) => {
     const ctx = await getContext();
     const cookies = await ctx.getCookies();
     const origin = await ctx.getOrigin();
     const framework = ctx.getFramework();
 
     const url = new URL(path, baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`);
+    const { query, fetchOptions: _fetchOptions, ...body } = args || {};
 
-    // For GET requests with data, append as query params
-    if (data && typeof data === 'object') {
-      const params = data as Record<string, string | number | boolean>;
-      for (const [key, value] of Object.entries(params)) {
+    if (query && typeof query === 'object') {
+      const queryParams = query as Record<string, string | number | boolean>;
+      for (const [key, value] of Object.entries(queryParams)) {
         if (value !== undefined && value !== null) {
           url.searchParams.set(key, String(value));
         }
       }
     }
 
+    const headers: Record<string, string> = {
+      Cookie: cookies,
+      Origin: origin,
+      [NEON_AUTH_SERVER_PROXY_HEADER]: framework,
+    };
+
+    let requestBody: string | undefined;
+    if (method === 'POST') {
+      headers['Content-Type'] = 'application/json';
+      if (Object.keys(body).length > 0) {
+        requestBody = JSON.stringify(body);
+      }
+    }
+
     const response = await fetch(url.toString(), {
-      method: 'GET',
-      headers: {
-        Cookie: cookies,
-        Origin: origin,
-        [NEON_AUTH_SERVER_PROXY_HEADER]: framework,
-      },
+      method,
+      headers,
+      body: requestBody,
     });
 
     // Handle response cookies
@@ -80,7 +95,11 @@ export function createAuthServerInternal(
   return createApiProxy(API_ENDPOINTS, fetchWithAuth) as NeonAuthServer;
 }
 
-type FetchWithAuth = (path: string, data?: unknown) => Promise<unknown>;
+type FetchWithAuth = (
+  path: string,
+  method: 'GET' | 'POST',
+  args?: Record<string, unknown>
+) => Promise<unknown>;
 
 function isEndpointConfig(value: unknown): value is EndpointConfig {
   return (
@@ -101,7 +120,8 @@ function createApiProxy(endpoints: EndpointTree, fetchFn: FetchWithAuth): unknow
 
         // If it's a leaf endpoint config, return a callable function
         if (isEndpointConfig(endpoint)) {
-          return (data?: unknown) => fetchFn(endpoint.path, data);
+          return (args?: Record<string, unknown>) =>
+            fetchFn(endpoint.path, endpoint.method, args);
         }
 
         // Otherwise it's a nested namespace - return another proxy

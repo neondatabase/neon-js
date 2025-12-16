@@ -1,5 +1,6 @@
 import { authServer } from '@/lib/auth/server';
 import Link from 'next/link';
+import { UpdateUserForm } from './update-user-form';
 
 export default async function ServerRenderedPage() {
   const sessionResult = await authServer.getSession();
@@ -40,6 +41,16 @@ export default async function ServerRenderedPage() {
               <pre className="overflow-auto rounded-lg bg-zinc-100 p-4 text-sm text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
                 {JSON.stringify(accountsResult, null, 2)}
               </pre>
+            </div>
+          )}
+
+          {/* Update User Form (only if logged in) */}
+          {sessionResult.data?.session && (
+            <div className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+              <h2 className="mb-4 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+                authServer.updateUser()
+              </h2>
+              <UpdateUserForm currentName={sessionResult.data.user?.name || ''} />
             </div>
           )}
 

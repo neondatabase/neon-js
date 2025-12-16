@@ -9,7 +9,7 @@
 
 export interface EndpointConfig {
   path: string;
-  method: 'GET';
+  method: 'GET' | 'POST';
 }
 
 export type EndpointTree = {
@@ -20,8 +20,12 @@ export const API_ENDPOINTS = {
   // Session
   getSession: { path: 'get-session', method: 'GET' },
 
-  // User
+  // Accounts
   listAccounts: { path: 'list-accounts', method: 'GET' },
+
+  // User
+  updateUser: { path: 'update-user', method: 'POST' },
+  deleteUser: { path: 'delete-user', method: 'POST' },
 
   // JWT
   token: { path: 'token', method: 'GET' },

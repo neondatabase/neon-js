@@ -18,6 +18,9 @@ export function Providers({ children }: { children: ReactNode }) {
             onSessionChange={() => {
                 router.refresh()
             }}
+            social={{
+                providers: ["google"],
+            }}
             emailOTP
             redirectTo="/account/settings"
             Link={Link}
