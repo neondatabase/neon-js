@@ -82,6 +82,66 @@ export const API_ENDPOINTS = {
 
   // JWT
   token: { path: 'token', method: 'GET' },
+  jwks: { path: 'jwt', method: 'GET' },
+  getAnonymousToken: { path: 'token/anonymous', method: 'GET' },
+
+  // Admin (requires admin role)
+  admin: {
+    createUser: { path: 'admin/create-user', method: 'POST' },
+    listUsers: { path: 'admin/list-users', method: 'GET' },
+    setRole: { path: 'admin/set-role', method: 'POST' },
+    setUserPassword: { path: 'admin/set-user-password', method: 'POST' },
+    updateUser: { path: 'admin/update-user', method: 'POST' },
+    banUser: { path: 'admin/ban-user', method: 'POST' },
+    unbanUser: { path: 'admin/unban-user', method: 'POST' },
+    listUserSessions: { path: 'admin/list-user-sessions', method: 'GET' },
+    revokeUserSession: { path: 'admin/revoke-user-session', method: 'POST' },
+    revokeUserSessions: { path: 'admin/revoke-user-sessions', method: 'POST' },
+    impersonateUser: { path: 'admin/impersonate-user', method: 'POST' },
+    stopImpersonating: { path: 'admin/stop-impersonating', method: 'POST' },
+    removeUser: { path: 'admin/remove-user', method: 'POST' },
+    hasPermission: { path: 'admin/has-permission', method: 'POST' },
+  },
+
+  // Organization
+  organization: {
+    // Core organization operations
+    create: { path: 'organization/create', method: 'POST' },
+    update: { path: 'organization/update', method: 'POST' },
+    delete: { path: 'organization/delete', method: 'POST' },
+    list: { path: 'organization/list', method: 'GET' },
+    getFullOrganization: { path: 'organization/get-full-organization', method: 'GET' },
+    setActive: { path: 'organization/set-active', method: 'POST' },
+    checkSlug: { path: 'organization/check-slug', method: 'GET' },
+
+    // Member management
+    listMembers: { path: 'organization/list-members', method: 'GET' },
+    removeMember: { path: 'organization/remove-member', method: 'POST' },
+    updateMemberRole: { path: 'organization/update-member-role', method: 'POST' },
+    leave: { path: 'organization/leave', method: 'POST' },
+    getActiveMember: { path: 'organization/get-active-member', method: 'GET' },
+    getActiveMemberRole: { path: 'organization/get-active-member-role', method: 'GET' },
+
+    // Invitations
+    inviteMember: { path: 'organization/invite-member', method: 'POST' },
+    acceptInvitation: { path: 'organization/accept-invitation', method: 'POST' },
+    rejectInvitation: { path: 'organization/reject-invitation', method: 'POST' },
+    cancelInvitation: { path: 'organization/cancel-invitation', method: 'POST' },
+    getInvitation: { path: 'organization/get-invitation', method: 'GET' },
+    listInvitations: { path: 'organization/list-invitations', method: 'GET' },
+    listUserInvitations: { path: 'organization/list-user-invitations', method: 'GET' },
+
+    // Permissions
+    hasPermission: { path: 'organization/has-permission', method: 'POST' },
+  },
+
+  // Email OTP
+  emailOtp: {
+    sendVerificationOtp: { path: 'email-otp/send-verification-otp', method: 'POST' },
+    verifyEmail: { path: 'email-otp/verify-email', method: 'POST' },
+    checkVerificationOtp: { path: 'email-otp/check-verification-otp', method: 'POST' },
+    resetPassword: { path: 'email-otp/passcode', method: 'POST' },
+  },
 } as const satisfies ValidEndpointTree<VanillaBetterAuthClient>;
 
 export type ApiEndpoints = typeof API_ENDPOINTS;

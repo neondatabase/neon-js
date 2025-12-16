@@ -51,9 +51,8 @@ export function createAuthServerInternal(
     let requestBody: string | undefined;
     if (method === 'POST') {
       headers['Content-Type'] = 'application/json';
-      if (Object.keys(body).length > 0) {
-        requestBody = JSON.stringify(body);
-      }
+      // Always send at least {} for POST requests to avoid "empty body" errors
+      requestBody = JSON.stringify(Object.keys(body).length > 0 ? body : {});
     }
 
     const response = await fetch(url.toString(), {
