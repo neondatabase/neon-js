@@ -463,7 +463,7 @@ const { data: session } = await auth.getSession();
 
 ```typescript
 // api/auth/[...path]/route.ts
-import { authApiHandler } from "@neondatabase/auth/next"
+import { authApiHandler } from "@neondatabase/auth/next/server"
 
 export const { GET, POST } = authApiHandler()
 
@@ -473,11 +473,11 @@ import { createAuthClient } from '@neondatabase/auth/next';
 export const authClient = createAuthClient()
 
 // middleware.ts
-import { neonAuthMiddleware } from '@neondatabase/auth/next';
+import { neonAuthMiddleware } from '@neondatabase/auth/next/server';
 export default neonAuthMiddleware();
 
 // Server Components - access session
-import { neonAuth } from '@neondatabase/auth/next';
+import { neonAuth } from '@neondatabase/auth/next/server';
 
 export async function Profile() {
   const { user } = await neonAuth();

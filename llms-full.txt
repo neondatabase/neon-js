@@ -40,7 +40,7 @@ Do NOT install `@neondatabase/neon-js` if you only need authentication - use `@n
 // 1. Install: npm install @neondatabase/neon-js
 
 // 2. Create API route handler: app/api/auth/[...path]/route.ts
-import { authApiHandler } from "@neondatabase/neon-js/auth/next";
+import { authApiHandler } from "@neondatabase/neon-js/auth/next/server";
 export const { GET, POST } = authApiHandler();
 
 // 3. Create auth client: lib/auth/client.ts
@@ -282,7 +282,7 @@ Add route protection with automatic redirect to login:
 
 ```typescript
 // middleware.ts
-import { neonAuthMiddleware } from "@neondatabase/neon-js/auth/next";
+import { neonAuthMiddleware } from "@neondatabase/neon-js/auth/next/server";
 
 export default neonAuthMiddleware({
   loginUrl: '/auth/sign-in', // Redirect here if not authenticated

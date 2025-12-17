@@ -40,7 +40,7 @@ To integrate Neon Auth with Next.js, mount the auth handler to an API route. Cre
 
 ```typescript
 // app/api/auth/[...path]/route.ts
-import { authApiHandler } from "@neondatabase/auth/next"
+import { authApiHandler } from "@neondatabase/auth/next/server"
 
 export const { GET, POST } = authApiHandler()
 ```
@@ -51,7 +51,7 @@ Create a `middleware.ts` file in your project root to protect routes and handle 
 
 ```typescript
 // middleware.ts
-import { neonAuthMiddleware } from "@neondatabase/auth/next"
+import { neonAuthMiddleware } from "@neondatabase/auth/next/server"
 
 export default neonAuthMiddleware({
   loginUrl: "/auth/sign-in",
@@ -282,7 +282,7 @@ Use the `neonAuth()` function to access session and user data in React Server Co
 
 ```typescript
 // app/components/session-card.tsx
-import { neonAuth } from "@neondatabase/auth/next"
+import { neonAuth } from "@neondatabase/auth/next/server"
 
 export async function SessionCard() {
   const { session, user } = await neonAuth()

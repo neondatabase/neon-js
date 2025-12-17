@@ -1,5 +1,6 @@
 import { BetterAuthReactAdapter } from '../adapters/better-auth-react/better-auth-react-adapter';
 import { createAuthClient as createNeonAuthClient } from '../neon-auth';
+
 export { authApiHandler } from './handler';
 export { neonAuthMiddleware } from './middleware';
 export { neonAuth } from './auth';

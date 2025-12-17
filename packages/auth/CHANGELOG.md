@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Server-Side Auth API (`createAuthServer`)**: New server-side auth client for Next.js backends. Use in Server Actions, Route Handlers, and React Server Components to perform auth operations (sign in, sign out, manage users, organizations) without client-side JavaScript. Export from `@neondatabase/auth/next/server`.
 
+### Changed
+
+- **Server utilities also available from `next/server`**: `neonAuth`, `neonAuthMiddleware`, and `authApiHandler` are now also exported from `@neondatabase/auth/next/server` alongside `createAuthServer`. This provides a clearer separation of server-only code (which depends on `next/headers`) from client code. Both import paths (`next` and `next/server`) remain valid.
+
 ## [0.1.0-beta.15] - 2025-12-12
 
 ### Added

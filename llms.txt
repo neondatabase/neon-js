@@ -29,7 +29,7 @@ Do NOT install `@neondatabase/neon-js` if you only need authentication - use `@n
 // 1. Install: npm install @neondatabase/neon-js
 
 // 2. Create API route handler: app/api/auth/[...path]/route.ts
-import { authApiHandler } from "@neondatabase/neon-js/auth/next";
+import { authApiHandler } from "@neondatabase/neon-js/auth/next/server";
 export const { GET, POST } = authApiHandler();
 
 // 3. Create auth client: lib/auth/client.ts
@@ -265,7 +265,7 @@ export default async function AuthPage({ params }: { params: Promise<{ path: str
 // /auth/magic-link, /auth/two-factor, /auth/callback, /auth/sign-out
 
 // 5. (Optional) Add middleware for protected routes: middleware.ts
-import { neonAuthMiddleware } from "@neondatabase/neon-js/auth/next";
+import { neonAuthMiddleware } from "@neondatabase/neon-js/auth/next/server";
 
 export default neonAuthMiddleware({
   loginUrl: '/auth/sign-in', // Redirect here if not authenticated
@@ -304,7 +304,7 @@ export default async function OrganizationPage({ params }: { params: Promise<{ p
 }
 
 // 8. Access session in server components
-import { neonAuth } from "@neondatabase/neon-js/auth/next";
+import { neonAuth } from "@neondatabase/neon-js/auth/next/server";
 
 export async function Profile() {
   const { session, user } = await neonAuth();

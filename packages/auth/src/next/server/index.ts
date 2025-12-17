@@ -1,6 +1,11 @@
 import { createAuthServerInternal } from '../../server';
 import { createNextRequestContext } from './adapter';
 
+// Re-export server-side utilities
+export { neonAuth } from '../auth';
+export { neonAuthMiddleware } from '../middleware';
+export { authApiHandler } from '../handler';
+
 /**
  * Creates a server-side auth API client for Next.js.
  * 
