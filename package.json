@@ -4,8 +4,7 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "packages/*",
-    "demos/*"
+    "packages/*"
   ],
   "scripts": {
     "link:neon-js": "cd packages/auth && bun link && cd ../postgrest-js && bun link && cd ../auth-ui && bun link && cd ../neon-js && bun link",
