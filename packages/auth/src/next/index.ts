@@ -4,9 +4,9 @@ export { authApiHandler } from './handler';
 export { neonAuthMiddleware } from './middleware';
 export { neonAuth } from './auth';
 
-export function createAuthClient()  {
+export function createAuthClient() {
   // @ts-expect-error - for nextjs proxy we do not need the baseUrl
   return createNeonAuthClient(undefined, {
     adapter: BetterAuthReactAdapter(),
   });
-};
+}

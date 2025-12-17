@@ -19,6 +19,7 @@ export default defineConfig(
       'src/vanilla/adapters/index.ts',
 
       'src/next/index.ts',
+      'src/next/server/index.ts',
     ],
     skipNodeModulesBundle: true,
     plugins: [

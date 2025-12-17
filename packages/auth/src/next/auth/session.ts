@@ -6,7 +6,7 @@ import type {
 import { getUpstreamURL } from '../handler/request';
 import { NEON_AUTH_BASE_URL } from '../env-variables';
 
-import { extractRequestCookies, parseSetCookies } from './cookies';
+import { extractNeonAuthCookies, parseSetCookies } from "../../utils/cookies"
 
 export type SessionData =
   | {
@@ -49,7 +49,7 @@ export const fetchSession = async (): Promise<SessionData> => {
   const response = await fetch(upstreamURL.toString(), {
     method: 'GET',
     headers: {
-      Cookie: extractRequestCookies(requestHeaders),
+      Cookie: extractNeonAuthCookies(requestHeaders),
     },
   });
 

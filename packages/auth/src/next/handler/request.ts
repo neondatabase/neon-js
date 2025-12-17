@@ -1,4 +1,4 @@
-import { extractRequestCookies } from "../auth/cookies";
+import { extractNeonAuthCookies } from "../../utils/cookies";
 import { NEON_AUTH_HEADER_MIDDLEWARE_NAME } from "../constants";
 
 const PROXY_HEADERS = ['user-agent', 'authorization', 'referer', 'content-type'];
@@ -44,7 +44,7 @@ const prepareRequestHeaders = (request: Request) => {
     }
   }
   headers.set('Origin', getOrigin(request));
-  headers.set('Cookie', extractRequestCookies(request.headers));
+  headers.set('Cookie', extractNeonAuthCookies(request.headers));
   headers.set(NEON_AUTH_HEADER_MIDDLEWARE_NAME, 'true');    
   return headers;
 }
