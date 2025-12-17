@@ -242,6 +242,7 @@ For Next.js projects, this package provides built-in integration via `@neondatab
 - Importing styles (with or without Tailwind CSS)
 - Accessing session data with `neonAuth()` in server components
 - Using `authClient.useSession()` hook in client components
+- Server-side auth operations with `createAuthServer()` from `@neondatabase/auth/next/server`
 
 ## CSS for UI Components
 

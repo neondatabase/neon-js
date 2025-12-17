@@ -322,6 +322,33 @@ function Dashboard() {
   if (!session) return <div>Not authenticated</div>;
   return <h1>Welcome, {session.user.name}</h1>;
 }
+
+// 10. Server-side auth operations (Server Actions, Route Handlers)
+// lib/auth/server.ts
+import { createAuthServer } from "@neondatabase/neon-js/auth/next/server";
+export const authServer = createAuthServer();
+
+// app/actions.ts
+'use server';
+import { authServer } from '@/lib/auth/server';
+import { redirect } from 'next/navigation';
+
+export async function signInAction(formData: FormData) {
+  const { error } = await authServer.signIn.email({
+    email: formData.get('email') as string,
+    password: formData.get('password') as string,
+  });
+  if (error) return { error: error.message };
+  redirect('/dashboard');
+}
+
+// Available authServer APIs:
+// - Session: getSession(), listSessions(), revokeSession()
+// - Auth: signIn.email(), signIn.social(), signUp.email(), signOut()
+// - User: updateUser(), changePassword(), deleteUser()
+// - Organization: organization.create(), .list(), .inviteMember(), etc.
+// - Admin: admin.listUsers(), .banUser(), .setRole(), etc.
+// - Email OTP: emailOtp.sendVerificationOtp(), .verifyEmail()
 ```
 
 ## Social Sign-In (Google, GitHub)
@@ -534,6 +561,7 @@ From `@neondatabase/neon-js`:
 - `@neondatabase/neon-js` - Main client (createClient, SupabaseAuthAdapter, BetterAuthVanillaAdapter)
 - `@neondatabase/neon-js/auth/react/adapters` - BetterAuthReactAdapter
 - `@neondatabase/neon-js/auth/next` - Next.js integration (authApiHandler, createAuthClient, neonAuth, neonAuthMiddleware)
+- `@neondatabase/neon-js/auth/next/server` - Server-side auth API (createAuthServer)
 - `@neondatabase/neon-js/auth/react/ui` - UI components (NeonAuthUIProvider, AuthView, SignInForm, etc.)
 - `@neondatabase/neon-js/auth/react/ui/server` - Server utilities (authViewPaths)
 - `@neondatabase/neon-js/ui/css` - Pre-built CSS bundle
@@ -544,6 +572,7 @@ From `@neondatabase/auth` (auth only, same subpaths):
 - `@neondatabase/auth/vanilla/adapters` - SupabaseAuthAdapter, BetterAuthVanillaAdapter
 - `@neondatabase/auth/react/adapters` - BetterAuthReactAdapter
 - `@neondatabase/auth/next` - Next.js integration (authApiHandler, createAuthClient, neonAuth, neonAuthMiddleware)
+- `@neondatabase/auth/next/server` - Server-side auth API (createAuthServer)
 - `@neondatabase/auth/react/ui` - UI components
 - `@neondatabase/auth/ui/css` - CSS bundle
 

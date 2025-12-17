@@ -818,6 +818,7 @@ From `@neondatabase/neon-js`:
 - `@neondatabase/neon-js` - Main client (createClient, SupabaseAuthAdapter, BetterAuthVanillaAdapter)
 - `@neondatabase/neon-js/auth/react/adapters` - BetterAuthReactAdapter
 - `@neondatabase/neon-js/auth/next` - Next.js integration (authApiHandler, createAuthClient, neonAuth, neonAuthMiddleware)
+- `@neondatabase/neon-js/auth/next/server` - Server-side auth API (createAuthServer)
 - `@neondatabase/neon-js/auth/react/ui` - UI components (NeonAuthUIProvider, AuthView, SignInForm, etc.)
 - `@neondatabase/neon-js/auth/react/ui/server` - Server utilities (authViewPaths)
 - `@neondatabase/neon-js/ui/css` - Pre-built CSS bundle
@@ -828,6 +829,7 @@ From `@neondatabase/auth` (auth only, same subpaths):
 - `@neondatabase/auth/vanilla/adapters` - SupabaseAuthAdapter, BetterAuthVanillaAdapter
 - `@neondatabase/auth/react/adapters` - BetterAuthReactAdapter
 - `@neondatabase/auth/next` - Next.js integration (authApiHandler, createAuthClient, neonAuth, neonAuthMiddleware)
+- `@neondatabase/auth/next/server` - Server-side auth API (createAuthServer)
 - `@neondatabase/auth/react/ui` - UI components
 - `@neondatabase/auth/ui/css` - CSS bundle
 

@@ -334,6 +334,50 @@ export default function DashboardPage() {
 }
 ```
 
+## Server-Side Auth Operations
+
+For Server Actions, Route Handlers, and other server-side auth operations, use `createAuthServer()` from `@neondatabase/auth/next/server`:
+
+```typescript
+// lib/auth/server.ts
+import { createAuthServer } from '@neondatabase/auth/next/server';
+export const authServer = createAuthServer();
+```
+
+### Server Action Example
+
+```typescript
+// app/actions.ts
+'use server';
+import { authServer } from '@/lib/auth/server';
+import { redirect } from 'next/navigation';
+
+export async function signIn(formData: FormData) {
+  const { error } = await authServer.signIn.email({
+    email: formData.get('email') as string,
+    password: formData.get('password') as string,
+  });
+  if (error) return { error: error.message };
+  redirect('/dashboard');
+}
+
+export async function signOut() {
+  await authServer.signOut();
+  redirect('/auth/sign-in');
+}
+```
+
+### Available APIs
+
+The `authServer` provides access to all Neon Auth APIs:
+
+- **Session**: `getSession()`, `listSessions()`, `revokeSession()`, `revokeOtherSessions()`
+- **Auth**: `signIn.email()`, `signIn.social()`, `signIn.emailOtp()`, `signUp.email()`, `signOut()`
+- **User**: `updateUser()`, `changePassword()`, `deleteUser()`, `sendVerificationEmail()`
+- **Organization**: `organization.create()`, `organization.list()`, `organization.inviteMember()`, `organization.removeMember()`, etc.
+- **Admin**: `admin.listUsers()`, `admin.banUser()`, `admin.setRole()`, `admin.createUser()`, etc.
+- **Email OTP**: `emailOtp.sendVerificationOtp()`, `emailOtp.verifyEmail()`
+
 ## Project Structure
 
 ```

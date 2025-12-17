@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-beta.16] - 2025-12-17
+
+### Added
+
+- **Server-Side Auth API (`createAuthServer`)**: New server-side auth client for Next.js backends. Use in Server Actions, Route Handlers, and React Server Components to perform auth operations (sign in, sign out, manage users, organizations) without client-side JavaScript. Export from `@neondatabase/auth/next/server`.
+
 ## [0.1.0-beta.15] - 2025-12-12
 
 ### Added
