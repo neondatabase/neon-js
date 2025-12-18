@@ -11,17 +11,15 @@ type Params = { path: string[] };
  * @returns A Next.js API handler functions those can be used in a Next.js route.
  *
  * @example
- * 
  * Mount the `authApiHandler` to an API route. Create a route file inside `/api/auth/[...all]/route.ts` directory. 
  *  And add the following code:
  * 
  * ```ts 
- * 
+ * // app/api/auth/[...all]/route.ts
  * import { authApiHandler } from '@neondatabase/auth/next';
  * 
  * export const { GET, POST } = authApiHandler();
  * ```
- * 
  */
 export function authApiHandler() {
   const baseURL = process.env.NEON_AUTH_BASE_URL;

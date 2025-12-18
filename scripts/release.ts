@@ -255,10 +255,11 @@ async function release(packageName: string): Promise<void> {
   console.log(`  📦 Running bun update...`);
   await $`bun update`.cwd(ROOT_DIR).quiet();
 
-  // Amend the last commit to include lock file changes
+  // Create new commit with the lock file changes,
+  // amending to the last commit, removes the tag
   console.log(`  📝 Adding lock file to last commit...`);
   await $`git add bun.lock`.cwd(ROOT_DIR).quiet();
-  await $`git commit --amend --no-edit`.cwd(ROOT_DIR).quiet();
+  await $`git commit -m "chore: update lock file"`.cwd(ROOT_DIR).quiet();
 
   // ============================================
   // Phase 3: Publishing
