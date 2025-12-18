@@ -22,6 +22,7 @@ export default defineConfig(
       'src/auth/vanilla/index.ts',
       'src/auth/vanilla/adapters/index.ts',
       'src/auth/next/index.ts',
+      'src/auth/next/server/index.ts',
     ],
     external: ['@neondatabase/auth', '@neondatabase/postgrest-js'],
     plugins: [

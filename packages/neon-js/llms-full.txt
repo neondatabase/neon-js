@@ -662,7 +662,7 @@ Mount the auth handler to an API route:
 
 ```typescript
 // app/api/auth/[...path]/route.ts
-import { authApiHandler } from "@neondatabase/auth/next"
+import { authApiHandler } from "@neondatabase/auth/next/server"
 
 export const { GET, POST } = authApiHandler()
 ```
@@ -673,7 +673,7 @@ Protect routes and handle session validation:
 
 ```typescript
 // middleware.ts
-import { neonAuthMiddleware } from "@neondatabase/auth/next"
+import { neonAuthMiddleware } from "@neondatabase/auth/next/server"
 
 export default neonAuthMiddleware({
   loginUrl: "/auth/sign-in",
@@ -876,7 +876,7 @@ export default async function OrganizationPage({
 #### React Server Components
 
 ```typescript
-import { neonAuth } from "@neondatabase/auth/next"
+import { neonAuth } from "@neondatabase/auth/next/server"
 
 export async function SessionCard() {
   const { session, user } = await neonAuth()
