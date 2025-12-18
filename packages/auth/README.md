@@ -246,21 +246,32 @@ For Next.js projects, this package provides built-in integration via `@neondatab
 
 ## CSS for UI Components
 
-Styles for Neon Auth UI components are available from this package:
+Choose the import method based on your project setup:
 
-| Export | Use Case |
-|--------|----------|
-| `@neondatabase/auth/ui/css` | Pre-built styles (~47KB) |
-| `@neondatabase/auth/ui/tailwind` | Tailwind-ready CSS |
+### Without Tailwind CSS
+
+If your project doesn't use Tailwind CSS, import the pre-built CSS bundle:
+
+```typescript
+// In your root layout or app entry point
+import '@neondatabase/auth/ui/css';
+```
+
+This includes all necessary styles (~47KB minified) with no additional configuration required.
+
+### With Tailwind CSS v4
+
+If your project already uses Tailwind CSS v4, import the Tailwind-ready CSS to avoid duplicate styles:
 
 ```css
-/* Without Tailwind */
-@import '@neondatabase/auth/ui/css';
-
-/* With Tailwind CSS v4 */
+/* In your main CSS file (e.g., globals.css) */
 @import 'tailwindcss';
 @import '@neondatabase/auth/ui/tailwind';
 ```
+
+This imports only the theme variables. Your Tailwind build generates the utility classes.
+
+> **Note:** Never import both paths. This causes duplicate styles.
 
 ## Related Packages
 

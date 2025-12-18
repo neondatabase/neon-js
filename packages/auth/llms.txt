@@ -151,6 +151,21 @@ Same as default API, plus:
 - **Request Deduplication**: Concurrent calls share single network request
 - **Cold start**: ~200ms (single request) vs ~2000ms (without deduplication)
 
+## CSS for UI Components
+
+Choose based on your project setup:
+
+```css
+/* Without Tailwind - pre-built bundle (~47KB) */
+@import '@neondatabase/auth/ui/css';
+
+/* With Tailwind CSS v4 - theme tokens only */
+@import 'tailwindcss';
+@import '@neondatabase/auth/ui/tailwind';
+```
+
+Never import both paths - causes duplicate styles.
+
 ## Optional
 
 - [Next.js Integration](https://github.com/neondatabase/neon-js/blob/main/packages/auth/NEXT-JS.md): Setup guide for Next.js 15+ with middleware and RSC support

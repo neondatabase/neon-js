@@ -17,6 +17,7 @@ A unified TypeScript SDK for Neon services, providing seamless integration with 
   - [Which Package Should I Use?](#which-package-should-i-use)
   - [Quick Start](#quick-start)
     - [Using Adapters](#using-adapters)
+    - [Anonymous Access](#anonymous-access)
   - [CLI Tool: Generate Types](#cli-tool-generate-types)
     - [Basic Usage](#basic-usage)
     - [Flags](#flags)
@@ -28,6 +29,7 @@ A unified TypeScript SDK for Neon services, providing seamless integration with 
     - [Quick Migration Steps](#quick-migration-steps)
   - [Authentication Methods](#authentication-methods)
     - [Core Methods](#core-methods)
+  - [UI Component Styles](#ui-component-styles)
   - [Environment Support](#environment-support)
   - [Architecture](#architecture)
   - [Performance](#performance)
@@ -84,7 +86,6 @@ This monorepo contains four packages. Choose based on your needs:
 
 - **`@neondatabase/neon-js`** (Recommended): Full-featured SDK with auth + Neon Data API. Use this for most applications.
 - **`@neondatabase/auth`**: Authentication only. Use when you want to use Neon Auth for authentication and don't need to use the Neon Data API. Includes Next.js integration via `@neondatabase/auth/next` (handler, client, middleware). See the [Next.js Setup Guide](./packages/auth/NEXT-JS.md).
-- **`@neondatabase/auth-ui`**: Pre-built UI components for Neon Auth. Use when you want ready-to-use sign-in/sign-up forms.
 - **`@neondatabase/postgrest-js`**: Database queries only. Use when you handle authentication externally or don't need auth.
 
 ## Quick Start
@@ -324,6 +325,35 @@ The SDK supports comprehensive authentication methods via the Better Auth adapte
 - **Password Reset**: `resetPasswordForEmail()`, `resend()`
 - **State Monitoring**: `onAuthStateChange()` with cross-tab synchronization
 
+## UI Component Styles
+
+Choose the import method based on your project setup:
+
+### Without Tailwind CSS
+
+If your project doesn't use Tailwind CSS, import the pre-built CSS bundle:
+
+```typescript
+// In your root layout or app entry point
+import '@neondatabase/neon-js/ui/css';
+```
+
+This includes all necessary styles (~47KB minified) with no additional configuration required.
+
+### With Tailwind CSS v4
+
+If your project already uses Tailwind CSS v4, import the Tailwind-ready CSS to avoid duplicate styles:
+
+```css
+/* In your main CSS file (e.g., globals.css) */
+@import 'tailwindcss';
+@import '@neondatabase/neon-js/ui/tailwind';
+```
+
+This imports only the theme variables. Your Tailwind build generates the utility classes.
+
+> **Note:** Never import both paths. This causes duplicate styles.
+
 ## Environment Support
 
 The SDK works in both browser and Node.js environments:
@@ -375,6 +405,6 @@ Apache-2.0
 
 ## Links
 
-- [Neon Documentation](https://neon.tech/docs)
+- [Neon Documentation](https://neon.com/docs/auth/overview)
 - [Better Auth Documentation](https://www.better-auth.com/docs)
 - [GitHub Repository](https://github.com/neondatabase/neon-js)
