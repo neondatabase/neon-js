@@ -1,27 +1,33 @@
-# Neon Auth UI Theming
+# @neondatabase/auth-ui
 
-> Complete guide to customizing Neon Auth UI appearance. For basic setup, see [llms.txt](llms.txt).
+> React UI components and theming for Neon Auth - pre-built sign-in, sign-up, and user management forms with customizable styling.
+
+## Installation
+
+```bash
+npm install @neondatabase/auth-ui @neondatabase/auth
+```
 
 ## CSS Import Decision
 
 | Your Setup | Import Path | Bundle Size |
 |------------|-------------|-------------|
-| No Tailwind | `@import '@neondatabase/neon-js/ui/css'` | ~47KB |
-| Tailwind v4 | `@import '@neondatabase/neon-js/ui/tailwind'` | ~2KB (tokens only) |
+| No Tailwind | `@import '@neondatabase/auth-ui/css'` | ~47KB |
+| Tailwind v4 | `@import '@neondatabase/auth-ui/tailwind'` | ~2KB (tokens only) |
 
 **Rule:** Never import both. Causes duplicate styles.
 
 **Without Tailwind (pre-built CSS):**
 ```typescript
 // In layout.tsx or _app.tsx
-import "@neondatabase/neon-js/ui/css";
+import "@neondatabase/auth-ui/css";
 ```
 
 **With Tailwind v4:**
 ```css
 /* globals.css */
 @import 'tailwindcss';
-@import '@neondatabase/neon-js/ui/tailwind';
+@import '@neondatabase/auth-ui/tailwind';
 
 /* Your overrides go here */
 ```
@@ -226,11 +232,11 @@ function toggleDarkMode() {
 ### 1. Importing Both CSS Paths
 ```css
 /* WRONG - duplicate styles, ~94KB */
-@import '@neondatabase/neon-js/ui/css';
-@import '@neondatabase/neon-js/ui/tailwind';
+@import '@neondatabase/auth-ui/css';
+@import '@neondatabase/auth-ui/tailwind';
 
 /* CORRECT - pick one */
-@import '@neondatabase/neon-js/ui/css';
+@import '@neondatabase/auth-ui/css';
 ```
 
 ### 2. Missing Foreground Pairs
@@ -264,14 +270,14 @@ function toggleDarkMode() {
 ```css
 /* WRONG - overrides load before Neon CSS */
 @import './my-overrides.css';
-@import '@neondatabase/neon-js/ui/css';
+@import '@neondatabase/auth-ui/css';
 
 /* CORRECT - Neon CSS first, then overrides */
-@import '@neondatabase/neon-js/ui/css';
+@import '@neondatabase/auth-ui/css';
 @import './my-overrides.css';
 
 /* OR inline after import */
-@import '@neondatabase/neon-js/ui/css';
+@import '@neondatabase/auth-ui/css';
 
 :root {
   --primary: oklch(0.55 0.25 250);
@@ -302,7 +308,7 @@ function toggleDarkMode() {
 All UI components accept `classNames` props for targeted customization:
 
 ```typescript
-import { SignInForm } from "@neondatabase/neon-js/auth/react/ui";
+import { SignInForm } from "@neondatabase/auth-ui";
 
 <SignInForm
   className="mx-auto max-w-md"
@@ -328,4 +334,3 @@ import { SignInForm } from "@neondatabase/neon-js/auth/react/ui";
 - [shadcn/ui Theming Guide](https://ui.shadcn.com/docs/theming)
 - [better-auth-ui Documentation](https://better-auth-ui.com)
 - [next-themes](https://github.com/pacocoursey/next-themes)
-- [Main SDK Documentation](llms.txt)

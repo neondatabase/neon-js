@@ -266,10 +266,11 @@ paths within the package are valid (per Node.js ESM specification). Wrapper file
 - `session-cache-manager.ts` - Session caching with TTL
 - `token-cache.ts` - Generic token caching with JWT-based TTL
 - `in-flight-request-manager.ts` - Request deduplication
+- `oauth-popup.ts` - Popup-based OAuth flow for iframe contexts
 - `better-auth-helpers.ts` - Session mapping and error handling
 - `better-auth-types.ts` - Type definitions
-- `better-auth-methods.ts` - Shared method implementations
-- `constants.ts` - Configuration (TTLs, intervals, buffers)
+- `better-auth-methods.ts` - Shared method implementations (includes iframe detection and popup OAuth handling)
+- `constants.ts` - Configuration (TTLs, intervals, buffers, popup parameters)
 
 **Plugins**: `src/plugins/`
 - `anonymous-token.ts` - Better Auth client plugin for anonymous token retrieval
@@ -277,7 +278,7 @@ paths within the package are valid (per Node.js ESM specification). Wrapper file
 **Utilities**: `src/utils/`
 - `jwt.ts` - JWT parsing and expiration utilities
 - `date.ts` - Date utilities
-- `browser.ts` - Browser detection utilities
+- `browser.ts` - Browser detection utilities (`isBrowser`, `isIframe`, `supportsBroadcastChannel`)
 
 **Tests**: `src/__tests__/`
 - Uses real Better Auth SDK with MSW for network mocking
@@ -543,6 +544,14 @@ export default function AuthPage() {
 ```
 
 ## Adapter Features
+
+### OAuth Popup Flow for Iframes
+- Automatic popup-based OAuth flow when running inside iframes
+- OAuth providers block redirects in iframes due to X-Frame-Options/CSP restrictions
+- SDK detects iframe context via `isIframe()` and opens OAuth in a popup window instead
+- Communication via postMessage to send session verifier back to parent
+- 120s timeout with 500ms polling for popup status
+- Implemented in `src/core/oauth-popup.ts` and integrated in `src/core/better-auth-methods.ts`
 
 ### Anonymous Access
 - `allowAnonymous: true` in config enables anonymous token for unauthenticated users
