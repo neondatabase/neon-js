@@ -23,6 +23,31 @@ This package is designed to work seamlessly with Neon's authentication infrastru
 - **Performance optimizations** - Session caching and request deduplication
 - **TypeScript support** - Fully typed with strict type checking
 
+## Why @neondatabase/auth?
+
+### vs. better-auth/client
+
+`@neondatabase/auth` is a wrapper around Better Auth that provides:
+
+**API Flexibility:**
+- Multiple adapters (Supabase-compatible, React hooks, vanilla)
+- Restricted options to match Neon Auth capabilities
+
+**Neon Auth Integration:**
+- Automatic `token_verifier` on OAuth callback
+- Pre-configured plugins for Neon Auth
+- Automatic JWT extraction from sessions
+- Popup-based OAuth flow for iframes
+
+**Built-in Enhancements:**
+- Session caching (60s TTL)
+- Request deduplication
+- Event system
+- Cross-tab sync
+- Token refresh detection
+
+If you're not using Neon Auth, you should probably use `better-auth/client` directly for more flexibility.
+
 ## Installation
 
 ```bash
@@ -244,43 +269,79 @@ For Next.js projects, this package provides built-in integration via `@neondatab
 - Using `authClient.useSession()` hook in client components
 - Server-side auth operations with `createAuthServer()` from `@neondatabase/auth/next/server`
 
-## CSS for UI Components
+## UI Components
 
-Choose the import method based on your project setup:
+Pre-built login forms and auth pages are included. No extra installation needed.
 
-### Without Tailwind CSS
+### 1. Import CSS
 
-If your project doesn't use Tailwind CSS, import the pre-built CSS bundle:
-
+**Without Tailwind CSS:**
 ```typescript
-// In your root layout or app entry point
 import '@neondatabase/auth/ui/css';
 ```
 
-This includes all necessary styles (~47KB minified) with no additional configuration required.
-
-### With Tailwind CSS v4
-
-If your project already uses Tailwind CSS v4, import the Tailwind-ready CSS to avoid duplicate styles:
-
+**With Tailwind CSS v4:**
 ```css
-/* In your main CSS file (e.g., globals.css) */
 @import 'tailwindcss';
 @import '@neondatabase/auth/ui/tailwind';
 ```
 
-This imports only the theme variables. Your Tailwind build generates the utility classes.
+### 2. Setup Provider
 
-> **Note:** Never import both paths. This causes duplicate styles.
+```typescript
+"use client"
+
+import { NeonAuthUIProvider } from "@neondatabase/auth/react/ui"
+import { createAuthClient } from "@neondatabase/auth"
+import "@neondatabase/auth/ui/css"
+
+const authClient = createAuthClient('https://your-auth-url.com')
+
+export function AuthProvider({ children }) {
+  return (
+    <NeonAuthUIProvider authClient={authClient} redirectTo="/dashboard">
+      {children}
+    </NeonAuthUIProvider>
+  )
+}
+```
+
+### 3. Use Components
+
+**Option A: Full Auth Pages (Recommended)**
+
+Use `AuthView` to render complete auth flows based on the URL path:
+
+```typescript
+import { AuthView } from "@neondatabase/auth/react/ui"
+
+// Renders sign-in, sign-up, forgot-password, etc. based on path
+<AuthView path="sign-in" />
+```
+
+**Option B: Individual Components**
+
+```typescript
+import { SignInForm, UserButton } from "@neondatabase/auth/react/ui"
+
+<SignInForm />
+<UserButton />
+```
+
+Available components: `SignInForm`, `SignUpForm`, `UserButton`, `AuthView`, `AccountView`, `OrganizationView`
+
+For Next.js with dynamic routes, see the [Next.js Setup Guide](./NEXT-JS.md).
+
+For full documentation and theming, see [`@neondatabase/auth-ui`](../auth-ui).
 
 ## Related Packages
 
 - [`@neondatabase/neon-js`](../neon-js) - Full SDK with database and auth integration
-- [`@neondatabase/postgrest-js`](../postgrest-js) - PostgreSQL client without auth
+- [`@neondatabase/postgrest-js`](../postgrest-js) - PostgREST client without auth
 
 ## Resources
 
-- [Neon Auth Documentation](https://neon.tech/docs/neon-auth)
+- [Neon Auth Documentation](https://neon.com/docs/neon-auth)
 - [Better Auth Documentation](https://www.better-auth.com/docs)
 
 ## Support
