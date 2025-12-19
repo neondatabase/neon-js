@@ -35,6 +35,52 @@ npm install @neondatabase/neon-js
 bun add @neondatabase/neon-js
 ```
 
+## Prerequisites
+
+Before using neon-js, you'll need:
+
+### 1. A Neon Account and Project
+
+- Sign up at [neon.tech](https://neon.tech)
+- Create a new project in the Neon Console
+
+### 2. Enable the Data API (for database queries)
+
+- Go to your project settings in Neon Console
+- Enable the Data API feature
+- Copy your Data API URL
+
+**Data API URL format:**
+```
+https://ep-xxx.apirest.c-2.us-east-2.aws.neon.build/dbname/rest/v1
+```
+
+### 3. Enable Neon Auth (for authentication)
+
+- Go to your project settings in Neon Console
+- Enable Neon Auth
+- Copy your Auth URL
+
+**Auth URL format:**
+```
+https://ep-xxx.neonauth.c-2.us-east-2.aws.neon.build/dbname/auth
+```
+
+### 4. Configure Environment Variables
+
+Create a `.env` or `.env.local` file:
+
+```bash
+# Next.js
+NEON_AUTH_BASE_URL=https://ep-xxx.neonauth.c-2.us-east-2.aws.neon.build/dbname/auth
+NEXT_PUBLIC_NEON_AUTH_URL=https://ep-xxx.neonauth.c-2.us-east-2.aws.neon.build/dbname/auth
+NEON_DATA_API_URL=https://ep-xxx.apirest.c-2.us-east-2.aws.neon.build/dbname/rest/v1
+
+# Vite/React
+VITE_NEON_AUTH_URL=https://ep-xxx.neonauth.c-2.us-east-2.aws.neon.build/dbname/auth
+VITE_NEON_DATA_API_URL=https://ep-xxx.apirest.c-2.us-east-2.aws.neon.build/dbname/rest/v1
+```
+
 ## Quick Start
 
 ```typescript
@@ -360,23 +406,65 @@ const client = createClient({
 });
 ```
 
-## UI Component Styles
+## UI Components
 
-Styles for Neon Auth UI components are available from this package:
+Pre-built login forms and auth pages are included. No extra installation needed.
 
-| Export | Use Case |
-|--------|----------|
-| `@neondatabase/neon-js/ui/css` | Pre-built styles (~47KB) |
-| `@neondatabase/neon-js/ui/tailwind` | Tailwind-ready CSS |
+### 1. Import CSS
 
+**Without Tailwind CSS:**
+```typescript
+import '@neondatabase/neon-js/ui/css';
+```
+
+**With Tailwind CSS v4:**
 ```css
-/* Without Tailwind */
-@import '@neondatabase/neon-js/ui/css';
-
-/* With Tailwind CSS v4 */
 @import 'tailwindcss';
 @import '@neondatabase/neon-js/ui/tailwind';
 ```
+
+### 2. Setup Provider
+
+```typescript
+"use client"
+
+import { NeonAuthUIProvider } from "@neondatabase/neon-js/auth/react/ui"
+import "@neondatabase/neon-js/ui/css"
+
+export function Providers({ children }) {
+  return (
+    <NeonAuthUIProvider authClient={client.auth} redirectTo="/dashboard">
+      {children}
+    </NeonAuthUIProvider>
+  )
+}
+```
+
+### 3. Use Components
+
+**Option A: Full Auth Pages (Recommended)**
+
+Use `AuthView` to render complete auth flows based on the URL path:
+
+```typescript
+import { AuthView } from "@neondatabase/neon-js/auth/react/ui"
+
+// Renders sign-in, sign-up, forgot-password, etc. based on path
+<AuthView path="sign-in" />
+```
+
+**Option B: Individual Components**
+
+```typescript
+import { SignInForm, UserButton } from "@neondatabase/neon-js/auth/react/ui"
+
+<SignInForm />
+<UserButton />
+```
+
+Available components: `SignInForm`, `SignUpForm`, `UserButton`, `AuthView`, `AccountView`, `OrganizationView`
+
+For full documentation and theming, see [`@neondatabase/auth-ui`](../auth-ui).
 
 ## TypeScript
 
@@ -530,6 +618,71 @@ export function useAuth() {
 }
 ```
 
+## Supabase Migration Guide
+
+neon-js provides a Supabase-compatible API, making migration straightforward.
+
+### 1. Update Dependencies
+
+```diff
+- "@supabase/supabase-js": "^2.74.0"
++ "@neondatabase/neon-js": "^0.1.0"
+```
+
+### 2. Update Environment Variables
+
+```diff
+- VITE_SUPABASE_URL="https://xxx.supabase.co"
+- VITE_SUPABASE_ANON_KEY="..."
++ VITE_NEON_DATA_API_URL="https://xxx.neon.tech/neondb/rest/v1"
++ VITE_NEON_AUTH_URL="https://your-auth-server.com"
+```
+
+### 3. Update Client Initialization
+
+```diff
+- import { createClient } from '@supabase/supabase-js';
++ import { createClient, SupabaseAuthAdapter } from '@neondatabase/neon-js';
+
+- export const client = createClient(
+-   import.meta.env.VITE_SUPABASE_URL,
+-   import.meta.env.VITE_SUPABASE_ANON_KEY
+- );
++ export const client = createClient<Database>({
++   auth: {
++     adapter: SupabaseAuthAdapter(), // Must call as function!
++     url: import.meta.env.VITE_NEON_AUTH_URL,
++   },
++   dataApi: {
++     url: import.meta.env.VITE_NEON_DATA_API_URL,
++   },
++ });
+```
+
+### 4. No Code Changes Needed
+
+All authentication methods work the same:
+
+```typescript
+// These work identically
+await client.auth.signInWithPassword({ email, password });
+await client.auth.signUp({ email, password });
+const { data: session } = await client.auth.getSession();
+client.auth.onAuthStateChange((event, session) => { /* ... */ });
+```
+
+All database queries work the same:
+
+```typescript
+// These work identically
+const { data } = await client.from('items').select();
+await client.from('items').insert({ name: 'New Item' });
+await client.from('items').update({ status: 'done' }).eq('id', 1);
+await client.from('items').delete().eq('id', 1);
+```
+
+See the [todo-guardian-pro migration PR](https://github.com/pffigueiredo/todo-guardian-pro/pull/1) for a complete migration example.
+
 ## Related Packages
 
 This package combines two underlying packages:
@@ -539,8 +692,8 @@ This package combines two underlying packages:
 
 ## Resources
 
-- [Neon Documentation](https://neon.tech/docs)
-- [Neon Auth Documentation](https://neon.tech/docs/neon-auth)
+- [Neon Documentation](https://neon.com/docs)
+- [Neon Auth Documentation](https://neon.com/docs/neon-auth)
 - [Better Auth Documentation](https://www.better-auth.com/docs)
 - [PostgREST Documentation](https://postgrest.org)
 

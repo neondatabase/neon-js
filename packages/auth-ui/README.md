@@ -259,23 +259,122 @@ export default async function AuthPage({
 
 ## Customizing Theme
 
-The CSS uses CSS custom properties for theming. Override them in your CSS:
+Neon Auth UI uses CSS custom properties for theming.
+
+### Core Color Tokens
+
+Override in `:root` (light) and `.dark` (dark mode):
 
 ```css
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  /* Primary - buttons, links, focus rings */
   --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
-  /* ... see theme.css for all variables */
+
+  /* Secondary - secondary buttons */
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+
+  /* Background/Foreground - page colors */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+
+  /* Muted - placeholders, disabled states */
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+
+  /* Accent - hover states */
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+
+  /* Destructive - errors, delete actions */
+  --destructive: oklch(0.577 0.245 27.325);
+
+  /* UI Elements */
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --radius: 0.625rem;
 }
 
 .dark {
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
-  /* ... dark mode overrides */
+  /* ... other dark tokens */
 }
 ```
+
+### Token Pairing Rules
+
+**CRITICAL:** Always override pairs together to maintain contrast.
+
+| Background Token | Foreground Token | Min Contrast |
+|-----------------|------------------|--------------|
+| `--primary` | `--primary-foreground` | 4.5:1 |
+| `--secondary` | `--secondary-foreground` | 4.5:1 |
+| `--background` | `--foreground` | 4.5:1 |
+| `--muted` | `--muted-foreground` | 4.5:1 |
+| `--accent` | `--accent-foreground` | 4.5:1 |
+| `--destructive` | `--destructive-foreground` | 4.5:1 |
+
+### OKLCH Color Format
+
+Format: `oklch(L C H)` or `oklch(L C H / alpha)`
+
+| Parameter | Range | Description |
+|-----------|-------|-------------|
+| L (Lightness) | 0-1 | 0 = black, 1 = white |
+| C (Chroma) | 0-0.4 | 0 = gray, higher = more vivid |
+| H (Hue) | 0-360 | Color wheel degrees |
+| alpha | 0-1 | Opacity |
+
+**Convert HEX/RGB to OKLCH:** https://oklch.com
+
+### Dark Mode Implementation
+
+#### Option 1: next-themes (Recommended for Next.js)
+
+```typescript
+import { ThemeProvider } from "next-themes";
+
+export default function Layout({ children }) {
+  return (
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      {children}
+    </ThemeProvider>
+  );
+}
+```
+
+#### Option 2: CSS Only (System Preference)
+
+```css
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+  }
+}
+```
+
+### Component-Specific Styling
+
+All UI components accept `classNames` props:
+
+```typescript
+<SignInForm
+  className="mx-auto max-w-md"
+  classNames={{
+    card: "border-primary/20",
+    button: "rounded-full",
+    input: "bg-muted/50",
+  }}
+/>
+```
+
+Available interfaces: `AuthViewClassNames`, `AuthFormClassNames`, `UserAvatarClassNames`, `UserButtonClassNames`, `SettingsCardClassNames`
 
 ## Documentation
 
@@ -283,7 +382,7 @@ For component documentation, see the [better-auth-ui docs](https://better-auth-u
 
 ## Related Packages
 
-- [`@neondatabase/auth`](../neon-auth) - Authentication adapters for Neon Auth
+- [`@neondatabase/auth`](../auth) - Authentication adapters for Neon Auth
 - [`@neondatabase/neon-js`](../neon-js) - Full SDK with database and auth integration
 
 ## Support

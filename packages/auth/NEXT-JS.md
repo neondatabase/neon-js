@@ -409,6 +409,6 @@ middleware.ts                 # Route protection
 
 ## Learn More
 
-- [Neon Auth Documentation](https://neon.tech/docs/guides/neon-auth)
+- [Neon Auth Documentation](https://neon.com/docs/guides/neon-auth)
 - [better-auth-ui Documentation](https://better-auth-ui.com/integrations/next-js)
 - [Next.js Documentation](https://nextjs.org/docs)
