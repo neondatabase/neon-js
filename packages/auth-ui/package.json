@@ -80,7 +80,7 @@
   },
   "dependencies": {
     "@captchafox/react": "^1.10.0",
-    "@daveyplate/better-auth-ui": "3.2.13",
+    "@daveyplate/better-auth-ui": "3.3.9",
     "@hcaptcha/react-hcaptcha": "^1.12.1",
     "@hookform/resolvers": "^5.2.2",
     "@marsidev/react-turnstile": ">=1.1.0",

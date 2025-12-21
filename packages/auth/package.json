@@ -104,7 +104,8 @@
     "release": "bun run build && bumpp --tag 'auth-v%s' && bun publish --tag latest"
   },
   "devDependencies": {
-    "msw": "2.6.8"
+    "msw": "2.6.8",
+    "next": "16.0.6"
   },
   "dependencies": {
     "@supabase/auth-js": "2.79.0",
@@ -116,7 +117,7 @@
   "peerDependencies": {
     "react": ">=18.0.0",
     "react-dom": ">=18.0.0",
-    "next": "^16.0.6"
+    "next": "16.0.6"
   },
   "peerDependenciesMeta": {
     "react": {

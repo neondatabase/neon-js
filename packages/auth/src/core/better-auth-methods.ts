@@ -52,15 +52,15 @@ type InternalAuthEvent =
   | { type: 'SIGN_IN'; data: CachedSessionData }
   | { type: 'SIGN_OUT' }
   | { type: 'TOKEN_REFRESH'; data: CachedSessionData }
-  | { type: 'USER_UPDATE'; data: CachedSessionData };
+  | { type: 'USER_UPDATE'; data?: CachedSessionData };
 
 type MethodHook = {
-  beforeRequest?: (
+  beforeFetch?: (
     input: string | URL | globalThis.Request,
     init?: RequestInit
   ) => Promise<Response> | null | Response;
   onRequest: (request: RequestContext) => void | RequestContext;
-  onSuccess: (responseData: unknown) => void;
+  onSuccess: (responseData: unknown) => void | Promise<void>;
 };
 
 export const BETTER_AUTH_ENDPOINTS = {
@@ -149,7 +149,7 @@ export const BETTER_AUTH_METHODS_HOOKS: Record<string, MethodHook> = {
     },
   },
   signIn: {
-    beforeRequest: (input, init) => {
+    beforeFetch: (input, init) => {
       const url = typeof input === 'string' ? input : input.toString();
 
       // Only intercept social sign-in when in iframe
@@ -190,12 +190,16 @@ export const BETTER_AUTH_METHODS_HOOKS: Record<string, MethodHook> = {
           session: responseData.session,
           user: responseData.user,
         };
+        BETTER_AUTH_METHODS_CACHE.setCachedSession(sessionData);
         emitAuthEvent({ type: 'USER_UPDATE', data: sessionData });
+      } else {
+        BETTER_AUTH_METHODS_CACHE.clearSessionCache();
+        emitAuthEvent({ type: 'USER_UPDATE' });
       }
     },
   },
   getSession: {
-    beforeRequest: () => {
+    beforeFetch: () => {
       const cachedData = BETTER_AUTH_METHODS_CACHE.getCachedSession();
       if (!cachedData) {
         return null;
@@ -259,7 +263,7 @@ export const BETTER_AUTH_METHODS_HOOKS: Record<string, MethodHook> = {
     },
   },
   anonymousToken: {
-    beforeRequest: () => {
+    beforeFetch: () => {
       const cachedResponse =
         BETTER_AUTH_ANONYMOUS_TOKEN_CACHE.getCachedResponse();
       if (!cachedResponse) {

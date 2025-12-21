@@ -64,14 +64,13 @@ export abstract class NeonAuthAdapterCore {
           if (method) {
             BETTER_AUTH_METHODS_HOOKS[method].onRequest(request);
           }
-
           userOnRequest?.(request);
         },
         customFetchImpl: async (url, init) => {
+          const headers = new Headers(init?.headers);
           // Skip deduplication if X-Force-Fetch header is present
-          if (init?.headers && FORCE_FETCH_HEADER in init.headers) {
-            const headers = { ...init.headers };
-            delete headers[FORCE_FETCH_HEADER];
+          if (headers.has(FORCE_FETCH_HEADER)) {
+            headers.delete(FORCE_FETCH_HEADER);
             const response = await fetch(url, { ...init, headers });
 
             // Check for HTTP errors
@@ -97,7 +96,7 @@ export abstract class NeonAuthAdapterCore {
           if (betterAuthMethod) {
             const response = await BETTER_AUTH_METHODS_HOOKS[
               betterAuthMethod
-            ].beforeRequest?.(url, init);
+            ].beforeFetch?.(url, init);
             if (response) {
               return response;
             }
