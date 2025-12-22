@@ -3,6 +3,8 @@
  * Generic utility for adding token-based authentication to requests
  */
 
+import { injectClientInfo } from '../utils/client-info.js';
+
 type Fetch = typeof fetch;
 type GetAccessToken = () => Promise<string | null>;
 
@@ -46,8 +48,8 @@ export function fetchWithToken(
       throw new AuthRequiredError();
     }
 
-    // Clone headers to avoid mutation
-    const headers = new Headers(init?.headers);
+    // Inject SDK identification, then add Authorization
+    const headers = injectClientInfo(init?.headers);
 
     // Inject Authorization header if not present (respects user overrides)
     if (!headers.has('Authorization')) {

@@ -34,7 +34,8 @@ export type BetterAuthVanillaAdapterInstance = BetterAuthVanillaAdapterImpl;
 
 /** Builder type that creates adapter instances */
 export type BetterAuthVanillaAdapterBuilder = (
-  url: string
+  url: string,
+  fetchOptions?: { headers?: Record<string, string> }
 ) => BetterAuthVanillaAdapterInstance;
 
 /**
@@ -58,6 +59,16 @@ export type BetterAuthVanillaAdapterBuilder = (
 export function BetterAuthVanillaAdapter(
   options?: BetterAuthVanillaAdapterOptions
 ): BetterAuthVanillaAdapterBuilder {
-  return (url: string) =>
-    new BetterAuthVanillaAdapterImpl({ baseURL: url, ...options });
+  return (url: string, fetchOptions?: { headers?: Record<string, string> }) =>
+    new BetterAuthVanillaAdapterImpl({
+      baseURL: url,
+      ...options,
+      fetchOptions: {
+        ...options?.fetchOptions,
+        headers: {
+          ...options?.fetchOptions?.headers,
+          ...fetchOptions?.headers,
+        },
+      },
+    });
 }

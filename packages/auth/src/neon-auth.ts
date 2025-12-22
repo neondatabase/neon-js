@@ -38,13 +38,32 @@ export type NeonAuthAdapter =
  */
 export interface NeonAuthConfig<T extends NeonAuthAdapter> {
   /** The adapter builder to use. Defaults to BetterAuthVanillaAdapter() if not specified. */
-  adapter?: (url: string) => T;
+  adapter?: (
+    url: string,
+    fetchOptions?: { headers?: Record<string, string> }
+  ) => T;
   /**
    * When true, automatically uses an anonymous token when no user session exists.
    * This enables RLS-based data access for users with the anonymous role.
    * @default false
    */
   allowAnonymous?: boolean;
+}
+
+/**
+ * Configuration for createAuthClient
+ */
+interface NeonAuthConfigInternal<
+  T extends NeonAuthAdapter,
+> extends NeonAuthConfig<T> {
+  /**
+   * Additional fetch options to pass to the auth adapter.
+   * Used by neon-js to inject SDK identification headers.
+   * @internal
+   */
+  fetchOptions?: {
+    headers?: Record<string, string>;
+  };
 }
 
 /**
@@ -120,12 +139,15 @@ export type NeonAuth<T extends NeonAuthAdapter> = {
  */
 export function createInternalNeonAuth<
   T extends NeonAuthAdapter = BetterAuthVanillaAdapterInstance,
->(url: string, config?: NeonAuthConfig<T>): NeonAuth<T> {
+>(url: string, config?: NeonAuthConfigInternal<T>): NeonAuth<T> {
   // Default to BetterAuthVanillaAdapter if no adapter specified
   const adapterBuilder = config?.adapter ?? BetterAuthVanillaAdapter();
 
-  // Call the builder with the URL to create the adapter instance
-  const adapter = adapterBuilder(url) as T;
+  // Destructure fetchOptions to ensure the type property is preserved in build output
+  const { fetchOptions } = config ?? {};
+
+  // Call the builder with the URL and optional fetchOptions (for SDK header injection)
+  const adapter = adapterBuilder(url, fetchOptions) as T;
 
   // Capture allowAnonymous at creation time
   const allowAnonymous = config?.allowAnonymous ?? false;

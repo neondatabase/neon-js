@@ -3,6 +3,12 @@ import {
   createInternalNeonAuth,
   type NeonAuthConfig,
 } from '@neondatabase/auth';
+
+// Extended type that includes fetchOptions (not exported in bundled types due to bundler tree-shaking)
+type NeonAuthConfigWithFetchOptions<T extends NeonAuthAdapter> =
+  NeonAuthConfig<T> & {
+    fetchOptions?: { headers?: Record<string, string> };
+  };
 import {
   type BetterAuthVanillaAdapterInstance,
   type SupabaseAuthAdapterInstance,
@@ -14,6 +20,10 @@ import {
   type DefaultSchemaName,
   type NeonClientConstructorOptions,
 } from './neon-client';
+import {
+  buildNeonJsClientInfo,
+  X_NEON_CLIENT_INFO_HEADER,
+} from '../utils/client-info';
 
 /**
  * Auth configuration for createClient
@@ -145,12 +155,21 @@ export function createClient<
 ): NeonClient<Database, SchemaName, TAuthAdapter> {
   const { auth: authConfig, dataApi: dataApiConfig } = config;
 
+  // Build client info once - sub-packages will see it and skip their own injection
+  const clientInfoHeader = buildNeonJsClientInfo();
+
   // Step 1: Instantiate auth adapter using createAuthClient
-  // Default to BetterAuthVanillaAdapter if no adapter specified
+  // Pass the neon-js client info header so auth requests identify as neon-js
+  // Note: fetchOptions is an internal property not exported in bundled types, hence the type assertion
   const auth = createInternalNeonAuth(authConfig.url, {
     adapter: authConfig.adapter,
     allowAnonymous: authConfig.allowAnonymous ?? false,
-  });
+    fetchOptions: {
+      headers: {
+        [X_NEON_CLIENT_INFO_HEADER]: clientInfoHeader,
+      },
+    },
+  } as NeonAuthConfigWithFetchOptions<TAuthAdapter>);
 
   // Step 2: Create lazy token accessor - called on every request
   // Returns null if no session (will throw AuthRequiredError in fetchWithToken)
@@ -165,6 +184,7 @@ export function createClient<
   );
 
   // Step 4: Create client with auth integrated
+  // Pass the neon-js client info header so data API requests identify as neon-js
   const client = new NeonClient<Database, SchemaName, TAuthAdapter>({
     dataApiUrl: dataApiConfig.url,
     authClient: auth,
@@ -173,6 +193,10 @@ export function createClient<
       global: {
         ...dataApiConfig.options?.global,
         fetch: authFetch,
+        headers: {
+          ...dataApiConfig.options?.global?.headers,
+          [X_NEON_CLIENT_INFO_HEADER]: clientInfoHeader,
+        },
       },
     },
   });
