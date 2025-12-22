@@ -54,7 +54,9 @@
     "lint": "eslint .",
     "clean": "rm -rf node_modules dist"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "@neondatabase/internal": "workspace:*"
+  },
   "dependencies": {
     "@supabase/postgrest-js": "2.79.0"
   }

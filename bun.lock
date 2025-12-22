@@ -24,6 +24,7 @@
       "version": "0.1.0-beta.19",
       "dependencies": {
         "@neondatabase/auth-ui": "workspace:*",
+        "@neondatabase/internal": "workspace:*",
         "@supabase/auth-js": "2.79.0",
         "better-auth": "1.4.6",
         "jose": "6.1.2",
@@ -98,6 +99,10 @@
         "react-dom": ">=18.0.0",
       },
     },
+    "packages/internal": {
+      "name": "@neondatabase/internal",
+      "version": "0.0.1",
+    },
     "packages/neon-js": {
       "name": "@neondatabase/neon-js",
       "version": "0.1.0-beta.19",
@@ -119,6 +124,7 @@
       "name": "@neondatabase/postgrest-js",
       "version": "0.1.0-alpha.1",
       "dependencies": {
+        "@neondatabase/internal": "workspace:*",
         "@supabase/postgrest-js": "2.79.0",
       },
     },
@@ -371,6 +377,8 @@
     "@neondatabase/auth": ["@neondatabase/auth@workspace:packages/auth"],
 
     "@neondatabase/auth-ui": ["@neondatabase/auth-ui@workspace:packages/auth-ui"],
+
+    "@neondatabase/internal": ["@neondatabase/internal@workspace:packages/internal"],
 
     "@neondatabase/neon-js": ["@neondatabase/neon-js@workspace:packages/neon-js"],
 

@@ -158,9 +158,7 @@ export function createClient<
   // Build client info once - sub-packages will see it and skip their own injection
   const clientInfoHeader = buildNeonJsClientInfo();
 
-  // Step 1: Instantiate auth adapter using createAuthClient
-  // Pass the neon-js client info header so auth requests identify as neon-js
-  // Note: fetchOptions is an internal property not exported in bundled types, hence the type assertion
+  // Step 1: Instantiate auth adapter
   const auth = createInternalNeonAuth(authConfig.url, {
     adapter: authConfig.adapter,
     allowAnonymous: authConfig.allowAnonymous ?? false,
@@ -184,7 +182,6 @@ export function createClient<
   );
 
   // Step 4: Create client with auth integrated
-  // Pass the neon-js client info header so data API requests identify as neon-js
   const client = new NeonClient<Database, SchemaName, TAuthAdapter>({
     dataApiUrl: dataApiConfig.url,
     authClient: auth,

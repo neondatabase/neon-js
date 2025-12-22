@@ -26,7 +26,8 @@ export default defineConfig(
       'unicorn/prevent-abbreviations': 'off', // Allow SDK abbreviations
       'unicorn/string-content': 'off',
       'unicorn/consistent-function-scoping': 'off', // Allow inline arrow functions in class methods,
-      'unicorn/explicit-length-check': 'off', // Allow explicit length checks
+      'unicorn/explicit-length-check': 'off', // Allow explicit length checks,
+      'unicorn/no-typeof-undefined': 'off', // Allow typeof undefined checks
 
       // TypeScript rules
       '@typescript-eslint/no-explicit-any': 'off',

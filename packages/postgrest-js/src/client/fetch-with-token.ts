@@ -48,7 +48,6 @@ export function fetchWithToken(
       throw new AuthRequiredError();
     }
 
-    // Inject SDK identification, then add Authorization
     const headers = injectClientInfo(init?.headers);
 
     // Inject Authorization header if not present (respects user overrides)

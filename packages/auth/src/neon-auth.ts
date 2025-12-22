@@ -142,11 +142,7 @@ export function createInternalNeonAuth<
 >(url: string, config?: NeonAuthConfigInternal<T>): NeonAuth<T> {
   // Default to BetterAuthVanillaAdapter if no adapter specified
   const adapterBuilder = config?.adapter ?? BetterAuthVanillaAdapter();
-
-  // Destructure fetchOptions to ensure the type property is preserved in build output
   const { fetchOptions } = config ?? {};
-
-  // Call the builder with the URL and optional fetchOptions (for SDK header injection)
   const adapter = adapterBuilder(url, fetchOptions) as T;
 
   // Capture allowAnonymous at creation time

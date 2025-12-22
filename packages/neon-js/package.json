@@ -118,8 +118,8 @@
     "msw": "2.6.8"
   },
   "dependencies": {
-    "@neondatabase/postgrest-js": "workspace:*",
     "@neondatabase/auth": "workspace:*",
+    "@neondatabase/postgrest-js": "workspace:*",
     "@supabase/postgres-meta": "0.93.1",
     "meow": "14.0.0",
     "zod": "4.1.12"

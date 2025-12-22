@@ -68,7 +68,6 @@ export abstract class NeonAuthAdapterCore {
           userOnRequest?.(request);
         },
         customFetchImpl: async (url, init) => {
-          // Inject SDK identification header
           const headers = injectClientInfo(init?.headers);
           // Skip deduplication if X-Force-Fetch header is present
           if (headers.has(FORCE_FETCH_HEADER)) {
