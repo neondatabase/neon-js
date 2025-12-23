@@ -13,21 +13,12 @@ import {
 import path from 'node:path';
 
 /**
- * Transform workspace:* dependencies to caret versions for publishing.
- * Also removes private internal packages (they get bundled, not published as dependencies).
- * Security: Validates resolved paths stay within packages directory.
- *
- * @param pkg - The package.json object to transform
- * @param packagesDir - The packages directory boundary for security validation
- * @returns The transformed package.json object
+ * Process a single dependency object, transforming workspace deps and removing private packages.
  */
-export function transformWorkspaceDeps(
-  pkg: Record<string, unknown>,
+function processDepObject(
+  deps: Record<string, string>,
   packagesDir: string
-): Record<string, unknown> {
-  const deps = pkg.dependencies as Record<string, string> | undefined;
-  if (!deps) return pkg;
-
+): void {
   const depsToRemove: string[] = [];
 
   for (const [name, version] of Object.entries(deps)) {
@@ -69,6 +60,31 @@ export function transformWorkspaceDeps(
 
   for (const dep of depsToRemove) {
     delete deps[dep];
+  }
+}
+
+/**
+ * Transform workspace:* dependencies to caret versions for publishing.
+ * Also removes private internal packages (they get bundled, not published as dependencies).
+ * Processes both dependencies and devDependencies.
+ * Security: Validates resolved paths stay within packages directory.
+ *
+ * @param pkg - The package.json object to transform
+ * @param packagesDir - The packages directory boundary for security validation
+ * @returns The transformed package.json object
+ */
+export function transformWorkspaceDeps(
+  pkg: Record<string, unknown>,
+  packagesDir: string
+): Record<string, unknown> {
+  const deps = pkg.dependencies as Record<string, string> | undefined;
+  const devDeps = pkg.devDependencies as Record<string, string> | undefined;
+
+  if (deps) {
+    processDepObject(deps, packagesDir);
+  }
+  if (devDeps) {
+    processDepObject(devDeps, packagesDir);
   }
 
   return pkg;

@@ -16,7 +16,7 @@ export type ReactBetterAuthClient = ReturnType<
   }>
 >;
 
-/**`
+/**
  * Type representing the Better Auth Vanilla client
  */
 export type VanillaBetterAuthClient = ReturnType<
@@ -51,11 +51,12 @@ export interface NeonAuthConfig<T extends NeonAuthAdapter> {
 }
 
 /**
- * Configuration for createAuthClient
+ * Extended configuration for createInternalNeonAuth.
+ * Includes fetchOptions for SDK identification headers.
+ * @internal - Used by neon-js for header injection
  */
-interface NeonAuthConfigInternal<
-  T extends NeonAuthAdapter,
-> extends NeonAuthConfig<T> {
+interface NeonAuthConfigInternal<T extends NeonAuthAdapter>
+  extends NeonAuthConfig<T> {
   /**
    * Additional fetch options to pass to the auth adapter.
    * Used by neon-js to inject SDK identification headers.

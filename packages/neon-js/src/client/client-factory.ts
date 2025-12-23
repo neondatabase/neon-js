@@ -4,11 +4,12 @@ import {
   type NeonAuthConfig,
 } from '@neondatabase/auth';
 
-// Extended type that includes fetchOptions (not exported in bundled types due to bundler tree-shaking)
+// Extended type that includes fetchOptions (used by createInternalNeonAuth internally)
 type NeonAuthConfigWithFetchOptions<T extends NeonAuthAdapter> =
   NeonAuthConfig<T> & {
     fetchOptions?: { headers?: Record<string, string> };
   };
+
 import {
   type BetterAuthVanillaAdapterInstance,
   type SupabaseAuthAdapterInstance,

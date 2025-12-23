@@ -1,3 +1,20 @@
+declare global {
+  const Deno:
+    | {
+        version?: { deno?: string };
+        build?: { os?: string; arch?: string };
+      }
+    | undefined;
+
+  const Bun:
+    | {
+        version?: string;
+      }
+    | undefined;
+
+  const EdgeRuntime: string | undefined;
+}
+
 export interface ClientInfo {
   sdk: string;
   version: string;
@@ -8,24 +25,18 @@ export interface ClientInfo {
   framework?: string;
 }
 
-declare const Deno: {
-  version?: { deno?: string };
-  build?: { os?: string; arch?: string };
-};
-
-declare const Bun: {
-  version?: string;
-};
-
-declare const EdgeRuntime: string | undefined;
+/**
+ * Type guard for checking if a property exists on globalThis
+ */
+function hasGlobalProperty(key: string): boolean {
+  return key in globalThis;
+}
 
 /**
  * Detects the JavaScript framework being used at runtime.
  * Detection order matters to avoid false positives (e.g., Next.js includes React).
  */
 function detectFramework(): string | undefined {
-  const g = globalThis as unknown as Record<string, unknown>;
-
   // Server-side detections (Node.js) - check first since server-side is more reliable
   // Next.js server
   if (
@@ -37,21 +48,21 @@ function detectFramework(): string | undefined {
   }
 
   // Browser-only detections
-  if (g.window !== undefined) {
+  if (typeof globalThis.window !== 'undefined') {
     // Next.js (client-side) - check before React since Next.js includes React
-    if (g.__NEXT_DATA__) return 'next';
+    if (hasGlobalProperty('__NEXT_DATA__')) return 'next';
 
     // Remix - check before React since Remix includes React
-    if (g.__remixContext) return 'remix';
+    if (hasGlobalProperty('__remixContext')) return 'remix';
 
     // React (generic React apps)
-    if (g.__REACT_DEVTOOLS_GLOBAL_HOOK__) return 'react';
+    if (hasGlobalProperty('__REACT_DEVTOOLS_GLOBAL_HOOK__')) return 'react';
 
     // Vue
-    if (g.__VUE__) return 'vue';
+    if (hasGlobalProperty('__VUE__')) return 'vue';
 
     // Angular (zone.js is always bundled with Angular)
-    if (g.Zone !== undefined) return 'angular';
+    if (hasGlobalProperty('Zone')) return 'angular';
   }
 
   return undefined;
@@ -143,6 +154,11 @@ export function createClientInfoInjector(
   defaultSdkName: string,
   defaultSdkVersion: string
 ) {
+  // Cache client info at factory creation time (module init)
+  const cachedClientInfo = JSON.stringify(
+    getClientInfo(defaultSdkName, defaultSdkVersion)
+  );
+
   return function injectClientInfo(
     headers: HeadersInit | undefined,
     sdkOverride?: { name: string; version: string }
@@ -153,11 +169,12 @@ export function createClientInfoInjector(
       return result;
     }
 
-    const sdkName = sdkOverride?.name ?? defaultSdkName;
-    const sdkVersion = sdkOverride?.version ?? defaultSdkVersion;
-    const clientInfo = getClientInfo(sdkName, sdkVersion);
+    // Only recompute if SDK override is provided (rare case)
+    const clientInfoString = sdkOverride
+      ? JSON.stringify(getClientInfo(sdkOverride.name, sdkOverride.version))
+      : cachedClientInfo;
 
-    result.set(X_NEON_CLIENT_INFO_HEADER, JSON.stringify(clientInfo));
+    result.set(X_NEON_CLIENT_INFO_HEADER, clientInfoString);
 
     return result;
   };
