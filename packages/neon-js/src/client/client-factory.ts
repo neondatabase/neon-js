@@ -3,13 +3,6 @@ import {
   createInternalNeonAuth,
   type NeonAuthConfig,
 } from '@neondatabase/auth';
-
-// Extended type that includes fetchOptions (used by createInternalNeonAuth internally)
-type NeonAuthConfigWithFetchOptions<T extends NeonAuthAdapter> =
-  NeonAuthConfig<T> & {
-    fetchOptions?: { headers?: Record<string, string> };
-  };
-
 import {
   type BetterAuthVanillaAdapterInstance,
   type SupabaseAuthAdapterInstance,
@@ -160,7 +153,7 @@ export function createClient<
   const clientInfoHeader = buildNeonJsClientInfo();
 
   // Step 1: Instantiate auth adapter
-  const auth = createInternalNeonAuth(authConfig.url, {
+  const auth = createInternalNeonAuth<TAuthAdapter>(authConfig.url, {
     adapter: authConfig.adapter,
     allowAnonymous: authConfig.allowAnonymous ?? false,
     fetchOptions: {
@@ -168,7 +161,7 @@ export function createClient<
         [X_NEON_CLIENT_INFO_HEADER]: clientInfoHeader,
       },
     },
-  } as NeonAuthConfigWithFetchOptions<TAuthAdapter>);
+  });
 
   // Step 2: Create lazy token accessor - called on every request
   // Returns null if no session (will throw AuthRequiredError in fetchWithToken)

@@ -15,6 +15,8 @@ declare global {
   const EdgeRuntime: string | undefined;
 }
 
+export const X_NEON_CLIENT_INFO_HEADER = 'X-Neon-Client-Info';
+
 export interface ClientInfo {
   sdk: string;
   version: string;
@@ -147,8 +149,6 @@ export function getClientInfo(sdkName: string, sdkVersion: string): ClientInfo {
 
   return result;
 }
-
-export const X_NEON_CLIENT_INFO_HEADER = 'X-Neon-Client-Info';
 
 export function createClientInfoInjector(
   defaultSdkName: string,
