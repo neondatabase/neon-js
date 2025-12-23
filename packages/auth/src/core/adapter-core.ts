@@ -13,6 +13,7 @@ import {
   initBroadcastChannel,
 } from './better-auth-methods';
 import { anonymousTokenClient } from '../plugins/anonymous-token';
+import { injectClientInfo } from '../utils/client-info';
 import type { BetterAuthInstance } from '../types';
 
 export interface NeonAuthAdapterCoreAuthOptions extends Omit<
@@ -67,7 +68,7 @@ export abstract class NeonAuthAdapterCore {
           userOnRequest?.(request);
         },
         customFetchImpl: async (url, init) => {
-          const headers = new Headers(init?.headers);
+          const headers = injectClientInfo(init?.headers);
           // Skip deduplication if X-Force-Fetch header is present
           if (headers.has(FORCE_FETCH_HEADER)) {
             headers.delete(FORCE_FETCH_HEADER);
@@ -109,7 +110,7 @@ export abstract class NeonAuthAdapterCore {
 
           const response =
             await BETTER_AUTH_METHODS_IN_FLIGHT_REQUESTS.deduplicate(key, () =>
-              fetch(url, init)
+              fetch(url, { ...init, headers })
             );
 
           // Check for HTTP errors before returning

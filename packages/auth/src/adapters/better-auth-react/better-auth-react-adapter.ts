@@ -32,8 +32,9 @@ class BetterAuthReactAdapterImpl extends NeonAuthAdapterCore {
 export type BetterAuthReactAdapterInstance = BetterAuthReactAdapterImpl;
 
 /** Builder type that creates adapter instances */
-export type BetterAuthReactAdapterBuilder = (
-  url: string
+type BetterAuthReactAdapterBuilder = (
+  url: string,
+  fetchOptions?: { headers?: Record<string, string> }
 ) => BetterAuthReactAdapterInstance;
 
 /**
@@ -57,6 +58,16 @@ export type BetterAuthReactAdapterBuilder = (
 export function BetterAuthReactAdapter(
   options?: BetterAuthReactAdapterOptions
 ): BetterAuthReactAdapterBuilder {
-  return (url: string) =>
-    new BetterAuthReactAdapterImpl({ baseURL: url, ...options });
+  return (url: string, fetchOptions?: { headers?: Record<string, string> }) =>
+    new BetterAuthReactAdapterImpl({
+      baseURL: url,
+      ...options,
+      fetchOptions: {
+        ...options?.fetchOptions,
+        headers: {
+          ...options?.fetchOptions?.headers,
+          ...fetchOptions?.headers,
+        },
+      },
+    });
 }

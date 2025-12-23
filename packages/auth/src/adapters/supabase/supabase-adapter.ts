@@ -1451,7 +1451,8 @@ export type SupabaseAuthAdapterInstance = SupabaseAuthAdapterImpl;
 
 /** Builder type that creates adapter instances */
 export type SupabaseAuthAdapterBuilder = (
-  url: string
+  url: string,
+  fetchOptions?: { headers?: Record<string, string> }
 ) => SupabaseAuthAdapterInstance;
 
 /**
@@ -1475,6 +1476,16 @@ export type SupabaseAuthAdapterBuilder = (
 export function SupabaseAuthAdapter(
   options?: SupabaseAuthAdapterOptions
 ): SupabaseAuthAdapterBuilder {
-  return (url: string) =>
-    new SupabaseAuthAdapterImpl({ baseURL: url, ...options });
+  return (url: string, fetchOptions?: { headers?: Record<string, string> }) =>
+    new SupabaseAuthAdapterImpl({
+      baseURL: url,
+      ...options,
+      fetchOptions: {
+        ...options?.fetchOptions,
+        headers: {
+          ...options?.fetchOptions?.headers,
+          ...fetchOptions?.headers,
+        },
+      },
+    });
 }

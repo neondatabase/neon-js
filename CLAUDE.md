@@ -8,7 +8,13 @@ A unified TypeScript SDK monorepo for Neon services, providing seamless integrat
 
 ## Monorepo Structure
 
-This is a Bun workspaces monorepo with four published packages:
+This is a Bun workspaces monorepo with four published packages and one private internal package:
+
+### `@neondatabase/internal` (packages/internal/) - PRIVATE
+Internal utilities shared across packages (not published to npm):
+- **Client Info Detection**: Runtime environment (Node.js, Deno, Bun, Edge, Browser) and framework detection (Next.js, Remix, React, Vue, Angular)
+- **Header Injection**: `X-Neon-Client-Info` header injection for telemetry
+- Bundled into consuming packages at build time (not a runtime dependency)
 
 ### `@neondatabase/postgrest-js` (packages/postgrest-js/)
 Generic PostgreSQL client for Neon Data API without authentication:

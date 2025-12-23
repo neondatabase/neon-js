@@ -14,6 +14,10 @@ import {
   type DefaultSchemaName,
   type NeonClientConstructorOptions,
 } from './neon-client';
+import {
+  buildNeonJsClientInfo,
+  X_NEON_CLIENT_INFO_HEADER,
+} from '../utils/client-info';
 
 /**
  * Auth configuration for createClient
@@ -145,11 +149,18 @@ export function createClient<
 ): NeonClient<Database, SchemaName, TAuthAdapter> {
   const { auth: authConfig, dataApi: dataApiConfig } = config;
 
-  // Step 1: Instantiate auth adapter using createAuthClient
-  // Default to BetterAuthVanillaAdapter if no adapter specified
-  const auth = createInternalNeonAuth(authConfig.url, {
+  // Build client info once - sub-packages will see it and skip their own injection
+  const clientInfoHeader = buildNeonJsClientInfo();
+
+  // Step 1: Instantiate auth adapter
+  const auth = createInternalNeonAuth<TAuthAdapter>(authConfig.url, {
     adapter: authConfig.adapter,
     allowAnonymous: authConfig.allowAnonymous ?? false,
+    fetchOptions: {
+      headers: {
+        [X_NEON_CLIENT_INFO_HEADER]: clientInfoHeader,
+      },
+    },
   });
 
   // Step 2: Create lazy token accessor - called on every request
@@ -173,6 +184,10 @@ export function createClient<
       global: {
         ...dataApiConfig.options?.global,
         fetch: authFetch,
+        headers: {
+          ...dataApiConfig.options?.global?.headers,
+          [X_NEON_CLIENT_INFO_HEADER]: clientInfoHeader,
+        },
       },
     },
   });
