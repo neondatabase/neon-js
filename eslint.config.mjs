@@ -11,6 +11,14 @@ export default defineConfig(
   unicorn.configs.recommended, // Use Unicorn's recommended preset
   globalIgnores(['**/dist/**']),
   {
+    // Set tsconfigRootDir to resolve multiple tsconfig issue
+    languageOptions: {
+      parserOptions: {
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  },
+  {
     rules: {
       // Unicorn customizations (override recommended preset)
       'unicorn/filename-case': [

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useContext, useState, useEffect, useCallback } from 'react';
 import { AuthUIContext } from '@neondatabase/neon-js/auth/react';
 import { neonClient } from '../client';
-import type { Tables } from '../../database.types';
+import type { Tables } from '../database.types';
 
 type Todo = Tables<'todos'>;
 type FilterType = 'all' | 'active' | 'completed';

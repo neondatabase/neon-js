@@ -37,8 +37,22 @@ jobs:
       - name: Build packages
         run: bun run build
 
+      # Create an isolated Neon branch for this PR/run
+      - name: Create Neon branch
+        id: create-branch
+        uses: neondatabase/create-branch-action@v5
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: test-${{ github.run_id }}-${{ github.run_attempt }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          get_auth_url: true
+          get_data_api_url: true
+
       - name: Build example app
         run: cd examples/react-app && bun run build
+        env:
+          VITE_NEON_AUTH_URL: ${{ steps.create-branch.outputs.auth_url }}
+          VITE_NEON_DATA_API_URL: ${{ steps.create-branch.outputs.data_api_url }}
 
       # Get Playwright version for cache key
       - name: Get Playwright version
@@ -66,12 +80,18 @@ jobs:
         run: cd e2e && bunx playwright install-deps chromium
 
       - name: Run E2E tests
-        run: bun run test:e2e:ci
+        run: bun run --filter e2e test:ci
         env:
           CI: true
-          # Use GitHub secrets for test environment
-          VITE_NEON_AUTH_URL: ${{ secrets.NEON_AUTH_URL_TEST }}
-          VITE_NEON_DATA_API_URL: ${{ secrets.NEON_DATA_API_URL_TEST }}
+
+      # Clean up: Delete Neon branch (runs even if tests fail)
+      - name: Delete Neon branch
+        if: always()
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ secrets.NEON_PROJECT_ID }}
+          branch: test-${{ github.run_id }}-${{ github.run_attempt }}
+          api_key: ${{ secrets.NEON_API_KEY }}
 
       # Upload HTML report (always, for debugging)
       - name: Upload test report
