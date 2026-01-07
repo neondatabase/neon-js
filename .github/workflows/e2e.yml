@@ -40,14 +40,14 @@ jobs:
       # Create an isolated Neon branch for this PR/run
       - name: Create Neon branch
         id: create-branch
-        uses: neondatabase/create-branch-action@v5
+        uses: neondatabase/create-branch-action@v6
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_name: test-${{ github.run_id }}-${{ github.run_attempt }}
           api_key: ${{ secrets.NEON_API_KEY }}
-          role: neondb_owner
           get_auth_url: true
           get_data_api_url: true
+          expires_at: "2h"
 
       - name: Build example app
         run: cd examples/react-app && bun run build
