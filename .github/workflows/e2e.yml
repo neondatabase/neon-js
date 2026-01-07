@@ -38,6 +38,9 @@ jobs:
         run: bun run build
 
       # Create an isolated Neon branch for this PR/run
+      - name: Get branch expiration date (2 hours from now)
+        run: echo "EXPIRES_AT=$(date -u --date '+2 hours' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
+
       - name: Create Neon branch
         id: create-branch
         uses: neondatabase/create-branch-action@v6
@@ -47,7 +50,7 @@ jobs:
           api_key: ${{ secrets.NEON_API_KEY }}
           get_auth_url: true
           get_data_api_url: true
-          expires_at: "2h"
+          expires_at: ${{ env.EXPIRES_AT }}
 
       - name: Build example app
         run: cd examples/react-app && bun run build
