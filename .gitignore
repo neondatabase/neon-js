@@ -14,3 +14,12 @@ tsconfig.tsbuildinfo
 # Claude/Cursor plans and todos
 plans/
 todos/
+
+# E2E testing
+e2e/test-results/
+e2e/playwright-report/
+e2e/.playwright/
+e2e/blob-report/
+
+# Auth state (may contain tokens)
+playwright/.auth/

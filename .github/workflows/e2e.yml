@@ -1,0 +1,92 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# SECURITY: Limit permissions to minimum required
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    timeout-minutes: 15
+    runs-on:
+      group: neondatabase-protected-runner-group
+      labels: linux-ubuntu-latest
+
+    # Limit concurrent runs to save resources
+    concurrency:
+      group: e2e-${{ github.head_ref || github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false # Security: don't persist git creds
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build packages
+        run: bun run build
+
+      - name: Build example app
+        run: cd examples/react-app && bun run build
+
+      # Get Playwright version for cache key
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "version=$(cd e2e && bunx playwright --version | awk '{print $2}')" >> $GITHUB_OUTPUT
+
+      # Cache browser binaries with restore-keys fallback
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+          restore-keys: |
+            playwright-chromium-${{ runner.os }}-
+
+      # Install browsers only on cache miss
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: cd e2e && bunx playwright install --with-deps chromium
+
+      # Install system deps if browsers were cached (they may need system libs)
+      - name: Install system dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: cd e2e && bunx playwright install-deps chromium
+
+      - name: Run E2E tests
+        run: bun run test:e2e:ci
+        env:
+          CI: true
+          # Use GitHub secrets for test environment
+          VITE_NEON_AUTH_URL: ${{ secrets.NEON_AUTH_URL_TEST }}
+          VITE_NEON_DATA_API_URL: ${{ secrets.NEON_DATA_API_URL_TEST }}
+
+      # Upload HTML report (always, for debugging)
+      - name: Upload test report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report/
+          retention-days: 7
+
+      # Upload screenshots/traces only on failure
+      - name: Upload test artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifacts
+          path: e2e/test-results/
+          retention-days: 3
