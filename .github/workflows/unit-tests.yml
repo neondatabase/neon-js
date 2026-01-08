@@ -1,0 +1,59 @@
+name: Unit Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    timeout-minutes: 15
+    runs-on:
+      group: neondatabase-protected-runner-group
+      labels: linux-ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Restore build cache
+        id: build-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            packages/internal/dist
+            packages/postgrest-js/dist
+            packages/auth-ui/dist
+            packages/auth/dist
+            packages/neon-js/dist
+          key: build-${{ runner.os }}-${{ hashFiles('packages/*/src/**', 'packages/*/tsdown.config.ts', 'build/**', 'tsconfig.json') }}
+          restore-keys: |
+            build-${{ runner.os }}-
+
+      - name: Build packages
+        if: steps.build-cache.outputs.cache-hit != 'true'
+        run: bun run build
+
+      # Run unit tests using vitest
+      # Note: Uses `bun test:ci` which runs `vitest run` for each package
+      # The CSS build tests in auth-ui require the build to complete first
+      - name: Run unit tests
+        run: bun run test:ci
