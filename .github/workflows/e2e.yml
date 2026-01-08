@@ -6,6 +6,19 @@ on:
   pull_request:
     branches: [main]
 
+  # Cross-repo trigger: Allow external repos to run E2E tests
+  # Used by Neon Auth service to validate changes don't break the SDK
+  repository_dispatch:
+    types: [run-e2e]
+
+  # Manual trigger with optional ref override
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Git ref to test (branch, tag, or SHA)'
+        required: false
+        default: 'main'
+
 # SECURITY: Limit permissions to minimum required
 permissions:
   contents: read
@@ -17,15 +30,17 @@ jobs:
       group: neondatabase-protected-runner-group
       labels: linux-ubuntu-latest
 
-    # Limit concurrent runs to save resources
+    # Concurrency: prevent duplicate runs, but don't cancel external triggers
     concurrency:
-      group: e2e-${{ github.head_ref || github.ref }}
-      cancel-in-progress: true
+      group: e2e-${{ github.event_name == 'repository_dispatch' && github.run_id || github.head_ref || github.ref }}
+      cancel-in-progress: ${{ github.event_name != 'repository_dispatch' }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          # Use ref from dispatch events, otherwise default behavior
+          ref: ${{ github.event.client_payload.ref || inputs.ref || '' }}
           persist-credentials: false # Security: don't persist git creds
 
       - name: Setup Bun
