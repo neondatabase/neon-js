@@ -41,7 +41,11 @@ jobs:
         with:
           # Use ref from dispatch events, otherwise default behavior
           ref: ${{ github.event.client_payload.ref || inputs.ref || '' }}
-          persist-credentials: false # Security: don't persist git creds
+          # Security: don't persist git creds for normal triggers.
+          # For repository_dispatch (cross-repo), we must persist credentials because
+          # the cleanup phase fails with the cross-repo token context.
+          # This is safe: no subsequent step uses git, and the runner is ephemeral.
+          persist-credentials: ${{ github.event_name == 'repository_dispatch' }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
