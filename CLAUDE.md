@@ -672,10 +672,25 @@ GitHub Actions workflows in `.github/workflows/`:
 - Caches Bun dependencies and build artifacts
 
 ### `e2e.yml` - E2E Tests
-- Runs on: Push to main, PRs to main
-- Steps: Build packages → Create Neon branch → Build example app → Run Playwright → Cleanup
+- Runs on: Push to main, PRs to main, `repository_dispatch` (cross-repo), `workflow_dispatch` (manual)
+- **Multi-environment support:** Can test against `production`, `staging`, or `preview` environments
+- Uses GitHub Environments for environment-specific secrets (`NEON_API_KEY`) and variables (`NEON_PROJECT_ID`, `NEON_API_HOST`)
+- Steps: Validate inputs (dispatch only) → Build packages → Create Neon branch → Build example app → Run Playwright → Cleanup
 - Creates ephemeral Neon database branch with 2-hour expiration
 - Uploads test reports and artifacts on failure
+
+**Cross-repo triggering:**
+External repositories (e.g., Neon Auth service) can trigger E2E tests via `repository_dispatch`:
+```bash
+curl -X POST \
+  -H "Authorization: token $GITHUB_TOKEN" \
+  -H "Accept: application/vnd.github.v3+json" \
+  https://api.github.com/repos/neondatabase/neon-js/dispatches \
+  -d '{"event_type":"run-e2e","client_payload":{"environment":"staging"}}'
+```
+
+**Manual triggering:**
+Use the GitHub Actions UI with optional `ref` and `environment` inputs.
 
 **Build Caching:**
 All CI workflows share the same cache key pattern for build artifacts:
