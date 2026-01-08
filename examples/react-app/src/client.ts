@@ -16,3 +16,14 @@ export const neonClient = createClient<Database>({
     url: import.meta.env.VITE_NEON_DATA_API_URL || DEFAULT_DATA_API_URL,
   },
 });
+
+// // local test
+// export const neonClient = createClient({
+//   auth: {
+//     url: 'https://ep-floral-snow-52713923.neonauth.localtest.me:30443/neondb/auth',
+//     allowAnonymous: true,
+//   },
+//   dataApi: {
+//     url: 'https://ep-floral-snow-52713923.apirest.localtest.me:9443/neondb/rest/v1',
+//   },
+// });
