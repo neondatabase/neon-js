@@ -9,6 +9,7 @@ permissions:
 
 jobs:
   ci:
+    timeout-minutes: 15
     runs-on:
       group: neondatabase-protected-runner-group
       labels: linux-ubuntu-latest
