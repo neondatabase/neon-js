@@ -40,7 +40,7 @@ This is a Bun workspaces monorepo. See [CLAUDE.md](./CLAUDE.md) for detailed dev
 ```bash
 bun install          # Install dependencies
 bun dev              # Watch mode for all packages
-bun build            # Build all packages
+bun run build        # Build all packages
 bun test             # Run tests
 bun typecheck        # Type check all packages
 ```

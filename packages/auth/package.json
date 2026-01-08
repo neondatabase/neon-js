@@ -96,7 +96,7 @@
     "dev": "tsdown --watch",
     "test": "vitest",
     "test:node": "node --run test",
-    "test:ci": "vitest run",
+    "test:ci": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit",
     "test:types": "tsc --noEmit",
     "lint": "eslint .",

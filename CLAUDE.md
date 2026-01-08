@@ -96,6 +96,24 @@ UI components for Neon Auth built on top of [better-auth-ui](https://better-auth
 - `react`, `react-dom` (peer dependencies)
 - `@daveyplate/better-auth-ui` (component library)
 
+### Examples (`examples/`)
+
+Example applications demonstrating SDK usage:
+
+**`examples/react-app/`** - React + Vite example app
+- Full-featured demo with auth flows, database queries, and UI components
+- Used as the target for E2E tests
+- Includes committed database types (`src/database.types.ts`)
+- Configured for Vercel deployment
+
+**Build and run:**
+```bash
+cd examples/react-app
+bun install
+bun run dev   # Development server
+bun run build # Production build
+```
+
 ## Development Commands
 
 Run from repository root:
@@ -600,16 +618,69 @@ Works in both browser and Node.js:
 
 ## Testing
 
-Tests use real SDKs with MSW for network mocking:
-- Verifies API compatibility and interface contracts
-- Catches breaking changes in Better Auth SDK versions
-- Located in `packages/auth/src/__tests__/`
+### Unit Tests
 
-**Run tests:**
+Unit tests use Vitest with MSW for network mocking:
+- Located in `packages/auth/src/__tests__/` and `packages/neon-js/src/__tests__/`
+- Uses real Better Auth SDK with mocked network responses
+- Verifies API compatibility and interface contracts
+- Type tests in `packages/neon-js/src/__tests__/type-tests.test-d.ts`
+
+**Run unit tests:**
 ```bash
-bun test:node    # Recommended (reliable MSW)
-npx vitest       # Alternative
-bun test         # May have MSW issues with Bun's fetch
+bun test              # Run all tests (watch mode)
+bun test:node         # Node.js runtime (recommended for MSW)
+bun test:ci           # CI mode (no watch, all packages)
+```
+
+### E2E Tests
+
+End-to-end tests use Playwright with a real Neon backend:
+- Located in `e2e/tests/`
+- Tests against `examples/react-app/` with live auth flows
+- Creates ephemeral Neon branches per test run (auto-deleted after 2 hours)
+
+**Test files:**
+- `auth-flow.spec.ts` - Authentication flow tests (sign up, sign in, OAuth)
+- `neon-js.spec.ts` - SDK integration tests (database queries, auth state)
+- `helpers.ts` - Shared test utilities
+
+**Run E2E tests locally:**
+```bash
+# Build packages and example app first
+bun run build
+cd examples/react-app && bun run build
+
+# Run E2E tests
+bun run --filter e2e test:ci
+```
+
+**Note:** E2E tests require Neon Auth/Data API credentials configured in environment variables.
+
+## CI/CD Workflows
+
+GitHub Actions workflows in `.github/workflows/`:
+
+### `ci.yml` - Build & Lint & Typecheck
+- Runs on: Pull requests to main
+- Steps: Install deps → Lint → Build (cached) → Typecheck
+- Uses build caching for faster subsequent runs
+
+### `unit-tests.yml` - Unit Tests
+- Runs on: Push to main, PRs to main
+- Steps: Install deps → Build (cached) → Run vitest
+- Caches Bun dependencies and build artifacts
+
+### `e2e.yml` - E2E Tests
+- Runs on: Push to main, PRs to main
+- Steps: Build packages → Create Neon branch → Build example app → Run Playwright → Cleanup
+- Creates ephemeral Neon database branch with 2-hour expiration
+- Uploads test reports and artifacts on failure
+
+**Build Caching:**
+All CI workflows share the same cache key pattern for build artifacts:
+```
+build-${{ runner.os }}-${{ hashFiles('packages/*/src/**', 'packages/*/tsdown.config.ts', 'build/**', 'tsconfig.json') }}
 ```
 
 ## Code Style
@@ -650,6 +721,8 @@ Following the [Better Auth Supabase Migration Guide](https://www.better-auth.com
 
 - `packages/auth/NEXT-JS.md` - Next.js integration guide
 - `packages/auth-ui/README.md` - UI components documentation
+- `e2e/` - E2E test infrastructure (Playwright)
+- `examples/react-app/` - Reference implementation
 
 ## References
 

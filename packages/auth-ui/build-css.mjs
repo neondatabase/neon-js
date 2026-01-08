@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable no-undef */
 import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 // eslint-disable-next-line unicorn/import-style
@@ -33,9 +34,7 @@ function extractClassesFromCSS(cssPath) {
     // - Escaped chars: \X where X is any non-whitespace character
     // The regex stops at unescaped combinator/pseudo chars like >, ), space, etc.
     for (const selector of rule.selectors) {
-      const classMatches = selector.matchAll(
-        /\.((?:[a-zA-Z0-9_-]|\\[^\s])+)/g
-      );
+      const classMatches = selector.matchAll(/\.((?:[a-zA-Z0-9_-]|\\[^\s])+)/g);
       for (const match of classMatches) {
         // Unescape CSS escapes (e.g., \: → :, \[ → [)
         const className = match[1].replaceAll(/\\(.)/g, '$1');
@@ -89,7 +88,7 @@ async function stripLayerWrappers(cssPath) {
     },
   ]).process(css, { from: cssPath });
 
-  writeFileSync(cssPath, result.css, 'utf-8');
+  writeFileSync(cssPath, result.css, 'utf8');
 }
 
 // Build pre-built CSS (for consumers WITHOUT Tailwind)
@@ -102,7 +101,7 @@ const indexCssWithSource =
   `\n\n/* Auto-generated: Scan better-auth-ui source files */\n@source "${betterAuthUiSrc}/**/*.{ts,tsx}";\n`;
 
 const tempIndexCssPath = resolve(__dirname, 'src/.index.css.tmp');
-writeFileSync(tempIndexCssPath, indexCssWithSource, 'utf-8');
+writeFileSync(tempIndexCssPath, indexCssWithSource, 'utf8');
 
 // Temp file for theme.css with @source directive (for build time)
 const themeCssPath = resolve(__dirname, 'src/theme.css');
@@ -111,7 +110,7 @@ const themeCssWithSource =
   themeCss +
   `\n\n/* Auto-generated: Scan better-auth-ui source files */\n@source "${betterAuthUiSrc}/**/*.{ts,tsx}";\n`;
 const tempThemeCssPath = resolve(__dirname, 'src/.theme.css.tmp');
-writeFileSync(tempThemeCssPath, themeCssWithSource, 'utf-8');
+writeFileSync(tempThemeCssPath, themeCssWithSource, 'utf8');
 
 try {
   // Build pre-built CSS with all utilities (style.css)
@@ -156,7 +155,7 @@ try {
     writeFileSync(
       themeInlinePath,
       `/* Extracted from src/theme.css */\n${themeInlineBlock}\n`,
-      'utf-8'
+      'utf8'
     );
     console.log('✅ Theme inline block extracted to theme-inline.css');
     themeInlineImport = "@import './theme-inline.css';\n";
@@ -171,7 +170,7 @@ try {
 <div class="${extractedClasses.join(' ')}"></div>
 `;
   const safelistPath = resolve(__dirname, 'dist/.safelist.html');
-  writeFileSync(safelistPath, safelistContent, 'utf-8');
+  writeFileSync(safelistPath, safelistContent, 'utf8');
 
   // Write tailwind.css WITH @source pointing to our safelist
   // This avoids referencing the @daveyplate package
@@ -185,7 +184,7 @@ ${themeInlineImport}
   writeFileSync(
     resolve(__dirname, 'dist/tailwind.css'),
     distTailwindCss,
-    'utf-8'
+    'utf8'
   );
   console.log('✅ Tailwind-ready CSS (tailwind.css) created successfully');
   console.log(
@@ -200,5 +199,8 @@ ${themeInlineImport}
     const { unlinkSync } = await import('node:fs');
     unlinkSync(tempIndexCssPath);
     unlinkSync(tempThemeCssPath);
-  } catch {}
+  } catch (error) {
+    console.error('❌ Failed to clean up temporary files:', error.message);
+    process.exit(1);
+  }
 }

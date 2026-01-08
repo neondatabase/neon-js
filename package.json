@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "e2e",
+    "examples/*"
   ],
   "scripts": {
     "link:neon-js": "cd packages/auth && bun link && cd ../postgrest-js && bun link && cd ../auth-ui && bun link && cd ../neon-js && bun link",
@@ -21,7 +23,11 @@
     "release:postgrest-js": "bun scripts/release.ts postgrest-js",
     "release:auth": "bun scripts/release.ts auth",
     "release:auth-ui": "bun scripts/release.ts auth-ui",
-    "release:neon-js": "bun scripts/release.ts neon-js"
+    "release:neon-js": "bun scripts/release.ts neon-js",
+    "test:e2e": "bun run build && bun run --filter e2e test",
+    "test:e2e:ui": "bun run build && bun run --filter e2e test:ui",
+    "test:e2e:debug": "bun run build && bun run --filter e2e test:debug",
+    "test:e2e:ci": "bun run build && cd examples/react-app && bun run build && cd ../.. && bun run --filter e2e test:ci"
   },
   "devDependencies": {
     "@arethetypeswrong/core": "^0.18.2",

@@ -47,7 +47,7 @@
     "dev": "tsdown --watch",
     "test": "vitest",
     "test:node": "node --run test",
-    "test:ci": "vitest run",
+    "test:ci": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit",
     "test:types": "tsc --noEmit",
     "release": "bun run build && bumpp --tag 'postgrest-js-v%s' && bun publish --tag latest",
