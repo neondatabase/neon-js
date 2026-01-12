@@ -133,6 +133,7 @@ try {
   );
 
   // Strip @layer wrappers for Tailwind v3 compatibility
+  // This includes both @layer base and @layer neon-auth
   await stripLayerWrappers(resolve(__dirname, 'dist/style.css'));
   console.log(
     '✅ Stripped @layer wrappers from style.css for v3 compatibility'
@@ -174,7 +175,7 @@ try {
 
   // Write tailwind.css WITH @source pointing to our safelist
   // This avoids referencing the @daveyplate package
-  const distTailwindCss = `/* Tailwind-ready CSS for consumers WITH Tailwind */
+  const distTailwindCss = `/* Tailwind-ready CSS for consumers WITH Tailwind v4 */
 /* Import this AFTER @import 'tailwindcss' in your CSS */
 @import './theme.css';
 ${themeInlineImport}

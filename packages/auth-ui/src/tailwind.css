@@ -1,4 +1,6 @@
-/* Tailwind-ready CSS for consumers WITH Tailwind */
+/* Tailwind-ready CSS for consumers WITH Tailwind v4 */
 /* Import this AFTER @import 'tailwindcss' in your CSS */
 @import './theme.css';
 
+/* Safelist ensures auth-ui classes aren't purged */
+@source "./.safelist.html";
