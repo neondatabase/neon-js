@@ -9,7 +9,7 @@ export default defineConfig(
   eslint.configs.recommended,
   tseslint.configs.recommended,
   unicorn.configs.recommended, // Use Unicorn's recommended preset
-  globalIgnores(['**/dist/**']),
+  globalIgnores(['**/dist/**', '**/examples/**']),
   {
     // Set tsconfigRootDir to resolve multiple tsconfig issue
     languageOptions: {
