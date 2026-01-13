@@ -19,6 +19,7 @@ e2e/test-results/
 e2e/playwright-report/
 e2e/.playwright/
 e2e/blob-report/
+.playwright-mcp/
 
 # Auth state (may contain tokens)
 playwright/.auth/
