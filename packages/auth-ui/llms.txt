@@ -34,7 +34,20 @@ import "@neondatabase/auth-ui/css";
 
 ## Theme Tokens
 
-### Core Colors
+Auth-UI CSS is designed to **never override your theme**. It uses a fallback pattern that respects your existing CSS variables.
+
+### How It Works
+
+Auth-UI variables are scoped to `.neon-auth-ui` and use this pattern:
+```css
+--neon-primary: var(--primary, oklch(0.205 0 0));
+```
+
+This means:
+1. If you define `--primary` in `:root`, auth-ui uses YOUR value
+2. If you don't, auth-ui uses its default
+
+### Customizing Colors
 
 Override in `:root` (light) and `.dark` (dark mode):
 

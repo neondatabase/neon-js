@@ -109,12 +109,13 @@ Add a wrapper `<div>` in the React provider that applies the scoping class witho
 
 ```tsx
 // NeonAuthUIProvider.tsx
-export function NeonAuthUIProvider({ children, className, ...props }) {
+export function NeonAuthUIProvider({ children, className, defaultTheme = 'system', ...props }) {
   return (
     <div className={cn('neon-auth-ui', className)}>
-      <ThemeProvider attribute="class" defaultTheme="system">
+      <ThemeProvider attribute="class" defaultTheme={defaultTheme} enableSystem>
         <AuthUIProvider {...props}>
           {children}
+          <Toaster />
         </AuthUIProvider>
       </ThemeProvider>
     </div>
@@ -257,3 +258,10 @@ The fix supports multiple dark mode detection patterns:
 /* data-theme attribute */
 [data-theme="dark"] .neon-auth-ui { ... }
 ```
+
+The implementation uses a custom variant for dark mode:
+```css
+@custom-variant dark (&:is(.dark *));
+```
+
+This ensures dark mode styles are applied when the `.dark` class is present on any ancestor element, which is compatible with next-themes and similar dark mode libraries.
