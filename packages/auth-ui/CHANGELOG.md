@@ -6,10 +6,9 @@ All notable changes to `@neondatabase/auth-ui` will be documented in this file.
 
 ### Fixed
 
-- **CSS Theme Isolation**: CSS variables are now scoped to `.neon-auth-ui` wrapper class instead of `:root` to prevent overriding user's custom Tailwind themes
+- **CSS Theme Isolation**: CSS variables now use `--neon-*` prefix on `:root` to prevent overriding user's custom Tailwind themes
   - All variables use `--neon-*` prefix internally with fallback pattern: `var(--user-var, default)`
   - Styles wrapped in `@layer neon-auth` for lower specificity than user's unlayered CSS
-  - Global resets removed - base styles now scoped to `.neon-auth-ui *` only
   - See `docs/solutions/ui-bugs/css-variables-theme-conflict.md` for details
 
 ### Added

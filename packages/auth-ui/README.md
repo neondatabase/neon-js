@@ -272,7 +272,7 @@ Neon Auth UI uses CSS custom properties for theming. **Your existing theme varia
 
 ### How It Works
 
-Auth-UI variables are scoped to `.neon-auth-ui` and use this pattern:
+Auth-UI defines `--neon-*` prefixed variables on `:root` inside `@layer neon-auth`:
 ```css
 --neon-primary: var(--primary, oklch(0.205 0 0));
 ```

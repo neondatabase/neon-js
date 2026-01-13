@@ -86,7 +86,7 @@ Auth-UI CSS is designed to **never override your theme**. It uses a fallback pat
 
 ### How It Works
 
-Auth-UI variables are scoped to `.neon-auth-ui` and use this pattern:
+Auth-UI defines `--neon-*` prefixed variables on `:root` inside `@layer neon-auth`:
 ```css
 --neon-primary: var(--primary, oklch(0.205 0 0));
 ```
@@ -400,7 +400,7 @@ Auth-UI uses modern CSS features with excellent browser support:
 | CSS custom properties | 49+ | 31+ | 9.1+ | 16+ | ~98% |
 
 **Graceful degradation:**
-- Older browsers ignore `@layer` but still get scoped styles via `.neon-auth-ui` selector
+- Older browsers ignore `@layer` but styles still work correctly via `:root` variables
 - If OKLCH is unsupported, consider providing HSL fallbacks in your overrides
 
 **Known issues:**
