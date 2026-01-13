@@ -185,6 +185,14 @@ jobs:
           echo "created: ${{ steps.create-branch.outputs.created }}"
           echo "=== End Outputs ==="
 
+      - name: Debug - Check Data API after delay
+        run: |
+          echo "=== Checking Data API after 5s delay ==="
+          sleep 5
+          curl -s -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
+            "${{ vars.NEON_API_HOST || 'https://console.neon.tech/api/v2' }}/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.create-branch.outputs.branch_id }}/data-api/neondb" | jq .
+          echo "=== End Data API Check ==="
+
       # Build React example (uses VITE_ prefix)
       - name: Build React example app
         if: matrix.app == 'react-neon-js'
