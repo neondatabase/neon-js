@@ -236,7 +236,7 @@ Use the `neonAuth()` function to access session and user data in React Server Co
 
 ```tsx
 // app/components/session-card.tsx
-import { neonAuth } from "@neondatabase/auth/next"
+import { neonAuth } from "@neondatabase/auth/next/server"
 
 export async function SessionCard() {
   const { session, user } = await neonAuth()

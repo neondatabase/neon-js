@@ -6,7 +6,7 @@ import type {
 import { getUpstreamURL } from '../handler/request';
 import { NEON_AUTH_BASE_URL } from '../env-variables';
 
-import { extractNeonAuthCookies, parseSetCookies } from "../../utils/cookies"
+import { extractNeonAuthCookies, parseSetCookies } from '../../utils/cookies';
 
 export type SessionData =
   | {
@@ -25,7 +25,7 @@ export type SessionData =
  *
  * @example
  * ```ts
- * import { neonAuth } from "@neondatabase/auth/next"
+ * import { neonAuth } from "@neondatabase/auth/next/server"
  *
  * const { session, user } = await neonAuth()
  * ```
