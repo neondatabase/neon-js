@@ -228,14 +228,14 @@ jobs:
           E2E_TARGET_APP: ${{ matrix.app }}
 
       # Clean up: Delete Neon branch (runs even if tests fail)
-      - name: Delete Neon branch
-        if: always()
-        uses: neondatabase/delete-branch-action@v3
-        with:
-          project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch: test-${{ matrix.app }}-${{ github.run_id }}-${{ github.run_attempt }}
-          api_key: ${{ secrets.NEON_API_KEY }}
-          api_host: ${{ vars.NEON_API_HOST }}
+      # - name: Delete Neon branch
+      #   if: always()
+      #   uses: neondatabase/delete-branch-action@v3
+      #   with:
+      #     project_id: ${{ vars.NEON_PROJECT_ID }}
+      #     branch: test-${{ matrix.app }}-${{ github.run_id }}-${{ github.run_attempt }}
+      #     api_key: ${{ secrets.NEON_API_KEY }}
+      #     api_host: ${{ vars.NEON_API_HOST }}
 
       # Upload HTML report (always, for debugging)
       - name: Upload test report
