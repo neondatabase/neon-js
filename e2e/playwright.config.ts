@@ -44,6 +44,7 @@ const exampleAppDir = path.resolve(__dirname, appConfig.dir);
 const ciReporters = [
   ['github'],
   ['blob'], // For sharded report merging
+  ['html', { open: 'never' }], // HTML report for artifact upload
 ] satisfies ReporterDescription[];
 
 const localReporters = [
