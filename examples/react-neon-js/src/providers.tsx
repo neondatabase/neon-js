@@ -26,26 +26,22 @@ export function Providers({ children }: { children: React.ReactNode }) {
       authClient={neonClient.auth}
       navigate={navigate}
       social={{
-        providers: ['github', 'google'], // Remove: discord, apple, microsoft
+        providers: ['github', 'google'],
       }}
       magicLink={false}
       multiSession={false}
       redirectTo="/dashboard"
       Link={Link}
-      // Avatar configuration with base64 storage (no server needed)
       avatar={{
         size: 256,
         extension: 'webp',
       }}
-      // Configure sign-up to show additional fields
       signUp={{
         fields: ['name'],
       }}
-      // Configure account settings to show custom fields
       account={{
         fields: ['image', 'name', 'company', 'age', 'newsletter'],
       }}
-      // Custom localization for a personalized experience
       localization={{
         SIGN_IN: 'Welcome Back',
         SIGN_IN_DESCRIPTION: 'Sign in to your account to continue',
@@ -64,7 +60,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
         SECURITY: 'Security Settings',
         SESSIONS: 'Active Sessions',
       }}
-      // Enable credentials (email/password) with forgot password support
       credentials={{
         forgotPassword: true,
       }}
