@@ -176,15 +176,6 @@ jobs:
           get_data_api_url: true
           expires_at: ${{ env.EXPIRES_AT }}
 
-      - name: Debug create-branch outputs
-        run: |
-          echo "=== Create Branch Action Outputs ==="
-          echo "branch_id: ${{ steps.create-branch.outputs.branch_id }}"
-          echo "auth_url: ${{ steps.create-branch.outputs.auth_url }}"
-          echo "data_api_url: ${{ steps.create-branch.outputs.data_api_url }}"
-          echo "created: ${{ steps.create-branch.outputs.created }}"
-          echo "=== End Outputs ==="
-
       # Build React example (uses VITE_ prefix)
       - name: Build React example app
         if: matrix.app == 'react-neon-js'
@@ -199,6 +190,7 @@ jobs:
         run: cd examples/nextjs-neon-auth && bun run build
         env:
           NEON_AUTH_BASE_URL: ${{ steps.create-branch.outputs.auth_url }}
+          DATABASE_URL: ${{ steps.create-branch.outputs.db_url }}
 
       # Get Playwright version for cache key
       - name: Get Playwright version
