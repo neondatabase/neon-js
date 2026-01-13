@@ -6,8 +6,29 @@ import { fileURLToPath } from 'node:url';
 // Environment detection - explicit boolean check
 const isCI = process.env.CI === 'true' || process.env.CI === '1';
 
+// App configuration - allows targeting different example apps
+const APP_CONFIG = {
+  'react-neon-js': {
+    port: 5173,
+    dir: '../examples/react-neon-js',
+    devCommand: 'bun run dev',
+    previewCommand: 'bun run preview',
+  },
+  'nextjs-neon-auth': {
+    port: 3000,
+    dir: '../examples/nextjs-neon-auth',
+    devCommand: 'bun run dev',
+    previewCommand: 'bun run start', // Next.js uses 'start' for production
+  },
+} as const;
+
+type AppName = keyof typeof APP_CONFIG;
+
+// Select app based on environment variable or default to react-neon-js
+const targetApp = (process.env.E2E_TARGET_APP as AppName) || 'react-neon-js';
+const appConfig = APP_CONFIG[targetApp];
+
 // Configuration constants - avoid magic numbers
-const DEV_SERVER_URL = 'http://localhost:5173';
 const TIMEOUTS = {
   test: 60_000, // 1 minute per test
   expect: 10_000, // 10 seconds for assertions
@@ -17,7 +38,7 @@ const TIMEOUTS = {
 
 // Absolute path resolution for cross-directory webServer (ES module compatible)
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const exampleAppDir = path.resolve(__dirname, '../examples/react-app');
+const exampleAppDir = path.resolve(__dirname, appConfig.dir);
 
 // Reporter configurations with satisfies for type safety
 const ciReporters = [
@@ -32,7 +53,10 @@ const localReporters = [
 
 export default defineConfig({
   testDir: './tests',
-  testMatch: '**/*.spec.ts',
+  // Filter tests based on app - Next.js only runs auth-flow tests (no Todos)
+  testMatch: targetApp === 'nextjs-neon-auth'
+    ? '**/auth-flow.spec.ts'
+    : '**/*.spec.ts',
 
   // Parallel execution - 2 workers balances speed and stability
   fullyParallel: true,
@@ -55,7 +79,7 @@ export default defineConfig({
 
   // Shared settings for all projects
   use: {
-    baseURL: DEV_SERVER_URL,
+    baseURL: `http://localhost:${appConfig.port}`,
     trace: isCI ? 'retain-on-failure' : 'on-first-retry',
     screenshot: 'only-on-failure',
     video: isCI ? 'off' : 'on-first-retry', // Disable video in CI for speed
@@ -74,8 +98,8 @@ export default defineConfig({
 
   // Auto-start example app server
   webServer: {
-    command: isCI ? 'bun run preview' : 'bun run dev',
-    url: DEV_SERVER_URL,
+    command: isCI ? appConfig.previewCommand : appConfig.devCommand,
+    url: `http://localhost:${appConfig.port}`,
     timeout: isCI ? TIMEOUTS.webServerCI : TIMEOUTS.webServer,
     reuseExistingServer: !isCI,
     cwd: exampleAppDir, // Absolute path for reliability

@@ -7,7 +7,11 @@
     "test:ui": "playwright test --ui",
     "test:debug": "playwright test --debug",
     "test:headed": "playwright test --headed",
-    "test:ci": "playwright test"
+    "test:ci": "playwright test",
+    "test:react": "E2E_TARGET_APP=react-neon-js playwright test",
+    "test:nextjs": "E2E_TARGET_APP=nextjs-neon-auth playwright test",
+    "test:react:ci": "E2E_TARGET_APP=react-neon-js playwright test",
+    "test:nextjs:ci": "E2E_TARGET_APP=nextjs-neon-auth playwright test"
   },
   "devDependencies": {
     "@playwright/test": "^1.51.0"

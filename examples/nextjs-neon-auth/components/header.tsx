@@ -1,16 +1,12 @@
 "use client"
 
-// import { UserButton } from "@daveyplate/better-auth-ui"
-import { UserButton } from "@neondatabase/auth/react/ui"
+import { SignedIn, SignedOut, UserButton } from "@neondatabase/auth/react/ui"
 import Link from "next/link"
 
-import { authClient } from "@/lib/auth-client"
 import { Button } from "@/components/ui/button"
 import { ModeToggle } from "@/components/mode-toggle"
 
 export function Header() {
-    const { data: session } = authClient.useSession()
-
     return (
         <header className="sticky top-0 z-50 flex h-12 justify-between border-b bg-background/60 px-4 backdrop-blur md:h-14 md:px-6">
             <div className="flex items-center gap-6">
@@ -35,7 +31,7 @@ export function Header() {
                     </svg>
                     <span className="hidden sm:inline font-semibold">Notely</span>
                 </Link>
-                {session && (
+                <SignedIn>
                     <nav className="flex items-center gap-1">
                         <Link href="/dashboard">
                             <Button variant="ghost" size="sm">
@@ -53,7 +49,7 @@ export function Header() {
                             </Button>
                         </Link>
                     </nav>
-                )}
+                </SignedIn>
             </div>
 
             <div className="flex items-center gap-2">
@@ -74,7 +70,14 @@ export function Header() {
                     <span className="sr-only">GitHub</span>
                 </Link>
                 <ModeToggle />
-                <UserButton size="icon" />
+                <SignedIn>
+                    <UserButton size="icon" />
+                </SignedIn>
+                <SignedOut>
+                    <Link href="/auth/sign-in">
+                        <Button variant="ghost" size="sm">Sign In</Button>
+                    </Link>
+                </SignedOut>
             </div>
         </header>
     )

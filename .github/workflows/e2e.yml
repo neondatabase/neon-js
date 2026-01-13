@@ -11,7 +11,7 @@ on:
   repository_dispatch:
     types: [run-e2e]
 
-  # Manual trigger with optional ref and environment override
+  # Manual trigger with optional ref, environment, and app override
   workflow_dispatch:
     inputs:
       ref:
@@ -27,6 +27,15 @@ on:
           - production
           - staging
           - preview
+      app:
+        description: 'Example app to test'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - react-neon-js
+          - nextjs-neon-auth
 
 # SECURITY: Limit permissions to minimum required
 permissions:
@@ -78,10 +87,22 @@ jobs:
         github.event_name == 'pull_request' ||
         needs.validate.result == 'success'
       )
-    timeout-minutes: 15
+    timeout-minutes: 20
     runs-on:
       group: neondatabase-protected-runner-group
       labels: linux-ubuntu-latest
+
+    # Matrix strategy: test both example apps in parallel
+    strategy:
+      fail-fast: false
+      matrix:
+        app:
+          - react-neon-js
+          - nextjs-neon-auth
+        exclude:
+          # Exclude apps not matching the input when a specific app is requested
+          - app: ${{ (github.event.inputs.app != 'all' && github.event.inputs.app != 'react-neon-js' && github.event.inputs.app != '') && 'react-neon-js' || 'never-exclude' }}
+          - app: ${{ (github.event.inputs.app != 'all' && github.event.inputs.app != 'nextjs-neon-auth' && github.event.inputs.app != '') && 'nextjs-neon-auth' || 'never-exclude' }}
 
     # Use GitHub Environments for environment-specific secrets/variables
     # - production: Default, uses production Neon API
@@ -89,9 +110,9 @@ jobs:
     # - preview: Uses preview Neon API
     environment: ${{ needs.validate.outputs.environment || 'production' }}
 
-    # Concurrency: prevent duplicate runs, but don't cancel external triggers
+    # Concurrency: prevent duplicate runs per app, but don't cancel external triggers
     concurrency:
-      group: e2e-${{ github.event_name == 'repository_dispatch' && github.run_id || github.head_ref || github.ref }}
+      group: e2e-${{ matrix.app }}-${{ github.event_name == 'repository_dispatch' && github.run_id || github.head_ref || github.ref }}
       cancel-in-progress: ${{ github.event_name != 'repository_dispatch' }}
 
     steps:
@@ -147,7 +168,7 @@ jobs:
         uses: neondatabase/create-branch-action@v6
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch_name: test-${{ github.run_id }}-${{ github.run_attempt }}
+          branch_name: test-${{ matrix.app }}-${{ github.run_id }}-${{ github.run_attempt }}
           api_key: ${{ secrets.NEON_API_KEY }}
           # api_host: Empty for production (uses default), set per-environment for staging/preview
           api_host: ${{ vars.NEON_API_HOST }}
@@ -155,11 +176,20 @@ jobs:
           get_data_api_url: true
           expires_at: ${{ env.EXPIRES_AT }}
 
-      - name: Build example app
-        run: cd examples/react-app && bun run build
+      # Build React example (uses VITE_ prefix)
+      - name: Build React example app
+        if: matrix.app == 'react-neon-js'
+        run: cd examples/react-neon-js && bun run build
         env:
           VITE_NEON_AUTH_URL: ${{ steps.create-branch.outputs.auth_url }}
           VITE_NEON_DATA_API_URL: ${{ steps.create-branch.outputs.data_api_url }}
+
+      # Build Next.js example (uses NEON_AUTH_BASE_URL)
+      - name: Build Next.js example app
+        if: matrix.app == 'nextjs-neon-auth'
+        run: cd examples/nextjs-neon-auth && bun run build
+        env:
+          NEON_AUTH_BASE_URL: ${{ steps.create-branch.outputs.auth_url }}
 
       # Get Playwright version for cache key
       - name: Get Playwright version
@@ -187,9 +217,15 @@ jobs:
         run: cd e2e && bunx playwright install-deps chromium
 
       - name: Run E2E tests
-        run: bun run --filter e2e test:ci
+        run: |
+          if [ "${{ matrix.app }}" = "react-neon-js" ]; then
+            bun run --filter e2e test:react:ci
+          else
+            bun run --filter e2e test:nextjs:ci
+          fi
         env:
           CI: true
+          E2E_TARGET_APP: ${{ matrix.app }}
 
       # Clean up: Delete Neon branch (runs even if tests fail)
       - name: Delete Neon branch
@@ -197,7 +233,7 @@ jobs:
         uses: neondatabase/delete-branch-action@v3
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch: test-${{ github.run_id }}-${{ github.run_attempt }}
+          branch: test-${{ matrix.app }}-${{ github.run_id }}-${{ github.run_attempt }}
           api_key: ${{ secrets.NEON_API_KEY }}
           api_host: ${{ vars.NEON_API_HOST }}
 
@@ -206,7 +242,7 @@ jobs:
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.app }}
           path: e2e/playwright-report/
           retention-days: 7
 
@@ -215,6 +251,6 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: test-artifacts
+          name: test-artifacts-${{ matrix.app }}
           path: e2e/test-results/
           retention-days: 3

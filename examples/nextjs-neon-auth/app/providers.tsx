@@ -26,7 +26,13 @@ export function Providers({ children }: { children: ReactNode }) {
             redirectTo="/dashboard"
             Link={Link}
             organization={{
-                
+
+            }}
+            credentials={{
+                forgotPassword: true,
+            }}
+            signUp={{
+                fields: ['name'],
             }}
         >
             {children}
