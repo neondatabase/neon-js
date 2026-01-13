@@ -1,19 +1,17 @@
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { neonAuth, } from "@neondatabase/auth/next"
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { neonAuth } from '@neondatabase/auth/next/server';
 
 export async function SessionCard() {
-  const { session, user } = await neonAuth()
-  const isLoggedIn = !!session && !!user
+  const { session, user } = await neonAuth();
+  const isLoggedIn = !!session && !!user;
 
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+    <div className="rounded-lg border bg-card p-6 shadow-sm">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-          Session Info
-        </h2>
+        <h2 className="text-lg font-semibold text-foreground">Session Info</h2>
         <svg
-          className="h-5 w-5 text-zinc-400"
+          className="h-5 w-5 text-muted-foreground"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -28,10 +26,12 @@ export async function SessionCard() {
       </div>
       <div className="space-y-3">
         <div>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">Session Status</p>
+          <p className="text-sm text-muted-foreground">Session Status</p>
           <div className="mt-1 flex items-center gap-2">
-            <div className={`h-2 w-2 rounded-full ${isLoggedIn ? 'bg-green-500' : 'bg-orange-500'}`} />
-            <p className="font-medium text-zinc-900 dark:text-zinc-50">
+            <div
+              className={`h-2 w-2 rounded-full ${isLoggedIn ? 'bg-green-500' : 'bg-orange-500'}`}
+            />
+            <p className="font-medium text-foreground">
               {isLoggedIn ? 'Active' : 'Not logged in'}
             </p>
           </div>
@@ -39,7 +39,7 @@ export async function SessionCard() {
         {isLoggedIn ? (
           <>
             <div>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">User</p>
+              <p className="text-sm text-muted-foreground">User</p>
               <div className="mt-1 flex items-center gap-3">
                 {user.image && (
                   <img
@@ -49,11 +49,11 @@ export async function SessionCard() {
                   />
                 )}
                 <div>
-                  <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                  <p className="font-medium text-foreground">
                     {user.name || 'Anonymous'}
                   </p>
                   {user.email && (
-                    <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                    <p className="text-sm text-muted-foreground">
                       {user.email}
                     </p>
                   )}
@@ -61,8 +61,8 @@ export async function SessionCard() {
               </div>
             </div>
             <div>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">Session Expires</p>
-              <p className="mt-1 font-mono text-sm text-zinc-900 dark:text-zinc-50">
+              <p className="text-sm text-muted-foreground">Session Expires</p>
+              <p className="mt-1 font-mono text-sm text-foreground">
                 {new Date(session.expiresAt).toLocaleString()}
               </p>
             </div>
@@ -78,5 +78,5 @@ export async function SessionCard() {
         )}
       </div>
     </div>
-  )
+  );
 }

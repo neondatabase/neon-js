@@ -9,13 +9,13 @@ interface ServerInfoCardProps {
 
 export function ServerInfoCard({ serverData }: ServerInfoCardProps) {
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+    <div className="rounded-lg border bg-card p-6 shadow-sm">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+        <h2 className="text-lg font-semibold text-foreground">
           Server Info
         </h2>
         <svg
-          className="h-5 w-5 text-zinc-400"
+          className="h-5 w-5 text-muted-foreground"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -30,23 +30,23 @@ export function ServerInfoCard({ serverData }: ServerInfoCardProps) {
       </div>
       <div className="space-y-3">
         <div>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">Request ID</p>
-          <p className="mt-1 font-mono text-sm text-zinc-900 dark:text-zinc-50">
+          <p className="text-sm text-muted-foreground">Request ID</p>
+          <p className="mt-1 font-mono text-sm text-foreground">
             {serverData.requestId}
           </p>
         </div>
         <div>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">Environment</p>
+          <p className="text-sm text-muted-foreground">Environment</p>
           <div className="mt-1 flex items-center gap-2">
-            <div className={`h-2 w-2 rounded-full ${serverData.environment === 'production' ? 'bg-green-500' : 'bg-blue-500'}`} />
-            <p className="font-medium text-zinc-900 dark:text-zinc-50 capitalize">
+            <div className={`h-2 w-2 rounded-full ${serverData.environment === 'production' ? 'bg-green-500' : 'bg-primary'}`} />
+            <p className="font-medium text-foreground capitalize">
               {serverData.environment}
             </p>
           </div>
         </div>
         <div className="mt-4">
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">Features</p>
-          <ul className="mt-2 space-y-1 text-xs text-zinc-600 dark:text-zinc-400">
+          <p className="text-xs text-muted-foreground">Features</p>
+          <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
             <li className="flex items-center gap-1">
               <span className="text-green-500">✓</span> Zero client JS
             </li>
@@ -62,4 +62,3 @@ export function ServerInfoCard({ serverData }: ServerInfoCardProps) {
     </div>
   )
 }
-

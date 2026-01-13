@@ -55,7 +55,7 @@ export default async function QuotePage() {
   ])
 
   return (
-    <div className="min-h-[calc(100vh-3.5rem)] bg-zinc-50 dark:bg-zinc-950">
+    <div className="min-h-[calc(100vh-3.5rem)] bg-muted">
       <div className="container mx-auto px-4 py-8 md:px-6 md:py-12">
         <PageHeader />
 

@@ -22,7 +22,7 @@ export default async function AuthPage({
         <p className="w-3xs text-center text-muted-foreground text-xs mt-4">
           By continuing, you agree to our{' '}
           <Link
-            className="text-warning underline"
+            className="text-foreground underline hover:text-primary"
             href="/terms"
             target="_blank"
           >
@@ -30,7 +30,7 @@ export default async function AuthPage({
           </Link>{' '}
           and{' '}
           <Link
-            className="text-warning underline"
+            className="text-foreground underline hover:text-primary"
             href="/privacy"
             target="_blank"
           >

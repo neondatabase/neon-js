@@ -97,8 +97,8 @@ export default function NotesPage() {
         return (
             <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center">
                 <div className="flex flex-col items-center gap-2">
-                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-300 border-t-zinc-950 dark:border-zinc-700 dark:border-t-zinc-50" />
-                    <p className="text-sm text-zinc-600 dark:text-zinc-400">Loading...</p>
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-foreground" />
+                    <p className="text-sm text-muted-foreground">Loading...</p>
                 </div>
             </div>
         )
@@ -109,19 +109,19 @@ export default function NotesPage() {
     }
 
     return (
-        <div className="min-h-[calc(100vh-3.5rem)] bg-zinc-50 dark:bg-zinc-950">
+        <div className="min-h-[calc(100vh-3.5rem)] bg-muted">
             <div className="container mx-auto max-w-2xl px-4 py-8 md:px-6 md:py-12">
                 {/* Header */}
                 <div className="mb-8">
                     <div className="flex items-center gap-3 mb-2">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 dark:bg-amber-500/20">
-                            <StickyNote className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                            <StickyNote className="h-5 w-5 text-primary" />
                         </div>
-                        <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+                        <h1 className="text-3xl font-bold tracking-tight text-foreground">
                             Notes
                         </h1>
                     </div>
-                    <p className="text-zinc-600 dark:text-zinc-400">
+                    <p className="text-muted-foreground">
                         Quick notes for your thoughts. Last 15 notes are displayed.
                     </p>
                 </div>
@@ -134,13 +134,12 @@ export default function NotesPage() {
                             value={newNote}
                             onChange={(e) => setNewNote(e.target.value)}
                             placeholder="Add a quick note..."
-                            className="flex-1 rounded-lg border border-zinc-200 bg-white px-4 py-3 text-zinc-900 placeholder:text-zinc-400 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder:text-zinc-500 dark:focus:border-amber-400"
+                            className="flex-1 rounded-lg border bg-card px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                             disabled={isAdding}
                         />
                         <Button
                             type="submit"
                             disabled={!newNote.trim() || isAdding}
-                            className="bg-amber-500 px-4 text-white hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-500"
                         >
                             {isAdding ? (
                                 <Loader2 className="h-5 w-5 animate-spin" />
@@ -155,17 +154,17 @@ export default function NotesPage() {
                 {isLoading ? (
                     <div className="flex items-center justify-center py-12">
                         <div className="flex flex-col items-center gap-2">
-                            <div className="h-6 w-6 animate-spin rounded-full border-3 border-zinc-300 border-t-zinc-950 dark:border-zinc-700 dark:border-t-zinc-50" />
-                            <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading notes...</p>
+                            <div className="h-6 w-6 animate-spin rounded-full border-3 border-muted border-t-foreground" />
+                            <p className="text-sm text-muted-foreground">Loading notes...</p>
                         </div>
                     </div>
                 ) : notes.length === 0 ? (
-                    <div className="rounded-lg border border-dashed border-zinc-300 bg-white p-12 text-center dark:border-zinc-700 dark:bg-zinc-900">
-                        <StickyNote className="mx-auto h-12 w-12 text-zinc-300 dark:text-zinc-600" />
-                        <h3 className="mt-4 font-medium text-zinc-900 dark:text-zinc-50">
+                    <div className="rounded-lg border border-dashed bg-card p-12 text-center">
+                        <StickyNote className="mx-auto h-12 w-12 text-muted-foreground/50" />
+                        <h3 className="mt-4 font-medium text-foreground">
                             No notes yet
                         </h3>
-                        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                        <p className="mt-1 text-sm text-muted-foreground">
                             Add your first note using the form above.
                         </p>
                     </div>
@@ -174,18 +173,18 @@ export default function NotesPage() {
                         {notes.map((note) => (
                             <div
                                 key={note.id}
-                                className="group flex items-start justify-between gap-4 rounded-lg border border-zinc-200 bg-white p-4 shadow-sm transition-all hover:border-zinc-300 hover:shadow dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
+                                className="group flex items-start justify-between gap-4 rounded-lg border bg-card p-4 shadow-sm transition-all hover:shadow"
                             >
                                 <div className="min-w-0 flex-1">
-                                    <p className="text-zinc-900 dark:text-zinc-50">{note.title}</p>
-                                    <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
+                                    <p className="text-foreground">{note.title}</p>
+                                    <p className="mt-1 text-xs text-muted-foreground">
                                         {formatDate(note.createdAt)}
                                     </p>
                                 </div>
                                 <button
                                     onClick={() => handleDeleteNote(note.id)}
                                     disabled={deletingId === note.id}
-                                    className="shrink-0 rounded-md p-2 text-zinc-400 opacity-0 transition-all hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 disabled:opacity-50 dark:hover:bg-red-950 dark:hover:text-red-400"
+                                    className="shrink-0 rounded-md p-2 text-muted-foreground opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100 disabled:opacity-50"
                                     title="Delete note"
                                 >
                                     {deletingId === note.id ? (
@@ -202,4 +201,3 @@ export default function NotesPage() {
         </div>
     )
 }
-

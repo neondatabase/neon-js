@@ -20,8 +20,8 @@ export default function DashboardPage() {
         return (
             <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center">
                 <div className="flex flex-col items-center gap-2">
-                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-300 border-t-zinc-950 dark:border-zinc-700 dark:border-t-zinc-50" />
-                    <p className="text-sm text-zinc-600 dark:text-zinc-400">Loading...</p>
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-foreground" />
+                    <p className="text-sm text-muted-foreground">Loading...</p>
                 </div>
             </div>
         )
@@ -32,14 +32,14 @@ export default function DashboardPage() {
     }
 
     return (
-        <div className="min-h-[calc(100vh-3.5rem)] bg-zinc-50 dark:bg-zinc-950">
+        <div className="min-h-[calc(100vh-3.5rem)] bg-muted">
             <div className="container mx-auto px-4 py-8 md:px-6 md:py-12">
                 {/* Welcome Section */}
                 <div className="mb-8">
-                    <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 md:text-4xl">
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">
                         Welcome back, {session.user.name || session.user.email}!
                     </h1>
-                    <p className="mt-2 text-zinc-600 dark:text-zinc-400">
+                    <p className="mt-2 text-muted-foreground">
                         Here&apos;s what&apos;s happening with your account today.
                     </p>
                 </div>
@@ -47,13 +47,13 @@ export default function DashboardPage() {
                 {/* Dashboard Grid */}
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                     {/* Account Info Card */}
-                    <div className="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+                    <div className="rounded-lg border bg-card p-6 shadow-sm">
                         <div className="mb-4 flex items-center justify-between">
-                            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                            <h2 className="text-lg font-semibold text-foreground">
                                 Account Info
                             </h2>
                             <svg
-                                className="h-5 w-5 text-zinc-400"
+                                className="h-5 w-5 text-muted-foreground"
                                 fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
@@ -68,22 +68,22 @@ export default function DashboardPage() {
                         </div>
                         <div className="space-y-3">
                             <div>
-                                <p className="text-sm text-zinc-500 dark:text-zinc-400">Email</p>
-                                <p className="mt-1 font-medium text-zinc-900 dark:text-zinc-50">
+                                <p className="text-sm text-muted-foreground">Email</p>
+                                <p className="mt-1 font-medium text-foreground">
                                     {session.user.email}
                                 </p>
                             </div>
                             {session.user.name && (
                                 <div>
-                                    <p className="text-sm text-zinc-500 dark:text-zinc-400">Name</p>
-                                    <p className="mt-1 font-medium text-zinc-900 dark:text-zinc-50">
+                                    <p className="text-sm text-muted-foreground">Name</p>
+                                    <p className="mt-1 font-medium text-foreground">
                                         {session.user.name}
                                     </p>
                                 </div>
                             )}
                             <div>
-                                <p className="text-sm text-zinc-500 dark:text-zinc-400">User ID</p>
-                                <p className="mt-1 font-mono text-sm text-zinc-600 dark:text-zinc-400">
+                                <p className="text-sm text-muted-foreground">User ID</p>
+                                <p className="mt-1 font-mono text-sm text-muted-foreground">
                                     {session.user.id}
                                 </p>
                             </div>
@@ -96,13 +96,13 @@ export default function DashboardPage() {
                     </div>
 
                     {/* Session Card */}
-                    <div className="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+                    <div className="rounded-lg border bg-card p-6 shadow-sm">
                         <div className="mb-4 flex items-center justify-between">
-                            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                            <h2 className="text-lg font-semibold text-foreground">
                                 Session
                             </h2>
                             <svg
-                                className="h-5 w-5 text-zinc-400"
+                                className="h-5 w-5 text-muted-foreground"
                                 fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
@@ -117,21 +117,21 @@ export default function DashboardPage() {
                         </div>
                         <div className="space-y-3">
                             <div>
-                                <p className="text-sm text-zinc-500 dark:text-zinc-400">Status</p>
+                                <p className="text-sm text-muted-foreground">Status</p>
                                 <div className="mt-1 flex items-center gap-2">
                                     <div className="h-2 w-2 rounded-full bg-green-500" />
-                                    <p className="font-medium text-zinc-900 dark:text-zinc-50">Active</p>
+                                    <p className="font-medium text-foreground">Active</p>
                                 </div>
                             </div>
                             <div>
-                                <p className="text-sm text-zinc-500 dark:text-zinc-400">Session ID</p>
-                                <p className="mt-1 font-mono text-sm text-zinc-600 dark:text-zinc-400">
+                                <p className="text-sm text-muted-foreground">Session ID</p>
+                                <p className="mt-1 font-mono text-sm text-muted-foreground">
                                     {session.session.id.substring(0, 24)}...
                                 </p>
                             </div>
                             <div>
-                                <p className="text-sm text-zinc-500 dark:text-zinc-400">Expires At</p>
-                                <p className="mt-1 text-sm text-zinc-900 dark:text-zinc-50">
+                                <p className="text-sm text-muted-foreground">Expires At</p>
+                                <p className="mt-1 text-sm text-foreground">
                                     {new Date(session.session.expiresAt).toLocaleDateString("en-US", {
                                         year: "numeric",
                                         month: "long",
@@ -143,13 +143,13 @@ export default function DashboardPage() {
                     </div>
 
                     {/* Quick Actions Card */}
-                    <div className="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+                    <div className="rounded-lg border bg-card p-6 shadow-sm">
                         <div className="mb-4 flex items-center justify-between">
-                            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                            <h2 className="text-lg font-semibold text-foreground">
                                 Quick Actions
                             </h2>
                             <svg
-                                className="h-5 w-5 text-zinc-400"
+                                className="h-5 w-5 text-muted-foreground"
                                 fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
@@ -228,15 +228,15 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Additional Info Section */}
-                <div className="mt-8 rounded-lg border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-                    <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                <div className="mt-8 rounded-lg border bg-card p-6 shadow-sm">
+                    <h2 className="mb-4 text-lg font-semibold text-foreground">
                         Getting Started
                     </h2>
                     <div className="grid gap-4 md:grid-cols-3">
                         <div className="flex gap-3">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-800">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
                                 <svg
-                                    className="h-5 w-5 text-zinc-600 dark:text-zinc-400"
+                                    className="h-5 w-5 text-muted-foreground"
                                     fill="none"
                                     stroke="currentColor"
                                     viewBox="0 0 24 24"
@@ -250,18 +250,18 @@ export default function DashboardPage() {
                                 </svg>
                             </div>
                             <div>
-                                <h3 className="font-medium text-zinc-900 dark:text-zinc-50">
+                                <h3 className="font-medium text-foreground">
                                     Documentation
                                 </h3>
-                                <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                                <p className="mt-1 text-sm text-muted-foreground">
                                     Learn how to use all features
                                 </p>
                             </div>
                         </div>
                         <div className="flex gap-3">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-800">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
                                 <svg
-                                    className="h-5 w-5 text-zinc-600 dark:text-zinc-400"
+                                    className="h-5 w-5 text-muted-foreground"
                                     fill="none"
                                     stroke="currentColor"
                                     viewBox="0 0 24 24"
@@ -275,16 +275,16 @@ export default function DashboardPage() {
                                 </svg>
                             </div>
                             <div>
-                                <h3 className="font-medium text-zinc-900 dark:text-zinc-50">Support</h3>
-                                <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                                <h3 className="font-medium text-foreground">Support</h3>
+                                <p className="mt-1 text-sm text-muted-foreground">
                                     Get help from our team
                                 </p>
                             </div>
                         </div>
                         <div className="flex gap-3">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-800">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
                                 <svg
-                                    className="h-5 w-5 text-zinc-600 dark:text-zinc-400"
+                                    className="h-5 w-5 text-muted-foreground"
                                     fill="none"
                                     stroke="currentColor"
                                     viewBox="0 0 24 24"
@@ -298,10 +298,10 @@ export default function DashboardPage() {
                                 </svg>
                             </div>
                             <div>
-                                <h3 className="font-medium text-zinc-900 dark:text-zinc-50">
+                                <h3 className="font-medium text-foreground">
                                     API Access
                                 </h3>
-                                <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                                <p className="mt-1 text-sm text-muted-foreground">
                                     Integrate with your apps
                                 </p>
                             </div>
@@ -312,4 +312,3 @@ export default function DashboardPage() {
         </div>
     )
 }
-

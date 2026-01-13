@@ -1,18 +1,18 @@
-import { neonAuth } from "@neondatabase/auth/next"
+import { neonAuth } from '@neondatabase/auth/next/server';
 
 export async function UseCasesSection() {
-  const { user } = await neonAuth()
+  const { user } = await neonAuth();
 
   return (
-    <div className="mt-8 rounded-lg border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-      <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+    <div className="mt-8 rounded-lg border bg-card p-6 shadow-sm">
+      <h2 className="mb-4 text-lg font-semibold text-foreground">
         Real-World Use Cases for {user?.name}
       </h2>
       <div className="grid gap-6 md:grid-cols-3">
         <div className="space-y-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
             <svg
-              className="h-5 w-5 text-blue-600 dark:text-blue-400"
+              className="h-5 w-5 text-primary"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -25,17 +25,15 @@ export async function UseCasesSection() {
               />
             </svg>
           </div>
-          <h3 className="font-semibold text-zinc-900 dark:text-zinc-50">
-            Database Queries
-          </h3>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Directly query your Neon Postgres database without exposing connection strings
-            to the client.
+          <h3 className="font-semibold text-foreground">Database Queries</h3>
+          <p className="text-sm text-muted-foreground">
+            Directly query your Neon Postgres database without exposing
+            connection strings to the client.
           </p>
         </div>
 
         <div className="space-y-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/30">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10">
             <svg
               className="h-5 w-5 text-green-600 dark:text-green-400"
               fill="none"
@@ -50,19 +48,19 @@ export async function UseCasesSection() {
               />
             </svg>
           </div>
-          <h3 className="font-semibold text-zinc-900 dark:text-zinc-50">
+          <h3 className="font-semibold text-foreground">
             Cookie & Session Access
           </h3>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Read cookies and session data directly on the server - perfect for auth checks
-            and personalized content.
+          <p className="text-sm text-muted-foreground">
+            Read cookies and session data directly on the server - perfect for
+            auth checks and personalized content.
           </p>
         </div>
 
         <div className="space-y-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-900/30">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
             <svg
-              className="h-5 w-5 text-purple-600 dark:text-purple-400"
+              className="h-5 w-5 text-muted-foreground"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -75,16 +73,13 @@ export async function UseCasesSection() {
               />
             </svg>
           </div>
-          <h3 className="font-semibold text-zinc-900 dark:text-zinc-50">
-            Fast Initial Load
-          </h3>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Pre-render content on the server for instant page loads with fully populated
-            data - no loading spinners!
+          <h3 className="font-semibold text-foreground">Fast Initial Load</h3>
+          <p className="text-sm text-muted-foreground">
+            Pre-render content on the server for instant page loads with fully
+            populated data - no loading spinners!
           </p>
         </div>
       </div>
     </div>
-  )
+  );
 }
-

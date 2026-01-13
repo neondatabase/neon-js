@@ -11,13 +11,13 @@ interface ServerTimeCardProps {
 
 export function ServerTimeCard({ serverData }: ServerTimeCardProps) {
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+    <div className="rounded-lg border bg-card p-6 shadow-sm">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+        <h2 className="text-lg font-semibold text-foreground">
           Server Time
         </h2>
         <svg
-          className="h-5 w-5 text-zinc-400"
+          className="h-5 w-5 text-muted-foreground"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -32,25 +32,25 @@ export function ServerTimeCard({ serverData }: ServerTimeCardProps) {
       </div>
       <div className="space-y-3">
         <div>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">Current Day</p>
-          <p className="mt-1 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+          <p className="text-sm text-muted-foreground">Current Day</p>
+          <p className="mt-1 text-lg font-semibold text-foreground">
             {serverData.dayOfWeek}
             {serverData.isWeekend && (
-              <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-300">
+              <span className="ml-2 rounded-full bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-600 dark:text-green-400">
                 Weekend!
               </span>
             )}
           </p>
         </div>
         <div>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">Rendered At</p>
-          <p className="mt-1 font-mono text-sm text-zinc-900 dark:text-zinc-50">
+          <p className="text-sm text-muted-foreground">Rendered At</p>
+          <p className="mt-1 font-mono text-sm text-foreground">
             {new Date(serverData.serverTime).toLocaleString()}
           </p>
         </div>
         <div>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">Server Timezone</p>
-          <p className="mt-1 font-mono text-sm text-zinc-900 dark:text-zinc-50">
+          <p className="text-sm text-muted-foreground">Server Timezone</p>
+          <p className="mt-1 font-mono text-sm text-foreground">
             {serverData.serverTimezone}
           </p>
         </div>
@@ -58,4 +58,3 @@ export function ServerTimeCard({ serverData }: ServerTimeCardProps) {
     </div>
   )
 }
-
