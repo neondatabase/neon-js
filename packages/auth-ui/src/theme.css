@@ -9,10 +9,11 @@
  */
 @layer neon-auth {
   /*
-   * Variables scoped to wrapper class - NO :root pollution
+   * CSS variables on :root - accessible everywhere including portals
+   * Namespaced with --neon-* prefix to avoid conflicts
    * Fallback chain: user's var -> auth-ui default
    */
-  .neon-auth-ui {
+  :root {
     /* Design tokens */
     --neon-radius: 0.625rem;
 
@@ -67,8 +68,8 @@
     --neon-team-5: var(--team-5, oklch(0.769 0.188 70.08));
   }
 
-  /* Dark mode - next-themes adds .dark class to parent (html/body) */
-  .dark .neon-auth-ui {
+  /* Dark mode - next-themes adds .dark class to html element */
+  :root.dark {
     --neon-background: var(--background, oklch(0.145 0 0));
     --neon-foreground: var(--foreground, oklch(0.985 0 0));
     --neon-card: var(--card, oklch(0.205 0 0));
@@ -120,24 +121,17 @@
   }
 
   /*
-   * Wrapper for CSS variable scoping
-   * Uses display: contents to be invisible to layout
-   */
-  .neon-auth-ui {
-    display: contents;
-  }
-
-  /*
-   * Base styles for auth-ui components - scoped to wrapper
+   * Base styles for auth-ui components
    * These are required by better-auth-ui components
+   * Within @layer neon-auth, so user's unlayered CSS wins
    */
-  .neon-auth-ui * {
+  * {
     box-sizing: border-box;
     @apply border-border outline-ring/50;
   }
 
-  /* Apply theme colors to the auth UI container */
-  .neon-auth-ui {
+  /* Apply theme text color */
+  body {
     @apply text-foreground;
   }
 }

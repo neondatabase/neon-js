@@ -271,13 +271,12 @@ paths within the package are valid (per Node.js ESM specification). Wrapper file
 Auth-UI CSS is designed to **never override user's theme**. This is achieved through:
 
 1. **CSS Layers** (`@layer neon-auth`) - All auth-ui styles live in a named layer with lower priority than unlayered user CSS
-2. **Scoped Variables** - CSS variables use `.neon-auth-ui` wrapper class with `--neon-*` prefix, not `:root`
+2. **Namespaced Variables** - CSS variables use `--neon-*` prefix on `:root` to avoid conflicts with user's `--primary`, `--background`, etc.
 3. **Fallback Pattern** - Variables inherit user's values if defined: `--neon-primary: var(--primary, default)`
-4. **No Global Resets** - Base styles (box-sizing, border colors) scoped to `.neon-auth-ui *` only
+4. **Global Base Styles in Layer** - Base styles (`*`, `body`) are global but within `@layer neon-auth`, so user's unlayered CSS wins
 
 **Implementation:**
-- `packages/auth-ui/src/theme.css` - Scoped variables and layer definitions
-- `packages/auth-ui/src/neon-auth-ui-provider.tsx` - Wrapper div with `className="neon-auth-ui"`
+- `packages/auth-ui/src/theme.css` - Variables on `:root`, base styles on `*` and `body`, all within `@layer neon-auth`
 - See `docs/solutions/ui-bugs/css-variables-theme-conflict.md` for full design rationale
 
 ## Architecture
