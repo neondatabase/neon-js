@@ -315,6 +315,7 @@ Auth-UI CSS is designed to **never override user's theme**. This is achieved thr
 - `adapter-core.ts` - Base adapter class with shared functionality (includes `getJWTToken(allowAnonymous)`)
 - `session-cache-manager.ts` - Session caching with TTL
 - `token-cache.ts` - Generic token caching with JWT-based TTL
+- `anonymous-token-cache-manager.ts` - Anonymous token caching for RLS-based access
 - `in-flight-request-manager.ts` - Request deduplication
 - `oauth-popup.ts` - Popup-based OAuth flow for iframe contexts
 - `better-auth-helpers.ts` - Session mapping and error handling
