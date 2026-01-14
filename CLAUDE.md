@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **Note:** `AGENTS.md` is a symlink to this file, so other AI coding tools use the same instructions. On Windows, Git may create a text file instead of a symlink—if so, keep both files in sync manually.
+
 ## Project Overview
 
 A unified TypeScript SDK monorepo for Neon services, providing seamless integration with **Neon Auth** (authentication service) and **Neon Data API** (PostgreSQL database queries). Built with a familiar interface for easy adoption.
