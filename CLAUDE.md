@@ -277,7 +277,7 @@ Auth-UI CSS is designed to **never override user's theme**. This is achieved thr
 
 **Implementation:**
 - `packages/auth-ui/src/theme.css` - Variables on `:root`, base styles on `*` and `body`, all within `@layer neon-auth`
-- See `docs/solutions/ui-bugs/css-variables-theme-conflict.md` for full design rationale
+- See `dev-notes/solutions/ui-bugs/css-variables-theme-conflict.md` for full design rationale
 
 ## Architecture
 
@@ -760,7 +760,7 @@ Following the [Better Auth Supabase Migration Guide](https://www.better-auth.com
 
 - `packages/auth/NEXT-JS.md` - Next.js integration guide
 - `packages/auth-ui/README.md` - UI components documentation
-- `docs/solutions/ui-bugs/css-variables-theme-conflict.md` - CSS theming isolation fix documentation
+- `dev-notes/solutions/ui-bugs/css-variables-theme-conflict.md` - CSS theming isolation fix documentation
 - `e2e/` - E2E test infrastructure (Playwright)
 - `examples/react-neon-js/` - Reference React + Vite implementation
 - `examples/nextjs-neon-auth/` - Reference Next.js implementation
