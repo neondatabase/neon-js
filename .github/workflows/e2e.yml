@@ -227,6 +227,9 @@ jobs:
         env:
           CI: true
           E2E_TARGET_APP: ${{ matrix.app }}
+          # Next.js runtime env vars (read via process.env at server start)
+          NEON_AUTH_BASE_URL: ${{ steps.create-branch.outputs.auth_url }}
+          DATABASE_URL: ${{ steps.create-branch.outputs.db_url }}
 
       # Clean up: Delete Neon branch (runs even if tests fail)
       - name: Delete Neon branch

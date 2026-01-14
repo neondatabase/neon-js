@@ -34,12 +34,12 @@ Export the `NEON_AUTH_BASE_URL` environment variable pointing to your Neon Auth 
 NEON_AUTH_BASE_URL=https://your-neon-auth-url.neon.tech
 ```
 
-### 3. Set Up Middleware (Optional)
+### 3. Set Up Proxy (Optional)
 
-Create a `middleware.ts` file in your project root to protect routes and handle session validation:
+Create a `proxy.ts` file in your project root to proxy authentication requests to the Neon Auth server:
 
 ```typescript
-// middleware.ts
+// proxy.ts
 import { neonAuthMiddleware } from '@neondatabase/auth/next/server';
 
 export default neonAuthMiddleware()
