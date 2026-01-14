@@ -41,13 +41,13 @@ export function AddNoteForm() {
                     value={newNote}
                     onChange={(e) => setNewNote(e.target.value)}
                     placeholder="Add a quick note..."
-                    className="flex-1 rounded-lg border border-zinc-200 bg-white px-4 py-3 text-zinc-900 placeholder:text-zinc-400 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder:text-zinc-500 dark:focus:border-amber-400"
+                    className="flex-1 rounded-lg border border-input bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
                     disabled={isAdding}
                 />
                 <Button
                     type="submit"
                     disabled={!newNote.trim() || isAdding}
-                    className="bg-amber-500 px-4 text-white hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-500"
+                    className="bg-primary px-4 text-primary-foreground hover:bg-primary/90"
                 >
                     {isAdding ? (
                         <Loader2 className="h-5 w-5 animate-spin" />

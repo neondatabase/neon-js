@@ -33,7 +33,7 @@ export function DeleteNoteButton({ noteId }: DeleteNoteButtonProps) {
         <button
             onClick={handleDelete}
             disabled={isDeleting}
-            className="shrink-0 rounded-md p-2 text-zinc-400 opacity-0 transition-all hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 disabled:opacity-50 dark:hover:bg-red-950 dark:hover:text-red-400"
+            className="shrink-0 rounded-md p-2 text-muted-foreground opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100 disabled:opacity-50"
             title="Delete note"
         >
             {isDeleting ? (

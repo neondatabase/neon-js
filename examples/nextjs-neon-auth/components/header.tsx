@@ -38,9 +38,9 @@ export function Header() {
                                 Dashboard
                             </Button>
                         </Link>
-                        <Link href="/quote">
+                        <Link href="/account/organizations">
                             <Button variant="ghost" size="sm">
-                                Quote
+                                Organizations
                             </Button>
                         </Link>
                         <Link href="/notes">
@@ -54,7 +54,7 @@ export function Header() {
 
             <div className="flex items-center gap-2">
                 <Link
-                    href="https://github.com/neondatabase/neon-auth-nextjs"
+                    href="https://github.com/neondatabase/neon-js/tree/main/examples/nextjs-neon-auth"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex h-9 w-9 items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground transition-colors"
