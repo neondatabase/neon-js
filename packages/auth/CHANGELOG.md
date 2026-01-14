@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-beta.21] - 2026-01-14
+
+### Removed
+
+#### Breaking: Server Utilities Removed from `@neondatabase/auth/next`
+
+The following deprecated exports have been removed from `@neondatabase/auth/next`:
+
+- `authApiHandler` - Use `@neondatabase/auth/next/server` instead
+- `neonAuthMiddleware` - Use `@neondatabase/auth/next/server` instead
+- `neonAuth` - Use `@neondatabase/auth/next/server` instead
+
+**Migration:**
+
+```diff
+- import { authApiHandler, neonAuthMiddleware, neonAuth } from '@neondatabase/auth/next';
++ import { authApiHandler, neonAuthMiddleware, neonAuth } from '@neondatabase/auth/next/server';
+```
+
+This change enforces proper separation of server-only code (which depends on `next/headers`) from client code.
+
 ## [0.1.0-beta.20] - 2025-12-23
 
 ### Added

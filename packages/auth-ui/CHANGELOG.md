@@ -4,6 +4,8 @@ All notable changes to `@neondatabase/auth-ui` will be documented in this file.
 
 ## Unreleased
 
+## [0.1.0-alpha.11] - 2026-01-14
+
 ### Fixed
 
 - **CSS Theme Isolation**: CSS variables now use `--neon-*` prefix on `:root` to prevent overriding user's custom Tailwind themes

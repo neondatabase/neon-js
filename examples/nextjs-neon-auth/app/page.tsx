@@ -57,7 +57,7 @@ export default function Home() {
           <div className="flex flex-col gap-2 rounded-lg border bg-card p-6">
             <h3 className="font-semibold text-foreground">Better Auth Core</h3>
             <p className="text-sm text-muted-foreground">
-              Leverage the full power of Better Auth&apos;s flexible authentication framework.
+              Uses Better Auth&apos;s flexible authentication framework under the hood.
             </p>
           </div>
           <div className="flex flex-col gap-2 rounded-lg border bg-card p-6">
