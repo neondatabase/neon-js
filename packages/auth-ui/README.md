@@ -46,6 +46,14 @@ This imports only the theme variables and component scanning directive. Your Tai
 
 ### 2. Use the Provider
 
+The `NeonAuthUIProvider` accepts all props from `@daveyplate/better-auth-ui`'s `AuthUIProvider`, plus:
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `authClient` | `NeonAuthPublicApi` | required | Auth client from `@neondatabase/auth` |
+| `className` | `string` | - | Additional classes for the wrapper div |
+| `defaultTheme` | `'light' \| 'dark' \| 'system'` | `'system'` | Default theme for next-themes |
+
 #### With Next.js (Recommended)
 
 ```typescript
@@ -123,10 +131,11 @@ import {
 ## Features
 
 - ✅ **Works with or without Tailwind CSS** - Pre-built CSS bundle or Tailwind-ready import
+- ✅ **Theme-safe** - Never overrides your custom CSS variables (uses fallback pattern)
 - ✅ **Automatic React adapter** - Works with both vanilla and React Better Auth clients
 - ✅ **Full better-auth-ui compatibility** - All components and utilities re-exported
 - ✅ **Type-safe** - Full TypeScript support
-- ✅ **Dark mode support** - Add `.dark` class to enable dark theme
+- ✅ **Dark mode support** - Built-in next-themes integration
 
 ## CSS Exports
 
@@ -259,7 +268,18 @@ export default async function AuthPage({
 
 ## Customizing Theme
 
-Neon Auth UI uses CSS custom properties for theming.
+Neon Auth UI uses CSS custom properties for theming. **Your existing theme variables are respected** - auth-ui uses a fallback pattern that won't override your custom styles.
+
+### How It Works
+
+Auth-UI defines `--neon-*` prefixed variables on `:root` inside `@layer neon-auth`:
+```css
+--neon-primary: var(--primary, oklch(0.205 0 0));
+```
+
+This means:
+1. If you define `--primary` in `:root`, auth-ui uses YOUR value
+2. If you don't, auth-ui uses its default
 
 ### Core Color Tokens
 
@@ -334,21 +354,18 @@ Format: `oklch(L C H)` or `oklch(L C H / alpha)`
 
 ### Dark Mode Implementation
 
-#### Option 1: next-themes (Recommended for Next.js)
+`NeonAuthUIProvider` includes next-themes by default. Control the initial theme with the `defaultTheme` prop:
 
 ```typescript
-import { ThemeProvider } from "next-themes";
-
-export default function Layout({ children }) {
-  return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      {children}
-    </ThemeProvider>
-  );
-}
+<NeonAuthUIProvider
+  authClient={authClient}
+  defaultTheme="dark"  // 'light' | 'dark' | 'system'
+>
+  {children}
+</NeonAuthUIProvider>
 ```
 
-#### Option 2: CSS Only (System Preference)
+#### CSS Only (System Preference)
 
 ```css
 @media (prefers-color-scheme: dark) {

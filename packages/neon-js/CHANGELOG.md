@@ -12,6 +12,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Client Telemetry**: Automatically injects `X-Neon-Client-Info` header with SDK name, version, runtime environment (Node.js, Deno, Bun, Edge, Browser), and framework detection (Next.js, Remix, React, Vue, Angular).
 
+### Removed
+
+#### Breaking: Server Utilities Removed from `@neondatabase/neon-js/auth/next`
+
+The following deprecated exports have been removed from `@neondatabase/neon-js/auth/next`:
+
+- `authApiHandler` - Use `@neondatabase/neon-js/auth/next/server` instead
+- `neonAuthMiddleware` - Use `@neondatabase/neon-js/auth/next/server` instead
+- `neonAuth` - Use `@neondatabase/neon-js/auth/next/server` instead
+
+**Migration:**
+
+```diff
+- import { authApiHandler, neonAuthMiddleware, neonAuth } from '@neondatabase/neon-js/auth/next';
++ import { authApiHandler, neonAuthMiddleware, neonAuth } from '@neondatabase/neon-js/auth/next/server';
+```
+
+This change enforces proper separation of server-only code (which depends on `next/headers`) from client code.
+
 ## [0.1.0-beta.18] - 2025-12-18
 
 ### Fixed

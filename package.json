@@ -27,7 +27,9 @@
     "test:e2e": "bun run build && bun run --filter e2e test",
     "test:e2e:ui": "bun run build && bun run --filter e2e test:ui",
     "test:e2e:debug": "bun run build && bun run --filter e2e test:debug",
-    "test:e2e:ci": "bun run build && cd examples/react-app && bun run build && cd ../.. && bun run --filter e2e test:ci"
+    "test:e2e:ci": "bun run build && cd examples/react-neon-js && bun run build && cd ../.. && bun run --filter e2e test:ci",
+    "test:e2e:react": "bun run --filter e2e test:react",
+    "test:e2e:nextjs": "bun run --filter e2e test:nextjs"
   },
   "devDependencies": {
     "@arethetypeswrong/core": "^0.18.2",

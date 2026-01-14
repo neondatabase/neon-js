@@ -9,6 +9,7 @@ import { getReactClient } from './react-adapter';
 import { Toaster } from 'sonner';
 import { ThemeProvider } from 'next-themes';
 import { useMemo } from 'react';
+import { cn } from './utils';
 
 /**
  * Neon Auth UI Provider Props
@@ -21,11 +22,17 @@ export type NeonAuthUIProviderProps<T extends NeonAuthAdapter> = Omit<
   'authClient'
 > & {
   authClient: NeonAuthPublicApi<T>;
+  /** Additional class names for the wrapper div */
+  className?: string;
+  /** Default theme for next-themes. Defaults to 'system'. */
+  defaultTheme?: 'light' | 'dark' | 'system';
 };
 
 export function NeonAuthUIProvider<T extends NeonAuthAdapter>({
   authClient,
   children,
+  className,
+  defaultTheme = 'system',
   ...props
 }: NeonAuthUIProviderProps<T>) {
   /*
@@ -39,21 +46,23 @@ export function NeonAuthUIProvider<T extends NeonAuthAdapter>({
   }, [authClient]);
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      <AuthUIProvider
-        authClient={reactClient}
-        {...props}
-        multiSession={false}
-        apiKey={false}
-        magicLink={false}
-        passkey={false}
-        oneTap={false}
-        genericOAuth={undefined}
-        twoFactor={undefined}
-      >
-        {children}
-        <Toaster />
-      </AuthUIProvider>
-    </ThemeProvider>
+    <div className={cn('neon-auth-ui', className)}>
+      <ThemeProvider attribute="class" defaultTheme={defaultTheme} enableSystem>
+        <AuthUIProvider
+          authClient={reactClient}
+          {...props}
+          multiSession={false}
+          apiKey={false}
+          magicLink={false}
+          passkey={false}
+          oneTap={false}
+          genericOAuth={undefined}
+          twoFactor={undefined}
+        >
+          {children}
+          <Toaster />
+        </AuthUIProvider>
+      </ThemeProvider>
+    </div>
   );
 }

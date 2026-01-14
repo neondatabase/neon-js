@@ -100,15 +100,26 @@ UI components for Neon Auth built on top of [better-auth-ui](https://better-auth
 
 Example applications demonstrating SDK usage:
 
-**`examples/react-app/`** - React + Vite example app
+**`examples/react-neon-js/`** - React + Vite example app (primary E2E target)
 - Full-featured demo with auth flows, database queries, and UI components
 - Used as the target for E2E tests
 - Includes committed database types (`src/database.types.ts`)
 - Configured for Vercel deployment
 
+**`examples/nextjs-neon-auth/`** - Next.js App Router example
+- Next.js 15 with App Router integration
+- Demonstrates server-side auth (`neonAuth()`, `createAuthServer()`)
+- Auth UI components with custom theming
+- Drizzle ORM integration for database operations
+- API routes for notes CRUD operations
+
+**`examples/react-auth-external-ui/`** - React + Vite with external UI
+- React app demonstrating external/custom UI integration
+- Shows how to use auth adapters without auth-ui package
+
 **Build and run:**
 ```bash
-cd examples/react-app
+cd examples/react-neon-js  # or nextjs-neon-auth, react-auth-external-ui
 bun install
 bun run dev   # Development server
 bun run build # Production build
@@ -254,6 +265,19 @@ paths within the package are valid (per Node.js ESM specification). Wrapper file
 `@neondatabase/neon-js/auth/*` import paths.
 
 **Reference:** [Node.js Packages Documentation](https://nodejs.org/api/packages.html)
+
+### CSS Theming Isolation Strategy
+
+Auth-UI CSS is designed to **never override user's theme**. This is achieved through:
+
+1. **CSS Layers** (`@layer neon-auth`) - All auth-ui styles live in a named layer with lower priority than unlayered user CSS
+2. **Namespaced Variables** - CSS variables use `--neon-*` prefix on `:root` to avoid conflicts with user's `--primary`, `--background`, etc.
+3. **Fallback Pattern** - Variables inherit user's values if defined: `--neon-primary: var(--primary, default)`
+4. **Global Base Styles in Layer** - Base styles (`*`, `body`) are global but within `@layer neon-auth`, so user's unlayered CSS wins
+
+**Implementation:**
+- `packages/auth-ui/src/theme.css` - Variables on `:root`, base styles on `*` and `body`, all within `@layer neon-auth`
+- See `dev-notes/solutions/ui-bugs/css-variables-theme-conflict.md` for full design rationale
 
 ## Architecture
 
@@ -637,7 +661,7 @@ bun test:ci           # CI mode (no watch, all packages)
 
 End-to-end tests use Playwright with a real Neon backend:
 - Located in `e2e/tests/`
-- Tests against `examples/react-app/` with live auth flows
+- Tests against `examples/react-neon-js/` with live auth flows
 - Creates ephemeral Neon branches per test run (auto-deleted after 2 hours)
 
 **Test files:**
@@ -649,7 +673,7 @@ End-to-end tests use Playwright with a real Neon backend:
 ```bash
 # Build packages and example app first
 bun run build
-cd examples/react-app && bun run build
+cd examples/react-neon-js && bun run build
 
 # Run E2E tests
 bun run --filter e2e test:ci
@@ -736,8 +760,10 @@ Following the [Better Auth Supabase Migration Guide](https://www.better-auth.com
 
 - `packages/auth/NEXT-JS.md` - Next.js integration guide
 - `packages/auth-ui/README.md` - UI components documentation
+- `dev-notes/solutions/ui-bugs/css-variables-theme-conflict.md` - CSS theming isolation fix documentation
 - `e2e/` - E2E test infrastructure (Playwright)
-- `examples/react-app/` - Reference implementation
+- `examples/react-neon-js/` - Reference React + Vite implementation
+- `examples/nextjs-neon-auth/` - Reference Next.js implementation
 
 ## References
 

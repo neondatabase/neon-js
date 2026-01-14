@@ -4,6 +4,21 @@ All notable changes to `@neondatabase/auth-ui` will be documented in this file.
 
 ## Unreleased
 
+## [0.1.0-alpha.11] - 2026-01-14
+
+### Fixed
+
+- **CSS Theme Isolation**: CSS variables now use `--neon-*` prefix on `:root` to prevent overriding user's custom Tailwind themes
+  - All variables use `--neon-*` prefix internally with fallback pattern: `var(--user-var, default)`
+  - Styles wrapped in `@layer neon-auth` for lower specificity than user's unlayered CSS
+  - See `dev-notes/solutions/ui-bugs/css-variables-theme-conflict.md` for details
+
+### Added
+
+- `className` prop on `NeonAuthUIProvider` for custom wrapper styling
+- `defaultTheme` prop on `NeonAuthUIProvider` to configure next-themes default ('light' | 'dark' | 'system')
+- `cn()` utility function for className merging (clsx + tailwind-merge)
+
 ## [0.1.0-alpha.1] - 2025-11-27
 
 ### Added
