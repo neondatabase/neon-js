@@ -3,7 +3,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
 
-import { authClient } from "@/lib/auth-client"
+import { authClient } from "@/lib/auth/client"
 import { Button } from "@/components/ui/button"
 
 export default function DashboardPage() {
@@ -119,7 +119,7 @@ export default function DashboardPage() {
                             <div>
                                 <p className="text-sm text-muted-foreground">Status</p>
                                 <div className="mt-1 flex items-center gap-2">
-                                    <div className="h-2 w-2 rounded-full bg-green-500" />
+                                    <div className="h-2 w-2 rounded-full bg-primary" />
                                     <p className="font-medium text-foreground">Active</p>
                                 </div>
                             </div>

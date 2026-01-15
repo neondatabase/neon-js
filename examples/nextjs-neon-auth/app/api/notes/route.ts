@@ -3,6 +3,7 @@ import { eq, desc } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { notes } from '@/lib/schema';
 import { neonAuth } from '@neondatabase/auth/next/server';
+import { authServer } from '@/lib/auth/server';
 
 // GET - List notes for the current user
 export async function GET() {
@@ -24,25 +25,23 @@ export async function GET() {
 
 // POST - Create a new note
 export async function POST(request: NextRequest) {
-  const session = await neonAuth();
+    const { data: session } = await authServer.getSession()
+    if (!session?.user) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
 
-  if (!session.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+    const { title } = await request.json()
+    if (!title || typeof title !== "string" || title.trim() === "") {
+        return NextResponse.json({ error: "Title is required" }, { status: 400 })
+    }
 
-  const { title } = await request.json();
+    const [newNote] = await db
+        .insert(notes)
+        .values({
+            title: title.trim(),
+            userId: session.user.id,
+        })
+        .returning()
 
-  if (!title || typeof title !== 'string' || title.trim() === '') {
-    return NextResponse.json({ error: 'Title is required' }, { status: 400 });
-  }
-
-  const [newNote] = await db
-    .insert(notes)
-    .values({
-      title: title.trim(),
-      userId: session.user.id,
-    })
-    .returning();
-
-  return NextResponse.json(newNote, { status: 201 });
+    return NextResponse.json(newNote, { status: 201 })
 }
