@@ -1,3 +1,9 @@
+---
+name: neon-auth-react
+description: Sets up Neon Auth in React applications (Vite, CRA). Configures authentication adapters, creates auth client, and sets up UI components. Use when adding auth-only to React apps (no database needed).
+allowed-tools: ["Bash", "Write", "Read", "Edit", "Glob", "Grep"]
+---
+
 # Neon Auth for React
 
 Help developers set up @neondatabase/auth (authentication only, no database) in React applications with Vite, Create React App, or similar bundlers.

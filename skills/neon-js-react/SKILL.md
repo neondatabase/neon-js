@@ -1,3 +1,9 @@
+---
+name: neon-js-react
+description: Sets up the full Neon SDK with authentication AND database queries in React apps (Vite, CRA). Creates typed client, generates database types, and configures auth UI. Use for auth + database integration.
+allowed-tools: ["Bash", "Write", "Read", "Edit", "Glob", "Grep"]
+---
+
 # Neon JS for React
 
 Help developers set up @neondatabase/neon-js with authentication AND database queries in React applications (Vite, CRA, etc.).
