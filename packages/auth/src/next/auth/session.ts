@@ -22,8 +22,9 @@ export type SessionData =
 
 /**
  * Parse session data from JSON, converting date strings to Date objects
+ * @internal Exported for internal use by auth handler
  */
-function parseSessionData(json: any): SessionData {
+export function parseSessionData(json: any): SessionData {
   if (!json.session || !json.user) {
     return { session: null, user: null };
   }
@@ -44,7 +45,7 @@ function parseSessionData(json: any): SessionData {
 }
 
 /**
- * A utility function to be used in react server components fetch the session details from the Neon Auth API, if session token is available in cookie.
+ * A utility function to be used in react server components to fetch the session details.
  *
  * @returns - `{ session: Session, user: User }` | `{ session: null, user: null}`.
  *
@@ -71,19 +72,29 @@ export const neonAuth = async (): Promise<SessionData> => {
 
   // Fallback: Cookie missing or invalid
   // This only happens if neonAuth() called without middleware or on excluded routes
-  return await fetchSession();
+  // Use disableRefresh=true to avoid refreshing session during read-only operations
+  // TODO: For GA release, we should remove this fallback and throw an error if the session data cookie is missing or invalid.
+  return await fetchSession({ disableRefresh: true });
 };
 
 /**
  * A utility function to fetch the session details from the Neon Auth API, if session token is available in cookie.
  *
+ * @param options - Fetch options
+ * @param options.disableRefresh - If true, don't refresh the session cookie (read-only)
  * @returns - `{ session: Session, user: User }` | `{ session: null, user: null}`.
  */
-export const fetchSession = async (): Promise<SessionData> => {
+export const fetchSession = async (options?: { disableRefresh?: boolean }): Promise<SessionData> => {
   const baseUrl = NEON_AUTH_BASE_URL!;
   const requestHeaders = await headers();
+
+  const originalUrl = new URL('get-session', baseUrl);
+  if (options?.disableRefresh) {
+    originalUrl.searchParams.set('disableRefresh', 'true');
+  }
+
   const upstreamURL = getUpstreamURL(baseUrl, 'get-session', {
-    originalUrl: new URL('get-session', baseUrl),
+    originalUrl,
   });
 
   const response = await fetch(upstreamURL.toString(), {
@@ -126,9 +137,9 @@ export const fetchSession = async (): Promise<SessionData> => {
       path: '/',
       expires: expiresAt,
     });
-  } catch (error) {
-    // Session data cookie creation failed - log but continue without it
-    console.error('Failed to create session data cookie:', error);
+  } catch {
+    // Expected: cookies can only be modified in Server Actions/Route Handlers
+    // Silently ignore - session data still works, middleware will handle cookie creation
   }
 
   return sessionData;

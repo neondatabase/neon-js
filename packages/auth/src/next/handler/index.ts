@@ -1,6 +1,7 @@
 import { ERRORS } from '../errors';
 import { handleAuthRequest } from './request';
 import { handleAuthResponse } from './response';
+import { getSessionDataFromCookie } from './session-cookie';
 
 type Params = { path: string[] };
 
@@ -33,8 +34,33 @@ export function authApiHandler() {
   ) => {
     const resolvedParams = await params;
     const path = resolvedParams.path.join('/');
+    console.time('authApiHandler');
+    
+
+    // Fast path: Optimize /get-session with session data cookie
+    if (path === 'get-session' && request.method === 'GET') {
+      const url = new URL(request.url);
+      const disableCookieCache = url.searchParams.get('disableCookieCache');
+
+      // Try cookie validation unless explicitly disabled
+      if (disableCookieCache !== 'true') {
+        console.time('authApiHandler:getSessionDataFromCookie');
+        const sessionData = await getSessionDataFromCookie(request);
+        console.timeEnd('authApiHandler:getSessionDataFromCookie');
+        if (sessionData && sessionData.session) {
+          // Valid cookie - return directly without upstream call
+          console.timeEnd('authApiHandler');
+          return Response.json(sessionData);
+        }
+      }
+    }
+
+    console.time(`authApiHandler:${path}`);
     const response = await handleAuthRequest(baseURL, request, path);
-    return await handleAuthResponse(response);
+    console.timeEnd(`authApiHandler:${path}`);
+    const result = await handleAuthResponse(response, request);
+    console.timeEnd('authApiHandler');
+    return result;
   };
 
   return {

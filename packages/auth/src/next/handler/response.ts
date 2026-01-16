@@ -1,6 +1,7 @@
-import { sessionToSignedCookie, type SessionData } from '../../server/session';
+import { sessionToSignedCookie } from '../../server/session';
 import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../constants';
 import { parseSetCookies } from '../../utils/cookies';
+import { parseSessionData, type SessionData } from '../auth/session';
 
 // Allowlist of response headers that we want to proxy to the client from Neon Auth.
 const RESPONSE_HEADERS_ALLOWLIST = ['content-type', 'content-length', 'content-encoding', 'transfer-encoding',
@@ -8,9 +9,17 @@ const RESPONSE_HEADERS_ALLOWLIST = ['content-type', 'content-length', 'content-e
    'set-cookie', 'set-auth-jwt', 'set-auth-token', 'x-neon-ret-request-id'];
 
 export const handleAuthResponse = async (
-  response: Response
+  response: Response,
+  originalRequest?: Request
 ) => {
   const responseHeaders = prepareResponseHeaders(response);
+
+  // Check if disableCookieCache is set in the original request
+  let disableCookieCache = false;
+  if (originalRequest) {
+    const url = new URL(originalRequest.url);
+    disableCookieCache = url.searchParams.get('disableCookieCache') === 'true';
+  }
 
   // Check if upstream touched session_token cookie (creation, refresh, or deletion)
   const setCookieHeader = response.headers.get('set-cookie');
@@ -27,13 +36,12 @@ export const handleAuthResponse = async (
       );
     }
     // Case 2: Cookie creation/refresh (sign-in, token refresh, user update)
-    // Create a new session data cookie
-    else {
+    // Create a new session data cookie (unless disableCookieCache is set)
+    else if (!disableCookieCache) {
       try {
         // Fetch session data using the new/refreshed session_token
         const sessionData = await fetchSessionWithCookie(setCookieHeader);
 
-        console.log('sessionData ****', sessionData);
         if (sessionData.session) {
           // Create session data cookie
           const { sessionData: signedData, expiresAt } = await sessionToSignedCookie(sessionData);
@@ -95,5 +103,7 @@ async function fetchSessionWithCookie(setCookieHeader: string): Promise<SessionD
   }
 
   const body = await response.json();
-  return { session: body.session, user: body.user };
+
+  // Parse session data (converts date strings to Date objects)
+  return parseSessionData(body);
 }
