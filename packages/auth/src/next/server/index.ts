@@ -1,5 +1,8 @@
 import { createAuthServerInternal } from '../../server';
 import { createNextRequestContext } from './adapter';
+import { cookies } from 'next/headers';
+import { validateSessionData } from '../../server/session';
+import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../constants';
 
 // Re-export server-side utilities
 export { neonAuth } from '../auth';
@@ -8,14 +11,14 @@ export { authApiHandler } from '../handler';
 
 /**
  * Creates a server-side auth API client for Next.js.
- * 
+ *
  * This client exposes the Neon Auth APIs including authentication, user management, organizations, and admin operations.
- * 
+ *
  * **Where to use:**
  * - React Server Components
  * - Server Actions
  * - Route Handlers
- * 
+ *
  * **Requirements:**
  * - `NEON_AUTH_BASE_URL` environment variable must be set
  * - Cookies are automatically read/written via `next/headers`
@@ -67,8 +70,40 @@ export function createAuthServer() {
     );
   }
 
-  return createAuthServerInternal({
+  const baseServer = createAuthServerInternal({
     baseUrl,
     context: createNextRequestContext,
   });
+
+  // Override getSession with cookie-optimized version
+  return {
+    ...baseServer,
+
+    async getSession(options?: Parameters<typeof baseServer.getSession>[0]) {
+      // Check if cookie cache is disabled via query param
+      const disableCookieCache = (options?.query as any)?.disableCookieCache === 'true';
+
+      if (!disableCookieCache) {
+        // Try cookie first (fast path)
+        try {
+          const cookieStore = await cookies();
+          const sessionDataCookie = cookieStore.get(NEON_AUTH_SESSION_DATA_COOKIE_NAME);
+
+          if (sessionDataCookie?.value) {
+            const result = await validateSessionData(sessionDataCookie.value);
+
+            if (result.valid && result.payload) {
+              // Valid cookie - return immediately (0 upstream calls)
+              return { data: result.payload, error: null };
+            }
+          }
+        } catch (error) {
+          // Cookie read/validation error - silently fall through to upstream
+        }
+      }
+
+      // Fallback: Call upstream API
+      return baseServer.getSession(options);
+    },
+  };
 }
