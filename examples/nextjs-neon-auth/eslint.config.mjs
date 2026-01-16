@@ -19,12 +19,10 @@ const eslintConfig = defineConfig([
     files: ['**/*.{ts,tsx,mjs}'],
     languageOptions: {
       ecmaVersion: 2020,
-      globals: globals.browser,
-      parserOptions: {
-        tsconfigRootDir: import.meta.dirname,
-      },
+      globals: {...globals.browser, ...globals.node},
+      parserOptions: { tsconfigRootDir: import.meta.dirname },
     },
-  }
+  },
 ]);
 
 export default eslintConfig;
