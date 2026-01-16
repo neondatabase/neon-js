@@ -7,6 +7,8 @@ import { getUpstreamURL } from '../handler/request';
 import { NEON_AUTH_BASE_URL } from '../env-variables';
 
 import { extractNeonAuthCookies, parseSetCookies } from '../../utils/cookies';
+import { sessionToSignedCookie, validateSessionData } from '../../server/session';
+import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../../core/constants';
 
 export type SessionData =
   | {
@@ -17,6 +19,29 @@ export type SessionData =
       session: null;
       user: null;
     };
+
+/**
+ * Parse session data from JSON, converting date strings to Date objects
+ */
+function parseSessionData(json: any): SessionData {
+  if (!json.session || !json.user) {
+    return { session: null, user: null };
+  }
+
+  return {
+    session: {
+      ...json.session,
+      expiresAt: new Date(json.session.expiresAt),
+      createdAt: new Date(json.session.createdAt),
+      updatedAt: new Date(json.session.updatedAt),
+    },
+    user: {
+      ...json.user,
+      createdAt: new Date(json.user.createdAt),
+      updatedAt: new Date(json.user.updatedAt),
+    },
+  };
+}
 
 /**
  * A utility function to be used in react server components fetch the session details from the Neon Auth API, if session token is available in cookie.
@@ -31,6 +56,21 @@ export type SessionData =
  * ```
  */
 export const neonAuth = async (): Promise<SessionData> => {
+  // Read session data cookie (middleware guarantees validity)
+  const cookieStore = await cookies();
+  const sessionDataCookie = cookieStore.get(NEON_AUTH_SESSION_DATA_COOKIE_NAME)?.value;
+
+  if (sessionDataCookie) {
+    const result = await validateSessionData(sessionDataCookie);
+
+    if (result.valid && result.payload) {
+      // Payload is already SessionData (nested structure)
+      return result.payload;
+    }
+  }
+
+  // Fallback: Cookie missing or invalid
+  // This only happens if neonAuth() called without middleware or on excluded routes
   return await fetchSession();
 };
 
@@ -54,9 +94,11 @@ export const fetchSession = async (): Promise<SessionData> => {
   });
 
   const body = await response.json();
+  const cookieStore = await cookies();
+
+  // Handle set-cookie from upstream
   const cookieHeader = response.headers.get('set-cookie');
   if (cookieHeader) {
-    const cookieStore = await cookies();
     parseSetCookies(cookieHeader).map((cookie) => {
       cookieStore.set(cookie.name, cookie.value, cookie);
     });
@@ -65,5 +107,29 @@ export const fetchSession = async (): Promise<SessionData> => {
   if (!response.ok || body === null) {
     return { session: null, user: null };
   }
-  return { session: body.session, user: body.user };
+
+  // Parse session data (converts date strings to Date objects)
+  const sessionData = parseSessionData(body);
+
+  if (sessionData.session === null) {
+    return sessionData;
+  }
+
+  // Create and set session data cookie for local validation
+  try {
+    const { sessionData: signedData, expiresAt } = await sessionToSignedCookie(sessionData);
+
+    cookieStore.set(NEON_AUTH_SESSION_DATA_COOKIE_NAME, signedData, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+      expires: expiresAt,
+    });
+  } catch (error) {
+    // Session data cookie creation failed - log but continue without it
+    console.error('Failed to create session data cookie:', error);
+  }
+
+  return sessionData;
 };

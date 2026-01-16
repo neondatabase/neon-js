@@ -1,13 +1,61 @@
+import { sessionToSignedCookie, type SessionData } from '../../server/session';
+import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../constants';
+import { parseSetCookies } from '../../utils/cookies';
+
 // Allowlist of response headers that we want to proxy to the client from Neon Auth.
 const RESPONSE_HEADERS_ALLOWLIST = ['content-type', 'content-length', 'content-encoding', 'transfer-encoding',
     'connection', 'date',
    'set-cookie', 'set-auth-jwt', 'set-auth-token', 'x-neon-ret-request-id'];
 
-export const handleAuthResponse = async (response: Response) => {
+export const handleAuthResponse = async (
+  response: Response
+) => {
+  const responseHeaders = prepareResponseHeaders(response);
+
+  // Check if upstream touched session_token cookie (creation, refresh, or deletion)
+  const setCookieHeader = response.headers.get('set-cookie');
+  if (setCookieHeader && setCookieHeader.includes('session_token')) {
+
+    // Remove the session data cookie if the session_token cookie is deleted
+    if (setCookieHeader.includes('max-age=0') ||
+        setCookieHeader.includes('Max-Age=0')) {
+
+      // Delete session data cookie too
+      responseHeaders.append('set-cookie',
+        `${NEON_AUTH_SESSION_DATA_COOKIE_NAME}=; ` +
+        `Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`
+      );
+    }
+    // Case 2: Cookie creation/refresh (sign-in, token refresh, user update)
+    // Create a new session data cookie
+    else {
+      try {
+        // Fetch session data using the new/refreshed session_token
+        const sessionData = await fetchSessionWithCookie(setCookieHeader);
+
+        console.log('sessionData ****', sessionData);
+        if (sessionData.session) {
+          // Create session data cookie
+          const { sessionData: signedData, expiresAt } = await sessionToSignedCookie(sessionData);
+
+          // Add to response
+          responseHeaders.append('set-cookie',
+            `${NEON_AUTH_SESSION_DATA_COOKIE_NAME}=${signedData}; ` +
+            `Path=/; HttpOnly; Secure; SameSite=Lax; ` +
+            `Expires=${expiresAt.toUTCString()}`
+          );
+        }
+      } catch (error) {
+        // Session data creation failed - log but don't break the response
+        console.error('Failed to create session data cookie:', error);
+      }
+    }
+  }
+
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
-    headers: prepareResponseHeaders(response),
+    headers: responseHeaders,
   })
 }
 
@@ -20,4 +68,32 @@ const prepareResponseHeaders = (response: Response) => {
     }
   }
   return headers;
+}
+
+/**
+ * Helper to fetch session using set-cookie header
+ */
+async function fetchSessionWithCookie(setCookieHeader: string): Promise<SessionData> {
+  const baseUrl = process.env.NEON_AUTH_BASE_URL!;
+
+  // Extract session_token cookie from set-cookie header
+  const parsedCookies = parseSetCookies(setCookieHeader);
+  const sessionToken = parsedCookies.find(c => c.name.includes('session_token'));
+
+  if (!sessionToken) {
+    throw new Error('session_token not found in set-cookie header');
+  }
+
+  const response = await fetch(`${baseUrl}/get-session`, {
+    headers: {
+      Cookie: `${sessionToken.name}=${sessionToken.value}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch session data');
+  }
+
+  const body = await response.json();
+  return { session: body.session, user: body.user };
 }

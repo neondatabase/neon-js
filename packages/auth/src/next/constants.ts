@@ -1,5 +1,5 @@
 // Re-export from core for backwards compatibility
-export { NEON_AUTH_COOKIE_PREFIX } from '../core/constants';
+export { NEON_AUTH_COOKIE_PREFIX, NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../core/constants';
 import { NEON_AUTH_COOKIE_PREFIX } from '../core/constants';
 
 export const NEON_AUTH_SESSION_COOKIE_NAME = `${NEON_AUTH_COOKIE_PREFIX}.session_token`;

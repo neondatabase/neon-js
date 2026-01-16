@@ -8,14 +8,14 @@ export { authApiHandler } from '../handler';
 
 /**
  * Creates a server-side auth API client for Next.js.
- * 
+ *
  * This client exposes the Neon Auth APIs including authentication, user management, organizations, and admin operations.
- * 
+ *
  * **Where to use:**
  * - React Server Components
  * - Server Actions
  * - Route Handlers
- * 
+ *
  * **Requirements:**
  * - `NEON_AUTH_BASE_URL` environment variable must be set
  * - Cookies are automatically read/written via `next/headers`
