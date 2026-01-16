@@ -1,3 +1,9 @@
+---
+name: neon-auth-nextjs
+description: Sets up Neon Auth in Next.js App Router applications. Configures API routes, middleware, server components, and UI. Use when adding auth-only to Next.js apps (no database needed).
+allowed-tools: ["Bash", "Write", "Read", "Edit", "Glob", "Grep"]
+---
+
 # Neon Auth for Next.js
 
 Help developers set up @neondatabase/auth in Next.js App Router applications (auth only, no database).
