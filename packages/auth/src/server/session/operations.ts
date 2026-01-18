@@ -8,6 +8,25 @@ import { SignJWT } from 'jose';
 const SESSION_CACHE_TTL_MS = 5 * 60 * 1000;
 
 /**
+ * Parse and validate date value, throwing descriptive error on failure
+ * @internal
+ */
+function parseDate(dateValue: unknown, fieldName: string): Date {
+  const date = new Date(dateValue as string);
+  if (isNaN(date.getTime())) {
+    throw new Error(`Invalid date value for ${fieldName}: ${JSON.stringify(dateValue)}`);
+  }
+  return date;
+}
+
+/**
+ * Check if session caching is enabled (secret is configured)
+ */
+export function isSessionCacheEnabled(): boolean {
+  return process.env.NEON_AUTH_COOKIE_SECRET !== undefined;
+}
+
+/**
  * Convert session data from /get-session into a signed cookie
  * @param sessionData - Session and user data from Auth server
  * @returns Signed session data cookie
@@ -45,60 +64,104 @@ function signPayload(
 
 /**
  * Parse session data from JSON, converting date strings to Date objects
+ *
+ * Note: Better Auth API returns ISO 8601 date strings. JSON.parse() does not
+ * automatically convert these to Date objects, so manual conversion is required.
+ *
  * @internal Exported for internal use by auth handler
  */
-export function parseSessionData(json: any): SessionData {
-  if (!json.session || !json.user) {
+export function parseSessionData(json: unknown): SessionData {
+  // Handle null/undefined/missing response
+  if (!json || typeof json !== 'object') {
     return { session: null, user: null };
   }
 
-  return {
-    session: {
-      ...json.session,
-      expiresAt: new Date(json.session.expiresAt),
-      createdAt: new Date(json.session.createdAt),
-      updatedAt: new Date(json.session.updatedAt),
-    },
-    user: {
-      ...json.user,
-      createdAt: new Date(json.user.createdAt),
-      updatedAt: new Date(json.user.updatedAt),
-    },
-  };
+  const data = json as any;
+
+  // Handle explicit null session
+  if (!data.session || !data.user) {
+    return { session: null, user: null };
+  }
+
+  // Validate and parse dates
+  try {
+    return {
+      session: {
+        ...data.session,
+        expiresAt: parseDate(data.session.expiresAt, 'session.expiresAt'),
+        createdAt: parseDate(data.session.createdAt, 'session.createdAt'),
+        updatedAt: parseDate(data.session.updatedAt, 'session.updatedAt'),
+      },
+      user: {
+        ...data.user,
+        createdAt: parseDate(data.user.createdAt, 'user.createdAt'),
+        updatedAt: parseDate(data.user.updatedAt, 'user.updatedAt'),
+      },
+    };
+  } catch (error) {
+    console.error('[parseSessionData] Failed to parse session dates:', {
+      error: error instanceof Error ? error.message : String(error),
+      hasSession: !!data.session,
+      hasUser: !!data.user,
+    });
+
+    // Return null session on parse error (graceful degradation)
+    return { session: null, user: null };
+  }
 }
 
 /**
- * Extract and validate session data from cookie in Request object
+ * Extract and validate session data from cookie header
+ * Falls back to null on any error (caller should fetch from API)
  *
- * @param request - The incoming Request object
- * @param cookieName - Name of the cookie to extract
- * @returns SessionData if cookie is valid, null otherwise
+ * @param request - Request object with cookie header
+ * @param cookieName - Name of session data cookie
+ * @returns SessionData or null on validation failure
  */
 export async function getSessionDataFromCookie(
   request: Request,
   cookieName: string
 ): Promise<SessionData | null> {
   try {
+    // Extract cookie header
     const cookieHeader = request.headers.get('cookie');
     if (!cookieHeader) {
-      return null;
+      return null; // No cookies - expected case
     }
 
+    // Parse cookie header
     const parsedCookies = parseCookies(cookieHeader);
     const sessionDataCookie = parsedCookies.get(cookieName);
+
     if (!sessionDataCookie) {
-      return null;
+      return null; // Cookie not present - expected case
     }
 
-    // Validate the cookie signature and expiry
+    // Validate cookie signature and expiry
     const result = await validateSessionData(sessionDataCookie);
+
     if (result.valid && result.payload) {
-      return result.payload;
+      return result.payload; // Valid cookie
     }
 
+    // Cookie present but invalid - log for visibility
+    console.warn('[getSessionDataFromCookie] Invalid session cookie:', {
+      error: result.error,
+      cookieName,
+      // Don't log cookie value for security
+    });
+
     return null;
-  } catch {
-    // Cookie validation error - return null for silent fallback
-    return null;
+  } catch (error) {
+    // Unexpected error during extraction/validation
+    console.error('[getSessionDataFromCookie] Unexpected validation error:', {
+      error: error instanceof Error ? error.message : String(error),
+      cookieName,
+      ...(process.env.NODE_ENV !== 'production' && {
+        stack: error instanceof Error ? error.stack : undefined,
+      }),
+    });
+
+    return null; // Fallback to API call
   }
 }

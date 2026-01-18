@@ -1,5 +1,7 @@
 export { validateSessionData, type SessionValidationResult } from './validator';
-export { 
+export {
   getSessionDataFromCookie,
-  signSessionDataCookie, 
-  parseSessionData } from './operations';
+  signSessionDataCookie,
+  parseSessionData,
+  isSessionCacheEnabled,
+} from './operations';

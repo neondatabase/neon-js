@@ -1,7 +1,7 @@
 import { createAuthServerInternal } from '@/server';
 import { createNextRequestContext } from './adapter';
 import { cookies } from 'next/headers';
-import { validateSessionData } from '@/server/session';
+import { validateSessionData, isSessionCacheEnabled } from '@/server/session';
 import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../constants';
 
 // Re-export server-side utilities
@@ -80,26 +80,42 @@ export function createAuthServer() {
     ...baseServer,
 
     async getSession(options?: Parameters<typeof baseServer.getSession>[0]) {
+      // Backward compatibility: if secret not configured, use original behavior
+      if (!isSessionCacheEnabled()) {
+        return baseServer.getSession(options);
+      }
+
       // Check if cookie cache is disabled via query param
-      const disableCookieCache = (options?.query?.disableCookieCache === 'true');
+      const disableCookieCache = options?.query?.disableCookieCache === 'true';
 
-      if (!disableCookieCache && process.env.NEON_AUTH_COOKIE_SECRET !== undefined) {
-        // Try cookie first (fast path)
-        try {
-          const cookieStore = await cookies();
-          const sessionDataCookie = cookieStore.get(NEON_AUTH_SESSION_DATA_COOKIE_NAME);
+      if (disableCookieCache) {
+        return baseServer.getSession(options);
+      }
 
-          if (sessionDataCookie?.value) {
-            const result = await validateSessionData(sessionDataCookie.value);
+      // Try cookie cache first
+      try {
+        const cookieStore = await cookies();
+        const sessionDataCookie = cookieStore.get(NEON_AUTH_SESSION_DATA_COOKIE_NAME);
 
-            if (result.valid && result.payload) {
-              // Valid cookie - return immediately (0 upstream calls)
-              return { data: result.payload, error: null };
-            }
+        if (sessionDataCookie?.value) {
+          const result = await validateSessionData(sessionDataCookie.value);
+
+          if (result.valid && result.payload) {
+            // Cache hit - return immediately
+            return { data: result.payload, error: null };
+          } else if (result.error) {
+            // Cache miss - invalid cookie
+            console.debug('[createAuthServer.getSession] Invalid session cookie:', {
+              error: result.error,
+            });
           }
-        } catch {
-          // Cookie read/validation error - silently fall through to upstream
         }
+      } catch (error) {
+        // Cookie read/validation error - log and fall through
+        console.error('[createAuthServer.getSession] Cookie validation error:', {
+          error: error instanceof Error ? error.message : String(error),
+          hasSecret: !!process.env.NEON_AUTH_COOKIE_SECRET,
+        });
       }
 
       // Fallback: Call upstream API

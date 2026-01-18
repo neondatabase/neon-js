@@ -4,7 +4,7 @@ import { NEON_AUTH_BASE_URL } from '../env-variables';
 import { ERRORS } from '@/server/errors';
 import { fetchSession } from '../auth/session';
 import { NEON_AUTH_HEADER_MIDDLEWARE_NAME, NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../constants';
-import { validateSessionData } from '../../server/session';
+import { validateSessionData, isSessionCacheEnabled } from '../../server/session';
 
 const AUTH_API_ROUTES = '/api/auth';
 const SKIP_ROUTES = [
@@ -72,18 +72,34 @@ export function neonAuthMiddleware({
       return NextResponse.next();
     }
 
-    if (process.env.NEON_AUTH_COOKIE_SECRET !== undefined) {
+    // Try session cookie cache if enabled (backward compatible)
+    if (isSessionCacheEnabled()) {
       const sessionDataCookie = request.cookies.get(NEON_AUTH_SESSION_DATA_COOKIE_NAME)?.value;
 
       if (sessionDataCookie) {
-        const result = await validateSessionData(sessionDataCookie);
-        if (result.valid) {
-          // Valid session cache - allow request without API call
-          const reqHeaders = new Headers(request.headers);
-          reqHeaders.set(NEON_AUTH_HEADER_MIDDLEWARE_NAME, 'true');
+        try {
+          const result = await validateSessionData(sessionDataCookie);
 
-          return NextResponse.next({
-            request: { headers: reqHeaders },
+          if (result.valid) {
+            // Cache hit - fast path (no API call)
+            const reqHeaders = new Headers(request.headers);
+            reqHeaders.set(NEON_AUTH_HEADER_MIDDLEWARE_NAME, 'true');
+
+            return NextResponse.next({
+              request: { headers: reqHeaders },
+            });
+          } else {
+            // Cache miss - invalid cookie
+            console.debug('[neonAuthMiddleware] Invalid session cookie:', {
+              pathname,
+              error: result.error,
+            });
+          }
+        } catch (error) {
+          // Validation error - log and fall through to API call
+          console.error('[neonAuthMiddleware] Cookie validation error:', {
+            pathname,
+            error: error instanceof Error ? error.message : String(error),
           });
         }
       }

@@ -1,4 +1,4 @@
-import { signSessionDataCookie } from '../../server/session';
+import { signSessionDataCookie, isSessionCacheEnabled } from '../../server/session';
 import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../constants';
 import { parseSetCookies } from '../../server/utils/cookies';
 import type { SessionData } from '@/server/types';
@@ -13,7 +13,7 @@ export const handleAuthResponse = async (response: Response) => {
   const responseHeaders = prepareResponseHeaders(response);
 
   // If session cookie secret is set, procure session data cookie from upstream response
-  if (process.env.NEON_AUTH_COOKIE_SECRET !== undefined) {
+  if (isSessionCacheEnabled()) {
     const sessionDataCookie = await procureSessionData(response.headers);
     if (sessionDataCookie) {
       responseHeaders.set('set-cookie', sessionDataCookie);
@@ -41,32 +41,57 @@ const prepareResponseHeaders = (response: Response) => {
 async function procureSessionData(headers: Headers): Promise<string | null> {
   const setCookieHeader = headers.get('set-cookie');
   const sessionTokenChanged = setCookieHeader && setCookieHeader.includes('session_token');
-  if (sessionTokenChanged) {
-    // Delete session data cookie, if session_token cookie is deleted
-    if (setCookieHeader.includes('max-age=0') ||
-        setCookieHeader.includes('Max-Age=0')) {
 
-      return `${NEON_AUTH_SESSION_DATA_COOKIE_NAME}=; ` +
-        `Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
+  if (!sessionTokenChanged) {
+    return null;
+  }
+
+  // Delete session data cookie if session_token cookie is deleted
+  if (setCookieHeader.includes('max-age=0') || setCookieHeader.includes('Max-Age=0')) {
+    return `${NEON_AUTH_SESSION_DATA_COOKIE_NAME}=; ` +
+      `Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
+  }
+
+  // Update session data cookie if session_token cookie is refreshed
+  try {
+    const sessionData = await fetchSessionWithCookie(setCookieHeader);
+
+    if (sessionData.session) {
+      const { value: signedData, expiresAt } = await signSessionDataCookie(sessionData);
+
+      return `${NEON_AUTH_SESSION_DATA_COOKIE_NAME}=${signedData}; ` +
+        `Path=/; HttpOnly; Secure; SameSite=Lax; ` +
+        `Expires=${expiresAt.toUTCString()}`;
     }
-    // Update session data cookie, if session_token cookie is refreshed
-    else {
-      try {
-        const sessionData = await fetchSessionWithCookie(setCookieHeader);
-        if (sessionData.session) {         
-          const { value: signedData, expiresAt } = await signSessionDataCookie(sessionData);
+  } catch (error) {
+    // Categorize error for better debugging
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorContext = {
+      error: errorMessage,
+      setCookieHeaderLength: setCookieHeader?.length || 0,
+    };
 
-          return `${NEON_AUTH_SESSION_DATA_COOKIE_NAME}=${signedData}; ` +
-            `Path=/; HttpOnly; Secure; SameSite=Lax; ` +
-            `Expires=${expiresAt.toUTCString()}`;
-        }
-      } catch (error) {
-        // Session data creation failed - log but don't break the response
-        console.error('Failed to create session data cookie:', error);
-      }
+    if (errorMessage.includes('session_token not found')) {
+      console.warn('[procureSessionData] Session token missing in set-cookie:', errorContext);
+    } else if (errorMessage.includes('Failed to fetch session data')) {
+      console.error('[procureSessionData] Upstream /get-session request failed:', errorContext);
+    } else if (errorMessage.includes('NEON_AUTH_COOKIE_SECRET')) {
+      console.error('[procureSessionData] Cookie secret configuration error:', errorContext);
+    } else if (errorMessage.includes('Invalid date')) {
+      console.error('[procureSessionData] Date parsing error:', errorContext);
+    } else {
+      console.error('[procureSessionData] Unexpected error:', {
+        ...errorContext,
+        ...(process.env.NODE_ENV !== 'production' && {
+          stack: error instanceof Error ? error.stack : undefined,
+        }),
+      });
     }
   }
-  return null
+
+  // Return null on error - upstream response will still be returned to client
+  // Session cache will be skipped but auth still works
+  return null;
 }
 
 async function fetchSessionWithCookie(setCookieHeader: string): Promise<SessionData> {
@@ -85,9 +110,15 @@ async function fetchSessionWithCookie(setCookieHeader: string): Promise<SessionD
   });
 
   if (!response.ok) {
-    throw new Error('Failed to fetch session data');
+    throw new Error(`Failed to fetch session data: ${response.status} ${response.statusText}`);
   }
 
-  const body = await response.json();
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch (error) {
+    throw new Error(`Failed to parse /get-session response as JSON: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
   return parseSessionData(body);
 }

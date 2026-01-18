@@ -4,7 +4,7 @@ import { getUpstreamURL } from '../handler/request';
 import { NEON_AUTH_BASE_URL } from '../env-variables';
 
 import { extractNeonAuthCookies, parseSetCookies } from '@/server/utils/cookies';
-import { signSessionDataCookie, validateSessionData } from '@/server/session';
+import { signSessionDataCookie, validateSessionData, isSessionCacheEnabled } from '@/server/session';
 import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../constants';
 import type { SessionData } from '@/server/types';
 
@@ -35,6 +35,10 @@ export function parseSessionData(json: any): SessionData {
 /**
  * A utility function to be used in react server components to fetch the session details.
  *
+ * Behavior:
+ * - If NEON_AUTH_COOKIE_SECRET is set: Tries cache first, falls back to API
+ * - If NEON_AUTH_COOKIE_SECRET is missing: Always calls API (backward compatibility)
+ *
  * @returns - `{ session: Session, user: User }` | `{ session: null, user: null}`.
  *
  * @example
@@ -45,23 +49,37 @@ export function parseSessionData(json: any): SessionData {
  * ```
  */
 export const neonAuth = async (): Promise<SessionData> => {
-  // Read session data cookie (middleware guarantees validity)
+  // Backward compatibility: if secret not configured, use pre-PR behavior
+  if (!isSessionCacheEnabled()) {
+    return await fetchSession({ disableRefresh: true });
+  }
+
+  // Try cache first
   const cookieStore = await cookies();
   const sessionDataCookie = cookieStore.get(NEON_AUTH_SESSION_DATA_COOKIE_NAME)?.value;
 
   if (sessionDataCookie) {
-    const result = await validateSessionData(sessionDataCookie);
+    try {
+      const result = await validateSessionData(sessionDataCookie);
 
-    if (result.valid && result.payload) {
-      // Payload is already SessionData (nested structure)
-      return result.payload;
+      if (result.valid && result.payload) {
+        // Cache hit - fast path
+        return result.payload;
+      }
+
+      // Cache miss - invalid cookie
+      console.debug('[neonAuth] Invalid session cookie, fetching from API:', {
+        error: result.error,
+      });
+    } catch (error) {
+      // Validation error - log and fall through
+      console.error('[neonAuth] Cookie validation error:', {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
-  // Fallback: Cookie missing or invalid
-  // This only happens if neonAuth() called without middleware or on excluded routes
-  // Use disableRefresh=true to avoid refreshing session during read-only operations
-  // TODO: For GA release, we should remove this fallback and throw an error if the session data cookie is missing or invalid.
+  // Fallback: fetch from API
   return await fetchSession({ disableRefresh: true });
 };
 
@@ -85,48 +103,110 @@ export const fetchSession = async (options?: { disableRefresh?: boolean }): Prom
     originalUrl,
   });
 
-  const response = await fetch(upstreamURL.toString(), {
-    method: 'GET',
-    headers: {
-      Cookie: extractNeonAuthCookies(requestHeaders),
-    },
-  });
-
-  const body = await response.json();
-  const cookieStore = await cookies();
-
-  // Handle set-cookie from upstream
-  const cookieHeader = response.headers.get('set-cookie');
-  if (cookieHeader) {
-    parseSetCookies(cookieHeader).map((cookie) => {
-      cookieStore.set(cookie.name, cookie.value, cookie);
+  // STEP 1: Network request with timeout
+  let response: Response;
+  try {
+    response = await fetch(upstreamURL.toString(), {
+      method: 'GET',
+      headers: {
+        Cookie: extractNeonAuthCookies(requestHeaders),
+      },
+      signal: AbortSignal.timeout(10000), // 10s timeout
     });
-  }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
 
-  if (!response.ok || body === null) {
+    console.error('[fetchSession] Network error:', {
+      url: upstreamURL.toString(),
+      error: errorMessage,
+      errorName: error instanceof Error ? error.name : 'Unknown',
+      isTimeout: errorMessage.includes('timeout') || errorMessage.includes('aborted'),
+    });
+
     return { session: null, user: null };
   }
 
-  // Parse session data (converts date strings to Date objects)
+  // STEP 2: Parse JSON response
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch (error) {
+    console.error('[fetchSession] JSON parse error:', {
+      status: response.status,
+      statusText: response.statusText,
+      contentType: response.headers.get('content-type'),
+      error: error instanceof Error ? error.message : String(error),
+    });
+
+    return { session: null, user: null };
+  }
+
+  // STEP 3: Handle upstream set-cookie headers
+  const cookieStore = await cookies();
+  const cookieHeader = response.headers.get('set-cookie');
+  if (cookieHeader) {
+    try {
+      parseSetCookies(cookieHeader).forEach((cookie) => {
+        cookieStore.set(cookie.name, cookie.value, cookie);
+      });
+    } catch (error) {
+      // Expected in RSC context - ignore
+      const isExpectedError = error instanceof Error &&
+        error.message.includes('cookies can only be modified');
+
+      if (!isExpectedError) {
+        console.error('[fetchSession] Failed to set upstream cookies:', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  // STEP 4: Check response status
+  if (!response.ok || body === null) {
+    console.warn('[fetchSession] Non-OK response from upstream:', {
+      status: response.status,
+      statusText: response.statusText,
+      bodyIsNull: body === null,
+      url: upstreamURL.toString(),
+    });
+
+    return { session: null, user: null };
+  }
+
+  // STEP 5: Parse session data (validates dates)
   const sessionData = parseSessionData(body);
 
   if (sessionData.session === null) {
     return sessionData;
   }
 
-  try {
-    const { value: signedData, expiresAt } = await signSessionDataCookie(sessionData);
+  // STEP 6: Create session data cookie if caching is enabled
+  if (isSessionCacheEnabled()) {
+    try {
+      const { value: signedData, expiresAt } = await signSessionDataCookie(sessionData);
 
-    cookieStore.set(NEON_AUTH_SESSION_DATA_COOKIE_NAME, signedData, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'lax',
-      path: '/',
-      expires: expiresAt,
-    });
-  } catch {
-    // Expected: cookies can only be modified in Server Actions/Route Handlers
-    // Silently ignore - session data still works, middleware will handle cookie creation
+      cookieStore.set(NEON_AUTH_SESSION_DATA_COOKIE_NAME, signedData, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+        path: '/',
+        expires: expiresAt,
+      });
+    } catch (error) {
+      // Expected in RSC context - middleware will handle cookie creation
+      const isExpectedError = error instanceof Error &&
+        (error.message.includes('cookies can only be modified') ||
+         error.message.includes('Server Actions') ||
+         error.message.includes('Route Handlers'));
+
+      if (!isExpectedError) {
+        console.error('[fetchSession] Unexpected cookie creation error:', {
+          error: error instanceof Error ? error.message : String(error),
+          hasSession: !!sessionData.session,
+        });
+      }
+    }
   }
 
   return sessionData;
