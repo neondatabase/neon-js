@@ -1,6 +1,8 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import { validateSessionData } from './validator';
-import { signSessionDataCookie } from './operations';
+import { signSessionDataCookie, parseSessionData, getSessionDataFromCookie, isSessionCacheEnabled } from './operations';
+import { getCookieSecret } from './signer';
+import { ERRORS } from '@/server/errors';
 import type { RequireSessionData } from '@/server/types';
 import type { BetterAuthSession, BetterAuthUser } from '@/core/better-auth-types';
 
@@ -71,7 +73,7 @@ describe('validateSessionData', () => {
     // Change the secret for validation
     process.env.NEON_AUTH_COOKIE_SECRET = 'wrong-secret-at-least-32-characters!';
     const result = await validateSessionData(cookie.value);
-    
+
     expect(result.valid).toBe(false);
     expect(result.error).toBeDefined();
 
@@ -100,6 +102,24 @@ describe('validateSessionData', () => {
     const result = await validateSessionData(tamperedData);
 
     expect(result.valid).toBe(false);
+  });
+
+  test('should reject non-JWT format strings', async () => {
+    const result = await validateSessionData('not-a-jwt-token');
+    expect(result.valid).toBe(false);
+    expect(result.error).toBeDefined();
+  });
+
+  test('should reject JWT with missing parts', async () => {
+    const result = await validateSessionData('header.payload'); // Missing signature
+    expect(result.valid).toBe(false);
+    expect(result.error).toBeDefined();
+  });
+
+  test('should reject empty cookie value', async () => {
+    const result = await validateSessionData('');
+    expect(result.valid).toBe(false);
+    expect(result.error).toBeDefined();
   });
 });
 
@@ -146,5 +166,173 @@ describe('signSessionDataCookie', () => {
     expect(result.value).toBeTypeOf('string');
     expect(result.expiresAt).toBeInstanceOf(Date);
   });
+
+  test('should use session expiry when less than 5-minute TTL', async () => {
+    const twoMinutesFromNow = new Date(Date.now() + 2 * 60 * 1000);
+    const sessionData = createTestSessionData(twoMinutesFromNow);
+
+    const result = await signSessionDataCookie(sessionData);
+
+    // Should use session expiry (2 min), not 5-min TTL
+    const timeDiff = Math.abs(result.expiresAt.getTime() - twoMinutesFromNow.getTime());
+    expect(timeDiff).toBeLessThan(1000); // 1 second tolerance
+  });
 });
 
+describe('Environment Variable Handling', () => {
+  const originalSecret = process.env.NEON_AUTH_COOKIE_SECRET;
+
+  afterEach(() => {
+    process.env.NEON_AUTH_COOKIE_SECRET = originalSecret;
+  });
+
+  test('isSessionCacheEnabled returns false when secret is missing', () => {
+    delete process.env.NEON_AUTH_COOKIE_SECRET;
+    expect(isSessionCacheEnabled()).toBe(false);
+  });
+
+  test('isSessionCacheEnabled returns true when secret is set', () => {
+    process.env.NEON_AUTH_COOKIE_SECRET = TEST_SECRET;
+    expect(isSessionCacheEnabled()).toBe(true);
+  });
+
+  test('getCookieSecret throws when secret is missing', () => {
+    delete process.env.NEON_AUTH_COOKIE_SECRET;
+    expect(() => getCookieSecret()).toThrow(ERRORS.MISSING_COOKIE_SECRET);
+  });
+
+  test('getCookieSecret throws when secret is too short', () => {
+    process.env.NEON_AUTH_COOKIE_SECRET = 'short'; // < 32 chars
+    expect(() => getCookieSecret()).toThrow(ERRORS.COOKIE_SECRET_TOO_SHORT);
+  });
+});
+
+describe('parseSessionData', () => {
+  test('parses valid ISO date strings', () => {
+    const json = {
+      session: {
+        id: 'session-123',
+        userId: 'user-123',
+        token: 'token-abc',
+        expiresAt: '2026-01-20T00:00:00.000Z', // ISO string
+        createdAt: '2026-01-18T00:00:00.000Z',
+        updatedAt: '2026-01-18T00:00:00.000Z',
+        ipAddress: '127.0.0.1',
+        userAgent: 'test',
+      },
+      user: {
+        id: 'user-123',
+        email: 'test@example.com',
+        emailVerified: true,
+        name: 'Test User',
+        image: null,
+        createdAt: '2026-01-18T00:00:00.000Z',
+        updatedAt: '2026-01-18T00:00:00.000Z',
+      },
+    };
+
+    const result = parseSessionData(json);
+    expect(result.session?.expiresAt).toBeInstanceOf(Date);
+    expect(result.session?.expiresAt.getTime()).toBeGreaterThan(0);
+    expect(result.user?.createdAt).toBeInstanceOf(Date);
+  });
+
+  test('handles missing session/user gracefully', () => {
+    const result = parseSessionData({});
+    expect(result.session).toBe(null);
+    expect(result.user).toBe(null);
+  });
+
+  test('handles null session in response', () => {
+    const result = parseSessionData({ session: null, user: null });
+    expect(result.session).toBe(null);
+    expect(result.user).toBe(null);
+  });
+
+  test('returns null session on invalid date strings', () => {
+    const json = {
+      session: {
+        id: 'session-123',
+        userId: 'user-123',
+        token: 'token-abc',
+        expiresAt: 'not-a-date',
+        createdAt: '2026-01-18T00:00:00.000Z',
+        updatedAt: '2026-01-18T00:00:00.000Z',
+        ipAddress: '127.0.0.1',
+        userAgent: 'test',
+      },
+      user: {
+        id: 'user-123',
+        email: 'test@example.com',
+        emailVerified: true,
+        name: 'Test User',
+        image: null,
+        createdAt: '2026-01-18T00:00:00.000Z',
+        updatedAt: '2026-01-18T00:00:00.000Z',
+      },
+    };
+
+    // After error handling improvements, this should return null session
+    const result = parseSessionData(json);
+    expect(result.session).toBe(null);
+    expect(result.user).toBe(null);
+  });
+
+  test('handles null/undefined input', () => {
+    expect(parseSessionData(null)).toEqual({ session: null, user: null });
+    expect(parseSessionData(undefined)).toEqual({ session: null, user: null });
+  });
+});
+
+describe('getSessionDataFromCookie', () => {
+  test('returns null when cookie header is missing', async () => {
+    const request = new Request('https://example.com', {});
+    const result = await getSessionDataFromCookie(request, 'session_data');
+    expect(result).toBe(null);
+  });
+
+  test('returns null when target cookie is not present', async () => {
+    const request = new Request('https://example.com', {
+      headers: { Cookie: 'other_cookie=value' },
+    });
+    const result = await getSessionDataFromCookie(request, 'session_data');
+    expect(result).toBe(null);
+  });
+
+  test('extracts and validates session data from valid cookie', async () => {
+    const sessionData = createTestSessionData();
+    const cookie = await signSessionDataCookie(sessionData);
+
+    const request = new Request('https://example.com', {
+      headers: { Cookie: `session_data=${cookie.value}` },
+    });
+
+    const result = await getSessionDataFromCookie(request, 'session_data');
+    expect(result).not.toBe(null);
+    expect(result?.session?.id).toBe('session-123');
+    expect(result?.user?.id).toBe(TEST_USER_ID);
+  });
+
+  test('returns null for invalid cookie signature', async () => {
+    const request = new Request('https://example.com', {
+      headers: { Cookie: 'session_data=invalid.jwt.token' },
+    });
+
+    const result = await getSessionDataFromCookie(request, 'session_data');
+    expect(result).toBe(null);
+  });
+
+  test('handles multiple cookies in header', async () => {
+    const sessionData = createTestSessionData();
+    const cookie = await signSessionDataCookie(sessionData);
+
+    const request = new Request('https://example.com', {
+      headers: {
+        Cookie: `other=value; session_data=${cookie.value}; another=123`,
+      },
+    });
+
+    const result = await getSessionDataFromCookie(request, 'session_data');
+    expect(result?.session?.id).toBe('session-123');
+  });
+});
