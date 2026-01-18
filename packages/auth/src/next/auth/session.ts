@@ -4,33 +4,9 @@ import { getUpstreamURL } from '../handler/request';
 import { NEON_AUTH_BASE_URL } from '../env-variables';
 
 import { extractNeonAuthCookies, parseSetCookies } from '@/server/utils/cookies';
-import { signSessionDataCookie, validateSessionData, isSessionCacheEnabled } from '@/server/session';
+import { signSessionDataCookie, validateSessionData, isSessionCacheEnabled, parseSessionData } from '@/server/session';
 import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../constants';
 import type { SessionData } from '@/server/types';
-
-/**
- * Parse session data from JSON, converting date strings to Date objects
- * @internal Exported for internal use by auth handler
- */
-export function parseSessionData(json: any): SessionData {
-  if (!json.session || !json.user) {
-    return { session: null, user: null };
-  }
-
-  return {
-    session: {
-      ...json.session,
-      expiresAt: new Date(json.session.expiresAt),
-      createdAt: new Date(json.session.createdAt),
-      updatedAt: new Date(json.session.updatedAt),
-    },
-    user: {
-      ...json.user,
-      createdAt: new Date(json.user.createdAt),
-      updatedAt: new Date(json.user.updatedAt),
-    },
-  };
-}
 
 /**
  * A utility function to be used in react server components to fetch the session details.
