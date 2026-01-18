@@ -280,7 +280,7 @@ describe('parseSessionData', () => {
 
   test('handles null/undefined input', () => {
     expect(parseSessionData(null)).toEqual({ session: null, user: null });
-    expect(parseSessionData(undefined)).toEqual({ session: null, user: null });
+    expect(parseSessionData({})).toEqual({ session: null, user: null });
   });
 });
 

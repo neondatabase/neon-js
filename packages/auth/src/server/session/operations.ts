@@ -13,8 +13,8 @@ const SESSION_CACHE_TTL_MS = 5 * 60 * 1000;
  */
 function parseDate(dateValue: unknown, fieldName: string): Date {
   const date = new Date(dateValue as string);
-  if (isNaN(date.getTime())) {
-    throw new Error(`Invalid date value for ${fieldName}: ${JSON.stringify(dateValue)}`);
+  if (Number.isNaN(date.getTime())) {
+    throw new TypeError(`Invalid date value for ${fieldName}: ${JSON.stringify(dateValue)}`);
   }
   return date;
 }

@@ -87,7 +87,7 @@ export const fetchSession = async (options?: { disableRefresh?: boolean }): Prom
       headers: {
         Cookie: extractNeonAuthCookies(requestHeaders),
       },
-      signal: AbortSignal.timeout(10000), // 10s timeout
+      signal: AbortSignal.timeout(3000), // 3s timeout
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -122,9 +122,9 @@ export const fetchSession = async (options?: { disableRefresh?: boolean }): Prom
   const cookieHeader = response.headers.get('set-cookie');
   if (cookieHeader) {
     try {
-      parseSetCookies(cookieHeader).forEach((cookie) => {
+      for (const cookie of parseSetCookies(cookieHeader)) {
         cookieStore.set(cookie.name, cookie.value, cookie);
-      });
+      }
     } catch (error) {
       // Expected in RSC context - ignore
       const isExpectedError = error instanceof Error &&
