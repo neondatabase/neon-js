@@ -1,7 +1,8 @@
-import { sessionToSignedCookie } from '../../server/session';
+import { signSessionDataCookie } from '../../server/session';
 import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../constants';
-import { parseSetCookies } from '../../utils/cookies';
-import { parseSessionData, type SessionData } from '../auth/session';
+import { parseSetCookies } from '../../server/utils/cookies';
+import type { SessionData } from '@/server/types';
+import { parseSessionData } from '@/server/session/operations';
 
 // Allowlist of response headers that we want to proxy to the client from Neon Auth.
 const RESPONSE_HEADERS_ALLOWLIST = ['content-type', 'content-length', 'content-encoding', 'transfer-encoding',
@@ -44,7 +45,7 @@ export const handleAuthResponse = async (
 
         if (sessionData.session) {
           // Create session data cookie
-          const { sessionData: signedData, expiresAt } = await sessionToSignedCookie(sessionData);
+          const { value: signedData, expiresAt } = await signSessionDataCookie(sessionData);
 
           // Add to response
           responseHeaders.append('set-cookie',

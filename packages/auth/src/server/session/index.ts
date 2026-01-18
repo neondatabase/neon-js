@@ -1,3 +1,5 @@
-export { signSessionData, getCookieSecret, type SessionData, type SessionCookieData } from './signer';
-export { validateSessionData, quickValidateSessionData, type SessionValidationResult } from './validator';
-export { sessionToSignedCookie } from './operations';
+export { validateSessionData, type SessionValidationResult } from './validator';
+export { 
+  getSessionDataFromCookie,
+  signSessionDataCookie, 
+  parseSessionData } from './operations';

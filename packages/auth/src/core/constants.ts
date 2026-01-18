@@ -1,15 +1,14 @@
 /**
  * Session caching configuration constants
  *
- * Uses 5-minute cache TTL for session data cookies.
- * Cache is automatically refreshed when expired via middleware fallback.
+ * Uses industry-standard 60s cache TTL (common across auth providers).
  *
  * Note: Token refresh detection is now automatic via Better Auth's
  * fetchOptions.onSuccess callback. No polling is needed.
  */
 
-/** Session cache TTL in milliseconds (5 minutes) */
-export const SESSION_CACHE_TTL_MS = 5 * 60 * 1000;
+/** Session cache TTL in milliseconds (60 seconds) */
+export const SESSION_CACHE_TTL_MS = 60_000;
 
 /** Clock skew buffer for token expiration checks in milliseconds (10 seconds) */
 export const CLOCK_SKEW_BUFFER_MS = 10_000;
@@ -32,9 +31,3 @@ export const NEON_AUTH_POPUP_CALLBACK_ROUTE = '/auth/callback';
 
 /** Message type for OAuth popup completion postMessage */
 export const OAUTH_POPUP_MESSAGE_TYPE = 'neon-auth:oauth-complete';
-
-/** Prefix for all Neon Auth cookies */
-export const NEON_AUTH_COOKIE_PREFIX = '__Secure-neon-auth';
-
-/** Name of the signed session data cookie for local validation */
-export const NEON_AUTH_SESSION_DATA_COOKIE_NAME = `${NEON_AUTH_COOKIE_PREFIX}.next.session_data`;

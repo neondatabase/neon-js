@@ -1,7 +1,7 @@
-import { createAuthServerInternal } from '../../server';
+import { createAuthServerInternal } from '@/server';
 import { createNextRequestContext } from './adapter';
 import { cookies } from 'next/headers';
-import { validateSessionData } from '../../server/session';
+import { validateSessionData } from '@/server/session';
 import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../constants';
 
 // Re-export server-side utilities

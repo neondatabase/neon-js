@@ -1,6 +1,6 @@
 import { cookies, headers } from 'next/headers';
 import type { RequestContext } from '../../server';
-import { extractNeonAuthCookies } from '../../utils/cookies';
+import { extractNeonAuthCookies } from '../../server/utils/cookies';
 
 /**
  * Creates a Next.js-specific RequestContext that reads cookies and headers

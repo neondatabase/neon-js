@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { needsSessionVerification, exchangeOAuthToken } from './oauth';
 import { NEON_AUTH_BASE_URL } from '../env-variables';
-import { ERRORS } from '../errors';
+import { ERRORS } from '@/server/errors';
 import { fetchSession } from '../auth/session';
 import { NEON_AUTH_HEADER_MIDDLEWARE_NAME, NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../constants';
 import { validateSessionData } from '../../server/session';

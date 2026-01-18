@@ -1,6 +1,6 @@
 import { jwtVerify } from 'jose';
-import { isJwtValid } from '../../utils/jwt';
-import { getCookieSecret, type SessionData } from './signer';
+import type { SessionData } from '@/server/types';
+import { getCookieSecret } from './signer';
 
 export interface SessionValidationResult {
   valid: boolean;
@@ -29,14 +29,4 @@ export async function validateSessionData(
       error: error instanceof Error ? error.message : 'Invalid session data',
     };
   }
-}
-
-/**
- * Quick session data validation (expiry check only, no signature verification)
- * Faster than full validation but less secure - use for performance-critical paths
- * @param sessionDataString - Session data string to validate
- * @returns true if session data is not expired
- */
-export function quickValidateSessionData(sessionDataString: string): boolean {
-  return isJwtValid(sessionDataString);
 }

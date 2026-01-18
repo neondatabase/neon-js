@@ -1,7 +1,8 @@
-import { ERRORS } from '../errors';
+import { ERRORS } from '@/server/errors';
 import { handleAuthRequest } from './request';
 import { handleAuthResponse } from './response';
-import { getSessionDataFromCookie } from './session-cookie';
+import { getSessionDataFromCookie } from '@/server/session';
+import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../constants';
 
 type Params = { path: string[] };
 
@@ -45,7 +46,7 @@ export function authApiHandler() {
       // Try cookie validation unless explicitly disabled
       if (disableCookieCache !== 'true') {
         console.time('authApiHandler:getSessionDataFromCookie');
-        const sessionData = await getSessionDataFromCookie(request);
+        const sessionData = await getSessionDataFromCookie(request, NEON_AUTH_SESSION_DATA_COOKIE_NAME);
         console.timeEnd('authApiHandler:getSessionDataFromCookie');
         if (sessionData && sessionData.session) {
           // Valid cookie - return directly without upstream call

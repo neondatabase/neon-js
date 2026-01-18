@@ -1,5 +1,5 @@
 import { parseCookies, parseSetCookieHeader } from 'better-auth/cookies';
-import { NEON_AUTH_COOKIE_PREFIX } from '../core/constants';
+import { NEON_AUTH_COOKIE_PREFIX } from '../constants';
 
 export interface ParsedCookie {
   name: string;

@@ -1,24 +1,12 @@
 import { cookies, headers } from 'next/headers';
-import type {
-  BetterAuthSession as Session,
-  BetterAuthUser as User,
-} from '../../core/better-auth-types';
+
 import { getUpstreamURL } from '../handler/request';
 import { NEON_AUTH_BASE_URL } from '../env-variables';
 
-import { extractNeonAuthCookies, parseSetCookies } from '../../utils/cookies';
-import { sessionToSignedCookie, validateSessionData } from '../../server/session';
-import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../../core/constants';
-
-export type SessionData =
-  | {
-      session: Session;
-      user: User;
-    }
-  | {
-      session: null;
-      user: null;
-    };
+import { extractNeonAuthCookies, parseSetCookies } from '@/server/utils/cookies';
+import { signSessionDataCookie, validateSessionData } from '@/server/session';
+import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../constants';
+import type { SessionData } from '@/server/types';
 
 /**
  * Parse session data from JSON, converting date strings to Date objects
@@ -126,9 +114,8 @@ export const fetchSession = async (options?: { disableRefresh?: boolean }): Prom
     return sessionData;
   }
 
-  // Create and set session data cookie for local validation
   try {
-    const { sessionData: signedData, expiresAt } = await sessionToSignedCookie(sessionData);
+    const { value: signedData, expiresAt } = await signSessionDataCookie(sessionData);
 
     cookieStore.set(NEON_AUTH_SESSION_DATA_COOKIE_NAME, signedData, {
       httpOnly: true,

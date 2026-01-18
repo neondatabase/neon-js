@@ -8,7 +8,7 @@ import {
   type EndpointConfig,
   type EndpointTree,
 } from './endpoints';
-import { parseSetCookies } from '../utils/cookies';
+import { parseSetCookies } from '@/server/utils/cookies';
 
 export interface NeonAuthServerConfig {
   baseUrl: string;
