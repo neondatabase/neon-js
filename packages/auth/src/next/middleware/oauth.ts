@@ -41,7 +41,7 @@ export const exchangeOAuthToken = async (
     'get-session'
   );
 
-  const response = await handleAuthResponse(upstreamResponse, upstreamRequest);
+  const response = await handleAuthResponse(upstreamResponse);
   if (response.ok) {
     const headers = new Headers();
     const cookies = extractResponseCookies(response.headers);

@@ -6,7 +6,7 @@ import { authServer } from "@/lib/auth/server"
 
 // DELETE - Delete a note by ID
 export async function DELETE(
-    request: NextRequest,
+    _: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     const { data: session } = await authServer.getSession()

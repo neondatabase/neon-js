@@ -25,7 +25,7 @@ export { authApiHandler } from '../handler';
  * 
  * @returns Auth server API client for Next.js
  * @throws Error if `NEON_AUTH_BASE_URL` environment variable is not set
- * 
+ *
  * @example
  * ```typescript
  * // lib/auth/server.ts - Create a singleton instance
@@ -44,14 +44,14 @@ export { authApiHandler } from '../handler';
  *   return <div>Hello {session.user.name}</div>;
  * }
  * ```
- * 
+ *
  * @example
  * ```typescript
  * // Server Action - Sign in
  * 'use server';
  * import { authServer } from '@/lib/auth/server';
  * import { redirect } from 'next/navigation';
- * 
+ *
  * export async function signIn(formData: FormData) {
  *   const { error } = await authServer.signIn.email({
  *     email: formData.get('email') as string,
@@ -81,9 +81,9 @@ export function createAuthServer() {
 
     async getSession(options?: Parameters<typeof baseServer.getSession>[0]) {
       // Check if cookie cache is disabled via query param
-      const disableCookieCache = (options?.query as any)?.disableCookieCache === 'true';
+      const disableCookieCache = (options?.query?.disableCookieCache === 'true');
 
-      if (!disableCookieCache) {
+      if (!disableCookieCache && process.env.NEON_AUTH_COOKIE_SECRET !== undefined) {
         // Try cookie first (fast path)
         try {
           const cookieStore = await cookies();
@@ -97,7 +97,7 @@ export function createAuthServer() {
               return { data: result.payload, error: null };
             }
           }
-        } catch (error) {
+        } catch {
           // Cookie read/validation error - silently fall through to upstream
         }
       }

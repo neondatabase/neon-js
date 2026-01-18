@@ -24,17 +24,6 @@ type NeonAuthMiddlewareOptions = {
    * Defaults to `/auth/sign-in`
    */
   loginUrl?: string;
-  /**
-   * Session cache configuration
-   */
-  sessionCache?: {
-    /**
-     * Enable session data cookie validation to eliminate API calls.
-     * Requires NEON_AUTH_COOKIE_SECRET environment variable.
-     * Defaults to `true`.
-     */
-    enabled?: boolean;
-  };
 };
 
 /**
@@ -42,8 +31,6 @@ type NeonAuthMiddlewareOptions = {
  *
  * @param options - Middleware configuration options
  * @param options.loginUrl - The URL to redirect to when the user is not authenticated (default: '/auth/sign-in')
- * @param options.sessionCache - Session cache configuration
- * @param options.sessionCache.enabled - Enable session data cookie validation to reduce API calls (default: true, requires NEON_AUTH_COOKIE_SECRET env var)
  * @returns A middleware function that can be used in the Next.js app.
  *
  * @example
@@ -51,16 +38,12 @@ type NeonAuthMiddlewareOptions = {
  * import { neonAuthMiddleware } from "@neondatabase/auth/next"
  *
  * export default neonAuthMiddleware({
- *   loginUrl: '/auth/sign-in',
- *   sessionCache: {
- *     enabled: true, // Optional (default: true)
- *   },
+ *   loginUrl: '/auth/sign-in'
  * });
  * ```
  */
 export function neonAuthMiddleware({
   loginUrl = '/auth/sign-in',
-  sessionCache = { enabled: true },
 }: NeonAuthMiddlewareOptions = {}) {
   const baseUrl = NEON_AUTH_BASE_URL;
   if (!baseUrl) {
@@ -89,13 +72,11 @@ export function neonAuthMiddleware({
       return NextResponse.next();
     }
 
-    // Fast path: Check session data cookie (no API calls)
-    if (sessionCache.enabled) {
+    if (process.env.NEON_AUTH_COOKIE_SECRET !== undefined) {
       const sessionDataCookie = request.cookies.get(NEON_AUTH_SESSION_DATA_COOKIE_NAME)?.value;
 
       if (sessionDataCookie) {
         const result = await validateSessionData(sessionDataCookie);
-
         if (result.valid) {
           // Valid session cache - allow request without API call
           const reqHeaders = new Headers(request.headers);

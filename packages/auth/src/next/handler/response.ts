@@ -9,55 +9,14 @@ const RESPONSE_HEADERS_ALLOWLIST = ['content-type', 'content-length', 'content-e
     'connection', 'date',
    'set-cookie', 'set-auth-jwt', 'set-auth-token', 'x-neon-ret-request-id'];
 
-export const handleAuthResponse = async (
-  response: Response,
-  originalRequest?: Request
-) => {
+export const handleAuthResponse = async (response: Response) => {
   const responseHeaders = prepareResponseHeaders(response);
 
-  // Check if disableCookieCache is set in the original request
-  let disableCookieCache = false;
-  if (originalRequest) {
-    const url = new URL(originalRequest.url);
-    disableCookieCache = url.searchParams.get('disableCookieCache') === 'true';
-  }
-
-  // Check if upstream touched session_token cookie (creation, refresh, or deletion)
-  const setCookieHeader = response.headers.get('set-cookie');
-  if (setCookieHeader && setCookieHeader.includes('session_token')) {
-
-    // Remove the session data cookie if the session_token cookie is deleted
-    if (setCookieHeader.includes('max-age=0') ||
-        setCookieHeader.includes('Max-Age=0')) {
-
-      // Delete session data cookie too
-      responseHeaders.append('set-cookie',
-        `${NEON_AUTH_SESSION_DATA_COOKIE_NAME}=; ` +
-        `Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`
-      );
-    }
-    // Case 2: Cookie creation/refresh (sign-in, token refresh, user update)
-    // Create a new session data cookie (unless disableCookieCache is set)
-    else if (!disableCookieCache) {
-      try {
-        // Fetch session data using the new/refreshed session_token
-        const sessionData = await fetchSessionWithCookie(setCookieHeader);
-
-        if (sessionData.session) {
-          // Create session data cookie
-          const { value: signedData, expiresAt } = await signSessionDataCookie(sessionData);
-
-          // Add to response
-          responseHeaders.append('set-cookie',
-            `${NEON_AUTH_SESSION_DATA_COOKIE_NAME}=${signedData}; ` +
-            `Path=/; HttpOnly; Secure; SameSite=Lax; ` +
-            `Expires=${expiresAt.toUTCString()}`
-          );
-        }
-      } catch (error) {
-        // Session data creation failed - log but don't break the response
-        console.error('Failed to create session data cookie:', error);
-      }
+  // If session cookie secret is set, procure session data cookie from upstream response
+  if (process.env.NEON_AUTH_COOKIE_SECRET !== undefined) {
+    const sessionDataCookie = await procureSessionData(response.headers);
+    if (sessionDataCookie) {
+      responseHeaders.set('set-cookie', sessionDataCookie);
     }
   }
 
@@ -79,13 +38,39 @@ const prepareResponseHeaders = (response: Response) => {
   return headers;
 }
 
-/**
- * Helper to fetch session using set-cookie header
- */
+async function procureSessionData(headers: Headers): Promise<string | null> {
+  const setCookieHeader = headers.get('set-cookie');
+  const sessionTokenChanged = setCookieHeader && setCookieHeader.includes('session_token');
+  if (sessionTokenChanged) {
+    // Delete session data cookie, if session_token cookie is deleted
+    if (setCookieHeader.includes('max-age=0') ||
+        setCookieHeader.includes('Max-Age=0')) {
+
+      return `${NEON_AUTH_SESSION_DATA_COOKIE_NAME}=; ` +
+        `Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
+    }
+    // Update session data cookie, if session_token cookie is refreshed
+    else {
+      try {
+        const sessionData = await fetchSessionWithCookie(setCookieHeader);
+        if (sessionData.session) {         
+          const { value: signedData, expiresAt } = await signSessionDataCookie(sessionData);
+
+          return `${NEON_AUTH_SESSION_DATA_COOKIE_NAME}=${signedData}; ` +
+            `Path=/; HttpOnly; Secure; SameSite=Lax; ` +
+            `Expires=${expiresAt.toUTCString()}`;
+        }
+      } catch (error) {
+        // Session data creation failed - log but don't break the response
+        console.error('Failed to create session data cookie:', error);
+      }
+    }
+  }
+  return null
+}
+
 async function fetchSessionWithCookie(setCookieHeader: string): Promise<SessionData> {
   const baseUrl = process.env.NEON_AUTH_BASE_URL!;
-
-  // Extract session_token cookie from set-cookie header
   const parsedCookies = parseSetCookies(setCookieHeader);
   const sessionToken = parsedCookies.find(c => c.name.includes('session_token'));
 
@@ -104,7 +89,5 @@ async function fetchSessionWithCookie(setCookieHeader: string): Promise<SessionD
   }
 
   const body = await response.json();
-
-  // Parse session data (converts date strings to Date objects)
   return parseSessionData(body);
 }

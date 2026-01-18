@@ -119,8 +119,7 @@ function createApiProxy(endpoints: EndpointTree, fetchFn: FetchWithAuth): unknow
 
         // If it's a leaf endpoint config, return a callable function
         if (isEndpointConfig(endpoint)) {
-          return (args?: Record<string, unknown>) =>
-            fetchFn(endpoint.path, endpoint.method, args);
+          return (args?: Record<string, unknown>) => fetchFn(endpoint.path, endpoint.method, args);
         }
 
         // Otherwise it's a nested namespace - return another proxy
