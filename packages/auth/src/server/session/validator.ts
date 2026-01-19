@@ -1,6 +1,7 @@
 import { jwtVerify } from 'jose';
 import type { SessionData } from '@/server/types';
 import { getCookieSecret } from './signer';
+import { parseSessionData } from './operations';
 
 export interface SessionValidationResult {
   valid: boolean;
@@ -22,7 +23,8 @@ export async function validateSessionData(
     const { payload } = await jwtVerify<SessionData>(sessionDataString, secret, {
       algorithms: ['HS256'],
     });
-    return { valid: true, payload };
+    const parsedPayload = parseSessionData(payload);
+    return { valid: true, payload: parsedPayload };
   } catch (error) {
     return {
       valid: false,

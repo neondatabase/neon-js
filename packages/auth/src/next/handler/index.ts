@@ -3,6 +3,7 @@ import { handleAuthRequest } from './request';
 import { handleAuthResponse } from './response';
 import { getSessionDataFromCookie, isSessionCacheEnabled } from '@/server/session';
 import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../constants';
+import { API_ENDPOINTS } from '@/server/endpoints';
 
 type Params = { path: string[] };
 
@@ -38,8 +39,8 @@ export function authApiHandler() {
 
     // Try cookie cache for /get-session GET requests (if enabled)
     if (isSessionCacheEnabled() &&
-        path === 'get-session' &&
-        request.method === 'GET') {
+        path === API_ENDPOINTS.getSession.path &&
+        request.method === API_ENDPOINTS.getSession.method) {
 
       const url = new URL(request.url);
       const disableCookieCache = url.searchParams.get('disableCookieCache');

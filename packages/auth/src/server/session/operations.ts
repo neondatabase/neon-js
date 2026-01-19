@@ -6,6 +6,7 @@ import { SignJWT } from 'jose';
 
 // 5-minute TTL for session data cookie
 const SESSION_CACHE_TTL_MS = 5 * 60 * 1000;
+const JWS_ALGO = 'HS256';
 
 /**
  * Parse and validate date value, throwing descriptive error on failure
@@ -45,6 +46,7 @@ export async function signSessionDataCookie(
   return { value, expiresAt: new Date(expiresAt) };
 }
 
+
 function signPayload(
   sessionData: SessionData,
   expiresAt: number,
@@ -55,7 +57,7 @@ function signPayload(
 
   // Sign the entire SessionData object (nested structure)
   return new SignJWT(sessionData)
-    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+    .setProtectedHeader({ alg: JWS_ALGO, typ: 'JWT' })
     .setIssuedAt()
     .setExpirationTime(expSeconds)
     .setSubject(sessionData.user?.id ?? 'anonymous')
