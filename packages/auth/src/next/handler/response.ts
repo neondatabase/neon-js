@@ -49,23 +49,23 @@ const prepareResponseHeaders = (response: Response) => {
 }
 
 async function procureSessionData(headers: Headers): Promise<string | null> {
-  // Check all Set-Cookie headers for session_token changes
   const setCookieHeaders = headers.getSetCookie();
-  const sessionTokenCookie = setCookieHeaders.find(cookie => cookie.includes('session_token'));
+  const sessionToken = setCookieHeaders.find(cookie => cookie.includes('session_token'));
 
-  if (!sessionTokenCookie) {
+  if (!sessionToken) {
     return null;
   }
 
-  // Delete session data cookie if session_token cookie is deleted
-  if (sessionTokenCookie.includes('max-age=0') || sessionTokenCookie.includes('Max-Age=0')) {
+  // Delete session data cookie if session_token cookie is deleted (case-insensitive check)
+  const sessionCookie = sessionToken.toLowerCase();
+  if (sessionCookie.includes('max-age=0')) {
     return `${NEON_AUTH_SESSION_DATA_COOKIE_NAME}=; ` +
       `Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
   }
 
   // Update session data cookie if session_token cookie is refreshed
   try {
-    const sessionData = await fetchSessionWithCookie(sessionTokenCookie);
+    const sessionData = await fetchSessionWithCookie(sessionToken);
 
     if (sessionData.session) {
       const { value: signedData, expiresAt } = await signSessionDataCookie(sessionData);
@@ -79,7 +79,7 @@ async function procureSessionData(headers: Headers): Promise<string | null> {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorContext = {
       error: errorMessage,
-      setCookieHeaderLength: sessionTokenCookie?.length || 0,
+      setCookieHeaderLength: sessionToken?.length || 0,
     };
 
     if (errorMessage.includes('session_token not found')) {
