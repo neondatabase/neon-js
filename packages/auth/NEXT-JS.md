@@ -12,7 +12,6 @@ A Next.js integration for **Neon Auth** (`@neondatabase/auth`). This guide demon
 - 🎨 **Pre-built UI Components** - Beautiful, customizable auth views
 - ⚡ **React Server Components** - Access session data in RSC
 - 🌙 **Dark Mode Support** - Built-in theme support
-- 🚀 **Session Data Cookie Caching** - Local session validation with 95-99% reduction in API calls
 
 ## Setup Guide
 
@@ -67,9 +66,6 @@ import { neonAuthMiddleware } from "@neondatabase/auth/next/server"
 
 export default neonAuthMiddleware({
   loginUrl: "/auth/sign-in",
-  sessionCache: {
-    enabled: true,    // Default: true (requires NEON_AUTH_COOKIE_SECRET)
-  },
 })
 
 export const config = {
@@ -421,78 +417,6 @@ lib/
 
 middleware.ts                 # Route protection
 ```
-
-## Troubleshooting
-
-### Session Data Cookie Issues
-
-**Problem: Middleware always calls `/get-session` API (no performance improvement)**
-
-- **Check environment variable**: Ensure `NEON_AUTH_COOKIE_SECRET` is set and at least 32 characters
-- **Check middleware config**: Verify `sessionCache.enabled` is not explicitly set to `false`
-- **Check logs**: Look for "Failed to create session data cookie" errors in server logs
-
-**Problem: "Cookie secret is required" error**
-
-```
-Error: Cookie secret is required. Set NEON_AUTH_COOKIE_SECRET environment variable (minimum 32 characters)
-```
-
-- Add `NEON_AUTH_COOKIE_SECRET` to your `.env.local` file
-- Ensure the secret is at least 32 characters long
-- Restart your Next.js development server after adding the variable
-
-**Problem: "Cookie secret must be at least 32 characters long" error**
-
-- Generate a secure 32+ character secret:
-  ```bash
-  openssl rand -base64 32
-  ```
-- Update `NEON_AUTH_COOKIE_SECRET` in your `.env.local` file
-
-**Problem: Users getting logged out unexpectedly**
-
-- Session data cookies expire after 5 minutes or when the session expires (whichever is sooner)
-- Middleware automatically refreshes expired session data cookies
-- Check if your sessions are expiring too quickly on the upstream server
-- Verify that `NEON_AUTH_COOKIE_SECRET` hasn't changed (changing it invalidates all session data cookies)
-
-### Performance Monitoring
-
-To verify session cache optimization is working, check your middleware logs:
-
-```typescript
-// middleware.ts
-import { neonAuthMiddleware } from "@neondatabase/auth/next/server"
-
-export default neonAuthMiddleware({
-  loginUrl: "/auth/sign-in",
-  sessionCache: {
-    enabled: true,
-  },
-})
-```
-
-**Expected behavior:**
-- First request: Calls `/get-session` API (creates session data cookie)
-- Subsequent requests (within 5 min): Validates session data locally (no API calls)
-- After 5 minutes: Calls `/get-session` API (refreshes session data cookie)
-- After auth operations: Session data cookie automatically refreshed
-
-### Security Considerations
-
-**Cookie Secret Management:**
-- Use a different secret for each environment (development, staging, production)
-- Store secrets securely (environment variables, secret managers)
-- Never commit secrets to version control
-- Rotate secrets periodically (invalidates all active session data cookies)
-
-**Session Data Cookie Attributes:**
-- `httpOnly: true` - Prevents JavaScript access
-- `secure: true` - HTTPS only in production
-- `sameSite: 'lax'` - CSRF protection
-- `path: '/'` - Available site-wide
-- Signed with HS256 - Tamper-proof
 
 ## Learn More
 

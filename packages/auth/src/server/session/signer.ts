@@ -2,6 +2,10 @@ import { ERRORS } from '@/server/errors';
 
 /**
  * Get cookie secret from environment variable
+ *
+ * IMPORTANT: The secret must be cryptographically random for security.
+ * Generate a secure secret using: openssl rand -base64 32
+ *
  * @returns Cookie secret for session data signing
  * @throws Error if secret is missing or too short
  */

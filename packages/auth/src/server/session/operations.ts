@@ -51,7 +51,7 @@ function signPayload(
   secret: string
 ): Promise<string> {
   const encodedSecret = new TextEncoder().encode(secret);
-  const expSeconds = Math.floor(expiresAt / 1000)
+  const expSeconds = Math.floor(expiresAt / 1000);
 
   // Sign the entire SessionData object (nested structure)
   return new SignJWT(sessionData)
