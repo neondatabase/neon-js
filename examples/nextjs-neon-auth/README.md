@@ -17,7 +17,7 @@ bun install
 ```bash
 cd examples/nextjs
 cp .env.example .env
-# Edit .env with your Neon Auth URL
+# Edit .env with your Neon Auth URL and Cookie secret
 ```
 
 4. Run the development server:

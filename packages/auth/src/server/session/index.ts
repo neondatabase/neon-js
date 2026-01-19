@@ -1,4 +1,4 @@
-export { validateSessionData, type SessionValidationResult } from './validator';
+export { validateSessionData } from './validator';
 export {
   getSessionDataFromCookie,
   signSessionDataCookie,

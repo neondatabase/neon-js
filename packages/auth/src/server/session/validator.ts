@@ -3,7 +3,7 @@ import type { SessionData } from '@/server/types';
 import { getCookieSecret } from './signer';
 import { parseSessionData } from './operations';
 
-export interface SessionValidationResult {
+interface SessionValidationResult {
   valid: boolean;
   payload?: SessionData;
   error?: string;
