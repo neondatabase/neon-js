@@ -759,6 +759,17 @@ Following the [Better Auth Supabase Migration Guide](https://www.better-auth.com
 **Password Management:**
 - `resetPasswordForEmail` -> `betterAuth.forgetPassword()`
 
+## Claude Code Skills
+
+The `skills/` directory contains AI-assistant skills for helping developers set up Neon packages:
+
+| Skill | When to Use |
+|-------|-------------|
+| `neon-auth-react` | Auth-only setup in React (Vite, CRA) - no database needed |
+| `neon-auth-nextjs` | Auth-only setup in Next.js App Router - no database needed |
+| `neon-js-react` | Full SDK (auth + database) in React (Vite, CRA) |
+| `neon-js-nextjs` | Full SDK (auth + database) in Next.js App Router |
+
 ## Additional Documentation
 
 - `packages/auth/NEXT-JS.md` - Next.js integration guide
