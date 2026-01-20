@@ -16,13 +16,3 @@ export function getJwtExpiration(jwt: string): number | null {
     return null;
   }
 }
-
-/**
- * Extract expiration timestamp from JWT payload in milliseconds
- * @param jwt - The JWT token string
- * @returns Expiration timestamp in milliseconds or null if invalid
- */
-export function getJwtExpirationMs(jwt: string): number | null {
-  const exp = getJwtExpiration(jwt);
-  return exp === null ? null : exp * 1000;
-}

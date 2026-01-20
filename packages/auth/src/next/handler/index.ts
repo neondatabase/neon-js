@@ -1,6 +1,9 @@
-import { ERRORS } from '../errors';
+import { ERRORS } from '@/server/errors';
 import { handleAuthRequest } from './request';
 import { handleAuthResponse } from './response';
+import { getSessionDataFromCookie, isSessionCacheEnabled } from '@/server/session';
+import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../constants';
+import { API_ENDPOINTS } from '@/server/endpoints';
 
 type Params = { path: string[] };
 
@@ -33,6 +36,38 @@ export function authApiHandler() {
   ) => {
     const resolvedParams = await params;
     const path = resolvedParams.path.join('/');
+
+    // Try cookie cache for /get-session GET requests (if enabled)
+    if (isSessionCacheEnabled() &&
+        path === API_ENDPOINTS.getSession.path &&
+        request.method === API_ENDPOINTS.getSession.method) {
+
+      const url = new URL(request.url);
+      const disableCookieCache = url.searchParams.get('disableCookieCache');
+
+      // Try cookie validation unless explicitly disabled
+      if (disableCookieCache !== 'true') {
+        try {
+          const sessionData = await getSessionDataFromCookie(
+            request,
+            NEON_AUTH_SESSION_DATA_COOKIE_NAME
+          );
+
+          if (sessionData && sessionData.session) {
+            // Cache hit - return immediately (no upstream call)
+            return Response.json(sessionData);
+          }
+        } catch (error) {
+          // Validation error - log and fall through to upstream
+          console.error('[authApiHandler] Cookie validation error:', {
+            error: error instanceof Error ? error.message : String(error),
+            path,
+          });
+        }
+      }
+    }
+
+    // Fallback: Call upstream API
     const response = await handleAuthRequest(baseURL, request, path);
     return await handleAuthResponse(response);
   };

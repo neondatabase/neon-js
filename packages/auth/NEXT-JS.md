@@ -25,13 +25,24 @@ pnpm add @neondatabase/auth
 yarn add @neondatabase/auth
 ```
 
-### 2. Set Environment Variable
+### 2. Set Environment Variables
 
-Export the `NEON_AUTH_BASE_URL` environment variable pointing to your Neon Auth server:
+Export the required environment variables for Neon Auth:
 
 ```bash
 # .env.local
 NEON_AUTH_BASE_URL=https://your-neon-auth-url.neon.tech
+
+# Cookie secret for session data signing (required for session caching)
+# Generate a random 32+ character string for production
+NEON_AUTH_COOKIE_SECRET=your-secret-at-least-32-characters-long
+```
+
+**Important**: The `NEON_AUTH_COOKIE_SECRET` must be at least 32 characters long. Generate a secure random string for production:
+
+```bash
+# Generate a secure secret
+openssl rand -base64 32
 ```
 
 ### 3. Create an Auth Handler
@@ -412,3 +423,4 @@ middleware.ts                 # Route protection
 - [Neon Auth Documentation](https://neon.com/docs/guides/neon-auth)
 - [better-auth-ui Documentation](https://better-auth-ui.com/integrations/next-js)
 - [Next.js Documentation](https://nextjs.org/docs)
+- [Better Auth Session Management](https://www.better-auth.com/docs/concepts/session-management)

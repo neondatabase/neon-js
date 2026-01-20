@@ -1,5 +1,27 @@
-import type { VanillaBetterAuthClient } from '../neon-auth';
+import type { VanillaBetterAuthClient } from '@/neon-auth';
 import type { API_ENDPOINTS } from './endpoints';
+import type {
+  BetterAuthSession as Session,
+  BetterAuthUser as User,
+} from '@/core/better-auth-types';
+
+export type RequireSessionData = {
+  session: Session;
+  user: User;
+};
+
+export type SessionData =
+  | RequireSessionData
+  | {
+      session: null;
+      user: null;
+    };
+
+
+export interface SessionDataCookie {
+  value: string;
+  expiresAt: Date;
+}
 
 /**
  * Extract top-level keys from API_ENDPOINTS.

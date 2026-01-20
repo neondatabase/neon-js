@@ -1,4 +1,4 @@
-import { extractNeonAuthCookies } from "../../utils/cookies";
+import { extractNeonAuthCookies } from "@/server/utils/cookies";
 import { NEON_AUTH_HEADER_MIDDLEWARE_NAME } from "../constants";
 
 const PROXY_HEADERS = ['user-agent', 'authorization', 'referer', 'content-type'];
