@@ -1,4 +1,4 @@
-import { signSessionDataCookie, isSessionCacheEnabled } from '../../server/session';
+import { signSessionDataCookie } from '../../server/session';
 import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../constants';
 import { parseSetCookies } from '../../server/utils/cookies';
 import type { SessionData } from '@/server/types';
@@ -9,12 +9,15 @@ const RESPONSE_HEADERS_ALLOWLIST = ['content-type', 'content-length', 'content-e
     'connection', 'date',
    'set-cookie', 'set-auth-jwt', 'set-auth-token', 'x-neon-ret-request-id'];
 
-export const handleAuthResponse = async (response: Response) => {
+export const handleAuthResponse = async (
+  response: Response,
+  config: { baseUrl: string; cookieSecret?: string }
+) => {
   const responseHeaders = prepareResponseHeaders(response);
 
   // If session cookie secret is set, procure session data cookie from upstream response
-  if (isSessionCacheEnabled()) {
-    const sessionDataCookie = await procureSessionData(response.headers);
+  if (config.cookieSecret) {
+    const sessionDataCookie = await mintSessionData(response.headers, config.baseUrl, config.cookieSecret);
     if (sessionDataCookie) {
       // Use append to preserve existing Set-Cookie headers from upstream
       responseHeaders.append('Set-Cookie', sessionDataCookie);
@@ -48,7 +51,11 @@ const prepareResponseHeaders = (response: Response) => {
   return headers;
 }
 
-async function procureSessionData(headers: Headers): Promise<string | null> {
+async function mintSessionData(
+  headers: Headers,
+  baseUrl: string,
+  cookieSecret: string
+): Promise<string | null> {
   const setCookieHeaders = headers.getSetCookie();
   const sessionToken = setCookieHeaders.find(cookie => cookie.includes('session_token'));
 
@@ -65,10 +72,10 @@ async function procureSessionData(headers: Headers): Promise<string | null> {
 
   // Update session data cookie if session_token cookie is refreshed
   try {
-    const sessionData = await fetchSessionWithCookie(sessionToken);
+    const sessionData = await fetchSessionWithCookie(sessionToken, baseUrl);
 
     if (sessionData.session) {
-      const { value: signedData, expiresAt } = await signSessionDataCookie(sessionData);
+      const { value: signedData, expiresAt } = await signSessionDataCookie(sessionData, cookieSecret);
 
       return `${NEON_AUTH_SESSION_DATA_COOKIE_NAME}=${signedData}; ` +
         `Path=/; HttpOnly; Secure; SameSite=Lax; ` +
@@ -105,8 +112,10 @@ async function procureSessionData(headers: Headers): Promise<string | null> {
   return null;
 }
 
-async function fetchSessionWithCookie(setCookieHeader: string): Promise<SessionData> {
-  const baseUrl = process.env.NEON_AUTH_BASE_URL!;
+async function fetchSessionWithCookie(
+  setCookieHeader: string,
+  baseUrl: string
+): Promise<SessionData> {
   const parsedCookies = parseSetCookies(setCookieHeader);
   const sessionToken = parsedCookies.find(c => c.name.includes('session_token'));
 
@@ -118,6 +127,7 @@ async function fetchSessionWithCookie(setCookieHeader: string): Promise<SessionD
     headers: {
       Cookie: `${sessionToken.name}=${sessionToken.value}`,
     },
+    signal: AbortSignal.timeout(3000), // 3s timeout
   });
 
   if (!response.ok) {

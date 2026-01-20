@@ -1,4 +1,3 @@
-import { getCookieSecret } from './signer';
 import type { RequireSessionData, SessionData, SessionDataCookie } from '@/server/types';
 import { validateSessionData } from './validator';
 import { parseCookies } from 'better-auth/cookies';
@@ -20,23 +19,17 @@ function parseDate(dateValue: unknown, fieldName: string): Date {
   return date;
 }
 
-/**
- * Check if session caching is enabled (secret is configured)
- */
-export function isSessionCacheEnabled(): boolean {
-  return process.env.NEON_AUTH_COOKIE_SECRET !== undefined;
-}
 
 /**
  * Convert session data from /get-session into a signed cookie
  * @param sessionData - Session and user data from Auth server
+ * @param cookieSecret - Optional secret for signing (falls back to environment variable)
  * @returns Signed session data cookie
  */
 export async function signSessionDataCookie(
-  sessionData: RequireSessionData
+  sessionData: RequireSessionData,
+  secret: string
 ): Promise<SessionDataCookie> {
-  const secret = getCookieSecret();
-
   const expiresAt = Math.min(
     sessionData.session.expiresAt.getTime(),
     Date.now() + SESSION_CACHE_TTL_MS
@@ -118,11 +111,13 @@ export function parseSessionData(json: unknown): SessionData {
  *
  * @param request - Request object with cookie header
  * @param cookieName - Name of session data cookie
+ * @param cookieSecret - cookie secret for validation
  * @returns SessionData or null on validation failure
  */
 export async function getSessionDataFromCookie(
   request: Request,
-  cookieName: string
+  cookieName: string,
+  cookieSecret: string
 ): Promise<SessionData | null> {
   try {
     // Extract cookie header
@@ -140,7 +135,7 @@ export async function getSessionDataFromCookie(
     }
 
     // Validate cookie signature and expiry
-    const result = await validateSessionData(sessionDataCookie);
+    const result = await validateSessionData(sessionDataCookie, cookieSecret);
 
     if (result.valid && result.payload) {
       return result.payload; // Valid cookie

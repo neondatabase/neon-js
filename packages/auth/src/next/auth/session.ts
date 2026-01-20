@@ -1,12 +1,13 @@
 import { cookies, headers } from 'next/headers';
 
 import { getUpstreamURL } from '../handler/request';
-import { NEON_AUTH_BASE_URL } from '../env-variables';
 
 import { extractNeonAuthCookies, parseSetCookies } from '@/server/utils/cookies';
-import { signSessionDataCookie, validateSessionData, isSessionCacheEnabled, parseSessionData } from '@/server/session';
+import { signSessionDataCookie, validateSessionData, parseSessionData } from '@/server/session';
 import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../constants';
 import type { SessionData } from '@/server/types';
+import { assertCookieSecret, assertDefined } from '@/server/session/validator';
+import { ERRORS } from '@/server/errors';
 
 /**
  * A utility function to be used in react server components to fetch the session details.
@@ -15,28 +16,45 @@ import type { SessionData } from '@/server/types';
  * - If NEON_AUTH_COOKIE_SECRET is set: Tries cache first, falls back to API
  * - If NEON_AUTH_COOKIE_SECRET is missing: Always calls API (backward compatibility)
  *
+ * @param config - Optional configuration (falls back to environment variables)
  * @returns - `{ session: Session, user: User }` | `{ session: null, user: null}`.
  *
  * @example
  * ```ts
  * import { neonAuth } from "@neondatabase/auth/next/server"
  *
+ * // Uses environment variables (backward compatible)
  * const { session, user } = await neonAuth()
+ *
+ * // Or with explicit config
+ * const { session, user } = await neonAuth({ baseUrl, cookieSecret })
  * ```
  */
-export const neonAuth = async (): Promise<SessionData> => {
+export const neonAuth = async (config?: {
+  baseUrl?: string;
+  cookieSecret?: string;
+}): Promise<SessionData> => {
+  const baseUrl = config?.baseUrl ?? process.env.NEON_AUTH_BASE_URL;
+  const cookieSecret = config?.cookieSecret ?? process.env.NEON_AUTH_COOKIE_SECRET;
+
+  assertDefined(baseUrl, new Error(ERRORS.MISSING_AUTH_BASE_URL));
+  
   // Backward compatibility: if secret not configured, use pre-PR behavior
-  if (!isSessionCacheEnabled()) {
-    return await fetchSession({ disableRefresh: true });
+  if (!cookieSecret) {
+    return await fetchSession({ disableRefresh: true, 
+      baseUrl,
+      cookieSecret,
+     });
   }
 
+  assertCookieSecret(cookieSecret);
   // Try cache first
   const cookieStore = await cookies();
   const sessionDataCookie = cookieStore.get(NEON_AUTH_SESSION_DATA_COOKIE_NAME)?.value;
 
   if (sessionDataCookie) {
     try {
-      const result = await validateSessionData(sessionDataCookie);
+      const result = await validateSessionData(sessionDataCookie, cookieSecret);
 
       if (result.valid && result.payload) {
         // Cache hit - fast path
@@ -56,7 +74,7 @@ export const neonAuth = async (): Promise<SessionData> => {
   }
 
   // Fallback: fetch from API
-  return await fetchSession({ disableRefresh: true });
+  return await fetchSession({ disableRefresh: true, baseUrl, cookieSecret });
 };
 
 /**
@@ -64,10 +82,16 @@ export const neonAuth = async (): Promise<SessionData> => {
  *
  * @param options - Fetch options
  * @param options.disableRefresh - If true, don't refresh the session cookie (read-only)
+ * @param options.baseUrl - base URL (falls back to environment variable)
+ * @param options.cookieSecret - cookie secret (falls back to environment variable)
  * @returns - `{ session: Session, user: User }` | `{ session: null, user: null}`.
  */
-export const fetchSession = async (options?: { disableRefresh?: boolean }): Promise<SessionData> => {
-  const baseUrl = NEON_AUTH_BASE_URL!;
+export const fetchSession = async (options: {
+  disableRefresh?: boolean;
+  baseUrl: string;
+  cookieSecret?: string;
+}): Promise<SessionData> => {
+  const baseUrl = options.baseUrl;
   const requestHeaders = await headers();
 
   const originalUrl = new URL('get-session', baseUrl);
@@ -126,7 +150,6 @@ export const fetchSession = async (options?: { disableRefresh?: boolean }): Prom
         cookieStore.set(cookie.name, cookie.value, cookie);
       }
     } catch (error) {
-      // Expected in RSC context - ignore
       const isExpectedError = error instanceof Error &&
         error.message.includes('cookies can only be modified');
 
@@ -158,9 +181,9 @@ export const fetchSession = async (options?: { disableRefresh?: boolean }): Prom
   }
 
   // STEP 6: Create session data cookie if caching is enabled
-  if (isSessionCacheEnabled()) {
+  if (options.cookieSecret) {
     try {
-      const { value: signedData, expiresAt } = await signSessionDataCookie(sessionData);
+      const { value: signedData, expiresAt } = await signSessionDataCookie(sessionData, options.cookieSecret);
 
       cookieStore.set(NEON_AUTH_SESSION_DATA_COOKIE_NAME, signedData, {
         httpOnly: true,

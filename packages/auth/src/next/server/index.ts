@@ -1,8 +1,10 @@
 import { createAuthServerInternal } from '@/server';
 import { createNextRequestContext } from './adapter';
 import { cookies } from 'next/headers';
-import { validateSessionData, isSessionCacheEnabled } from '@/server/session';
+import { validateSessionData } from '@/server/session';
 import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../constants';
+import { assertDefined } from '@/server/session/validator';
+import { ERRORS } from '@/server/errors';
 
 // Re-export server-side utilities
 export { neonAuth } from '../auth';
@@ -20,24 +22,35 @@ export { authApiHandler } from '../handler';
  * - Route Handlers
  *
  * **Requirements:**
- * - `NEON_AUTH_BASE_URL` environment variable must be set
+ * - `NEON_AUTH_BASE_URL` environment variable must be set (or passed in config)
  * - Cookies are automatically read/written via `next/headers`
- * 
+ *
+ * @param config - Optional configuration (falls back to environment variables)
+ * @param config.baseUrl - Optional base URL (falls back to NEON_AUTH_BASE_URL env var)
+ * @param config.cookieSecret - Optional cookie secret (falls back to NEON_AUTH_COOKIE_SECRET env var)
  * @returns Auth server API client for Next.js
- * @throws Error if `NEON_AUTH_BASE_URL` environment variable is not set
+ * @throws Error if `NEON_AUTH_BASE_URL` environment variable is not set and not provided in config
  *
  * @example
  * ```typescript
  * // lib/auth/server.ts - Create a singleton instance
  * import { createAuthServer } from '@neondatabase/auth/next/server';
+ *
+ * // Uses environment variables (backward compatible)
  * export const authServer = createAuthServer();
+ *
+ * // Or with explicit config
+ * export const authServer = createAuthServer({
+ *   baseUrl: 'https://auth.example.com',
+ *   cookieSecret: process.env.SECRET
+ * });
  * ```
- * 
+ *
  * @example
  * ```typescript
  * // Server Component - Reading session
  * import { authServer } from '@/lib/auth/server';
- * 
+ *
  * export default async function Page() {
  *   const { data: session } = await authServer.getSession();
  *   if (!session?.user) return <div>Not logged in</div>;
@@ -62,13 +75,14 @@ export { authApiHandler } from '../handler';
  * }
  * ```
  */
-export function createAuthServer() {
-  const baseUrl = process.env.NEON_AUTH_BASE_URL;
-  if (!baseUrl) {
-    throw new Error(
-      'NEON_AUTH_BASE_URL environment variable is required for createAuthServer()'
-    );
-  }
+export function createAuthServer(config?: {
+  baseUrl?: string;
+  cookieSecret?: string;
+}) {
+  const baseUrl = config?.baseUrl ?? process.env.NEON_AUTH_BASE_URL;
+  const cookieSecret = config?.cookieSecret ?? process.env.NEON_AUTH_COOKIE_SECRET;
+
+  assertDefined(baseUrl, new Error(ERRORS.MISSING_AUTH_BASE_URL));
 
   const baseServer = createAuthServerInternal({
     baseUrl,
@@ -81,13 +95,12 @@ export function createAuthServer() {
 
     async getSession(options?: Parameters<typeof baseServer.getSession>[0]) {
       // Backward compatibility: if secret not configured, use original behavior
-      if (!isSessionCacheEnabled()) {
+      if (!cookieSecret) {
         return baseServer.getSession(options);
       }
 
       // Check if cookie cache is disabled via query param
       const disableCookieCache = options?.query?.disableCookieCache === 'true';
-
       if (disableCookieCache) {
         return baseServer.getSession(options);
       }
@@ -98,7 +111,7 @@ export function createAuthServer() {
         const sessionDataCookie = cookieStore.get(NEON_AUTH_SESSION_DATA_COOKIE_NAME);
 
         if (sessionDataCookie?.value) {
-          const result = await validateSessionData(sessionDataCookie.value);
+          const result = await validateSessionData(sessionDataCookie.value, cookieSecret);
 
           if (result.valid && result.payload) {
             // Cache hit - return immediately
@@ -114,7 +127,7 @@ export function createAuthServer() {
         // Cookie read/validation error - log and fall through
         console.error('[createAuthServer.getSession] Cookie validation error:', {
           error: error instanceof Error ? error.message : String(error),
-          hasSecret: !!process.env.NEON_AUTH_COOKIE_SECRET,
+          hasSecret: !!cookieSecret,
         });
       }
 

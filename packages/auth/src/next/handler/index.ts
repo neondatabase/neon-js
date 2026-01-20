@@ -1,35 +1,48 @@
 import { ERRORS } from '@/server/errors';
 import { handleAuthRequest } from './request';
 import { handleAuthResponse } from './response';
-import { getSessionDataFromCookie, isSessionCacheEnabled } from '@/server/session';
+import { getSessionDataFromCookie } from '@/server/session';
 import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../constants';
 import { API_ENDPOINTS } from '@/server/endpoints';
+import { assertCookieSecret, assertDefined } from '@/server/session/validator';
 
 type Params = { path: string[] };
 
 /**
- * 
+ *
  * An API route handler to handle the auth requests from the client and proxy them to the Neon Auth.
- * 
+ *
+ * @param config - Optional configuration (falls back to environment variables)
+ * @param config.baseUrl - Optional base URL (falls back to NEON_AUTH_BASE_URL env var)
+ * @param config.cookieSecret - Optional cookie secret (falls back to NEON_AUTH_COOKIE_SECRET env var)
  * @returns A Next.js API handler functions those can be used in a Next.js route.
  *
  * @example
- * Mount the `authApiHandler` to an API route. Create a route file inside `/api/auth/[...all]/route.ts` directory. 
+ * Mount the `authApiHandler` to an API route. Create a route file inside `/api/auth/[...all]/route.ts` directory.
  *  And add the following code:
- * 
- * ```ts 
+ *
+ * ```ts
  * // app/api/auth/[...all]/route.ts
  * import { authApiHandler } from '@neondatabase/auth/next';
- * 
+ *
+ * // Uses environment variables (backward compatible)
  * export const { GET, POST } = authApiHandler();
+ *
+ * // Or with explicit config
+ * export const { GET, POST } = authApiHandler({
+ *   baseUrl: 'https://auth.example.com',
+ *   cookieSecret: process.env.SECRET
+ * });
  * ```
  */
-export function authApiHandler() {
-  const baseURL = process.env.NEON_AUTH_BASE_URL;
-  if (!baseURL) {
-    throw new Error(ERRORS.MISSING_AUTH_BASE_URL);
-  }
-
+export function authApiHandler(config?: {
+  baseUrl?: string;
+  cookieSecret?: string;
+}) {
+  const baseURL = config?.baseUrl ?? process.env.NEON_AUTH_BASE_URL;
+  const cookieSecret = config?.cookieSecret ?? process.env.NEON_AUTH_COOKIE_SECRET;
+  
+  assertDefined(baseURL, new Error(ERRORS.MISSING_AUTH_BASE_URL));
   const handler = async (
     request: Request,
     { params }: { params: Promise<Params> }
@@ -38,10 +51,11 @@ export function authApiHandler() {
     const path = resolvedParams.path.join('/');
 
     // Try cookie cache for /get-session GET requests (if enabled)
-    if (isSessionCacheEnabled() &&
+    if (cookieSecret &&
         path === API_ENDPOINTS.getSession.path &&
         request.method === API_ENDPOINTS.getSession.method) {
 
+      assertCookieSecret(cookieSecret);
       const url = new URL(request.url);
       const disableCookieCache = url.searchParams.get('disableCookieCache');
 
@@ -50,7 +64,8 @@ export function authApiHandler() {
         try {
           const sessionData = await getSessionDataFromCookie(
             request,
-            NEON_AUTH_SESSION_DATA_COOKIE_NAME
+            NEON_AUTH_SESSION_DATA_COOKIE_NAME,
+            cookieSecret
           );
 
           if (sessionData && sessionData.session) {
@@ -69,7 +84,7 @@ export function authApiHandler() {
 
     // Fallback: Call upstream API
     const response = await handleAuthRequest(baseURL, request, path);
-    return await handleAuthResponse(response);
+    return await handleAuthResponse(response, { baseUrl: baseURL, cookieSecret });
   };
 
   return {

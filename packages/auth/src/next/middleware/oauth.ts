@@ -19,7 +19,8 @@ export const needsSessionVerification = (request: NextRequest) => {
 
 export const exchangeOAuthToken = async (
   request: NextRequest,
-  baseUrl: string
+  baseUrl: string,
+  cookieSecret?: string
 ) => {
   const url = request.nextUrl;
   const verifier = url.searchParams.get(NEON_AUTH_SESSION_VERIFIER_PARAM_NAME);
@@ -41,7 +42,7 @@ export const exchangeOAuthToken = async (
     'get-session'
   );
 
-  const response = await handleAuthResponse(upstreamResponse);
+  const response = await handleAuthResponse(upstreamResponse, { baseUrl, cookieSecret });
   if (response.ok) {
     const headers = new Headers();
     const cookies = extractResponseCookies(response.headers);
