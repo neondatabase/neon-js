@@ -1,27 +1,34 @@
-import { signSessionDataCookie } from '../../server/session';
+import { signSessionDataCookie } from '../session';
 import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '@/server/constants';
-import { parseSetCookies } from '../../server/utils/cookies';
+import { parseSetCookies } from '../utils/cookies';
 import type { SessionData } from '@/server/types';
-import { parseSessionData } from '@/server/session/operations';
+import { parseSessionData } from '../session/operations';
 
 // Allowlist of response headers that we want to proxy to the client from Neon Auth.
 const RESPONSE_HEADERS_ALLOWLIST = ['content-type', 'content-length', 'content-encoding', 'transfer-encoding',
     'connection', 'date',
    'set-cookie', 'set-auth-jwt', 'set-auth-token', 'x-neon-ret-request-id'];
 
+/**
+ * Handles responses from upstream Neon Auth server
+ * - Proxies allowed headers to client
+ * - Mints session data cookie if session token is present
+ *
+ * @param response - Response from upstream Neon Auth server
+ * @param config - Configuration including base URL and cookie secret
+ * @returns New Response with proxied headers and session data cookie
+ */
 export const handleAuthResponse = async (
   response: Response,
-  config: { baseUrl: string; cookieSecret?: string }
+  config: { baseUrl: string; cookieSecret: string }
 ) => {
   const responseHeaders = prepareResponseHeaders(response);
 
-  // If session cookie secret is set, procure session data cookie from upstream response
-  if (config.cookieSecret) {
-    const sessionDataCookie = await mintSessionData(response.headers, config.baseUrl, config.cookieSecret);
-    if (sessionDataCookie) {
-      // Use append to preserve existing Set-Cookie headers from upstream
-      responseHeaders.append('Set-Cookie', sessionDataCookie);
-    }
+  // Mint session data cookie from upstream response
+  const sessionDataCookie = await mintSessionData(response.headers, config.baseUrl, config.cookieSecret);
+  if (sessionDataCookie) {
+    // Use append to preserve existing Set-Cookie headers from upstream
+    responseHeaders.append('Set-Cookie', sessionDataCookie);
   }
 
   return new Response(response.body, {

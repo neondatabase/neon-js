@@ -1,2 +1,0 @@
-export { neonAuth } from './session';
-

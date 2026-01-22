@@ -1,12 +1,11 @@
 import { createAuthServerInternal } from '@/server';
 import { createNextRequestContext } from './adapter';
-import type { NeonAuthConfig } from '../config';
-import { validateCookieSecret } from '../config';
+import type { NeonAuthConfig } from '@/server/config';
+import { validateCookieSecret } from '@/server/config';
 
-// Re-export server-side utilities
-export { neonAuth } from '../auth';
-export { neonAuthMiddleware } from '../middleware';
-export { authApiHandler } from '../handler';
+export { neonAuth } from './neon-auth';
+export { neonAuthMiddleware } from './middleware';
+export { authApiHandler } from './handler';
 
 /**
  * Creates a server-side auth API client for Next.js.

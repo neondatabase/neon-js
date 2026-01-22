@@ -1,9 +1,12 @@
 /**
- * Configuration types for Neon Auth Next.js integration
+ * Framework-agnostic configuration types for Neon Auth
+ *
+ * These configuration types are used across all server frameworks
+ * (Next.js, Remix, SvelteKit, TanStack Start, etc.)
  */
 
 /**
- * Base configuration for Neon Auth in Next.js
+ * Base configuration for Neon Auth server utilities
  */
 export interface NeonAuthConfig {
 	/**
@@ -47,7 +50,7 @@ export function validateCookieSecret(secret: string): void {
 	if (secret.length < 32) {
 		throw new Error(
 			'cookieSecret must be at least 32 characters long for security. ' +
-			'Generate a secure secret with: openssl rand -base64 32'
+				'Generate a secure secret with: openssl rand -base64 32'
 		);
 	}
 }

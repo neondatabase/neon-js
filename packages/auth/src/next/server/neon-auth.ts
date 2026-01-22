@@ -1,13 +1,13 @@
 import { cookies, headers } from 'next/headers';
 
-import { getUpstreamURL } from '../handler/request';
+import { getUpstreamURL } from '@/server/proxy/request';
 
 import { extractNeonAuthCookies, parseSetCookies } from '@/server/utils/cookies';
 import { signSessionDataCookie, validateSessionData, parseSessionData } from '@/server/session';
 import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '@/server/constants';
 import type { SessionData } from '@/server/types';
-import type { NeonAuthConfig } from '../config';
-import { validateCookieSecret } from '../config';
+import type { NeonAuthConfig } from '@/server/config';
+import { validateCookieSecret } from '@/server/config';
 
 /**
  * A utility function to be used in react server components to fetch the session details.
