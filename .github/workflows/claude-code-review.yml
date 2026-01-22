@@ -351,4 +351,3 @@ jobs:
             - **Be constructive**: Explain the "why" behind suggestions
             - **Be project-aware**: Use CLAUDE.md patterns and terminology
             - **Don't duplicate**: Skip issues automated tools will catch
-            - **Respect limits**: Max 5 comments per file TOTAL across all experts
