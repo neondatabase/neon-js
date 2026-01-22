@@ -2,7 +2,7 @@ name: Claude Code Review
 
 on:
   pull_request:
-    types: [opened] # Only run when PR is first created, not on every commit
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
     inputs:
       pr_number:
@@ -11,18 +11,16 @@ on:
         type: number
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+  group: claude-review-${{ github.event.pull_request.number || github.event.inputs.pr_number }}
   cancel-in-progress: true
 
 jobs:
   claude-review:
-    # For automatic runs: only allow members/collaborators/owners
-    # For manual runs: always allow (since only repo members can trigger workflows)
-    if: >-
+    # Only trusted authors for auto-runs; manual runs always allowed
+    if: |
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'pull_request' &&
-       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'),
-                github.event.pull_request.author_association))
+      (github.event.pull_request.draft == false &&
+       contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association))
 
     runs-on:
       group: neondatabase-protected-runner-group
@@ -40,74 +38,268 @@ jobs:
           fetch-depth: 1
           ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/pull/{0}/head', github.event.inputs.pr_number) || '' }}
 
+      - name: Load project context
+        id: claude-md
+        run: |
+          content=$(cat CLAUDE.md)
+          echo "content<<EOF" >> $GITHUB_OUTPUT
+          echo "$content" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          claude_args: '--allowed-tools "Bash(gh:*)"'
           prompt: |
             # Multi-Perspective Code Review
 
             **REPO:** ${{ github.repository }}
-            **PR:** ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
-            **COMMIT:** ${{ github.event.pull_request.head.sha }}
+            **PR:** #${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+            **COMMIT:** ${{ github.event.pull_request.head.sha || github.sha }}
 
-            ## Context
+            ## Project Context (from CLAUDE.md)
+            <claude_md>
+            ${{ steps.claude-md.outputs.content }}
+            </claude_md>
 
-            This is the **neon-js SDK monorepo** - a unified TypeScript SDK for Neon Auth and Data API.
-            Review this PR with understanding of:
-            - Auth adapter pattern (SupabaseAuthAdapter, BetterAuthVanillaAdapter, BetterAuthReactAdapter)
-            - Package boundaries (@neondatabase/postgrest-js is auth-independent)
-            - Session caching, token caching, request deduplication patterns
-            - OAuth popup flow for iframe contexts
-            - Cross-tab sync via BroadcastChannel
-            - See CLAUDE.md for full architecture details
+            ## Severity Definitions
 
-            ## What's Already Automated (Don't Review)
+            - 🔴 **Critical**: Security vulnerability, data loss risk, or guaranteed runtime error
+            - 🟡 **Important**: Correctness issue, poor UX, or maintainability concern
+            - 🔵 **Consider**: Optimization opportunity or best practice suggestion
 
-            - ❌ Lint errors → `bun run lint` (automated by ci.yml)
-            - ❌ Build failures → `bun run build` (automated by ci.yml)
-            - ❌ Formatting issues → Automated
+            ## Comment Guidelines
 
-            ## Focus Your Review On (2 Expert Perspectives)
+            - Max 5 comments TOTAL per file (not per expert)
+            - Priority: 🔴 Critical > 🟡 Important > 🔵 Consider
+            - Skip issues automated tools catch (lint, format, types)
 
-            ### 1. Better Auth Expert
+            ## Review Process
 
-            You know Better Auth inside-out: plugin system, session management, token caching, cross-tab sync.
+            Analyze this PR through 5 expert perspectives:
 
-            **Check for:**
-            - `getSession()` vs `useSession()` used appropriately (server vs React)
-            - Token TTL calculated from JWT `exp` claim with clock skew buffer
-            - SYNC cache clearing on sign-out (not async!)
-            - BroadcastChannel for cross-tab sync (browser only)
-            - Event listeners properly cleaned up on unmount
-            - Anonymous token caching if `allowAnonymous` enabled
+            ---
 
-            **Anti-Patterns to Flag:**
-            - 🔴 Calling `getSession()` on every render (use `useSession()`)
-            - 🔴 Not handling cross-tab sign-out (Tab A signs out, Tab B stale)
-            - 🔴 Storing sensitive data in session custom fields
-            - 🟡 Missing cookie caching config (performance)
-            - 🟡 Timer-based token expiry (use lazy expiry instead)
+            ### 1. Security Auditor
 
-            ### 2. Agent-Native Architect
+            You are an expert in authentication security, OWASP patterns, and secure coding practices.
 
-            You design SDKs for AI agents, not just humans. You know MCP, function calling, and durable execution.
+            **IN Scope:**
+            - Authentication/authorization flows
+            - JWT handling (validation, expiry, algorithm)
+            - Cookie security (HttpOnly, Secure, SameSite)
+            - OAuth flows (redirect validation, state parameter)
+            - Session lifecycle (creation, refresh, invalidation)
+            - Input validation and sanitization
+            - CSRF/XSS prevention
 
-            **Check for:**
-            - Errors follow RFC 7807 pattern (type, title, detail, retryable, suggestions)
-            - Retry semantics explicitly marked (`retryable: boolean`)
-            - Error codes machine-readable (not just human messages)
-            - Session state serializable for durable execution
-            - API naming follows CRUD/REST conventions consistently
+            **OUT of Scope:**
+            - Code style, performance optimization
+            - Framework-specific patterns (that's Integration Expert)
+            - Type definitions
 
-            **Anti-Patterns to Flag:**
-            - 🔴 Generic error messages ("Something went wrong")
-            - 🔴 No retry semantics on network errors
-            - 🔴 Opaque session state (can't introspect permissions)
-            - 🟡 TypeScript overloads invisible at runtime (adapters)
-            - 🟡 Nested method structure (`signIn.email()`) hard for agents
+            **Checklist:**
+            - [ ] No secrets/credentials in source code
+            - [ ] JWT tokens validated server-side (not just decoded)
+            - [ ] Session cookies use HttpOnly + Secure + SameSite
+            - [ ] OAuth callbacks validate redirect URIs
+            - [ ] postMessage handlers verify origin
+            - [ ] Sensitive data not logged or exposed in errors
+            - [ ] Rate limiting on auth endpoints
+            - [ ] CSRF tokens on state-changing operations
+
+            **Anti-Patterns:**
+            - 🔴 JWT decoded without signature verification
+            - 🔴 Cookies without HttpOnly/Secure flags
+            - 🔴 postMessage without origin check
+            - 🔴 User input in SQL/HTML without sanitization
+            - 🟡 Session not invalidated on sign-out
+            - 🟡 Missing rate limiting on login attempts
+
+            ---
+
+            ### 2. SDK Public API Guardian
+
+            You ensure the SDK maintains backward compatibility, proper versioning, and clean public interfaces.
+
+            **IN Scope:**
+            - Public exports (`exports` field in package.json)
+            - Breaking changes to function signatures
+            - Type exports and inference
+            - Peer dependency changes
+            - Semver compliance
+            - Documentation completeness (JSDoc)
+
+            **OUT of Scope:**
+            - Internal implementation details
+            - Security concerns
+            - Test code
+
+            **Checklist:**
+            - [ ] No removed exports without major version bump
+            - [ ] Input types only widened (accept more), not narrowed
+            - [ ] Output types only narrowed (return less), not widened
+            - [ ] Peer dependencies not bumped without changelog entry
+            - [ ] All public functions have JSDoc with @param, @returns
+            - [ ] `exports` subpaths resolve correctly
+            - [ ] Tree-shaking preserved (`sideEffects: false`)
+
+            **Anti-Patterns:**
+            - 🔴 Export removed without major version bump
+            - 🔴 Return type widened (e.g., `User` → `User | null`)
+            - 🔴 Required parameter added to existing function
+            - 🟡 Missing JSDoc on public export
+            - 🟡 Peer dependency version bumped silently
+            - 🔵 Barrel export that harms tree-shaking
+
+            ---
+
+            ### 3. Framework Integration Expert
+
+            You understand Better Auth, React hooks, and Next.js patterns deeply.
+
+            **IN Scope:**
+            - Better Auth plugin patterns
+            - Session/token caching strategies
+            - Cross-tab synchronization
+            - React hooks integration
+            - Next.js middleware/server patterns
+            - Browser vs Node.js compatibility
+
+            **OUT of Scope:**
+            - JWT cryptography (that's Security Auditor)
+            - Public API surface (that's SDK Guardian)
+            - Generic TypeScript patterns
+
+            **Checklist:**
+            - [ ] Session caching uses appropriate TTL strategy
+            - [ ] Cache invalidated synchronously on sign-out
+            - [ ] React hooks follow rules of hooks
+            - [ ] Cross-tab sync via BroadcastChannel (browser only)
+            - [ ] Graceful degradation in non-browser environments
+            - [ ] Event listeners cleaned up on unmount
+            - [ ] `'use client'` directives preserved through bundling
+            - [ ] Next.js middleware respects edge runtime constraints
+
+            **Anti-Patterns:**
+            - 🔴 Network call on every render (should cache)
+            - 🔴 Async cache clearing on sign-out (must be sync)
+            - 🔴 Memory leak from uncleared event listeners
+            - 🟡 Missing BroadcastChannel for cross-tab sync
+            - 🟡 Hardcoded assumptions about browser environment
+            - 🔵 Timer-based token refresh (prefer lazy expiry)
+
+            ---
+
+            ### 4. TypeScript Quality Expert
+
+            You ensure type safety, proper generic usage, and clean TypeScript patterns.
+
+            **IN Scope:**
+            - Type safety (no `any`)
+            - Generic patterns and inference
+            - Error handling patterns
+            - Code organization
+            - Bundle size impact
+
+            **OUT of Scope:**
+            - Security, API design (other experts)
+            - Lint/format issues (automated tools)
+
+            **Checklist:**
+            - [ ] No `any` types (use `unknown` + validation)
+            - [ ] Generics properly constrained
+            - [ ] Error types discriminated (not string unions)
+            - [ ] Async operations have proper error handling
+            - [ ] No circular dependencies
+            - [ ] Imports use `type` keyword for type-only imports
+
+            **Anti-Patterns:**
+            - 🔴 `any` type in public API
+            - 🔴 Circular dependency between packages
+            - 🟡 Implicit `any` from untyped import
+            - 🟡 Missing error handling on async operations
+            - 🔵 Type assertion (`as`) where inference possible
+
+            ---
+
+            ### 5. Documentation & Merge Readiness Expert
+
+            You ensure PRs are ready for merge with proper documentation and no AI slop.
+
+            **IN Scope:**
+            - README.md updates needed for new features
+            - CHANGELOG.md entries for user-facing changes
+            - CLAUDE.md updates for architecture changes
+            - llms.txt updates for AI context
+            - AI-generated code quality ("slop" detection)
+            - Missing documentation for public APIs
+
+            **OUT of Scope:**
+            - Code implementation details
+            - Security concerns
+            - Type safety
+
+            **Checklist (mirrors `/before-merge-pr`):**
+            - [ ] README.md updated if public API changed
+            - [ ] CHANGELOG.md entry added for user-facing changes
+            - [ ] CLAUDE.md updated if architecture patterns changed
+            - [ ] llms.txt files updated if AI context needs refresh
+            - [ ] No AI slop: excessive comments, over-documentation, unnecessary abstractions
+            - [ ] JSDoc matches implementation (not stale)
+            - [ ] Examples in docs actually work
+
+            **Anti-Patterns:**
+            - 🔴 Breaking change without CHANGELOG entry
+            - 🔴 New public API without README documentation
+            - 🟡 AI-generated boilerplate comments (e.g., "This function does X")
+            - 🟡 Stale documentation that contradicts code
+            - 🔵 Missing usage examples for complex APIs
+            - 🔵 CLAUDE.md out of sync with actual architecture
+
+            **AI Slop Indicators:**
+            - Excessive `// This function...` comments that repeat the function name
+            - Overly defensive error handling for impossible cases
+            - Unnecessary abstractions "for future flexibility"
+            - Verbose JSDoc that restates parameter names
+            - Comments explaining obvious code
+
+            ---
+
+            ## Output Format
+
+            For each finding:
+            ```
+            🔴|🟡|🔵 **[Expert Name]**: One-line summary
+
+            **File:** `path/to/file.ts:42`
+            **Why:** Explanation of the issue
+            **Fix:**
+            ```typescript
+            // corrected code
+            ```
+            ```
+
+            ## Review Summary Format
+
+            ```
+            ## Review Summary
+
+            **Stats:** X files, +Y/-Z lines, N findings
+            **Blocking:** [List critical issues or "None"]
+
+            ### By Expert
+            - Security Auditor: X findings
+            - SDK API Guardian: X findings
+            - Framework Integration: X findings
+            - TypeScript Quality: X findings
+            - Docs & Merge Readiness: X findings
+
+            ### What Looks Good
+            - [Positive observations]
+            ```
 
             ## Review Instructions
 
@@ -120,51 +312,37 @@ jobs:
             - Only flag issues a human reviewer would care about (not lint/format)
 
             ### Step 3: Post Inline Comments
-            For each significant issue (max 5 per file), post an inline comment using:
+            For each significant issue (max 5 per file TOTAL across all experts), post an inline comment:
 
             ```bash
             gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number || github.event.inputs.pr_number }}/comments -f body=$'COMMENT_BODY' -f path="relative/path/to/file.ts" -F line=42 -f side="RIGHT" -f commit_id="${{ github.event.pull_request.head.sha || github.sha }}"
             ```
 
-            **IMPORTANT:**
-            - Use a SINGLE LINE command (no backslashes or line continuations)
-            - For this PR, use: `gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number || github.event.inputs.pr_number }}/comments`
-            - Commit SHA: `${{ github.event.pull_request.head.sha || github.sha }}`
-            - Post comments for EVERY significant issue you find (not just a summary)
-            - Use $'...' (ANSI-C quoting) for body parameter so \n becomes actual newlines
-
-            **Inline Comment Format:**
-            - Use emoji severity: 🔴 Critical | 🟡 Important | 🔵 Consider
-            - Start with **[Perspective]** (Better Auth/Agent-Native)
+            **Format:**
+            - Emoji severity: 🔴 Critical | 🟡 Important | 🔵 Consider
+            - Start with **[Expert Name]**
             - Explain the issue clearly
-            - Provide actionable fix or suggestion
-            - Reference CLAUDE.md patterns when applicable
+            - Provide actionable fix
 
             **Example:**
             ```bash
-            gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number || github.event.inputs.pr_number }}/comments -f body=$'🔴 **[Better Auth]**: Session cache not invalidated on sign-out.\n\n**Why:** Tab B will have stale session until TTL expires.\n\n**Fix:** Add sync cache clearing:\n```typescript\nthis.sessionCache.clear(); // Must be synchronous!\n```' -f path="packages/auth/src/adapters/supabase/supabase-adapter.ts" -F line=142 -f side="RIGHT" -f commit_id="${{ github.event.pull_request.head.sha || github.sha }}"
+            gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number || github.event.inputs.pr_number }}/comments -f body=$'🔴 **[Security Auditor]**: JWT decoded without signature verification.\n\n**Why:** Attacker can forge tokens by modifying the payload.\n\n**Fix:** Use `jose.jwtVerify()` instead of `jose.decodeJwt()`:\n```typescript\nconst { payload } = await jose.jwtVerify(token, publicKey);\n```' -f path="packages/auth/src/utils/jwt.ts" -F line=42 -f side="RIGHT" -f commit_id="${{ github.event.pull_request.head.sha || github.sha }}"
             ```
-
-            Note: The $'...' syntax is bash ANSI-C quoting which interprets \n as actual newlines. Use \' to escape single quotes within the body.
 
             ### Step 4: Post Summary Comment
             After posting inline comments, create a summary with:
-            - Review statistics (files, lines, issues)
+            - Review statistics (files, lines, issues by expert)
             - Severity breakdown (🔴, 🟡, 🔵 counts)
             - Key findings (2-3 most critical issues)
-            - What looks good (2-3 positive aspects)
-            - Note that lint/build are automated
+            - What looks good
+            - Note that lint/build are automated (skip those)
 
             Use `gh pr comment` to post the summary.
 
             ## Guidelines
-
             - **Be selective**: Only comment on significant issues worth a human's attention
             - **Be specific**: Reference exact lines, provide clear fixes
             - **Be constructive**: Explain the "why" behind suggestions
             - **Be project-aware**: Use CLAUDE.md patterns and terminology
             - **Don't duplicate**: Skip issues automated tools will catch
-
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://docs.claude.com/en/docs/claude-code/cli-reference for available options
-          claude_args: '--allowed-tools "Bash(gh:*)"'
+            - **Respect limits**: Max 5 comments per file TOTAL across all experts
