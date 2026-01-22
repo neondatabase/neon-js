@@ -3,7 +3,6 @@ import { createNextRequestContext } from './adapter';
 import type { NeonAuthConfig } from '@/server/config';
 import { validateCookieSecret } from '@/server/config';
 
-export { neonAuth } from './neon-auth';
 export { neonAuthMiddleware } from './middleware';
 export { authApiHandler } from './handler';
 

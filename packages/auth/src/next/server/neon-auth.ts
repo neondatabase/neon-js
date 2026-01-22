@@ -3,67 +3,9 @@ import { cookies, headers } from 'next/headers';
 import { getUpstreamURL } from '@/server/proxy/request';
 
 import { extractNeonAuthCookies, parseSetCookies } from '@/server/utils/cookies';
-import { signSessionDataCookie, validateSessionData, parseSessionData } from '@/server/session';
+import { signSessionDataCookie, parseSessionData } from '@/server/session';
 import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '@/server/constants';
 import type { SessionData } from '@/server/types';
-import type { NeonAuthConfig } from '@/server/config';
-import { validateCookieSecret } from '@/server/config';
-
-/**
- * A utility function to be used in react server components to fetch the session details.
- *
- * Tries cookie cache first for fast access (< 1ms), falls back to API call if needed.
- *
- * @param config - Required configuration
- * @param config.baseUrl - Base URL of your Neon Auth instance
- * @param config.cookieSecret - Secret for signing session cookies (minimum 32 characters)
- * @returns `{ session: Session, user: User }` | `{ session: null, user: null}`
- * @throws Error if `cookieSecret` is less than 32 characters
- *
- * @example
- * ```ts
- * import { neonAuth } from "@neondatabase/auth/next/server"
- *
- * const { session, user } = await neonAuth({
- *   baseUrl: process.env.NEON_AUTH_BASE_URL!,
- *   cookieSecret: process.env.NEON_AUTH_COOKIE_SECRET!,
- * })
- * ```
- */
-export const neonAuth = async (config: NeonAuthConfig): Promise<SessionData> => {
-  const { baseUrl, cookieSecret } = config;
-
-  // Validate cookie secret
-  validateCookieSecret(cookieSecret);
-
-  // Try cache first
-  const cookieStore = await cookies();
-  const sessionDataCookie = cookieStore.get(NEON_AUTH_SESSION_DATA_COOKIE_NAME)?.value;
-
-  if (sessionDataCookie) {
-    try {
-      const result = await validateSessionData(sessionDataCookie, cookieSecret);
-
-      if (result.valid && result.payload) {
-        // Cache hit - fast path
-        return result.payload;
-      }
-
-      // Cache miss - invalid cookie
-      console.debug('[neonAuth] Invalid session cookie, fetching from API:', {
-        error: result.error,
-      });
-    } catch (error) {
-      // Validation error - log and fall through
-      console.error('[neonAuth] Cookie validation error:', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-
-  // Fallback: fetch from API
-  return await fetchSession({ disableRefresh: true, baseUrl, cookieSecret });
-};
 
 /**
  * A utility function to fetch the session details from the Neon Auth API, if session token is available in cookie.

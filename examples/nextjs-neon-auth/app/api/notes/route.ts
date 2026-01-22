@@ -2,17 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { eq, desc } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { notes } from '@/lib/schema';
-import { neonAuth } from '@neondatabase/auth/next/server';
 import { authServer } from '@/lib/auth/server';
 
 // GET - List notes for the current user
 export async function GET() {
-  const session = await neonAuth({
-    baseUrl: process.env.NEON_AUTH_BASE_URL!,
-    cookieSecret: process.env.NEON_AUTH_COOKIE_SECRET!,
-  });
+  const { data: session } = await authServer.getSession();
 
-  if (!session.user) {
+  if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
