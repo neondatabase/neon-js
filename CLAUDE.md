@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **Note:** `AGENTS.md` is a symlink to this file, so other AI coding tools use the same instructions. On Windows, Git may create a text file instead of a symlink—if so, keep both files in sync manually.
+
 ## Project Overview
 
 A unified TypeScript SDK monorepo for Neon services, providing seamless integration with **Neon Auth** (authentication service) and **Neon Data API** (PostgreSQL database queries). Built with a familiar interface for easy adoption.
@@ -313,6 +315,7 @@ Auth-UI CSS is designed to **never override user's theme**. This is achieved thr
 - `adapter-core.ts` - Base adapter class with shared functionality (includes `getJWTToken(allowAnonymous)`)
 - `session-cache-manager.ts` - Session caching with TTL
 - `token-cache.ts` - Generic token caching with JWT-based TTL
+- `anonymous-token-cache-manager.ts` - Anonymous token caching for RLS-based access
 - `in-flight-request-manager.ts` - Request deduplication
 - `oauth-popup.ts` - Popup-based OAuth flow for iframe contexts
 - `better-auth-helpers.ts` - Session mapping and error handling
@@ -755,6 +758,18 @@ Following the [Better Auth Supabase Migration Guide](https://www.better-auth.com
 
 **Password Management:**
 - `resetPasswordForEmail` -> `betterAuth.forgetPassword()`
+
+## Claude Code Skills
+
+The `skills/` directory contains AI-assistant skills for helping developers set up Neon packages:
+
+| Skill | When to Use |
+|-------|-------------|
+| `neon-auth-react` | Auth-only setup in React (Vite, CRA) - no database needed |
+| `neon-auth-nextjs` | Auth-only setup in Next.js App Router - no database needed |
+| `neon-js-react` | Full SDK (auth + database) in React (Vite, CRA) |
+
+**Note:** For full SDK setup in Next.js, use `neon-auth-nextjs` as a starting point and add the Data API configuration manually, or refer to the `examples/nextjs-neon-auth/` example.
 
 ## Additional Documentation
 

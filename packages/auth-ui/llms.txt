@@ -32,6 +32,24 @@ import "@neondatabase/auth-ui/css";
 /* Your overrides go here */
 ```
 
+## Available Components
+
+### Authentication Forms
+- `SignInForm` - Email/password + OAuth sign in
+- `SignUpForm` - New user registration
+- `AuthView` - Dynamic view based on route path
+- `SignedIn` / `SignedOut` / `AuthLoading` - Conditional rendering wrappers
+
+### Account Management
+- `UserButton` - Avatar with dropdown menu (sign out, settings)
+- `UserAvatar` - Just the avatar image
+- `AccountView` - Account settings pages
+- `SettingsCard` - Individual settings sections
+
+### Organization (if enabled on server)
+- `OrganizationView` - Org management pages
+- `OrganizationSwitcher` - Switch between organizations
+
 ## Provider Props
 
 ```typescript
@@ -362,6 +380,50 @@ function toggleDarkMode() {
   --primary: oklch(0.75 0.2 250);
   --primary-foreground: oklch(0.1 0 0);
 }
+```
+
+## Form Customization
+
+### Props
+
+```typescript
+<SignInForm
+  redirectTo="/dashboard"           // URL after successful auth
+  callbackURL="/auth/callback"      // OAuth callback URL
+  className="max-w-md mx-auto"      // Container className
+  classNames={{...}}                // Targeted element styling
+/>
+```
+
+### Disabling Features
+
+```typescript
+<NeonAuthUIProvider
+  authClient={authClient}
+  social={false}           // Hide OAuth buttons
+  emailOTP={false}         // Disable magic link option
+  passkey={false}          // Disable passkey authentication
+  forgotPassword={false}   // Hide forgot password link
+>
+```
+
+### Custom Fields
+
+```typescript
+<SignUpForm
+  additionalFields={{
+    username: {
+      label: "Username",
+      required: true,
+      type: "text",
+    },
+    company: {
+      label: "Company",
+      required: false,
+      type: "text",
+    },
+  }}
+/>
 ```
 
 ## Component-Specific Styling
