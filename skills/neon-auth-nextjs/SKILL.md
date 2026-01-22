@@ -95,7 +95,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       replace={router.replace}
       onSessionChange={() => router.refresh()}
       redirectTo="/dashboard"
-      Link={Link}
+      Link={({href, children}) => <Link to={href}>{children}</Link>}
     >
       {children}
     </NeonAuthUIProvider>
@@ -205,11 +205,11 @@ Full configuration options:
   replace={router.replace}      // router.replace for redirects
   onSessionChange={() => router.refresh()} // Refresh Server Components!
   redirectTo="/dashboard"       // Where to redirect after auth
-  Link={Link}                   // Next.js Link component
+  Link={({href, children}) => <Link to={href}>{children}</Link>}                   // Next.js Link component
 
   // Social/OAuth Providers
   social={{
-    providers: ['google', 'github', 'twitter', 'discord'],
+    providers: ['google'],
   }}
 
   // Feature Flags
@@ -507,7 +507,7 @@ import {
 ```typescript
 <NeonAuthUIProvider
   social={{
-    providers: ['google', 'github', 'twitter', 'discord', 'apple', 'microsoft'],
+    providers: ['google'],
   }}
 >
 ```

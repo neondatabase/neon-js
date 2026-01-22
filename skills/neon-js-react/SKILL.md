@@ -98,7 +98,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       authClient={neonClient.auth}
       navigate={navigate}
       redirectTo="/dashboard"
-      Link={Link}
+      Link={({href, children}) => <Link to={href}>{children}</Link>}
     >
       {children}
     </NeonAuthUIProvider>
@@ -189,12 +189,12 @@ Full configuration:
 
   // Navigation
   navigate={navigate}
-  Link={Link}
+  Link={({href, children}) => <Link to={href}>{children}</Link>}
   redirectTo="/dashboard"
 
   // Social/OAuth
   social={{
-    providers: ['google', 'github', 'twitter', 'discord'],
+    providers: ['google'],
   }}
 
   // Feature Flags
@@ -562,7 +562,7 @@ import {
 ```typescript
 <NeonAuthUIProvider
   social={{
-    providers: ['google', 'github', 'twitter', 'discord', 'apple', 'microsoft'],
+    providers: ['google'],
   }}
 >
 ```

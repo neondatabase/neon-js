@@ -4,10 +4,30 @@
 
 `@neondatabase/neon-js` brings together Neon Auth and Neon Data API in a single client. It provides a familiar interface for authentication and type-safe database queries with PostgREST.
 
+## When to Use This Package
+
+| Use Case | Package |
+|----------|---------|
+| Auth + Database (most apps) | `@neondatabase/neon-js` |
+| Auth only (no database) | `@neondatabase/auth` |
+| Database only (external auth) | `@neondatabase/postgrest-js` |
+| Pre-built UI components | Add `@neondatabase/auth-ui` |
+
 ## Installation
 
 ```bash
 npm install @neondatabase/neon-js
+```
+
+## Environment Variables
+
+```bash
+# React/Vite
+VITE_NEON_AUTH_URL=https://your-project.neon.tech/auth
+VITE_NEON_DATA_API_URL=https://your-project.neon.tech/rest/v1
+
+# Next.js
+NEON_AUTH_BASE_URL=https://your-project.neon.tech
 ```
 
 ## Quick Start
@@ -70,13 +90,15 @@ await client.auth.signOut();
 
 ### Adapters
 
+**Critical:** Adapters are factory functions - must call with `()`.
+
 ```typescript
 // SupabaseAuthAdapter - Supabase-compatible API
 import { createClient, SupabaseAuthAdapter } from '@neondatabase/neon-js';
 
 const client = createClient<Database>({
   auth: {
-    adapter: SupabaseAuthAdapter(),
+    adapter: SupabaseAuthAdapter(), // Must call with ()
     url: import.meta.env.VITE_NEON_AUTH_URL,
   },
   dataApi: {
@@ -89,7 +111,25 @@ const { data: session } = await client.auth.getSession();
 ```
 
 ```typescript
-// BetterAuthReactAdapter - React hooks
+// BetterAuthVanillaAdapter - Direct Better Auth API
+import { createClient, BetterAuthVanillaAdapter } from '@neondatabase/neon-js';
+
+const client = createClient<Database>({
+  auth: {
+    adapter: BetterAuthVanillaAdapter(),
+    url: import.meta.env.VITE_NEON_AUTH_URL,
+  },
+  dataApi: {
+    url: import.meta.env.VITE_NEON_DATA_API_URL,
+  },
+});
+
+await client.auth.signIn.email({ email, password });
+const session = await client.auth.getSession();
+```
+
+```typescript
+// BetterAuthReactAdapter - React hooks (MUST use subpath import)
 import { createClient } from '@neondatabase/neon-js';
 import { BetterAuthReactAdapter } from '@neondatabase/neon-js/auth/react/adapters';
 
@@ -112,6 +152,8 @@ function MyComponent() {
 
 ### Anonymous Access
 
+Enable RLS-based data access for unauthenticated users:
+
 ```typescript
 const client = createClient<Database>({
   auth: {
@@ -125,6 +167,47 @@ const client = createClient<Database>({
 
 // Works without signing in - uses anonymous token for RLS
 const { data: publicItems } = await client.from('public_items').select();
+```
+
+**Required SQL setup:**
+
+```sql
+-- Enable RLS on table
+ALTER TABLE public.public_items ENABLE ROW LEVEL SECURITY;
+
+-- Allow anonymous read access
+CREATE POLICY "anonymous_read" ON public.public_items
+  FOR SELECT TO anonymous USING (true);
+
+-- Grant permissions to roles
+GRANT SELECT ON public.public_items TO anonymous;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.public_items TO authenticated;
+```
+
+## Next.js Integration
+
+See [@neondatabase/auth/NEXT-JS.md](https://github.com/neondatabase/neon-js/blob/main/packages/auth/NEXT-JS.md) for full guide.
+
+**Quick setup:**
+
+```typescript
+// app/api/auth/[...path]/route.ts
+import { authApiHandler } from "@neondatabase/neon-js/auth/next/server"
+export const { GET, POST } = authApiHandler()
+
+// lib/auth-client.ts
+"use client"
+import { createAuthClient } from '@neondatabase/neon-js/auth/next';
+export const authClient = createAuthClient()
+
+// Server Components
+import { neonAuth } from '@neondatabase/neon-js/auth/next/server';
+const { user } = await neonAuth();
+
+// Server Actions
+import { createAuthServer } from '@neondatabase/neon-js/auth/next/server';
+const authServer = createAuthServer();
+await authServer.signIn.email({ email, password });
 ```
 
 ## Database Querying
@@ -203,6 +286,28 @@ const { data } = await client.rpc('get_user_stats', {
 });
 ```
 
+## Error Handling
+
+```typescript
+import { AuthRequiredError } from '@neondatabase/neon-js';
+
+try {
+  const { data } = await client.from('posts').select();
+} catch (error) {
+  if (error instanceof AuthRequiredError) {
+    // User not authenticated - redirect to login
+    window.location.href = '/login';
+  }
+  // Handle PostgREST errors
+  if (error.code === 'PGRST301') {
+    // Row-level security violation - check RLS policies
+  }
+  if (error.code === '42501') {
+    // Permission denied - check GRANT statements
+  }
+}
+```
+
 ## TypeScript
 
 Generate types from your database schema:
@@ -249,16 +354,39 @@ const client = createClient({
 ## CSS for UI Components
 
 ```css
-/* Without Tailwind */
+/* Without Tailwind - pre-built bundle (~47KB) */
 @import '@neondatabase/neon-js/ui/css';
 
-/* With Tailwind CSS v4 */
+/* With Tailwind CSS v4 - theme tokens only (~2KB) */
 @import 'tailwindcss';
 @import '@neondatabase/neon-js/ui/tailwind';
 ```
+
+**Rule:** Never import both - causes duplicate styles.
+
+## Critical Rules
+
+1. **Adapters are factories** - Call them: `SupabaseAuthAdapter()` not `SupabaseAuthAdapter`
+2. **React adapter import path** - Must use subpath: `@neondatabase/neon-js/auth/react/adapters`
+3. **CSS choice** - Pick ONE: `/ui/css` OR `/ui/tailwind`, never both
+4. **Anonymous access requires RLS** - Must configure database policies and grants
+5. **Type generation** - Run CLI after schema changes to keep types in sync
+
+## Troubleshooting
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `AuthRequiredError` | No session when querying | Sign in first or enable `allowAnonymous` |
+| `permission denied for table` | RLS blocking access | Add RLS policy + GRANT for role |
+| `adapter is not a function` | Missing `()` on adapter | Use `SupabaseAuthAdapter()` not `SupabaseAuthAdapter` |
+| OAuth popup blocked | Browser blocking popup | User must allow popups for domain |
+| `PGRST301` | JWT expired or invalid | Session expired - re-authenticate |
+| Cross-tab sync not working | Node.js environment | BroadcastChannel is browser-only feature |
+| Session always null | Cookies blocked | Check browser settings, try non-incognito |
 
 ## Optional
 
 - [CLI Tool](https://github.com/neondatabase/neon-js/tree/main/packages/neon-js#cli-tool): Generate TypeScript types from database
 - [PostgREST Documentation](https://postgrest.org): Query syntax reference
 - [Better Auth Documentation](https://www.better-auth.com/docs): Authentication library docs
+- [Next.js Integration Guide](https://github.com/neondatabase/neon-js/blob/main/packages/auth/NEXT-JS.md): Full Next.js setup

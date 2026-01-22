@@ -62,7 +62,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       authClient={authClient}
       navigate={navigate}
       redirectTo="/dashboard"
-      Link={Link}
+      Link={({ children, href }) => <Link to={href}>{children}</Link>}
     >
       {children}
     </NeonAuthUIProvider>
@@ -155,12 +155,12 @@ Full configuration options:
 
   // Navigation (required for React Router)
   navigate={navigate}           // Router's navigate function
-  Link={Link}                   // Router's Link component
+  Link={({href, children}) => <Link to={href}>{children}</Link>}                   // Router's Link component
   redirectTo="/dashboard"       // Where to redirect after auth
 
   // Social/OAuth Providers
   social={{
-    providers: ['google', 'github', 'twitter', 'discord'],
+    providers: ['google'],
   }}
 
   // Feature Flags
@@ -404,7 +404,7 @@ Enable providers in NeonAuthUIProvider:
 ```typescript
 <NeonAuthUIProvider
   social={{
-    providers: ['google', 'github', 'twitter', 'discord', 'apple', 'microsoft'],
+    providers: ['google'],
   }}
 >
 ```
@@ -561,7 +561,7 @@ const { data } = await authClient.getUserIdentities();
 
 // Link new provider
 await authClient.linkIdentity({
-  provider: 'github',
+  provider: 'google',
   options: { redirectTo: '/account/security' },
 });
 
