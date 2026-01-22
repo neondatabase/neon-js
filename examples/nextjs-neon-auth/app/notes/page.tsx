@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { StickyNote } from "lucide-react"
-import { authServer } from "@/lib/auth/server"
+import { auth } from "@/lib/auth/server"
 import { db } from "@/lib/db"
 import { notes } from "@/lib/schema"
 import { eq, desc } from "drizzle-orm"
@@ -18,7 +18,7 @@ function formatDate(date: Date | string) {
 }
 
 export default async function NotesPage() {
-    const { data: session } = await authServer.getSession()
+    const { data: session } = await auth.getSession()
 
     if (!session?.user) {
         redirect("/auth/sign-in")

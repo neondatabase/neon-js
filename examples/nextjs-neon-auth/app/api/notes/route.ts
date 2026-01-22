@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { eq, desc } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { notes } from '@/lib/schema';
-import { authServer } from '@/lib/auth/server';
+import { auth } from '@/lib/auth/server';
 
 // GET - List notes for the current user
 export async function GET() {
-  const { data: session } = await authServer.getSession();
+  const { data: session } = await auth.getSession();
 
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -24,7 +24,7 @@ export async function GET() {
 
 // POST - Create a new note
 export async function POST(request: NextRequest) {
-    const { data: session } = await authServer.getSession()
+    const { data: session } = await auth.getSession()
     if (!session?.user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }

@@ -1,8 +1,6 @@
-import { neonAuthMiddleware } from "@neondatabase/auth/next/server";
+import { auth } from "@/lib/auth/server";
 
-export default neonAuthMiddleware({
-  baseUrl: process.env.NEON_AUTH_BASE_URL!,
-  cookieSecret: process.env.NEON_AUTH_COOKIE_SECRET!,
+export default auth.middleware({
   // Redirects unauthenticated users to sign-in page
   loginUrl: "/auth/sign-in",
 });
