@@ -14,7 +14,7 @@ Use this skill when:
 - Setting up Neon Auth + Database in a React app (Vite, CRA, etc.)
 - User needs both authentication AND database queries
 - User mentions "neon-js", "neon auth + database", or "full neon SDK"
-- User is NOT using Next.js (use `neon-js-nextjs` skill for Next.js)
+- User is NOT using Next.js (for Next.js, use `neon-auth-nextjs` as a starting point and add Data API configuration, or see `examples/nextjs-neon-auth/`)
 
 ## Critical Rules
 

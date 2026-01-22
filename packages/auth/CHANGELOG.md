@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [Unreleased]
+
+### Added
+
+- **Next.js Session Data Caching**: Server-side session caching via signed cookie for `neonAuth()`. When `NEON_AUTH_COOKIE_SECRET` is set, sessions are cached in a signed cookie, reducing API calls. Falls back to API fetch when secret is not configured (backward compatible).
+
 ## [0.1.0-beta.21] - 2026-01-14
 
 ### Removed

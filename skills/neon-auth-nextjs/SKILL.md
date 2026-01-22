@@ -14,7 +14,6 @@ Use this skill when:
 - Setting up Neon Auth in Next.js (App Router)
 - User mentions "next.js", "next", or "app router" with Neon Auth
 - Auth-only setup (no database needed)
-- User is NOT using `@neondatabase/neon-js` (use `neon-js-nextjs` skill for full SDK)
 
 ## Critical Rules
 

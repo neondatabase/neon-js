@@ -768,7 +768,8 @@ The `skills/` directory contains AI-assistant skills for helping developers set 
 | `neon-auth-react` | Auth-only setup in React (Vite, CRA) - no database needed |
 | `neon-auth-nextjs` | Auth-only setup in Next.js App Router - no database needed |
 | `neon-js-react` | Full SDK (auth + database) in React (Vite, CRA) |
-| `neon-js-nextjs` | Full SDK (auth + database) in Next.js App Router |
+
+**Note:** For full SDK setup in Next.js, use `neon-auth-nextjs` as a starting point and add the Data API configuration manually, or refer to the `examples/nextjs-neon-auth/` example.
 
 ## Additional Documentation
 
