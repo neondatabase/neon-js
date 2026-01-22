@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { needsSessionVerification, exchangeOAuthToken } from './oauth';
-import { NEON_AUTH_BASE_URL } from '../env-variables';
-import { ERRORS } from '@/server/errors';
 import { fetchSession } from '../auth/session';
-import { NEON_AUTH_HEADER_MIDDLEWARE_NAME, NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../constants';
+import { NEON_AUTH_HEADER_MIDDLEWARE_NAME } from '../constants';
+import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '@/server/constants';
 import { validateSessionData } from '../../server/session';
-import { assertCookieSecret, assertDefined } from '@/server/session/validator';
+import type { NeonAuthMiddlewareConfig } from '../config';
+import { validateCookieSecret } from '../config';
 
 const AUTH_API_ROUTES = '/api/auth';
 const SKIP_ROUTES = [
@@ -19,57 +19,32 @@ const SKIP_ROUTES = [
   '/auth/forgot-password',
 ];
 
-type NeonAuthMiddlewareOptions = {
-  /**
-   * The URL to redirect to when the user is not authenticated.
-   * Defaults to `/auth/sign-in`
-   */
-  loginUrl?: string;
-  /**
-   * Optional base URL for Neon Auth (falls back to environment variable)
-   */
-  baseUrl?: string;
-  /**
-   * Optional cookie secret for session caching (falls back to environment variable)
-   */
-  cookieSecret?: string;
-};
-
 /**
  * A Next.js middleware to protect routes from unauthenticated requests and refresh the session if required.
  *
- * @param options - Middleware configuration options
- * @param options.loginUrl - The URL to redirect to when the user is not authenticated (default: '/auth/sign-in')
- * @param options.baseUrl - Optional base URL (falls back to environment variable)
- * @param options.cookieSecret - Optional cookie secret (falls back to environment variable)
+ * @param config - Required middleware configuration
+ * @param config.baseUrl - Base URL of your Neon Auth instance
+ * @param config.cookieSecret - Secret for signing session cookies (minimum 32 characters)
+ * @param config.loginUrl - The URL to redirect to when the user is not authenticated (default: '/auth/sign-in')
  * @returns A middleware function that can be used in the Next.js app.
+ * @throws Error if `cookieSecret` is less than 32 characters
  *
  * @example
  * ```ts
  * import { neonAuthMiddleware } from "@neondatabase/auth/next"
  *
- * // Uses environment variables (backward compatible)
  * export default neonAuthMiddleware({
- *   loginUrl: '/auth/sign-in'
- * });
- *
- * // Or with explicit config
- * export default neonAuthMiddleware({
+ *   baseUrl: process.env.NEON_AUTH_BASE_URL!,
+ *   cookieSecret: process.env.NEON_AUTH_COOKIE_SECRET!,
  *   loginUrl: '/auth/sign-in',
- *   baseUrl: 'https://auth.example.com',
- *   cookieSecret: process.env.SECRET
  * });
  * ```
  */
-export function neonAuthMiddleware({
-  loginUrl = '/auth/sign-in',
-  baseUrl: configBaseUrl,
-  cookieSecret: configCookieSecret,
-}: NeonAuthMiddlewareOptions = {}) {
-  const baseUrl = configBaseUrl ?? NEON_AUTH_BASE_URL;
-  const cookieSecret = configCookieSecret ?? process.env.NEON_AUTH_COOKIE_SECRET;
+export function neonAuthMiddleware(config: NeonAuthMiddlewareConfig) {
+  const { baseUrl, cookieSecret, loginUrl = '/auth/sign-in' } = config;
 
-  assertDefined(baseUrl, new Error(ERRORS.MISSING_AUTH_BASE_URL));
+  // Validate cookie secret
+  validateCookieSecret(cookieSecret);
   return async (request: NextRequest) => {
     const { pathname } = request.nextUrl;
 
@@ -92,37 +67,33 @@ export function neonAuthMiddleware({
       return NextResponse.next();
     }
 
-    // Try session cookie cache if enabled (backward compatible)
-    if (cookieSecret) {
-      assertCookieSecret(cookieSecret);
-      
-      const sessionDataCookie = request.cookies.get(NEON_AUTH_SESSION_DATA_COOKIE_NAME)?.value;
-      if (sessionDataCookie) {
-        try {
-          const result = await validateSessionData(sessionDataCookie, cookieSecret);
+    // Try session cookie cache first
+    const sessionDataCookie = request.cookies.get(NEON_AUTH_SESSION_DATA_COOKIE_NAME)?.value;
+    if (sessionDataCookie) {
+      try {
+        const result = await validateSessionData(sessionDataCookie, cookieSecret);
 
-          if (result.valid) {
-            // Cache hit - fast path (no API call)
-            const reqHeaders = new Headers(request.headers);
-            reqHeaders.set(NEON_AUTH_HEADER_MIDDLEWARE_NAME, 'true');
+        if (result.valid) {
+          // Cache hit - fast path (no API call)
+          const reqHeaders = new Headers(request.headers);
+          reqHeaders.set(NEON_AUTH_HEADER_MIDDLEWARE_NAME, 'true');
 
-            return NextResponse.next({
-              request: { headers: reqHeaders },
-            });
-          } else {
-            // Cache miss - invalid cookie
-            console.debug('[neonAuthMiddleware] Invalid session cookie:', {
-              pathname,
-              error: result.error,
-            });
-          }
-        } catch (error) {
-          // Validation error - log and fall through to API call
-          console.error('[neonAuthMiddleware] Cookie validation error:', {
+          return NextResponse.next({
+            request: { headers: reqHeaders },
+          });
+        } else {
+          // Cache miss - invalid cookie
+          console.debug('[neonAuthMiddleware] Invalid session cookie:', {
             pathname,
-            error: error instanceof Error ? error.message : String(error),
+            error: result.error,
           });
         }
+      } catch (error) {
+        // Validation error - log and fall through to API call
+        console.error('[neonAuthMiddleware] Cookie validation error:', {
+          pathname,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 

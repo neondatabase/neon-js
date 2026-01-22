@@ -4,50 +4,38 @@ import { getUpstreamURL } from '../handler/request';
 
 import { extractNeonAuthCookies, parseSetCookies } from '@/server/utils/cookies';
 import { signSessionDataCookie, validateSessionData, parseSessionData } from '@/server/session';
-import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../constants';
+import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '@/server/constants';
 import type { SessionData } from '@/server/types';
-import { assertCookieSecret, assertDefined } from '@/server/session/validator';
-import { ERRORS } from '@/server/errors';
+import type { NeonAuthConfig } from '../config';
+import { validateCookieSecret } from '../config';
 
 /**
  * A utility function to be used in react server components to fetch the session details.
  *
- * Behavior:
- * - If NEON_AUTH_COOKIE_SECRET is set: Tries cache first, falls back to API
- * - If NEON_AUTH_COOKIE_SECRET is missing: Always calls API (backward compatibility)
+ * Tries cookie cache first for fast access (< 1ms), falls back to API call if needed.
  *
- * @param config - Optional configuration (falls back to environment variables)
- * @returns - `{ session: Session, user: User }` | `{ session: null, user: null}`.
+ * @param config - Required configuration
+ * @param config.baseUrl - Base URL of your Neon Auth instance
+ * @param config.cookieSecret - Secret for signing session cookies (minimum 32 characters)
+ * @returns `{ session: Session, user: User }` | `{ session: null, user: null}`
+ * @throws Error if `cookieSecret` is less than 32 characters
  *
  * @example
  * ```ts
  * import { neonAuth } from "@neondatabase/auth/next/server"
  *
- * // Uses environment variables (backward compatible)
- * const { session, user } = await neonAuth()
- *
- * // Or with explicit config
- * const { session, user } = await neonAuth({ baseUrl, cookieSecret })
+ * const { session, user } = await neonAuth({
+ *   baseUrl: process.env.NEON_AUTH_BASE_URL!,
+ *   cookieSecret: process.env.NEON_AUTH_COOKIE_SECRET!,
+ * })
  * ```
  */
-export const neonAuth = async (config?: {
-  baseUrl?: string;
-  cookieSecret?: string;
-}): Promise<SessionData> => {
-  const baseUrl = config?.baseUrl ?? process.env.NEON_AUTH_BASE_URL;
-  const cookieSecret = config?.cookieSecret ?? process.env.NEON_AUTH_COOKIE_SECRET;
+export const neonAuth = async (config: NeonAuthConfig): Promise<SessionData> => {
+  const { baseUrl, cookieSecret } = config;
 
-  assertDefined(baseUrl, new Error(ERRORS.MISSING_AUTH_BASE_URL));
-  
-  // Backward compatibility: if secret not configured, use pre-PR behavior
-  if (!cookieSecret) {
-    return await fetchSession({ disableRefresh: true, 
-      baseUrl,
-      cookieSecret,
-     });
-  }
+  // Validate cookie secret
+  validateCookieSecret(cookieSecret);
 
-  assertCookieSecret(cookieSecret);
   // Try cache first
   const cookieStore = await cookies();
   const sessionDataCookie = cookieStore.get(NEON_AUTH_SESSION_DATA_COOKIE_NAME)?.value;
@@ -82,14 +70,14 @@ export const neonAuth = async (config?: {
  *
  * @param options - Fetch options
  * @param options.disableRefresh - If true, don't refresh the session cookie (read-only)
- * @param options.baseUrl - base URL (falls back to environment variable)
- * @param options.cookieSecret - cookie secret (falls back to environment variable)
- * @returns - `{ session: Session, user: User }` | `{ session: null, user: null}`.
+ * @param options.baseUrl - Base URL of your Neon Auth instance
+ * @param options.cookieSecret - Secret for signing session cookies
+ * @returns `{ session: Session, user: User }` | `{ session: null, user: null}`
  */
 export const fetchSession = async (options: {
   disableRefresh?: boolean;
   baseUrl: string;
-  cookieSecret?: string;
+  cookieSecret: string;
 }): Promise<SessionData> => {
   const baseUrl = options.baseUrl;
   const requestHeaders = await headers();
@@ -180,31 +168,29 @@ export const fetchSession = async (options: {
     return sessionData;
   }
 
-  // STEP 6: Create session data cookie if caching is enabled
-  if (options.cookieSecret) {
-    try {
-      const { value: signedData, expiresAt } = await signSessionDataCookie(sessionData, options.cookieSecret);
+  // STEP 6: Create session data cookie for caching
+  try {
+    const { value: signedData, expiresAt } = await signSessionDataCookie(sessionData, options.cookieSecret);
 
-      cookieStore.set(NEON_AUTH_SESSION_DATA_COOKIE_NAME, signedData, {
-        httpOnly: true,
-        secure: true,
-        sameSite: 'lax',
-        path: '/',
-        expires: expiresAt,
+    cookieStore.set(NEON_AUTH_SESSION_DATA_COOKIE_NAME, signedData, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+      expires: expiresAt,
+    });
+  } catch (error) {
+    // Expected in RSC context - middleware will handle cookie creation
+    const isExpectedError = error instanceof Error &&
+      (error.message.includes('cookies can only be modified') ||
+       error.message.includes('Server Actions') ||
+       error.message.includes('Route Handlers'));
+
+    if (!isExpectedError) {
+      console.error('[fetchSession] Unexpected cookie creation error:', {
+        error: error instanceof Error ? error.message : String(error),
+        hasSession: !!sessionData.session,
       });
-    } catch (error) {
-      // Expected in RSC context - middleware will handle cookie creation
-      const isExpectedError = error instanceof Error &&
-        (error.message.includes('cookies can only be modified') ||
-         error.message.includes('Server Actions') ||
-         error.message.includes('Route Handlers'));
-
-      if (!isExpectedError) {
-        console.error('[fetchSession] Unexpected cookie creation error:', {
-          error: error instanceof Error ? error.message : String(error),
-          hasSession: !!sessionData.session,
-        });
-      }
     }
   }
 

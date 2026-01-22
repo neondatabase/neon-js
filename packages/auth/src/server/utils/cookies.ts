@@ -65,5 +65,17 @@ export const parseSetCookies = (setCookieHeader: string): ParsedCookie[] => {
   return cookies;
 }
 
+/**
+ * Extract a single cookie value by name from a cookie header string
+ *
+ * @param cookieString - The cookie header string (e.g., "name=value; name2=value2")
+ * @param name - The cookie name to extract
+ * @returns The cookie value or null if not found
+ */
+export const parseCookieValue = (cookieString: string, name: string): string | null => {
+  if (!cookieString) return null;
 
+  const parsedCookies = parseCookies(cookieString);
+  return parsedCookies.get(name) ?? null;
+}
 

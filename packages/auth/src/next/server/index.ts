@@ -1,10 +1,7 @@
 import { createAuthServerInternal } from '@/server';
 import { createNextRequestContext } from './adapter';
-import { cookies } from 'next/headers';
-import { validateSessionData } from '@/server/session';
-import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../constants';
-import { assertDefined } from '@/server/session/validator';
-import { ERRORS } from '@/server/errors';
+import type { NeonAuthConfig } from '../config';
+import { validateCookieSecret } from '../config';
 
 // Re-export server-side utilities
 export { neonAuth } from '../auth';
@@ -22,27 +19,24 @@ export { authApiHandler } from '../handler';
  * - Route Handlers
  *
  * **Requirements:**
- * - `NEON_AUTH_BASE_URL` environment variable must be set (or passed in config)
+ * - `baseUrl` - Base URL of your Neon Auth instance
+ * - `cookieSecret` - Secret for signing session cookies (at least 32 characters)
  * - Cookies are automatically read/written via `next/headers`
  *
- * @param config - Optional configuration (falls back to environment variables)
- * @param config.baseUrl - Optional base URL (falls back to NEON_AUTH_BASE_URL env var)
- * @param config.cookieSecret - Optional cookie secret (falls back to NEON_AUTH_COOKIE_SECRET env var)
+ * @param config - Required configuration
+ * @param config.baseUrl - Base URL of your Neon Auth instance
+ * @param config.cookieSecret - Secret for signing session cookies (minimum 32 characters)
  * @returns Auth server API client for Next.js
- * @throws Error if `NEON_AUTH_BASE_URL` environment variable is not set and not provided in config
+ * @throws Error if `cookieSecret` is less than 32 characters
  *
  * @example
  * ```typescript
  * // lib/auth/server.ts - Create a singleton instance
  * import { createAuthServer } from '@neondatabase/auth/next/server';
  *
- * // Uses environment variables (backward compatible)
- * export const authServer = createAuthServer();
- *
- * // Or with explicit config
  * export const authServer = createAuthServer({
- *   baseUrl: 'https://auth.example.com',
- *   cookieSecret: process.env.SECRET
+ *   baseUrl: process.env.NEON_AUTH_BASE_URL!,
+ *   cookieSecret: process.env.NEON_AUTH_COOKIE_SECRET!,
  * });
  * ```
  *
@@ -75,64 +69,15 @@ export { authApiHandler } from '../handler';
  * }
  * ```
  */
-export function createAuthServer(config?: {
-  baseUrl?: string;
-  cookieSecret?: string;
-}) {
-  const baseUrl = config?.baseUrl ?? process.env.NEON_AUTH_BASE_URL;
-  const cookieSecret = config?.cookieSecret ?? process.env.NEON_AUTH_COOKIE_SECRET;
+export function createAuthServer(config: NeonAuthConfig) {
+  const { baseUrl, cookieSecret } = config;
 
-  assertDefined(baseUrl, new Error(ERRORS.MISSING_AUTH_BASE_URL));
+  validateCookieSecret(cookieSecret);
 
-  const baseServer = createAuthServerInternal({
+  // Create base server with cookie caching enabled
+  return createAuthServerInternal({
     baseUrl,
     context: createNextRequestContext,
+    cookieSecret,
   });
-
-  // Override getSession with cookie-optimized version
-  return {
-    ...baseServer,
-
-    async getSession(options?: Parameters<typeof baseServer.getSession>[0]) {
-      // Backward compatibility: if secret not configured, use original behavior
-      if (!cookieSecret) {
-        return baseServer.getSession(options);
-      }
-
-      // Check if cookie cache is disabled via query param
-      const disableCookieCache = options?.query?.disableCookieCache === 'true';
-      if (disableCookieCache) {
-        return baseServer.getSession(options);
-      }
-
-      // Try cookie cache first
-      try {
-        const cookieStore = await cookies();
-        const sessionDataCookie = cookieStore.get(NEON_AUTH_SESSION_DATA_COOKIE_NAME);
-
-        if (sessionDataCookie?.value) {
-          const result = await validateSessionData(sessionDataCookie.value, cookieSecret);
-
-          if (result.valid && result.payload) {
-            // Cache hit - return immediately
-            return { data: result.payload, error: null };
-          } else if (result.error) {
-            // Cache miss - invalid cookie
-            console.debug('[createAuthServer.getSession] Invalid session cookie:', {
-              error: result.error,
-            });
-          }
-        }
-      } catch (error) {
-        // Cookie read/validation error - log and fall through
-        console.error('[createAuthServer.getSession] Cookie validation error:', {
-          error: error instanceof Error ? error.message : String(error),
-          hasSecret: !!cookieSecret,
-        });
-      }
-
-      // Fallback: Call upstream API
-      return baseServer.getSession(options);
-    },
-  };
 }

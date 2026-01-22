@@ -7,7 +7,10 @@ import { authServer } from '@/lib/auth/server';
 
 // GET - List notes for the current user
 export async function GET() {
-  const session = await neonAuth();
+  const session = await neonAuth({
+    baseUrl: process.env.NEON_AUTH_BASE_URL!,
+    cookieSecret: process.env.NEON_AUTH_COOKIE_SECRET!,
+  });
 
   if (!session.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

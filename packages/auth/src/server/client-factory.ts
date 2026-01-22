@@ -8,17 +8,20 @@ import {
   type EndpointConfig,
   type EndpointTree,
 } from './endpoints';
-import { parseSetCookies } from '@/server/utils/cookies';
+import { parseSetCookies, parseCookieValue } from '@/server/utils/cookies';
+import { validateSessionData } from '@/server/session/validator';
+import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from './constants';
 
 export interface NeonAuthServerConfig {
   baseUrl: string;
   context: RequestContextFactory;
+  cookieSecret: string;
 }
 
 export function createAuthServerInternal(
   config: NeonAuthServerConfig
 ): NeonAuthServer {
-  const { baseUrl, context: getContext } = config;
+  const { baseUrl, context: getContext, cookieSecret } = config;
 
   const fetchWithAuth = async (
     path: string,
@@ -91,7 +94,44 @@ export function createAuthServerInternal(
     };
   };
 
-  return createApiProxy(API_ENDPOINTS, fetchWithAuth) as NeonAuthServer;
+  const baseServer = createApiProxy(API_ENDPOINTS, fetchWithAuth);
+  type GetSessionType = typeof baseServer.getSession;
+
+  return {
+    ...baseServer,
+    getSession: (async (...args: Parameters<GetSessionType>): Promise<ReturnType<GetSessionType>> => {
+      // Extract query params from better-auth's args
+      // Better-auth signature: getSession(data, fetchOptions)
+      const [data] = args;
+      const disableCookieCache = data?.query?.disableCookieCache === 'true';
+
+      if (!disableCookieCache) {
+        try {
+          const ctx = await getContext();
+          const cookiesString = await ctx.getCookies();
+          const sessionDataCookie = parseCookieValue(
+            cookiesString,
+            NEON_AUTH_SESSION_DATA_COOKIE_NAME
+          );
+
+          if (sessionDataCookie) {
+            const result = await validateSessionData(sessionDataCookie, cookieSecret);
+
+            if (result.valid && result.payload) {
+              // Cache hit - return immediately (no network call)
+              return { data: result.payload, error: null };
+            }
+          }
+        } catch (error) {
+          // Log error but fall through to API call
+          console.error('[createAuthServerInternal.getSession] Cookie validation error:', error);
+        }
+      }
+
+      // Fallback: Call upstream API
+      return baseServer.getSession(...args);
+    }),
+  };
 }
 
 type FetchWithAuth = (
@@ -109,7 +149,7 @@ function isEndpointConfig(value: unknown): value is EndpointConfig {
   );
 }
 
-function createApiProxy(endpoints: EndpointTree, fetchFn: FetchWithAuth): unknown {
+function createApiProxy(endpoints: EndpointTree, fetchFn: FetchWithAuth) {
   return new Proxy(
     {},
     {
@@ -126,5 +166,5 @@ function createApiProxy(endpoints: EndpointTree, fetchFn: FetchWithAuth): unknow
         return createApiProxy(endpoint as EndpointTree, fetchFn);
       },
     }
-  );
+  ) as NeonAuthServer;
 }

@@ -1,5 +1,5 @@
 import { signSessionDataCookie } from '../../server/session';
-import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../constants';
+import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '@/server/constants';
 import { parseSetCookies } from '../../server/utils/cookies';
 import type { SessionData } from '@/server/types';
 import { parseSessionData } from '@/server/session/operations';
