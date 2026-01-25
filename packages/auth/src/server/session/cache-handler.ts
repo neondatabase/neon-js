@@ -35,11 +35,34 @@ export async function trySessionCache(
       return Response.json(sessionData);
     }
   } catch (error) {
-    // Validation error - log and return null to fall through to upstream
-    console.error('[trySessionCache] Cookie validation error:', {
-      error: error instanceof Error ? error.message : String(error),
-      url: request.url,
-    });
+    // Validation error - log appropriately based on error type
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorName = error instanceof Error ? error.name : 'Unknown';
+
+    // JWTExpired is expected behavior - use debug level
+    if (errorName === 'JWTExpired') {
+      console.debug('[trySessionCache] Session cookie expired (expected):', {
+        error: errorMessage,
+        errorType: errorName,
+        url: request.url,
+      });
+    }
+    // JWT validation failures could indicate tampering - use warning level
+    else if (errorName === 'JWTInvalid' || errorName === 'JWTClaimValidationFailed') {
+      console.warn('[trySessionCache] Invalid session cookie (possible tampering):', {
+        error: errorMessage,
+        errorType: errorName,
+        url: request.url,
+      });
+    }
+    // Unexpected errors - use error level
+    else {
+      console.error('[trySessionCache] Unexpected cookie validation error:', {
+        error: errorMessage,
+        errorType: errorName,
+        url: request.url,
+      });
+    }
   }
 
   // Cache miss or error - return null to indicate upstream call needed

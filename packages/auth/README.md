@@ -257,17 +257,74 @@ Multiple concurrent `getSession()` calls are automatically deduplicated:
 
 ## Next.js Integration
 
-For Next.js projects, this package provides built-in integration via `@neondatabase/auth/next`. See the [Next.js Setup Guide](./NEXT-JS.md) for:
+For Next.js projects, this package provides built-in integration via `@neondatabase/auth/next`.
 
-- Setting up the auth handler with `authApiHandler()`
-- Protecting routes with `neonAuthMiddleware()`
-- Creating the auth client with `createAuthClient()` for client components
+### Unified Entry Point
+
+The `createNeonAuth()` function provides a single entry point for all server-side functionality:
+
+```typescript
+// lib/auth/server.ts
+import { createNeonAuth } from '@neondatabase/auth/next/server';
+
+export const auth = createNeonAuth({
+  baseUrl: process.env.NEON_AUTH_BASE_URL!,
+  cookieSecret: process.env.NEON_AUTH_COOKIE_SECRET!,
+});
+```
+
+**API Route Handler:**
+```typescript
+// app/api/auth/[...path]/route.ts
+import { auth } from '@/lib/auth/server';
+
+export const { GET, POST } = auth.handler();
+```
+
+**Middleware:**
+```typescript
+// middleware.ts
+import { auth } from '@/lib/auth/server';
+
+export default auth.middleware({ loginUrl: '/auth/sign-in' });
+```
+
+**Server Components:**
+```typescript
+import { auth } from '@/lib/auth/server';
+
+export default async function Page() {
+  const { data: session } = await auth.getSession();
+  if (!session?.user) return <div>Not logged in</div>;
+  return <div>Hello {session.user.name}</div>;
+}
+```
+
+**Server Actions:**
+```typescript
+'use server';
+import { auth } from '@/lib/auth/server';
+import { redirect } from 'next/navigation';
+
+export async function signIn(formData: FormData) {
+  const { error } = await auth.signIn.email({
+    email: formData.get('email') as string,
+    password: formData.get('password') as string,
+  });
+  if (error) return { error: error.message };
+  redirect('/dashboard');
+}
+```
+
+### Complete Guide
+
+See the [Next.js Setup Guide](./NEXT-JS.md) for comprehensive documentation including:
+
+- Client-side auth with `createAuthClient()` for client components
 - Configuring the `NeonAuthUIProvider` with Email OTP, Social Login, and Organizations
 - Creating auth pages (`AuthView`, `AccountView`, `OrganizationView`)
 - Importing styles (with or without Tailwind CSS)
-- Accessing session data with `neonAuth()` in server components
 - Using `authClient.useSession()` hook in client components
-- Server-side auth operations with `createAuthServer()` from `@neondatabase/auth/next/server`
 
 ## UI Components
 
