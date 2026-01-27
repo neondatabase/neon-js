@@ -12,10 +12,6 @@ export {
 } from './oauth';
 
 export {
-  validateSessionFromCookie,
-} from './session';
-
-export {
   shouldProtectRoute,
   checkSessionRequired,
   type SessionCheckResult,

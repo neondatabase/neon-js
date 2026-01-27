@@ -1,7 +1,8 @@
 import { needsSessionVerification, exchangeOAuthToken } from './oauth';
-import { validateSessionFromCookie } from './session';
 import { checkSessionRequired } from './route-protection';
 import { NEON_AUTH_HEADER_MIDDLEWARE_NAME } from '../proxy';
+import { handleAuthProxyRequest } from '../proxy';
+import { NEON_AUTH_SESSION_COOKIE_NAME } from '../constants';
 import type { SessionData } from '../types';
 
 /**
@@ -25,14 +26,6 @@ export interface AuthMiddlewareConfig {
 	baseUrl: string;
 	/** Secret for signing session cookies */
 	cookieSecret: string;
-	/**
-	 * Optional fallback to fetch session from upstream if not in cache
-	 * Framework-specific implementation (e.g., Next.js uses fetchSession with next/headers)
-	 */
-	fetchSessionFallback?: (
-		baseUrl: string,
-		cookieSecret: string
-	) => Promise<SessionData>;
 }
 
 /**
@@ -41,10 +34,9 @@ export interface AuthMiddlewareConfig {
  * Handles the complete middleware flow:
  * 1. Check if login URL (skip auth)
  * 2. Check OAuth verification (exchange token)
- * 3. Validate session from cookie cache
+ * 3. Get session (delegates to handleAuthProxyRequest for cookie cache + upstream fallback)
  * 4. Check if route requires protection
- * 5. Optionally fetch session from upstream if not cached
- * 6. Return decision object
+ * 5. Return decision object
  *
  * This is framework-agnostic - it returns a decision, NOT a framework-specific response.
  * The calling framework converts the decision to its response type (NextResponse, etc.)
@@ -62,7 +54,6 @@ export async function processAuthMiddleware(
 		loginUrl,
 		baseUrl,
 		cookieSecret,
-		fetchSessionFallback,
 	} = config;
 
 	// Always skip session check for login URL to prevent infinite redirect loop
@@ -85,35 +76,39 @@ export async function processAuthMiddleware(
 		}
 	}
 
-	// Try session cookie cache first
+	// Early return if session token cookie is missing - no need to call upstream
 	const cookieHeader = request.headers.get('cookie') || '';
-	const cachedSession = await validateSessionFromCookie(cookieHeader, cookieSecret);
+	let sessionData: SessionData = { session: null, user: null };
+
+	if (cookieHeader.includes(NEON_AUTH_SESSION_COOKIE_NAME)) {
+		// Session token present - get session by calling handleAuthProxyRequest
+		// (handles cookie cache + upstream fallback)
+		const sessionResponse = await handleAuthProxyRequest({
+			request,
+			path: 'get-session',
+			baseUrl,
+			cookieSecret,
+		});
+
+		// Parse session data from response
+		if (sessionResponse.ok) {
+			const data = await sessionResponse.json().catch(() => null);
+			if (data) {
+				sessionData = data as SessionData;
+			}
+		}
+	}
 
 	// Check if session is required for this route
-	const checkResult = checkSessionRequired(pathname, skipRoutes, loginUrl, cachedSession);
-
+	const checkResult = checkSessionRequired(pathname, skipRoutes, loginUrl, sessionData);
+	// Session valid or route doesn't require authentication
 	if (checkResult.allowed) {
-		// Session valid or route doesn't require authentication
 		return {
 			action: 'allow',
 			headers: {
 				[NEON_AUTH_HEADER_MIDDLEWARE_NAME]: 'true',
 			},
 		};
-	}
-
-	// Session required but not found in cache - try fetching from upstream if callback provided
-	if (!cachedSession && fetchSessionFallback) {
-		const session = await fetchSessionFallback(baseUrl, cookieSecret);
-		if (session.session !== null) {
-			// Session exists - allow request
-			return {
-				action: 'allow',
-				headers: {
-					[NEON_AUTH_HEADER_MIDDLEWARE_NAME]: 'true',
-				},
-			};
-		}
 	}
 
 	// No valid session and session is required - redirect to login

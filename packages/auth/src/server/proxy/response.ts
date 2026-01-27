@@ -97,15 +97,15 @@ async function mintSessionData(
     };
 
     if (errorMessage.includes('session_token not found')) {
-      console.warn('[procureSessionData] Session token missing in set-cookie:', errorContext);
+      console.warn('[mintSessionData] Session token missing in set-cookie:', errorContext);
     } else if (errorMessage.includes('Failed to fetch session data')) {
-      console.error('[procureSessionData] Upstream /get-session request failed:', errorContext);
+      console.error('[mintSessionData] Upstream /get-session request failed:', errorContext);
     } else if (errorMessage.includes('NEON_AUTH_COOKIE_SECRET')) {
-      console.error('[procureSessionData] Cookie secret configuration error:', errorContext);
+      console.error('[mintSessionData] Cookie secret configuration error:', errorContext);
     } else if (errorMessage.includes('Invalid date')) {
-      console.error('[procureSessionData] Date parsing error:', errorContext);
+      console.error('[mintSessionData] Date parsing error:', errorContext);
     } else {
-      console.error('[procureSessionData] Unexpected error:', {
+      console.error('[mintSessionData] Unexpected error:', {
         ...errorContext,
         ...(process.env.NODE_ENV !== 'production' && {
           stack: error instanceof Error ? error.stack : undefined,

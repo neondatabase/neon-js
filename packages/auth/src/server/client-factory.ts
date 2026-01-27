@@ -124,7 +124,7 @@ export function createAuthServerInternal(
           }
         } catch (error) {
           // Log error but fall through to API call
-          console.error('[createAuthServerInternal.getSession] Cookie validation error:', error);
+          console.error('[auth.getSession] Cookie validation error:', error);
         }
       }
 

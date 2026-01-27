@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { processAuthMiddleware } from '@/server/middleware';
-import { fetchSession } from './neon-auth';
 import type { NeonAuthMiddlewareConfig } from '@/server/config';
 import { validateCookieSecret } from '@/server/config';
 
@@ -51,8 +50,6 @@ export function neonAuthMiddleware(config: NeonAuthMiddlewareConfig) {
       loginUrl,
       baseUrl,
       cookieSecret,
-      fetchSessionFallback: async (url, secret) =>
-        fetchSession({ disableRefresh: true, baseUrl: url, cookieSecret: secret }),
     });
 
     switch (result.action) {
