@@ -1,5 +1,5 @@
 import { getSessionDataFromCookie } from './operations';
-import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '@/server/constants';
+import { NEON_AUTH_SESSION_DATA_COOKIE_NAME, NEON_AUTH_SESSION_COOKIE_NAME } from '@/server/constants';
 
 /**
  * Attempts to retrieve session data from cookie cache
@@ -20,6 +20,13 @@ export async function trySessionCache(
 
   // Skip cache if explicitly disabled
   if (disableCookieCache === 'true') {
+    return null;
+  }
+
+  const cookieHeader = request.headers.get('cookie') || '';
+  const hasSessionToken = cookieHeader.includes(NEON_AUTH_SESSION_COOKIE_NAME);
+if (!hasSessionToken) {
+    // No session token - ignore any stale session_data cookie
     return null;
   }
 

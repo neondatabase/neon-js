@@ -109,7 +109,6 @@ export async function mintSessionData(
 
       // Calculate Max-Age in seconds (relative time, immune to clock skew)
       const maxAge = Math.floor((expiresAt.getTime() - Date.now()) / 1000);
-
       return serializeSetCookie({
         name: NEON_AUTH_SESSION_DATA_COOKIE_NAME,
         value: signedData,

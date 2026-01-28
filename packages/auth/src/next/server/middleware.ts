@@ -74,6 +74,12 @@ export function neonAuthMiddleware(config: NeonAuthMiddlewareConfig) {
       }
 
       case 'redirect_login': {
+        // Clear stale cookies if present
+        if (result.cookies && result.cookies.length > 0) {
+          const loginHeaders = new Headers();
+          for (const cookie of result.cookies) loginHeaders.append('Set-Cookie', cookie);
+          return NextResponse.redirect(result.redirectUrl, { headers: loginHeaders });
+        }
         return NextResponse.redirect(result.redirectUrl);
       }
     }

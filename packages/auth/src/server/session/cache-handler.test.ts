@@ -129,7 +129,7 @@ describe('trySessionCache', () => {
 
     const request = new Request('https://example.com/api/auth/get-session', {
       headers: {
-        Cookie: `__Secure-neon-auth.session_data=${tamperedValue}`,
+        Cookie: `__Secure-neon-auth.local.session_data=${tamperedValue}`,
       },
     });
 

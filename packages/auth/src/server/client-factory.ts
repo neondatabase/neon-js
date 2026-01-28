@@ -10,7 +10,7 @@ import {
 } from './endpoints';
 import { parseSetCookies, parseCookieValue } from '@/server/utils/cookies';
 import { validateSessionData } from '@/server/session/validator';
-import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from './constants';
+import { NEON_AUTH_SESSION_COOKIE_NAME, NEON_AUTH_SESSION_DATA_COOKIE_NAME } from './constants';
 import { mintSessionData } from './proxy';
 
 export interface NeonAuthServerConfig {
@@ -73,7 +73,6 @@ export function createAuthServerInternal(
       for (const setCookieHeader of setCookieHeaders) {
         const parsedCookies = parseSetCookies(setCookieHeader);
         for (const cookie of parsedCookies) {
-          // Override domain if configured
           const cookieOptions = domain ? { ...cookie, domain } : cookie;
           await ctx.setCookie(cookie.name, cookie.value, cookieOptions);
         }
@@ -104,10 +103,7 @@ export function createAuthServerInternal(
       }
     }
 
-    // Parse response
     const responseData = await response.json().catch(() => null);
-
-    // Return in the same format as better-auth client
     if (!response.ok) {
       return {
         data: null,
@@ -142,16 +138,17 @@ export function createAuthServerInternal(
       try {
         const ctx = await getContext();
         const cookiesString = await ctx.getCookies();
+
+        const hasSessionToken = cookiesString.includes(NEON_AUTH_SESSION_COOKIE_NAME);
         const sessionDataCookie = parseCookieValue(
           cookiesString,
           NEON_AUTH_SESSION_DATA_COOKIE_NAME
         );
 
-        if (sessionDataCookie) {
+        // For valid session, both `session_token` and `session_data` cookies must exist
+        if (sessionDataCookie && hasSessionToken) {
           const result = await validateSessionData(sessionDataCookie, cookieSecret);
-
           if (result.valid && result.payload) {
-            // Cache hit - return immediately (no network call)
             return { data: result.payload, error: null } as any;
           }
         }

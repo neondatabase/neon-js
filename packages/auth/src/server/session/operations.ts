@@ -123,23 +123,19 @@ export async function getSessionDataFromCookie(
   cookieSecret: string
 ): Promise<SessionData | null> {
   try {
-    // Extract cookie header
     const cookieHeader = request.headers.get('cookie');
     if (!cookieHeader) {
-      return null; // No cookies - expected case
+      return null;
     }
 
-    // Parse cookie header
     const parsedCookies = parseCookies(cookieHeader);
     const sessionDataCookie = parsedCookies.get(cookieName);
-
     if (!sessionDataCookie) {
-      return null; // Cookie not present - expected case
+      return null;
     }
 
     // Validate cookie signature and expiry
     const result = await validateSessionData(sessionDataCookie, cookieSecret);
-
     if (result.valid && result.payload) {
       return result.payload; // Valid cookie
     }
@@ -148,7 +144,6 @@ export async function getSessionDataFromCookie(
     console.warn('[getSessionDataFromCookie] Invalid session cookie:', {
       error: result.error,
       cookieName,
-      // Don't log cookie value for security
     });
 
     return null;

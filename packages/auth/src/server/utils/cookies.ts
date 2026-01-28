@@ -54,6 +54,7 @@ export const parseSetCookies = (setCookieHeader: string): ParsedCookie[] => {
       name,
       value: decodeURIComponent(parsedCookie.value),
       path: parsedCookie.path,
+      domain: parsedCookie.domain,
       maxAge: parsedCookie['max-age'] ?? parsedCookie.maxAge,
       httpOnly: parsedCookie.httponly ?? true,
       secure: parsedCookie.secure ?? true,

@@ -169,7 +169,7 @@ describe('exchangeOAuthToken', () => {
 
     const headers = new Headers();
     headers.append('Set-Cookie', '__Secure-neon-auth.session_token=token-value');
-    headers.append('Set-Cookie', '__Secure-neon-auth.session_data=data-value');
+    headers.append('Set-Cookie', '__Secure-neon-auth.local.session_data=data-value');
 
     const mockProcessedResponse = new Response('OK', { status: 200, headers });
 

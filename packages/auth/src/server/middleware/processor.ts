@@ -2,8 +2,10 @@ import { needsSessionVerification, exchangeOAuthToken } from './oauth';
 import { checkSessionRequired } from './route-protection';
 import { NEON_AUTH_HEADER_MIDDLEWARE_NAME } from '../proxy';
 import { handleAuthProxyRequest } from '../proxy';
-import { NEON_AUTH_SESSION_COOKIE_NAME } from '../constants';
+import { NEON_AUTH_SESSION_COOKIE_NAME, NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../constants';
 import type { SessionData } from '../types';
+import { parseCookies } from 'better-auth/cookies';
+import { serializeSetCookie } from '../utils/cookies';
 
 /**
  * Result of middleware processing (framework-agnostic decision)
@@ -11,7 +13,7 @@ import type { SessionData } from '../types';
 export type MiddlewareResult =
 	| { action: 'allow'; headers?: Record<string, string> }
 	| { action: 'redirect_oauth'; redirectUrl: URL; cookies: string[] }
-	| { action: 'redirect_login'; redirectUrl: URL };
+	| { action: 'redirect_login'; redirectUrl: URL; cookies?: string[] };
 
 export interface AuthMiddlewareConfig {
 	/** Standard Web API Request object */
@@ -88,11 +90,18 @@ export async function processAuthMiddleware(
 		}
 	}
 
-	// Early return if session token cookie is missing - no need to call upstream
+	// Check for session token cookie
 	const cookieHeader = request.headers.get('cookie') || '';
+	const hasSessionToken = cookieHeader.includes(NEON_AUTH_SESSION_COOKIE_NAME);
+
+	// Check for stale session_data cookie (exists without session_token)
+	const parsedCookies = parseCookies(cookieHeader);
+	const hasSessionData = parsedCookies.has(NEON_AUTH_SESSION_DATA_COOKIE_NAME);
+	const hasStaleSessionData = hasSessionData && !hasSessionToken;
+
 	let sessionData: SessionData = { session: null, user: null };
 
-	if (cookieHeader.includes(NEON_AUTH_SESSION_COOKIE_NAME)) {
+	if (hasSessionToken) {
 		// Session token present - get session by calling handleAuthProxyRequest
 		// (handles cookie cache + upstream fallback)
 		const sessionResponse = await handleAuthProxyRequest({
@@ -115,6 +124,7 @@ export async function processAuthMiddleware(
 
 	// Check if session is required for this route
 	const checkResult = checkSessionRequired(pathname, skipRoutes, loginUrl, sessionData);
+
 	// Session valid or route doesn't require authentication
 	if (checkResult.allowed) {
 		return {
@@ -126,8 +136,24 @@ export async function processAuthMiddleware(
 	}
 
 	// No valid session and session is required - redirect to login
+	// If stale session_data exists, clear it to prevent redirect loops
+	const cookies: string[] = [];
+	if (hasStaleSessionData) {
+		cookies.push(serializeSetCookie({
+			name: NEON_AUTH_SESSION_DATA_COOKIE_NAME,
+			value: '',
+			path: '/',
+			domain,
+			httpOnly: true,
+			secure: true,
+			sameSite: 'lax',
+			maxAge: 0,
+		}));
+	}
+
 	return {
 		action: 'redirect_login',
 		redirectUrl: new URL(loginUrl, request.url),
+		cookies: cookies.length > 0 ? cookies : undefined,
 	};
 }
