@@ -1,6 +1,6 @@
 import { handleAuthProxyRequest } from '@/server/proxy';
 import type { NeonAuthConfig } from '@/server/config';
-import { validateCookieSecret } from '@/server/config';
+import { validateCookieConfig } from '@/server/config';
 
 type Params = { path: string[] };
 
@@ -9,9 +9,11 @@ type Params = { path: string[] };
  *
  * @param config - Required configuration
  * @param config.baseUrl - Base URL of your Neon Auth instance
- * @param config.cookieSecret - Secret for signing session cookies (minimum 32 characters)
+ * @param config.cookies - Cookie configuration
+ * @param config.cookies.secret - Secret for signing session cookies (minimum 32 characters)
+ * @param config.cookies.sessionDataTtl - Optional TTL for session cache in seconds (default: 300)
  * @returns A Next.js API handler functions that can be used in a Next.js route.
- * @throws Error if `cookieSecret` is less than 32 characters
+ * @throws Error if `cookies.secret` is less than 32 characters
  *
  * @example
  * Mount the `authApiHandler` to an API route. Create a route file inside `/api/auth/[...all]/route.ts` directory.
@@ -23,14 +25,16 @@ type Params = { path: string[] };
  *
  * export const { GET, POST } = authApiHandler({
  *   baseUrl: process.env.NEON_AUTH_BASE_URL!,
- *   cookieSecret: process.env.NEON_AUTH_COOKIE_SECRET!,
+ *   cookies: {
+ *     secret: process.env.NEON_AUTH_COOKIE_SECRET!,
+ *   },
  * });
  * ```
  */
 export function authApiHandler(config: NeonAuthConfig) {
-  const { baseUrl, cookieSecret } = config;
-  
-  validateCookieSecret(cookieSecret);
+  const { baseUrl, cookies } = config;
+
+  validateCookieConfig(cookies);
   const handler = async (
     request: Request,
     { params }: { params: Promise<Params> }
@@ -38,7 +42,13 @@ export function authApiHandler(config: NeonAuthConfig) {
     const resolvedParams = await params;
     const path = resolvedParams.path.join('/');
 
-    return handleAuthProxyRequest({ request, path, baseUrl, cookieSecret });
+    return handleAuthProxyRequest({
+      request,
+      path,
+      baseUrl,
+      cookieSecret: cookies.secret,
+      sessionDataTtl: cookies.sessionDataTtl,
+    });
   };
 
   return {

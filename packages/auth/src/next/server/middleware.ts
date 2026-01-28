@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { processAuthMiddleware } from '@/server/middleware';
 import type { NeonAuthMiddlewareConfig } from '@/server/config';
-import { validateCookieSecret } from '@/server/config';
+import { validateCookieConfig } from '@/server/config';
 
 const AUTH_API_ROUTES = '/api/auth';
 const SKIP_ROUTES = [
@@ -20,10 +20,12 @@ const SKIP_ROUTES = [
  *
  * @param config - Required middleware configuration
  * @param config.baseUrl - Base URL of your Neon Auth instance
- * @param config.cookieSecret - Secret for signing session cookies (minimum 32 characters)
+ * @param config.cookies - Cookie configuration
+ * @param config.cookies.secret - Secret for signing session cookies (minimum 32 characters)
+ * @param config.cookies.sessionDataTtl - Optional TTL for session cache in seconds (default: 300)
  * @param config.loginUrl - The URL to redirect to when the user is not authenticated (default: '/auth/sign-in')
  * @returns A middleware function that can be used in the Next.js app.
- * @throws Error if `cookieSecret` is less than 32 characters
+ * @throws Error if `cookies.secret` is less than 32 characters
  *
  * @example
  * ```ts
@@ -31,15 +33,17 @@ const SKIP_ROUTES = [
  *
  * export default neonAuthMiddleware({
  *   baseUrl: process.env.NEON_AUTH_BASE_URL!,
- *   cookieSecret: process.env.NEON_AUTH_COOKIE_SECRET!,
+ *   cookies: {
+ *     secret: process.env.NEON_AUTH_COOKIE_SECRET!,
+ *   },
  *   loginUrl: '/auth/sign-in',
  * });
  * ```
  */
 export function neonAuthMiddleware(config: NeonAuthMiddlewareConfig) {
-  const { baseUrl, cookieSecret, loginUrl = '/auth/sign-in' } = config;
+  const { baseUrl, cookies, loginUrl = '/auth/sign-in' } = config;
 
-  validateCookieSecret(cookieSecret);
+  validateCookieConfig(cookies);
   return async (request: NextRequest) => {
     const pathname = request.nextUrl.pathname;
 
@@ -49,7 +53,8 @@ export function neonAuthMiddleware(config: NeonAuthMiddlewareConfig) {
       skipRoutes: SKIP_ROUTES,
       loginUrl,
       baseUrl,
-      cookieSecret,
+      cookieSecret: cookies.secret,
+      sessionDataTtl: cookies.sessionDataTtl,
     });
 
     switch (result.action) {

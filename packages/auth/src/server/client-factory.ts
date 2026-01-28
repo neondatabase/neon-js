@@ -16,6 +16,7 @@ export interface NeonAuthServerConfig {
   baseUrl: string;
   context: RequestContextFactory;
   cookieSecret: string;
+  sessionDataTtl?: number;
 }
 
 export function createAuthServerInternal(

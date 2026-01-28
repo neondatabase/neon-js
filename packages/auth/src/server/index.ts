@@ -5,6 +5,5 @@ export { parseSessionData, validateSessionData } from './session';
 
 export {
 	type NeonAuthConfig,
-	type NeonAuthMiddlewareConfig,
-	validateCookieSecret,
+	type NeonAuthMiddlewareConfig
 } from './config';

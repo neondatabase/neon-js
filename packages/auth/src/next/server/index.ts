@@ -1,7 +1,7 @@
 import { createAuthServerInternal } from '@/server';
 import { createNextRequestContext } from './adapter';
 import type { NeonAuthConfig, NeonAuthMiddlewareConfig } from '@/server/config';
-import { validateCookieSecret } from '@/server/config';
+import { validateCookieConfig } from '@/server/config';
 import { authApiHandler } from './handler';
 import { neonAuthMiddleware } from './middleware';
 import type { NeonAuthServer } from '@/server/types';
@@ -25,9 +25,12 @@ import type { NeonAuthServer } from '@/server/types';
  *
  * @param config - Required configuration
  * @param config.baseUrl - Base URL of your Neon Auth instance
- * @param config.cookieSecret - Secret for signing session cookies (minimum 32 characters)
+ * @param config.cookies - Cookie configuration
+ * @param config.cookies.secret - Secret for signing session cookies (minimum 32 characters)
+ * @param config.cookies.sessionDataTtl - Optional TTL for session cache in seconds (default: 300)
+ * @param config.cookies.domain - Optional cookie domain (default: current domain)
  * @returns Unified auth instance with server methods, handler, and middleware
- * @throws Error if `cookieSecret` is less than 32 characters
+ * @throws Error if `cookies.secret` is less than 32 characters
  *
  * @example
  * ```typescript
@@ -36,7 +39,10 @@ import type { NeonAuthServer } from '@/server/types';
  *
  * export const auth = createNeonAuth({
  *   baseUrl: process.env.NEON_AUTH_BASE_URL!,
- *   cookieSecret: process.env.NEON_AUTH_COOKIE_SECRET!,
+ *   cookies: {
+ *     secret: process.env.NEON_AUTH_COOKIE_SECRET!,
+ *     sessionDataTtl: 300, // 5 minutes (default)
+ *   },
  * });
  * ```
  *
@@ -90,15 +96,16 @@ import type { NeonAuthServer } from '@/server/types';
  * ```
  */
 export function createNeonAuth(config: NeonAuthConfig) {
-	const { baseUrl, cookieSecret } = config;
+	const { baseUrl, cookies } = config;
 
-	validateCookieSecret(cookieSecret);
+	validateCookieConfig(cookies);
 
 	// Create base server with all Better Auth methods
 	const server = createAuthServerInternal({
 		baseUrl,
 		context: createNextRequestContext,
-		cookieSecret,
+		cookieSecret: cookies.secret,
+		sessionDataTtl: cookies.sessionDataTtl,
 	});
 
 	return {

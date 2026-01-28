@@ -15,17 +15,22 @@ const RESPONSE_HEADERS_ALLOWLIST = ['content-type', 'content-length', 'content-e
  * - Mints session data cookie if session token is present
  *
  * @param response - Response from upstream Neon Auth server
- * @param config - Configuration including base URL and cookie secret
+ * @param config - Configuration including base URL, cookie secret, and session data TTL
  * @returns New Response with proxied headers and session data cookie
  */
 export const handleAuthResponse = async (
   response: Response,
-  config: { baseUrl: string; cookieSecret: string }
+  config: { baseUrl: string; cookieSecret: string; sessionDataTtl?: number }
 ) => {
   const responseHeaders = prepareResponseHeaders(response);
 
   // Mint session data cookie from upstream response
-  const sessionDataCookie = await mintSessionData(response.headers, config.baseUrl, config.cookieSecret);
+  const sessionDataCookie = await mintSessionData(
+    response.headers,
+    config.baseUrl,
+    config.cookieSecret,
+    config.sessionDataTtl
+  );
   if (sessionDataCookie) {
     // Use append to preserve existing Set-Cookie headers from upstream
     responseHeaders.append('Set-Cookie', sessionDataCookie);
@@ -61,7 +66,8 @@ const prepareResponseHeaders = (response: Response) => {
 async function mintSessionData(
   headers: Headers,
   baseUrl: string,
-  cookieSecret: string
+  cookieSecret: string,
+  sessionDataTtl?: number
 ): Promise<string | null> {
   const setCookieHeaders = headers.getSetCookie();
   const sessionToken = setCookieHeaders.find(cookie => cookie.includes('session_token'));
@@ -82,7 +88,11 @@ async function mintSessionData(
     const sessionData = await fetchSessionWithCookie(sessionToken, baseUrl);
 
     if (sessionData.session) {
-      const { value: signedData, expiresAt } = await signSessionDataCookie(sessionData, cookieSecret);
+      const { value: signedData, expiresAt } = await signSessionDataCookie(
+        sessionData,
+        cookieSecret,
+        sessionDataTtl
+      );
 
       return `${NEON_AUTH_SESSION_DATA_COOKIE_NAME}=${signedData}; ` +
         `Path=/; HttpOnly; Secure; SameSite=Lax; ` +

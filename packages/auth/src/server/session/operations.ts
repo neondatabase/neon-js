@@ -3,8 +3,8 @@ import { validateSessionData } from './validator';
 import { parseCookies } from 'better-auth/cookies';
 import { SignJWT } from 'jose';
 
-// 5-minute TTL for session data cookie
-const SESSION_CACHE_TTL_MS = 5 * 60 * 1000;
+// Default 5-minute TTL for session data cookie (in seconds)
+export const DEFAULT_SESSION_CACHE_TTL_SECONDS = 300;
 const JWS_ALGO = 'HS256';
 
 /**
@@ -23,16 +23,19 @@ function parseDate(dateValue: unknown, fieldName: string): Date {
 /**
  * Convert session data from /get-session into a signed cookie
  * @param sessionData - Session and user data from Auth server
- * @param cookieSecret - Optional secret for signing (falls back to environment variable)
+ * @param secret - Secret for signing the cookie
+ * @param ttlSeconds - Time-to-live in seconds (default: 300 = 5 minutes)
  * @returns Signed session data cookie
  */
 export async function signSessionDataCookie(
   sessionData: RequireSessionData,
-  secret: string
+  secret: string,
+  ttlSeconds: number = DEFAULT_SESSION_CACHE_TTL_SECONDS
 ): Promise<SessionDataCookie> {
+  const ttlMs = ttlSeconds * 1000;
   const expiresAt = Math.min(
     sessionData.session.expiresAt.getTime(),
-    Date.now() + SESSION_CACHE_TTL_MS
+    Date.now() + ttlMs
   );
 
   const value = await signPayload(sessionData, expiresAt, secret);

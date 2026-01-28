@@ -26,6 +26,8 @@ export interface AuthMiddlewareConfig {
 	baseUrl: string;
 	/** Secret for signing session cookies */
 	cookieSecret: string;
+	/** Time-to-live for session data cache in seconds */
+	sessionDataTtl?: number;
 }
 
 /**
@@ -54,6 +56,7 @@ export async function processAuthMiddleware(
 		loginUrl,
 		baseUrl,
 		cookieSecret,
+		sessionDataTtl,
 	} = config;
 
 	// Always skip session check for login URL to prevent infinite redirect loop
@@ -88,6 +91,7 @@ export async function processAuthMiddleware(
 			path: 'get-session',
 			baseUrl,
 			cookieSecret,
+			sessionDataTtl,
 		});
 
 		// Parse session data from response

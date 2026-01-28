@@ -1,9 +1,45 @@
 /**
  * Framework-agnostic configuration types for Neon Auth
- *
- * These configuration types are used across all server frameworks
- * (Next.js, Remix, SvelteKit, TanStack Start, etc.)
  */
+
+/**
+ * Cookie configuration for Neon Auth
+ */
+export interface NeonAuthCookieConfig {
+	/**
+	 * Secret for signing session data cookies (enables session caching)
+	 * Must be at least 32 characters for security.
+	 *
+	 * Generate a secure secret:
+	 * ```bash
+	 * openssl rand -base64 32
+	 * ```
+	 *
+	 * @example process.env.NEON_AUTH_COOKIE_SECRET
+	 */
+	secret: string;
+
+	/**
+	 * Time-to-live for cached session data in seconds
+	 *
+	 * Controls how long session data is cached in a signed cookie before
+	 * requiring re-validation with the upstream auth server. 
+	 * Note: this does not affect the session token cookie TTL.
+	 *
+	 * @default 300 (5 minutes)
+	 * @example 60 // Cache for 1 minute
+	 * @example 600 // Cache for 10 minutes
+	 */
+	sessionDataTtl?: number;
+
+	/**
+	 * Cookie domain for all Neon Auth cookies
+	 *
+	 * @default undefined (browser default - current domain only)
+	 * @example '.example.com' // Share across subdomains
+	 */
+	domain?: string;
+}
 
 /**
  * Base configuration for Neon Auth server utilities
@@ -16,17 +52,9 @@ export interface NeonAuthConfig {
 	baseUrl: string;
 
 	/**
-	 * Secret for signing session data cookies (enables session caching)
-	 * Must be at least 32 characters for security.
-	 *
-	 * Generate a secure secret:
-	 * ```bash
-	 * openssl rand -base64 32
-	 * ```
-	 *
-	 * @example process.env.NEON_AUTH_COOKIE_SECRET
+	 * Cookie configuration
 	 */
-	cookieSecret: string;
+	cookies: NeonAuthCookieConfig;
 }
 
 /**
@@ -42,15 +70,19 @@ export interface NeonAuthMiddlewareConfig extends NeonAuthConfig {
 }
 
 /**
- * Validates cookie secret meets security requirements
- * @param secret - The cookie secret to validate
+ * Validates cookie configuration meets security requirements
+ * @param cookies - The cookie configuration to validate
  * @throws Error if secret is too short (< 32 characters)
  */
-export function validateCookieSecret(secret: string): void {
-	if (secret.length < 32) {
+export function validateCookieConfig(cookies: NeonAuthCookieConfig): void {
+	if (cookies.secret.length < 32) {
 		throw new Error(
-			'cookieSecret must be at least 32 characters long for security. ' +
+			'cookies.secret must be at least 32 characters long for security. ' +
 				'Generate a secure secret with: openssl rand -base64 32'
 		);
+	}
+
+	if (cookies.sessionDataTtl !== undefined && cookies.sessionDataTtl <= 0) {
+		throw new Error('cookies.sessionDataTtl must be a positive number (in seconds)');
 	}
 }
