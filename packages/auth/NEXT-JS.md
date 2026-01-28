@@ -98,7 +98,11 @@ export const config = {
 
 **Server Components:**
 ```typescript
+// app/dashboard/page.tsx
 import { auth } from '@/lib/auth/server';
+
+// Server components using `auth` methods must be rendered dynamically
+export const dynamic = 'force-dynamic'
 
 export default async function Page() {
   const { data: session } = await auth.getSession();

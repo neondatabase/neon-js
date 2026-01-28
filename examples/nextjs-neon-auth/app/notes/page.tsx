@@ -7,6 +7,9 @@ import { eq, desc } from "drizzle-orm"
 import { AddNoteForm } from "./add-note-form"
 import { DeleteNoteButton } from "./delete-note-button"
 
+// Server components using `auth` methods must be rendered dynamically
+export const dynamic = 'force-dynamic'
+
 function formatDate(date: Date | string) {
     return new Date(date).toLocaleDateString("en-US", {
         month: "short",

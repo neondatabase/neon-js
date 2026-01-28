@@ -71,6 +71,9 @@ import type { NeonAuthServer } from '@/server/types';
  * // app/page.tsx - Server Component
  * import { auth } from '@/lib/auth';
  *
+ * // Server components using `auth` methods must be rendered dynamically
+ * export const dynamic = 'force-dynamic'
+ *
  * export default async function Page() {
  *   const { data: session } = await auth.getSession();
  *   if (!session?.user) return <div>Not logged in</div>;

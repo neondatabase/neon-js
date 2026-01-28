@@ -285,6 +285,9 @@ Full configuration options:
 // NO 'use client' - this is a Server Component
 import { auth } from '@/lib/auth/server';
 
+// Server components using `auth` methods must be rendered dynamically
+export const dynamic = 'force-dynamic'
+
 export async function Profile() {
   const { data: session } = await auth.getSession();
 
