@@ -112,54 +112,55 @@ export function createNeonAuth(config: NeonAuthConfig) {
 		domain: cookies.domain,
 	});
 
-	return {
-		...server,
+	// Attach handler and middleware directly to the server proxy object
+	// instead of spreading (spreading a Proxy doesn't copy dynamic properties)
+	/**
+	 * Creates API route handlers for Next.js
+	 *
+	 * Mount this in your API routes to handle auth requests:
+	 * - `/api/auth/[...path]/route.ts`
+	 *
+	 * @returns Object with GET, POST, PUT, DELETE, PATCH handlers
+	 *
+	 * @example
+	 * ```typescript
+	 * // app/api/auth/[...path]/route.ts
+	 * import { auth } from '@/lib/auth';
+	 *
+	 * export const { GET, POST } = auth.handler();
+	 * ```
+	 */
+	(server as NeonAuth).handler = () => authApiHandler(config);
 
-		/**
-		 * Creates API route handlers for Next.js
-		 *
-		 * Mount this in your API routes to handle auth requests:
-		 * - `/api/auth/[...path]/route.ts`
-		 *
-		 * @returns Object with GET, POST, PUT, DELETE, PATCH handlers
-		 *
-		 * @example
-		 * ```typescript
-		 * // app/api/auth/[...path]/route.ts
-		 * import { auth } from '@/lib/auth';
-		 *
-		 * export const { GET, POST } = auth.handler();
-		 * ```
-		 */
-		handler: () => authApiHandler(config),
+	/**
+	 * Creates middleware for route protection
+	 *
+	 * Protects routes from unauthenticated access and handles:
+	 * - Session validation and refresh
+	 * - OAuth callback processing
+	 * - Login redirects
+	 *
+	 * @param middlewareConfig - Optional middleware configuration
+	 * @param middlewareConfig.loginUrl - URL to redirect to when not authenticated (default: '/auth/sign-in')
+	 * @returns Middleware function for Next.js
+	 *
+	 * @example
+	 * ```typescript
+	 * // middleware.ts
+	 * import { auth } from '@/lib/auth';
+	 *
+	 * export default auth.middleware({ loginUrl: '/auth/sign-in' });
+	 *
+	 * export const config = {
+	 *   matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+	 * };
+	 * ```
+	 */
+	(server as NeonAuth).middleware = (
+		middlewareConfig?: Pick<NeonAuthMiddlewareConfig, 'loginUrl'>
+	) => neonAuthMiddleware({ ...config, ...middlewareConfig });
 
-		/**
-		 * Creates middleware for route protection
-		 *
-		 * Protects routes from unauthenticated access and handles:
-		 * - Session validation and refresh
-		 * - OAuth callback processing
-		 * - Login redirects
-		 *
-		 * @param middlewareConfig - Optional middleware configuration
-		 * @param middlewareConfig.loginUrl - URL to redirect to when not authenticated (default: '/auth/sign-in')
-		 * @returns Middleware function for Next.js
-		 *
-		 * @example
-		 * ```typescript
-		 * // middleware.ts
-		 * import { auth } from '@/lib/auth';
-		 *
-		 * export default auth.middleware({ loginUrl: '/auth/sign-in' });
-		 *
-		 * export const config = {
-		 *   matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
-		 * };
-		 * ```
-		 */
-		middleware: (middlewareConfig?: Pick<NeonAuthMiddlewareConfig, 'loginUrl'>) =>
-			neonAuthMiddleware({ ...config, ...middlewareConfig }),
-	};
+	return server as NeonAuth;
 }
 
 /**

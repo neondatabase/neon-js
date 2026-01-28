@@ -126,43 +126,46 @@ export function createAuthServerInternal(
   };
 
   const baseServer = createApiProxy(API_ENDPOINTS, fetchWithAuth);
-  type GetSessionType = typeof baseServer.getSession;
 
-  return {
-    ...baseServer,
-    getSession: (async (...args: Parameters<GetSessionType>): Promise<ReturnType<GetSessionType>> => {
-      // Extract query params from better-auth's args
-      // Better-auth signature: getSession(data, fetchOptions)
-      const [data] = args;
-      const disableCookieCache = data?.query?.disableCookieCache === 'true';
+  // Store original getSession for fallback
+  const originalGetSession = baseServer.getSession;
 
-      if (!disableCookieCache) {
-        try {
-          const ctx = await getContext();
-          const cookiesString = await ctx.getCookies();
-          const sessionDataCookie = parseCookieValue(
-            cookiesString,
-            NEON_AUTH_SESSION_DATA_COOKIE_NAME
-          );
+  // Override getSession directly on the proxy (don't spread - that breaks the proxy!)
+  // Use 'any' for args to maintain compatibility with generic function signature
+  baseServer.getSession = async (...args: any[]) => {
+    // Extract query params from better-auth's args
+    // Better-auth signature: getSession(data, fetchOptions)
+    const [data] = args;
+    const disableCookieCache = data?.query?.disableCookieCache === 'true';
 
-          if (sessionDataCookie) {
-            const result = await validateSessionData(sessionDataCookie, cookieSecret);
+    if (!disableCookieCache) {
+      try {
+        const ctx = await getContext();
+        const cookiesString = await ctx.getCookies();
+        const sessionDataCookie = parseCookieValue(
+          cookiesString,
+          NEON_AUTH_SESSION_DATA_COOKIE_NAME
+        );
 
-            if (result.valid && result.payload) {
-              // Cache hit - return immediately (no network call)
-              return { data: result.payload, error: null };
-            }
+        if (sessionDataCookie) {
+          const result = await validateSessionData(sessionDataCookie, cookieSecret);
+
+          if (result.valid && result.payload) {
+            // Cache hit - return immediately (no network call)
+            return { data: result.payload, error: null } as any;
           }
-        } catch (error) {
-          // Log error but fall through to API call
-          console.error('[auth.getSession] Cookie validation error:', error);
         }
+      } catch (error) {
+        // Log error but fall through to API call
+        console.error('[auth.getSession] Cookie validation error:', error);
       }
+    }
 
-      // Fallback: Call upstream API
-      return baseServer.getSession(...args);
-    }),
+    // Fallback: Call upstream API
+    return originalGetSession(...args);
   };
+
+  return baseServer;
 }
 
 type FetchWithAuth = (
@@ -181,10 +184,17 @@ function isEndpointConfig(value: unknown): value is EndpointConfig {
 }
 
 function createApiProxy(endpoints: EndpointTree, fetchFn: FetchWithAuth) {
+  const target: Record<string, unknown> = {};
+
   return new Proxy(
-    {},
+    target,
     {
-      get(_, prop: string) {
+      get(target, prop: string) {
+        // Check if property was manually set on the target
+        if (prop in target) {
+          return target[prop];
+        }
+
         const endpoint = endpoints[prop];
         if (!endpoint) return;
 
@@ -195,6 +205,11 @@ function createApiProxy(endpoints: EndpointTree, fetchFn: FetchWithAuth) {
 
         // Otherwise it's a nested namespace - return another proxy
         return createApiProxy(endpoint as EndpointTree, fetchFn);
+      },
+      set(target, prop: string, value) {
+        // Allow setting properties on the target
+        target[prop] = value;
+        return true;
       },
     }
   ) as NeonAuthServer;
