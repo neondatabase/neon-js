@@ -2,15 +2,15 @@
 
 [![License](https://img.shields.io/npm/l/@neondatabase/neon-js.svg)](LICENSE)
 
-> A unified TypeScript SDK for Neon Auth and Neon Data API.
+> The official Neon SDK for building applications - integrates Neon Auth and Neon Data API.
 
 ## Packages
 
-| Package | Use Case | npm |
-|---------|----------|-----|
-| [`@neondatabase/neon-js`](./packages/neon-js) | Full SDK: Auth + Database + UI | [![npm](https://img.shields.io/npm/v/@neondatabase/neon-js)](https://www.npmjs.com/package/@neondatabase/neon-js) |
-| [`@neondatabase/auth`](./packages/auth) | Authentication + UI only | [![npm](https://img.shields.io/npm/v/@neondatabase/auth)](https://www.npmjs.com/package/@neondatabase/auth) |
-| [`@neondatabase/postgrest-js`](./packages/postgrest-js) | Database queries (no auth) | [![npm](https://img.shields.io/npm/v/@neondatabase/postgrest-js)](https://www.npmjs.com/package/@neondatabase/postgrest-js) |
+| Package                                                 | Use Case                       | npm                                                                                                                         |
+| ------------------------------------------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| [`@neondatabase/neon-js`](./packages/neon-js)           | Full SDK: Auth + Database + UI | [![npm](https://img.shields.io/npm/v/@neondatabase/neon-js)](https://www.npmjs.com/package/@neondatabase/neon-js)           |
+| [`@neondatabase/auth`](./packages/auth)                 | Authentication + UI only       | [![npm](https://img.shields.io/npm/v/@neondatabase/auth)](https://www.npmjs.com/package/@neondatabase/auth)                 |
+| [`@neondatabase/postgrest-js`](./packages/postgrest-js) | Database queries (no auth)     | [![npm](https://img.shields.io/npm/v/@neondatabase/postgrest-js)](https://www.npmjs.com/package/@neondatabase/postgrest-js) |
 
 ## Which Package Should I Use?
 
