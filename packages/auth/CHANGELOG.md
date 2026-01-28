@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Session Data Caching**: Next.js SDK now caches session details with `session_data` cookie. 
+  - Automatically created/refreshed when Neon Auth sets/refreshes `session_token` cookie
   - The cookie is JWT token with session and user details
   - The cookie needs to be signed with 32-characters long - `cookies.secret` 
   - The `/api/auth/get-session`, `auth.getSession()` and the middleware will try to parse user details from 

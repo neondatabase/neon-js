@@ -30,9 +30,21 @@ export const handleAuthRequest = async (baseUrl: string, request: Request, path:
 
     return response;
   } catch (error) {
+    if (error instanceof Error && error.name === 'TypeError' && error.message.includes('fetch')) {
+      return Response.json({
+        error: 'Unable to connect to authentication server',
+        code: 'NETWORK_ERROR'
+      }, { status: 502, headers: { 'Content-Type': 'application/json' } });
+    }
     const message = error instanceof Error ? error.message : "Internal Server Error";
     console.error(`[AuthError] ${message}`, error);
-    return new Response(`[AuthError] ${message}`, { status: 500 });
+    return Response.json(
+      {
+        error: message,
+        code: 'INTERNAL_ERROR',
+      },
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
   }
 }
 

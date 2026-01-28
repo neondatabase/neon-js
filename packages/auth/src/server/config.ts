@@ -2,6 +2,8 @@
  * Framework-agnostic configuration types for Neon Auth
  */
 
+import { ERRORS } from "./errors";
+
 /**
  * Session cookie configuration
  */
@@ -75,14 +77,15 @@ export interface NeonAuthMiddlewareConfig extends NeonAuthConfig {
  * @throws Error if secret is too short (< 32 characters)
  */
 export function validateCookieConfig(cookies: SessionCookieConfig): void {
+	if (!cookies.secret) {
+		throw new Error(ERRORS.MISSING_COOKIE_SECRET);
+	}
+
 	if (cookies.secret.length < 32) {
-		throw new Error(
-			'cookies.secret must be at least 32 characters long for security. ' +
-				'Generate a secure secret with: openssl rand -base64 32'
-		);
+		throw new Error(ERRORS.COOKIE_SECRET_TOO_SHORT);
 	}
 
 	if (cookies.sessionDataTtl !== undefined && cookies.sessionDataTtl <= 0) {
-		throw new Error('cookies.sessionDataTtl must be a positive number (in seconds)');
+		throw new Error(ERRORS.INVALID_SESSION_DATA_TTL);
 	}
 }
