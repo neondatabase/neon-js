@@ -26,13 +26,15 @@ Use this skill when:
 
 | Purpose | Import From |
 |---------|-------------|
-| API Handler | `@neondatabase/auth/next/server` |
-| Middleware | `@neondatabase/auth/next/server` |
-| Server Session (`neonAuth`) | `@neondatabase/auth/next/server` |
-| Server Actions (`createAuthServer`) | `@neondatabase/auth/next/server` |
+| Unified Server (`createNeonAuth`) | `@neondatabase/auth/next/server` |
 | Client Auth | `@neondatabase/auth/next` |
 | UI Components | `@neondatabase/auth/react/ui` |
 | View Paths (static params) | `@neondatabase/auth/react/ui/server` |
+
+**Note**: Use `createNeonAuth()` from `@neondatabase/auth/next/server` to get a unified `auth` instance that provides:
+- `.handler()` - API route handler
+- `.middleware()` - Route protection middleware
+- All Better Auth server methods (`.signIn`, `.signUp`, `.getSession`, etc.)
 
 ---
 
@@ -46,20 +48,43 @@ npm install @neondatabase/auth
 ### 2. Environment (`.env.local`)
 ```
 NEON_AUTH_BASE_URL=https://your-auth.neon.tech
+NEON_AUTH_COOKIE_SECRET=your-secret-at-least-32-characters-long
 ```
 
-### 3. API Route (`app/api/auth/[...path]/route.ts`)
-```typescript
-import { authApiHandler } from '@neondatabase/auth/next/server';
-
-export const { GET, POST } = authApiHandler();
+**Important**: Generate a secure secret (32+ characters) for production:
+```bash
+openssl rand -base64 32
 ```
 
-### 4. Middleware (`middleware.ts`)
-```typescript
-import { neonAuthMiddleware } from '@neondatabase/auth/next/server';
+### 3. Server Setup (`lib/auth/server.ts`)
 
-export default neonAuthMiddleware({
+Create a auth instance that provides handler, middleware, and server methods:
+
+```typescript
+import { createNeonAuth } from '@neondatabase/auth/next/server';
+
+export const auth = createNeonAuth({
+  baseUrl: process.env.NEON_AUTH_BASE_URL!,
+  cookies: {
+    secret: process.env.NEON_AUTH_COOKIE_SECRET!,
+    sessionDataTtl: 300,          // Optional: session data cache TTL in seconds (default: 300 = 5 min)
+    domain: '.example.com',       // Optional: for cross-subdomain cookies
+  },
+});
+```
+
+### 4. API Route (`app/api/auth/[...path]/route.ts`)
+```typescript
+import { auth } from '@/lib/auth/server';
+
+export const { GET, POST } = auth.handler();
+```
+
+### 5. Middleware (`middleware.ts`)
+```typescript
+import { auth } from '@/lib/auth/server';
+
+export default auth.middleware({
   loginUrl: '/auth/sign-in',
 });
 
@@ -68,7 +93,7 @@ export const config = {
 };
 ```
 
-### 5. Client (`lib/auth-client.ts`)
+### 6. Client (`lib/auth/client.ts`)
 ```typescript
 'use client';
 import { createAuthClient } from '@neondatabase/auth/next';
@@ -76,13 +101,13 @@ import { createAuthClient } from '@neondatabase/auth/next';
 export const authClient = createAuthClient();
 ```
 
-### 6. Provider (`app/providers.tsx`)
+### 7. Provider (`app/providers.tsx`)
 ```typescript
 'use client';
 import { NeonAuthUIProvider } from '@neondatabase/auth/react/ui';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { authClient } from '@/lib/auth-client';
+import { authClient } from '@/lib/auth/client';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -102,7 +127,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
 }
 ```
 
-### 7. Layout (`app/layout.tsx`)
+### 8. Layout (`app/layout.tsx`)
 ```typescript
 import { Providers } from './providers';
 import '@neondatabase/auth/ui/css';
@@ -118,7 +143,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 }
 ```
 
-### 8. Auth Pages (`app/auth/[path]/page.tsx`)
+### 9. Auth Pages (`app/auth/[path]/page.tsx`)
 ```typescript
 import { AuthView } from '@neondatabase/auth/react/ui';
 import { authViewPaths } from '@neondatabase/auth/react/ui/server';
@@ -258,17 +283,17 @@ Full configuration options:
 
 ```typescript
 // NO 'use client' - this is a Server Component
-import { neonAuth } from '@neondatabase/auth/next/server';
+import { auth } from '@/lib/auth/server';
 
 export async function Profile() {
-  const { session, user } = await neonAuth();
+  const { data: session } = await auth.getSession();
 
-  if (!user) return <div>Not signed in</div>;
+  if (!session?.user) return <div>Not signed in</div>;
 
   return (
     <div>
-      <p>Hello, {user.name}</p>
-      <p>Email: {user.email}</p>
+      <p>Hello, {session.user.name}</p>
+      <p>Email: {session.user.email}</p>
     </div>
   );
 }
@@ -278,17 +303,17 @@ export async function Profile() {
 
 ```typescript
 // app/api/user/route.ts
-import { neonAuth } from '@neondatabase/auth/next/server';
+import { auth } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
-  const { user } = await neonAuth();
+  const { data: session } = await auth.getSession();
 
-  if (!user) {
+  if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  return NextResponse.json({ user });
+  return NextResponse.json({ user: session.user });
 }
 ```
 
@@ -296,24 +321,18 @@ export async function GET() {
 
 ## Server Actions
 
-### Setup Server Auth (`lib/auth/server.ts`)
-
-```typescript
-import { createAuthServer } from '@neondatabase/auth/next/server';
-
-export const authServer = createAuthServer();
-```
+Server actions use the same `auth` instance from `lib/auth/server.ts`:
 
 ### Sign In Action
 
 ```typescript
 // app/actions/auth.ts
 'use server';
-import { authServer } from '@/lib/auth/server';
+import { auth } from '@/lib/auth/server';
 import { redirect } from 'next/navigation';
 
 export async function signIn(formData: FormData) {
-  const { error } = await authServer.signIn.email({
+  const { error } = await auth.signIn.email({
     email: formData.get('email') as string,
     password: formData.get('password') as string,
   });
@@ -326,7 +345,7 @@ export async function signIn(formData: FormData) {
 }
 
 export async function signUp(formData: FormData) {
-  const { error } = await authServer.signUp.email({
+  const { error } = await auth.signUp.email({
     email: formData.get('email') as string,
     password: formData.get('password') as string,
     name: formData.get('name') as string,
@@ -340,30 +359,32 @@ export async function signUp(formData: FormData) {
 }
 
 export async function signOut() {
-  await authServer.signOut();
+  await auth.signOut();
   redirect('/');
 }
 ```
 
 ### Available Server Methods
 
+The `auth` instance from `createNeonAuth()` provides all Better Auth server methods:
+
 ```typescript
 // Authentication
-authServer.signIn.email({ email, password })
-authServer.signUp.email({ email, password, name })
-authServer.signOut()
-authServer.getSession()
+auth.signIn.email({ email, password })
+auth.signUp.email({ email, password, name })
+auth.signOut()
+auth.getSession()
 
 // User Management
-authServer.updateUser({ name, image })
+auth.updateUser({ name, image })
 
 // Organizations
-authServer.organization.create({ name, slug })
-authServer.organization.list()
+auth.organization.create({ name, slug })
+auth.organization.list()
 
 // Admin (if enabled)
-authServer.admin.listUsers()
-authServer.admin.banUser({ userId })
+auth.admin.listUsers()
+auth.admin.banUser({ userId })
 ```
 
 ---
@@ -374,7 +395,7 @@ authServer.admin.banUser({ userId })
 
 ```typescript
 'use client';
-import { authClient } from '@/lib/auth-client';
+import { authClient } from '@/lib/auth/client';
 
 export function Dashboard() {
   const { data: session, isPending, error } = authClient.useSession();
@@ -391,7 +412,7 @@ export function Dashboard() {
 
 ```typescript
 'use client';
-import { authClient } from '@/lib/auth-client';
+import { authClient } from '@/lib/auth/client';
 
 // Sign in
 await authClient.signIn.email({ email, password });
@@ -532,9 +553,9 @@ await authClient.signIn.social({
 ### Basic Protected Routes
 
 ```typescript
-import { neonAuthMiddleware } from '@neondatabase/auth/next/server';
+import { auth } from '@/lib/auth/server';
 
-export default neonAuthMiddleware({
+export default auth.middleware({
   loginUrl: '/auth/sign-in',
 });
 
@@ -546,20 +567,11 @@ export const config = {
 ### Custom Logic
 
 ```typescript
-import { neonAuthMiddleware } from '@neondatabase/auth/next/server';
+import { auth } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
 
-export default neonAuthMiddleware({
+export default auth.middleware({
   loginUrl: '/auth/sign-in',
-  callbacks: {
-    authorized: async ({ auth, request }) => {
-      // Custom authorization logic
-      if (request.nextUrl.pathname.startsWith('/admin')) {
-        return auth?.user?.role === 'admin';
-      }
-      return !!auth;
-    },
-  },
 });
 ```
 
@@ -609,7 +621,7 @@ export default async function AccountPage({ params }: { params: Promise<{ path: 
 Enable RLS-based data access for unauthenticated users:
 
 ```typescript
-// lib/auth-client.ts
+// lib/auth/client.ts
 'use client';
 import { createAuthClient } from '@neondatabase/auth/next';
 
@@ -742,21 +754,32 @@ export const config = {
 Ensure your API route is set up correctly at `app/api/auth/[...path]/route.ts`:
 
 ```typescript
-import { authApiHandler } from '@neondatabase/auth/next/server';
-export const { GET, POST } = authApiHandler();
+import { auth } from '@/lib/auth/server';
+export const { GET, POST } = auth.handler();
 ```
 
 ### Session not persisting?
 
 1. Check cookies are enabled
 2. Verify `NEON_AUTH_BASE_URL` is correct in `.env.local`
-3. Make sure you're not in incognito with cookies blocked
+3. Verify `NEON_AUTH_COOKIE_SECRET` is set and at least 32 characters
+4. Make sure you're not in incognito with cookies blocked
+
+### Session data cache not working?
+
+1. Verify `NEON_AUTH_COOKIE_SECRET` is at least 32 characters long
+2. Check `cookies.secret` is passed to `createNeonAuth()`
+3. Optionally configure `cookies.sessionDataTtl` (default: 300 seconds)
 
 ---
 
 ## Performance Notes
 
-- **Session caching**: 60-second TTL, automatic JWT expiration handling
-- **Request deduplication**: Concurrent calls share single network request
-- **Server Components**: Use `neonAuth()` for zero-JS session access
+- **Session data caching**: JWT-signed `session_data` cookie with configurable TTL (default: 5 minutes)
+  - Configure via `cookies.sessionDataTtl` in seconds
+  - Enables sub-millisecond session lookups (<1ms)
+  - Automatic fallback to upstream `/get-session` on cache miss
+- **Request deduplication**: Concurrent calls share single network request (10x faster cold starts)
+- **Server Components**: Use `auth.getSession()` for zero-JS session access
 - **Cross-tab sync**: <50ms via BroadcastChannel
+- **Cookie domain**: Optional `cookies.domain` for cross-subdomain cookie sharing

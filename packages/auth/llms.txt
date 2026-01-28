@@ -244,29 +244,48 @@ Same as default API, plus:
 
 See [NEXT-JS.md](./NEXT-JS.md) for complete guide.
 
-**Key imports:**
+**Environment variables:**
+
+```bash
+NEON_AUTH_BASE_URL=https://your-project.neon.tech
+NEON_AUTH_COOKIE_SECRET=your-secret-at-least-32-characters-long
+```
+
+**Unified server setup:**
 
 ```typescript
-// API route handler
-import { authApiHandler } from '@neondatabase/auth/next/server';
-export const { GET, POST } = authApiHandler();
+// lib/auth/server.ts - Single entry point for all server functionality
+import { createNeonAuth } from '@neondatabase/auth/next/server';
 
-// Client-side
+export const auth = createNeonAuth({
+  baseUrl: process.env.NEON_AUTH_BASE_URL!,
+  cookies: {
+    secret: process.env.NEON_AUTH_COOKIE_SECRET!,
+    sessionDataTtl: 300,          // Optional: session data cache TTL in seconds (default: 300 = 5 min)
+    domain: '.example.com',       // Optional: for cross-subdomain cookies
+  },
+});
+
+// app/api/auth/[...path]/route.ts - API handler
+import { auth } from '@/lib/auth/server';
+export const { GET, POST } = auth.handler();
+
+// middleware.ts - Route protection
+import { auth } from '@/lib/auth/server';
+export default auth.middleware({ loginUrl: '/auth/sign-in' });
+
+// lib/auth/client.ts - Client-side
+"use client"
 import { createAuthClient } from '@neondatabase/auth/next';
 export const authClient = createAuthClient();
 
 // Server Components
-import { neonAuth } from '@neondatabase/auth/next/server';
-const { user } = await neonAuth();
+import { auth } from '@/lib/auth/server';
+const { data: session } = await auth.getSession();
 
-// Server Actions / Route Handlers
-import { createAuthServer } from '@neondatabase/auth/next/server';
-const authServer = createAuthServer();
-await authServer.signIn.email({ email, password });
-
-// Middleware
-import { neonAuthMiddleware } from '@neondatabase/auth/next/server';
-export default neonAuthMiddleware();
+// Server Actions
+import { auth } from '@/lib/auth/server';
+await auth.signIn.email({ email, password });
 ```
 
 ## Performance

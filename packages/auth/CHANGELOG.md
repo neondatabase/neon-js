@@ -12,10 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Session Data Caching**: Next.js SDK now caches session details with `session_data` cookie. 
   - The cookie is JWT token with session and user details
-  - The cookie needs to be signed with 32-characters long - `cookieSecret` 
+  - The cookie needs to be signed with 32-characters long - `cookies.secret` 
   - The `/api/auth/get-session`, `auth.getSession()` and the middleware will try to parse user details from 
     `session_data` cookie with fallback on upstream `/get-session` 
-  - The cookie has 5 minutes TTL
+  - The cookie has default 5 minutes TTL, can be customized with `cookies.sessionDataTtl`
+
+- **Cross Domain Cookie**: Next.js SDK now supports settings `domain` attribute on cookie
+  - Optional `cookie.domain` for cross-subdomain cookie sharing
 
 - **Unified Entry Point**: New `createNeonAuth()` combines all server functionality in one place
   - Returns an object with all Better Auth server methods (spread from base server)
@@ -31,13 +34,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Next.js files now thin adapters (~40-50 lines, 38% smaller)
 
 - **Required Configuration**: Explicit configuration with validation
-  - `NeonAuthConfig` type with required `baseUrl` and `cookieSecret`
+  - `NeonAuthConfig` type with required `baseUrl` and `cookies` configuration
   - No more implicit environment variable fallbacks
 
 ### Changed
 
 - **BREAKING**: Changed `createAuthServer()` to `createNeonAuth()` with explicit config
-  - `baseUrl` and `cookieSecret` are mandatory parameters
+  - `baseUrl` and `cookies.secret` are mandatory parameters
   - No fallback to `process.env.NEON_AUTH_BASE_URL` or other environment variables
   - Environment variables must be explicitly passed to config objects
 
@@ -87,7 +90,11 @@ const session = await neonAuth();     // ❌ No longer works
 import { createNeonAuth } from '@neondatabase/auth/next/server';
 export const auth = createNeonAuth({
   baseUrl: process.env.NEON_AUTH_BASE_URL!,
-  cookieSecret: process.env.NEON_AUTH_COOKIE_SECRET!,
+  cookies: {
+    secret: process.env.NEON_AUTH_COOKIE_SECRET!,
+    sessionDataTtl: 300,       // Optional: session data cache TTL in seconds (default: 300 = 5min)
+    domain: '.example',        // Optional: for cross-subdomain cookies
+  },
 });
 
 // app/api/auth/[...path]/route.ts

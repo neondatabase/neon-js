@@ -188,26 +188,48 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.public_items TO authenticated;
 
 See [@neondatabase/auth/NEXT-JS.md](https://github.com/neondatabase/neon-js/blob/main/packages/auth/NEXT-JS.md) for full guide.
 
+**Environment variables:**
+
+```bash
+NEON_AUTH_BASE_URL=https://your-project.neon.tech
+NEON_AUTH_COOKIE_SECRET=your-secret-at-least-32-characters-long
+```
+
 **Quick setup:**
 
 ```typescript
-// app/api/auth/[...path]/route.ts
-import { authApiHandler } from "@neondatabase/neon-js/auth/next/server"
-export const { GET, POST } = authApiHandler()
+// lib/auth/server.ts - Unified server instance
+import { createNeonAuth } from '@neondatabase/neon-js/auth/next/server';
 
-// lib/auth-client.ts
+export const auth = createNeonAuth({
+  baseUrl: process.env.NEON_AUTH_BASE_URL!,
+  cookies: {
+    secret: process.env.NEON_AUTH_COOKIE_SECRET!,
+    sessionDataTtl: 300,          // Optional: session data cache TTL in seconds (default: 300 = 5 min)
+    domain: '.example.com',       // Optional: for cross-subdomain cookies
+  },
+});
+
+// app/api/auth/[...path]/route.ts - API handler
+import { auth } from '@/lib/auth/server';
+export const { GET, POST } = auth.handler();
+
+// middleware.ts - Route protection
+import { auth } from '@/lib/auth/server';
+export default auth.middleware({ loginUrl: '/auth/sign-in' });
+
+// lib/auth/client.ts - Client-side auth
 "use client"
 import { createAuthClient } from '@neondatabase/neon-js/auth/next';
-export const authClient = createAuthClient()
+export const authClient = createAuthClient();
 
 // Server Components
-import { neonAuth } from '@neondatabase/neon-js/auth/next/server';
-const { user } = await neonAuth();
+import { auth } from '@/lib/auth/server';
+const { data: session } = await auth.getSession();
 
 // Server Actions
-import { createAuthServer } from '@neondatabase/neon-js/auth/next/server';
-const authServer = createAuthServer();
-await authServer.signIn.email({ email, password });
+import { auth } from '@/lib/auth/server';
+await auth.signIn.email({ email, password });
 ```
 
 ## Database Querying
