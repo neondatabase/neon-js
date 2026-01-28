@@ -14,6 +14,8 @@ export interface AuthProxyConfig {
 	cookieSecret: string;
 	/** Time-to-live for session data cache in seconds (default: 300 = 5 minutes) */
 	sessionDataTtl?: number;
+	/** Cookie domain for session data cookie */
+	domain?: string;
 }
 
 /**
@@ -31,7 +33,7 @@ export interface AuthProxyConfig {
  * @returns Standard Web API Response
  */
 export async function handleAuthProxyRequest(config: AuthProxyConfig): Promise<Response> {
-	const { request, path, baseUrl, cookieSecret, sessionDataTtl } = config;
+	const { request, path, baseUrl, cookieSecret, sessionDataTtl, domain } = config;
 
 	// Try cookie cache for /get-session GET requests (optimization)
 	if (
@@ -47,5 +49,9 @@ export async function handleAuthProxyRequest(config: AuthProxyConfig): Promise<R
 
 	// Fallback: Call upstream API
 	const response = await handleAuthRequest(baseUrl, request, path);
-	return await handleAuthResponse(response, { baseUrl, cookieSecret, sessionDataTtl });
+	return await handleAuthResponse(response, baseUrl, {
+		secret: cookieSecret,
+		sessionDataTtl,
+		domain,
+	});
 }

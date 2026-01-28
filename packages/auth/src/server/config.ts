@@ -3,9 +3,9 @@
  */
 
 /**
- * Cookie configuration for Neon Auth
+ * Session cookie configuration
  */
-export interface NeonAuthCookieConfig {
+export interface SessionCookieConfig {
 	/**
 	 * Secret for signing session data cookies (enables session caching)
 	 * Must be at least 32 characters for security.
@@ -54,7 +54,7 @@ export interface NeonAuthConfig {
 	/**
 	 * Cookie configuration
 	 */
-	cookies: NeonAuthCookieConfig;
+	cookies: SessionCookieConfig;
 }
 
 /**
@@ -74,7 +74,7 @@ export interface NeonAuthMiddlewareConfig extends NeonAuthConfig {
  * @param cookies - The cookie configuration to validate
  * @throws Error if secret is too short (< 32 characters)
  */
-export function validateCookieConfig(cookies: NeonAuthCookieConfig): void {
+export function validateCookieConfig(cookies: SessionCookieConfig): void {
 	if (cookies.secret.length < 32) {
 		throw new Error(
 			'cookies.secret must be at least 32 characters long for security. ' +

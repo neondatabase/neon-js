@@ -106,6 +106,7 @@ export function createNeonAuth(config: NeonAuthConfig) {
 		context: createNextRequestContext,
 		cookieSecret: cookies.secret,
 		sessionDataTtl: cookies.sessionDataTtl,
+		domain: cookies.domain,
 	});
 
 	return {

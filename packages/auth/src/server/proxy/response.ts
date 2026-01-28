@@ -1,8 +1,9 @@
 import { signSessionDataCookie } from '../session';
 import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '@/server/constants';
-import { parseSetCookies } from '../utils/cookies';
+import { parseSetCookies, serializeSetCookie } from '@/server/utils/cookies';
 import type { SessionData } from '@/server/types';
 import { parseSessionData } from '../session/operations';
+import type { SessionCookieConfig } from '../config';
 
 // Allowlist of response headers that we want to proxy to the client from Neon Auth.
 const RESPONSE_HEADERS_ALLOWLIST = ['content-type', 'content-length', 'content-encoding', 'transfer-encoding',
@@ -15,24 +16,20 @@ const RESPONSE_HEADERS_ALLOWLIST = ['content-type', 'content-length', 'content-e
  * - Mints session data cookie if session token is present
  *
  * @param response - Response from upstream Neon Auth server
- * @param config - Configuration including base URL, cookie secret, and session data TTL
+ * @param baseUrl - Base URL of Neon Auth server
+ * @param cookieConfig - Session cookie configuration
  * @returns New Response with proxied headers and session data cookie
  */
 export const handleAuthResponse = async (
   response: Response,
-  config: { baseUrl: string; cookieSecret: string; sessionDataTtl?: number }
+  baseUrl: string,
+  cookieConfig: SessionCookieConfig
 ) => {
-  const responseHeaders = prepareResponseHeaders(response);
+  const responseHeaders = prepareResponseHeaders(response, cookieConfig.domain);
 
   // Mint session data cookie from upstream response
-  const sessionDataCookie = await mintSessionData(
-    response.headers,
-    config.baseUrl,
-    config.cookieSecret,
-    config.sessionDataTtl
-  );
+  const sessionDataCookie = await mintSessionData(response.headers, baseUrl, cookieConfig);
   if (sessionDataCookie) {
-    // Use append to preserve existing Set-Cookie headers from upstream
     responseHeaders.append('Set-Cookie', sessionDataCookie);
   }
 
@@ -43,15 +40,23 @@ export const handleAuthResponse = async (
   })
 }
 
-const prepareResponseHeaders = (response: Response) => {
+const prepareResponseHeaders = (response: Response, domain?: string) => {
   const headers = new Headers();
   for (const header of RESPONSE_HEADERS_ALLOWLIST) {
     // Special handling for set-cookie: HTTP allows multiple Set-Cookie headers
     if (header === 'set-cookie') {
-      // Use getSetCookie() to get all Set-Cookie headers as array
       const cookies = response.headers.getSetCookie();
-      for (const cookie of cookies) {
-        headers.append('Set-Cookie', cookie);
+      for (const cookieHeader of cookies) {
+        // Parse and add domain if specified
+        if (domain) {
+          const parsedCookies = parseSetCookies(cookieHeader);
+          for (const parsedCookie of parsedCookies) {
+            parsedCookie.domain = domain;
+            headers.append('Set-Cookie', serializeSetCookie(parsedCookie));
+          }
+        } else {
+          headers.append('Set-Cookie', cookieHeader);
+        }
       }
     } else {
       const value = response.headers.get(header);
@@ -63,12 +68,12 @@ const prepareResponseHeaders = (response: Response) => {
   return headers;
 }
 
-async function mintSessionData(
+export async function mintSessionData(
   headers: Headers,
   baseUrl: string,
-  cookieSecret: string,
-  sessionDataTtl?: number
+  cookieConfig: SessionCookieConfig
 ): Promise<string | null> {
+  const { secret, sessionDataTtl, domain } = cookieConfig;
   const setCookieHeaders = headers.getSetCookie();
   const sessionToken = setCookieHeaders.find(cookie => cookie.includes('session_token'));
 
@@ -79,8 +84,16 @@ async function mintSessionData(
   // Delete session data cookie if session_token cookie is deleted (case-insensitive check)
   const sessionCookie = sessionToken.toLowerCase();
   if (sessionCookie.includes('max-age=0')) {
-    return `${NEON_AUTH_SESSION_DATA_COOKIE_NAME}=; ` +
-      `Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
+    return serializeSetCookie({
+      name: NEON_AUTH_SESSION_DATA_COOKIE_NAME,
+      value: '',
+      path: '/',
+      domain,
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      maxAge: 0,
+    });
   }
 
   // Update session data cookie if session_token cookie is refreshed
@@ -90,13 +103,20 @@ async function mintSessionData(
     if (sessionData.session) {
       const { value: signedData, expiresAt } = await signSessionDataCookie(
         sessionData,
-        cookieSecret,
+        secret,
         sessionDataTtl
       );
 
-      return `${NEON_AUTH_SESSION_DATA_COOKIE_NAME}=${signedData}; ` +
-        `Path=/; HttpOnly; Secure; SameSite=Lax; ` +
-        `Expires=${expiresAt.toUTCString()}`;
+      return serializeSetCookie({
+        name: NEON_AUTH_SESSION_DATA_COOKIE_NAME,
+        value: signedData,
+        path: '/',
+        domain,
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+        expires: expiresAt,
+      });
     }
   } catch (error) {
     // Categorize error for better debugging

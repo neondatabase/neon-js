@@ -11,18 +11,20 @@ import {
 import { parseSetCookies, parseCookieValue } from '@/server/utils/cookies';
 import { validateSessionData } from '@/server/session/validator';
 import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from './constants';
+import { mintSessionData } from './proxy';
 
 export interface NeonAuthServerConfig {
   baseUrl: string;
   context: RequestContextFactory;
   cookieSecret: string;
   sessionDataTtl?: number;
+  domain?: string;
 }
 
 export function createAuthServerInternal(
   config: NeonAuthServerConfig
 ): NeonAuthServer {
-  const { baseUrl, context: getContext, cookieSecret } = config;
+  const { baseUrl, context: getContext, cookieSecret, sessionDataTtl, domain } = config;
 
   const fetchWithAuth = async (
     path: string,
@@ -65,12 +67,40 @@ export function createAuthServerInternal(
       body: requestBody,
     });
 
-    // Handle response cookies
-    const setCookieHeader = response.headers.get('set-cookie');
-    if (setCookieHeader) {
-      const parsedCookies = parseSetCookies(setCookieHeader);
-      for (const cookie of parsedCookies) {
-        await ctx.setCookie(cookie.name, cookie.value, cookie);
+    // Handle response cookies 
+    const setCookieHeaders = response.headers.getSetCookie();
+    if (setCookieHeaders.length > 0) {
+      for (const setCookieHeader of setCookieHeaders) {
+        const parsedCookies = parseSetCookies(setCookieHeader);
+        for (const cookie of parsedCookies) {
+          // Override domain if configured
+          const cookieOptions = domain ? { ...cookie, domain } : cookie;
+          await ctx.setCookie(cookie.name, cookie.value, cookieOptions);
+        }
+      }
+
+      // Mint session data cookie if session_token was set
+      try {
+        const sessionDataCookie = await mintSessionData(response.headers, baseUrl, {
+          secret: cookieSecret,
+          sessionDataTtl,
+          domain,
+        });
+
+        if (sessionDataCookie) {
+          // Parse the Set-Cookie string to extract cookie details
+          const [parsedSessionData] = parseSetCookies(sessionDataCookie);
+          if (parsedSessionData) {
+            await ctx.setCookie(
+              parsedSessionData.name,
+              parsedSessionData.value,
+              parsedSessionData
+            );
+          }
+        }
+      } catch (error) {
+        // Log error but don't fail the request - session cache is optional
+        console.error('[fetchWithAuth] Failed to mint session data cookie:', error);
       }
     }
 

@@ -28,6 +28,8 @@ export interface AuthMiddlewareConfig {
 	cookieSecret: string;
 	/** Time-to-live for session data cache in seconds */
 	sessionDataTtl?: number;
+	/** Cookie domain for session data cookie */
+	domain?: string;
 }
 
 /**
@@ -57,6 +59,7 @@ export async function processAuthMiddleware(
 		baseUrl,
 		cookieSecret,
 		sessionDataTtl,
+		domain,
 	} = config;
 
 	// Always skip session check for login URL to prevent infinite redirect loop
@@ -68,7 +71,13 @@ export async function processAuthMiddleware(
 	// We need to exchange the verifier token and session challenge for the session cookie
 	const verification = needsSessionVerification(request);
 	if (verification) {
-		const exchangeResult = await exchangeOAuthToken(request, baseUrl, cookieSecret);
+		const exchangeResult = await exchangeOAuthToken(
+			request,
+			baseUrl,
+			cookieSecret,
+			sessionDataTtl,
+			domain
+		);
 		if (exchangeResult !== null) {
 			// OAuth exchange successful - redirect with session cookies
 			return {
@@ -92,6 +101,7 @@ export async function processAuthMiddleware(
 			baseUrl,
 			cookieSecret,
 			sessionDataTtl,
+			domain,
 		});
 
 		// Parse session data from response

@@ -55,6 +55,7 @@ export function neonAuthMiddleware(config: NeonAuthMiddlewareConfig) {
       baseUrl,
       cookieSecret: cookies.secret,
       sessionDataTtl: cookies.sessionDataTtl,
+      domain: cookies.domain,
     });
 
     switch (result.action) {

@@ -45,12 +45,16 @@ export function needsSessionVerification(request: Request): boolean {
  * @param request - Standard Web API Request object
  * @param baseUrl - Base URL of Neon Auth server
  * @param cookieSecret - Secret for signing session cookies
+ * @param sessionDataTtl - Optional TTL for session data cache
+ * @param domain - Optional cookie domain
  * @returns Exchange result with redirect URL and cookies, or null if exchange not needed/failed
  */
 export async function exchangeOAuthToken(
   request: Request,
   baseUrl: string,
-  cookieSecret: string
+  cookieSecret: string,
+  sessionDataTtl?: number,
+  domain?: string
 ): Promise<OAuthExchangeResult | null> {
   const url = new URL(request.url);
   const verifier = url.searchParams.get(NEON_AUTH_SESSION_VERIFIER_PARAM_NAME);
@@ -79,7 +83,11 @@ export async function exchangeOAuthToken(
     'get-session'
   );
 
-  const response = await handleAuthResponse(upstreamResponse, { baseUrl, cookieSecret });
+  const response = await handleAuthResponse(upstreamResponse, baseUrl, {
+    secret: cookieSecret,
+    sessionDataTtl,
+    domain,
+  });
 
   if (response.ok) {
     // Extract Set-Cookie headers from response
