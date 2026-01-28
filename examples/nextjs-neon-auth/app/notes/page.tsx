@@ -1,11 +1,14 @@
 import { redirect } from "next/navigation"
 import { StickyNote } from "lucide-react"
-import { authServer } from "@/lib/auth/server"
+import { auth } from "@/lib/auth/server"
 import { db } from "@/lib/db"
 import { notes } from "@/lib/schema"
 import { eq, desc } from "drizzle-orm"
 import { AddNoteForm } from "./add-note-form"
 import { DeleteNoteButton } from "./delete-note-button"
+
+// Server components using `auth` methods must be rendered dynamically
+export const dynamic = 'force-dynamic'
 
 function formatDate(date: Date | string) {
     return new Date(date).toLocaleDateString("en-US", {
@@ -18,7 +21,7 @@ function formatDate(date: Date | string) {
 }
 
 export default async function NotesPage() {
-    const { data: session } = await authServer.getSession()
+    const { data: session } = await auth.getSession()
 
     if (!session?.user) {
         redirect("/auth/sign-in")

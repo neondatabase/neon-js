@@ -1,45 +1,81 @@
 import { createAuthServerInternal } from '@/server';
 import { createNextRequestContext } from './adapter';
-import { cookies } from 'next/headers';
-import { validateSessionData, isSessionCacheEnabled } from '@/server/session';
-import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../constants';
-
-// Re-export server-side utilities
-export { neonAuth } from '../auth';
-export { neonAuthMiddleware } from '../middleware';
-export { authApiHandler } from '../handler';
+import type { NeonAuthConfig, NeonAuthMiddlewareConfig } from '@/server/config';
+import { validateCookieConfig } from '@/server/config';
+import { authApiHandler } from './handler';
+import { neonAuthMiddleware } from './middleware';
+import type { NeonAuthServer } from '@/server/types';
 
 /**
- * Creates a server-side auth API client for Next.js.
+ * Unified entry point for Neon Auth in Next.js
  *
- * This client exposes the Neon Auth APIs including authentication, user management, organizations, and admin operations.
+ * This is the recommended way to use Neon Auth in Next.js. It provides a single
+ * entry point that combines all server-side functionality.
+ *
+ * **Features:**
+ * - All Better Auth server methods (signIn, signUp, getSession, etc.)
+ * - `.handler()` - API route handler for `/api/auth/[...path]`
+ * - `.middleware(config?)` - Middleware for route protection
  *
  * **Where to use:**
  * - React Server Components
  * - Server Actions
  * - Route Handlers
+ * - Middleware
  *
- * **Requirements:**
- * - `NEON_AUTH_BASE_URL` environment variable must be set
- * - Cookies are automatically read/written via `next/headers`
- * 
- * @returns Auth server API client for Next.js
- * @throws Error if `NEON_AUTH_BASE_URL` environment variable is not set
+ * @param config - Required configuration
+ * @param config.baseUrl - Base URL of your Neon Auth instance
+ * @param config.cookies - Cookie configuration
+ * @param config.cookies.secret - Secret for signing session cookies (minimum 32 characters)
+ * @param config.cookies.sessionDataTtl - Optional TTL for session cache in seconds (default: 300)
+ * @param config.cookies.domain - Optional cookie domain (default: current domain)
+ * @returns Unified auth instance with server methods, handler, and middleware
+ * @throws Error if `cookies.secret` is less than 32 characters
  *
  * @example
  * ```typescript
- * // lib/auth/server.ts - Create a singleton instance
- * import { createAuthServer } from '@neondatabase/auth/next/server';
- * export const authServer = createAuthServer();
+ * // lib/auth.ts - Create a singleton instance
+ * import { createNeonAuth } from '@neondatabase/auth/next/server';
+ *
+ * export const auth = createNeonAuth({
+ *   baseUrl: process.env.NEON_AUTH_BASE_URL!,
+ *   cookies: {
+ *     secret: process.env.NEON_AUTH_COOKIE_SECRET!,
+ *     sessionDataTtl: 300, // 5 minutes (default)
+ *   },
+ * });
  * ```
- * 
+ *
  * @example
  * ```typescript
- * // Server Component - Reading session
- * import { authServer } from '@/lib/auth/server';
- * 
+ * // app/api/auth/[...path]/route.ts - API handler
+ * import { auth } from '@/lib/auth';
+ *
+ * export const { GET, POST } = auth.handler();
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // middleware.ts - Route protection
+ * import { auth } from '@/lib/auth';
+ *
+ * export default auth.middleware({ loginUrl: '/auth/sign-in' });
+ *
+ * export const config = {
+ *   matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+ * };
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // app/page.tsx - Server Component
+ * import { auth } from '@/lib/auth';
+ *
+ * // Server components using `auth` methods must be rendered dynamically
+ * export const dynamic = 'force-dynamic'
+ *
  * export default async function Page() {
- *   const { data: session } = await authServer.getSession();
+ *   const { data: session } = await auth.getSession();
  *   if (!session?.user) return <div>Not logged in</div>;
  *   return <div>Hello {session.user.name}</div>;
  * }
@@ -47,13 +83,13 @@ export { authApiHandler } from '../handler';
  *
  * @example
  * ```typescript
- * // Server Action - Sign in
+ * // app/actions.ts - Server Action
  * 'use server';
- * import { authServer } from '@/lib/auth/server';
+ * import { auth } from '@/lib/auth';
  * import { redirect } from 'next/navigation';
  *
  * export async function signIn(formData: FormData) {
- *   const { error } = await authServer.signIn.email({
+ *   const { error } = await auth.signIn.email({
  *     email: formData.get('email') as string,
  *     password: formData.get('password') as string,
  *   });
@@ -62,64 +98,78 @@ export { authApiHandler } from '../handler';
  * }
  * ```
  */
-export function createAuthServer() {
-  const baseUrl = process.env.NEON_AUTH_BASE_URL;
-  if (!baseUrl) {
-    throw new Error(
-      'NEON_AUTH_BASE_URL environment variable is required for createAuthServer()'
-    );
-  }
+export function createNeonAuth(config: NeonAuthConfig) {
+	const { baseUrl, cookies } = config;
 
-  const baseServer = createAuthServerInternal({
-    baseUrl,
-    context: createNextRequestContext,
-  });
+	validateCookieConfig(cookies);
 
-  // Override getSession with cookie-optimized version
-  return {
-    ...baseServer,
+	// Create base server with all Better Auth methods
+	const server = createAuthServerInternal({
+		baseUrl,
+		context: createNextRequestContext,
+		cookieSecret: cookies.secret,
+		sessionDataTtl: cookies.sessionDataTtl,
+		domain: cookies.domain,
+	});
 
-    async getSession(options?: Parameters<typeof baseServer.getSession>[0]) {
-      // Backward compatibility: if secret not configured, use original behavior
-      if (!isSessionCacheEnabled()) {
-        return baseServer.getSession(options);
-      }
+	// Attach handler and middleware directly to the server proxy object
+	// instead of spreading (spreading a Proxy doesn't copy dynamic properties)
+	/**
+	 * Creates API route handlers for Next.js
+	 *
+	 * Mount this in your API routes to handle auth requests:
+	 * - `/api/auth/[...path]/route.ts`
+	 *
+	 * @returns Object with GET, POST, PUT, DELETE, PATCH handlers
+	 *
+	 * @example
+	 * ```typescript
+	 * // app/api/auth/[...path]/route.ts
+	 * import { auth } from '@/lib/auth';
+	 *
+	 * export const { GET, POST } = auth.handler();
+	 * ```
+	 */
+	(server as NeonAuth).handler = () => authApiHandler(config);
 
-      // Check if cookie cache is disabled via query param
-      const disableCookieCache = options?.query?.disableCookieCache === 'true';
+	/**
+	 * Creates middleware for route protection
+	 *
+	 * Protects routes from unauthenticated access and handles:
+	 * - Session validation and refresh
+	 * - OAuth callback processing
+	 * - Login redirects
+	 *
+	 * @param middlewareConfig - Optional middleware configuration
+	 * @param middlewareConfig.loginUrl - URL to redirect to when not authenticated (default: '/auth/sign-in')
+	 * @returns Middleware function for Next.js
+	 *
+	 * @example
+	 * ```typescript
+	 * // middleware.ts
+	 * import { auth } from '@/lib/auth';
+	 *
+	 * export default auth.middleware({ loginUrl: '/auth/sign-in' });
+	 *
+	 * export const config = {
+	 *   matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+	 * };
+	 * ```
+	 */
+	(server as NeonAuth).middleware = (
+		middlewareConfig?: Pick<NeonAuthMiddlewareConfig, 'loginUrl'>
+	) => neonAuthMiddleware({ ...config, ...middlewareConfig });
 
-      if (disableCookieCache) {
-        return baseServer.getSession(options);
-      }
-
-      // Try cookie cache first
-      try {
-        const cookieStore = await cookies();
-        const sessionDataCookie = cookieStore.get(NEON_AUTH_SESSION_DATA_COOKIE_NAME);
-
-        if (sessionDataCookie?.value) {
-          const result = await validateSessionData(sessionDataCookie.value);
-
-          if (result.valid && result.payload) {
-            // Cache hit - return immediately
-            return { data: result.payload, error: null };
-          } else if (result.error) {
-            // Cache miss - invalid cookie
-            console.debug('[createAuthServer.getSession] Invalid session cookie:', {
-              error: result.error,
-            });
-          }
-        }
-      } catch (error) {
-        // Cookie read/validation error - log and fall through
-        console.error('[createAuthServer.getSession] Cookie validation error:', {
-          error: error instanceof Error ? error.message : String(error),
-          hasSecret: !!process.env.NEON_AUTH_COOKIE_SECRET,
-        });
-      }
-
-      // Fallback: Call upstream API
-      return baseServer.getSession(options);
-    },
-  };
+	return server as NeonAuth;
 }
+
+/**
+ * Return type for createNeonAuth
+ * Includes all Better Auth server methods plus handler() and middleware()
+ */
+export type NeonAuth = NeonAuthServer & {
+	handler: () => ReturnType<typeof authApiHandler>;
+	middleware: (
+		middlewareConfig?: Pick<NeonAuthMiddlewareConfig, 'loginUrl'>
+	) => ReturnType<typeof neonAuthMiddleware>;
+};

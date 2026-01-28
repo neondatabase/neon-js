@@ -3,5 +3,4 @@ export {
   getSessionDataFromCookie,
   signSessionDataCookie,
   parseSessionData,
-  isSessionCacheEnabled,
 } from './operations';

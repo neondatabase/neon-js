@@ -43,8 +43,8 @@ Authentication adapters for Neon Auth supporting multiple auth providers:
 - `@neondatabase/auth/react/adapters` - BetterAuthReactAdapter
 - `@neondatabase/auth/vanilla` - Vanilla adapter exports
 - `@neondatabase/auth/vanilla/adapters` - SupabaseAuthAdapter, BetterAuthVanillaAdapter
-- `@neondatabase/auth/next` - Next.js integration (authApiHandler, neonAuthMiddleware, createAuthClient, neonAuth)
-- `@neondatabase/auth/next/server` - Server-side auth API (createAuthServer)
+- `@neondatabase/auth/next` - Next.js integration (createAuthClient for client-side)
+- `@neondatabase/auth/next/server` - Next.js server integration (createNeonAuth for server-side)
 - `@neondatabase/auth/types` - Better Auth types (Session, User, Organization, etc.)
 - `@neondatabase/auth/ui/css` - Pre-built CSS
 - `@neondatabase/auth/ui/tailwind` - Tailwind CSS
@@ -67,8 +67,8 @@ Main SDK package that combines authentication with PostgreSQL querying:
 - `@neondatabase/neon-js/auth/react/adapters` - Re-exports @neondatabase/auth/react/adapters (BetterAuthReactAdapter)
 - `@neondatabase/neon-js/auth/vanilla` - Re-exports @neondatabase/auth/vanilla
 - `@neondatabase/neon-js/auth/vanilla/adapters` - Re-exports @neondatabase/auth/vanilla/adapters
-- `@neondatabase/neon-js/auth/next` - Re-exports @neondatabase/auth/next
-- `@neondatabase/neon-js/auth/next/server` - Re-exports @neondatabase/auth/next/server (createAuthServer)
+- `@neondatabase/neon-js/auth/next` - Re-exports @neondatabase/auth/next (createAuthClient)
+- `@neondatabase/neon-js/auth/next/server` - Re-exports @neondatabase/auth/next/server (createNeonAuth)
 - `@neondatabase/neon-js/ui/css` - Pre-built CSS
 - `@neondatabase/neon-js/ui/tailwind` - Tailwind CSS
 
@@ -110,7 +110,6 @@ Example applications demonstrating SDK usage:
 
 **`examples/nextjs-neon-auth/`** - Next.js App Router example
 - Next.js 15 with App Router integration
-- Demonstrates server-side auth (`neonAuth()`, `createAuthServer()`)
 - Auth UI components with custom theming
 - Drizzle ORM integration for database operations
 - API routes for notes CRUD operations
@@ -352,11 +351,8 @@ Auth-UI CSS is designed to **never override user's theme**. This is achieved thr
 **Dependencies**: Imports from `@neondatabase/postgrest-js` and `@neondatabase/auth`
 
 **Next.js Integration** (in `packages/auth/src/next/`):
-- `handler/` - `authApiHandler()` for API routes
-- `middleware/` - `neonAuthMiddleware()` for route protection
-- `auth/` - `neonAuth()` for server-side session access
-- `server/` - `createAuthServer()` for server-side auth operations (Server Actions, Route Handlers)
-- `index.ts` - `createAuthClient()` pre-configured for Next.js
+- `server/index.ts` - `createNeonAuth()` unified entry point combining auth handler, middleware, and all server methods
+- `index.ts` - `createAuthClient()` pre-configured for Next.js client-side
 
 ### UI Components Layer (`packages/auth-ui/`)
 
@@ -514,41 +510,47 @@ const { data: session } = await auth.getSession();
 ### Using with Next.js
 
 ```typescript
+// lib/auth/server.ts
+import { createNeonAuth } from '@neondatabase/auth/next/server';
+
+export const auth = createNeonAuth({
+  baseUrl: process.env.NEON_AUTH_BASE_URL!,
+  cookies: {
+    secret: process.env.NEON_AUTH_COOKIE_SECRET!,
+    sessionDataTtl: 300,          // Optional: session data cache TTL in seconds (default: 300 = 5 min)
+    domain: '.example.com',       // Optional: for cross-subdomain cookies
+  },
+});
+
 // api/auth/[...path]/route.ts
-import { authApiHandler } from "@neondatabase/auth/next/server"
+import { auth } from '@/lib/auth/server';
 
-export const { GET, POST } = authApiHandler()
-
-// lib/auth/client.ts
-"use client"
-import { createAuthClient } from '@neondatabase/auth/next';
-export const authClient = createAuthClient()
+export const { GET, POST } = auth.handler();
 
 // middleware.ts
-import { neonAuthMiddleware } from '@neondatabase/auth/next/server';
-export default neonAuthMiddleware();
+import { auth } from '@/lib/auth/server';
+
+export default auth.middleware({ loginUrl: '/auth/sign-in' });
 
 // Server Components - access session
-import { neonAuth } from '@neondatabase/auth/next/server';
+import { auth } from '@/lib/auth/server';
+
+// Server components using `auth` methods must be rendered dynamically
+export const dynamic = 'force-dynamic'
 
 export async function Profile() {
-  const { user } = await neonAuth();
-  if (!user) return null;
-  return <span>{user.name}</span>;
+  const { data: session } = await auth.getSession();
+  if (!session?.user) return null;
+  return <span>{session.user.name}</span>;
 }
 
 // Server Actions - auth operations
-// lib/auth/server.ts
-import { createAuthServer } from '@neondatabase/auth/next/server';
-export const authServer = createAuthServer();
-
-// app/actions.ts
 'use server';
-import { authServer } from '@/lib/auth/server';
+import { auth } from '@/lib/auth/server';
 import { redirect } from 'next/navigation';
 
 export async function signIn(formData: FormData) {
-  const { error } = await authServer.signIn.email({
+  const { error } = await auth.signIn.email({
     email: formData.get('email') as string,
     password: formData.get('password') as string,
   });
@@ -556,7 +558,13 @@ export async function signIn(formData: FormData) {
   redirect('/dashboard');
 }
 
-// Available APIs: authServer.getSession(), signIn, signUp, signOut,
+// lib/auth/client.ts - Client-side auth
+"use client"
+import { createAuthClient } from '@neondatabase/auth/next';
+
+export const authClient = createAuthClient();
+
+// Available APIs: authClient.getSession(), signIn, signUp, signOut,
 // organization.*, admin.*, emailOtp.*, updateUser, etc.
 ```
 

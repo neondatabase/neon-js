@@ -191,6 +191,7 @@ jobs:
         env:
           NEON_AUTH_BASE_URL: ${{ steps.create-branch.outputs.auth_url }}
           DATABASE_URL: ${{ steps.create-branch.outputs.db_url }}
+          NEON_AUTH_COOKIE_SECRET: ${{ secrets.NEON_AUTH_COOKIE_SECRET }}
 
       # Get Playwright version for cache key
       - name: Get Playwright version
@@ -230,6 +231,7 @@ jobs:
           # Next.js runtime env vars (read via process.env at server start)
           NEON_AUTH_BASE_URL: ${{ steps.create-branch.outputs.auth_url }}
           DATABASE_URL: ${{ steps.create-branch.outputs.db_url }}
+          NEON_AUTH_COOKIE_SECRET: ${{ secrets.NEON_AUTH_COOKIE_SECRET }}
 
       # Clean up: Delete Neon branch (runs even if tests fail)
       - name: Delete Neon branch

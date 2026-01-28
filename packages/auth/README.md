@@ -257,17 +257,15 @@ Multiple concurrent `getSession()` calls are automatically deduplicated:
 
 ## Next.js Integration
 
-For Next.js projects, this package provides built-in integration via `@neondatabase/auth/next`. See the [Next.js Setup Guide](./NEXT-JS.md) for:
+For Next.js projects, this package provides built-in integration via `@neondatabase/auth/next`. 
+See the [Next.js Setup Guide](./NEXT-JS.md) for comprehensive documentation including:
 
-- Setting up the auth handler with `authApiHandler()`
-- Protecting routes with `neonAuthMiddleware()`
-- Creating the auth client with `createAuthClient()` for client components
+- Setting up auth server instance with `createNeonAuth()` for handler, middleware and api methods  
+- Client-side auth with `createAuthClient()` for client components
 - Configuring the `NeonAuthUIProvider` with Email OTP, Social Login, and Organizations
 - Creating auth pages (`AuthView`, `AccountView`, `OrganizationView`)
 - Importing styles (with or without Tailwind CSS)
-- Accessing session data with `neonAuth()` in server components
 - Using `authClient.useSession()` hook in client components
-- Server-side auth operations with `createAuthServer()` from `@neondatabase/auth/next/server`
 
 ## UI Components
 

@@ -8,17 +8,23 @@ import {
   type EndpointConfig,
   type EndpointTree,
 } from './endpoints';
-import { parseSetCookies } from '@/server/utils/cookies';
+import { parseSetCookies, parseCookieValue } from '@/server/utils/cookies';
+import { validateSessionData } from '@/server/session/validator';
+import { NEON_AUTH_SESSION_COOKIE_NAME, NEON_AUTH_SESSION_DATA_COOKIE_NAME } from './constants';
+import { mintSessionData } from './proxy';
 
 export interface NeonAuthServerConfig {
   baseUrl: string;
   context: RequestContextFactory;
+  cookieSecret: string;
+  sessionDataTtl?: number;
+  domain?: string;
 }
 
 export function createAuthServerInternal(
   config: NeonAuthServerConfig
 ): NeonAuthServer {
-  const { baseUrl, context: getContext } = config;
+  const { baseUrl, context: getContext, cookieSecret, sessionDataTtl, domain } = config;
 
   const fetchWithAuth = async (
     path: string,
@@ -61,19 +67,43 @@ export function createAuthServerInternal(
       body: requestBody,
     });
 
-    // Handle response cookies
-    const setCookieHeader = response.headers.get('set-cookie');
-    if (setCookieHeader) {
-      const parsedCookies = parseSetCookies(setCookieHeader);
-      for (const cookie of parsedCookies) {
-        await ctx.setCookie(cookie.name, cookie.value, cookie);
+    // Handle response cookies 
+    const setCookieHeaders = response.headers.getSetCookie();
+    if (setCookieHeaders.length > 0) {
+      for (const setCookieHeader of setCookieHeaders) {
+        const parsedCookies = parseSetCookies(setCookieHeader);
+        for (const cookie of parsedCookies) {
+          const cookieOptions = domain ? { ...cookie, domain } : cookie;
+          await ctx.setCookie(cookie.name, cookie.value, cookieOptions);
+        }
+      }
+
+      // Mint session data cookie if session_token was set
+      try {
+        const sessionDataCookie = await mintSessionData(response.headers, baseUrl, {
+          secret: cookieSecret,
+          sessionDataTtl,
+          domain,
+        });
+
+        if (sessionDataCookie) {
+          // Parse the Set-Cookie string to extract cookie details
+          const [parsedSessionData] = parseSetCookies(sessionDataCookie);
+          if (parsedSessionData) {
+            await ctx.setCookie(
+              parsedSessionData.name,
+              parsedSessionData.value,
+              parsedSessionData
+            );
+          }
+        }
+      } catch (error) {
+        // Log error but don't fail the request - session cache is optional
+        console.error('[fetchWithAuth] Failed to mint session data cookie:', error);
       }
     }
 
-    // Parse response
     const responseData = await response.json().catch(() => null);
-
-    // Return in the same format as better-auth client
     if (!response.ok) {
       return {
         data: null,
@@ -91,7 +121,48 @@ export function createAuthServerInternal(
     };
   };
 
-  return createApiProxy(API_ENDPOINTS, fetchWithAuth) as NeonAuthServer;
+  const baseServer = createApiProxy(API_ENDPOINTS, fetchWithAuth);
+
+  // Store original getSession for fallback
+  const originalGetSession = baseServer.getSession;
+
+  // Override getSession directly on the proxy (don't spread - that breaks the proxy!)
+  // Use 'any' for args to maintain compatibility with generic function signature
+  baseServer.getSession = async (...args: any[]) => {
+    // Extract query params from better-auth's args
+    // Better-auth signature: getSession(data, fetchOptions)
+    const [data] = args;
+    const disableCookieCache = data?.query?.disableCookieCache === 'true';
+
+    if (!disableCookieCache) {
+      try {
+        const ctx = await getContext();
+        const cookiesString = await ctx.getCookies();
+
+        const hasSessionToken = cookiesString.includes(NEON_AUTH_SESSION_COOKIE_NAME);
+        const sessionDataCookie = parseCookieValue(
+          cookiesString,
+          NEON_AUTH_SESSION_DATA_COOKIE_NAME
+        );
+
+        // For valid session, both `session_token` and `session_data` cookies must exist
+        if (sessionDataCookie && hasSessionToken) {
+          const result = await validateSessionData(sessionDataCookie, cookieSecret);
+          if (result.valid && result.payload) {
+            return { data: result.payload, error: null } as any;
+          }
+        }
+      } catch (error) {
+        // Log error but fall through to API call
+        console.error('[auth.getSession] Cookie validation error:', error);
+      }
+    }
+
+    // Fallback: Call upstream API
+    return originalGetSession(...args);
+  };
+
+  return baseServer;
 }
 
 type FetchWithAuth = (
@@ -109,11 +180,18 @@ function isEndpointConfig(value: unknown): value is EndpointConfig {
   );
 }
 
-function createApiProxy(endpoints: EndpointTree, fetchFn: FetchWithAuth): unknown {
+function createApiProxy(endpoints: EndpointTree, fetchFn: FetchWithAuth) {
+  const target: Record<string, unknown> = {};
+
   return new Proxy(
-    {},
+    target,
     {
-      get(_, prop: string) {
+      get(target, prop: string) {
+        // Check if property was manually set on the target
+        if (prop in target) {
+          return target[prop];
+        }
+
         const endpoint = endpoints[prop];
         if (!endpoint) return;
 
@@ -125,6 +203,11 @@ function createApiProxy(endpoints: EndpointTree, fetchFn: FetchWithAuth): unknow
         // Otherwise it's a nested namespace - return another proxy
         return createApiProxy(endpoint as EndpointTree, fetchFn);
       },
+      set(target, prop: string, value) {
+        // Allow setting properties on the target
+        target[prop] = value;
+        return true;
+      },
     }
-  );
+  ) as NeonAuthServer;
 }

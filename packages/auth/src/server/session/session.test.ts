@@ -1,24 +1,13 @@
-import { describe, test, expect, beforeEach, afterEach } from 'vitest';
-import { validateSessionData } from './validator';
-import { signSessionDataCookie, parseSessionData, getSessionDataFromCookie, isSessionCacheEnabled } from './operations';
-import { getCookieSecret } from './signer';
+import { describe, test, expect } from 'vitest';
+import { validateSessionData, assertCookieSecret } from './validator';
+import { signSessionDataCookie, parseSessionData, getSessionDataFromCookie } from './operations';
 import { ERRORS } from '@/server/errors';
 import type { RequireSessionData } from '@/server/types';
 import type { BetterAuthSession, BetterAuthUser } from '@/core/better-auth-types';
 
-
 const TEST_SECRET = 'test-secret-at-least-32-characters-long!';
 const TEST_USER_ID = 'user-123';
 const TEST_EMAIL = 'test@example.com';
-
-// Setup environment variable for all tests
-beforeEach(() => {
-  process.env.NEON_AUTH_COOKIE_SECRET = TEST_SECRET;
-});
-
-afterEach(() => {
-  delete process.env.NEON_AUTH_COOKIE_SECRET;
-});
 
 const createTestSessionData = (expiresAt: Date = new Date(Date.now() + 3_600_000)): RequireSessionData => {
   return {
@@ -47,9 +36,9 @@ const createTestSessionData = (expiresAt: Date = new Date(Date.now() + 3_600_000
 describe('validateSessionData', () => {
   test('should validate valid session data', async () => {
     const sessionData = createTestSessionData();
-    const cookie = await signSessionDataCookie(sessionData);
+    const cookie = await signSessionDataCookie(sessionData, TEST_SECRET);
 
-    const result = await validateSessionData(cookie.value);
+    const result = await validateSessionData(cookie.value, TEST_SECRET);
     expect(result.valid).toBe(true);
     expect(result.payload).toBeDefined();
     expect(result.payload).toEqual(
@@ -68,24 +57,21 @@ describe('validateSessionData', () => {
 
   test('should reject session data with wrong secret', async () => {
     const sessionData = createTestSessionData();
-    const cookie = await signSessionDataCookie(sessionData);
+    const cookie = await signSessionDataCookie(sessionData, TEST_SECRET);
 
-    // Change the secret for validation
-    process.env.NEON_AUTH_COOKIE_SECRET = 'wrong-secret-at-least-32-characters!';
-    const result = await validateSessionData(cookie.value);
+    // Validate with different secret
+    const wrongSecret = 'wrong-secret-at-least-32-characters!';
+    const result = await validateSessionData(cookie.value, wrongSecret);
 
     expect(result.valid).toBe(false);
     expect(result.error).toBeDefined();
-
-    // Restore secret
-    process.env.NEON_AUTH_COOKIE_SECRET = TEST_SECRET;
   });
 
   test('should reject expired session data', async () => {
     const sessionData = createTestSessionData(new Date(Date.now() - 3_600_000));
-    const cookie = await signSessionDataCookie(sessionData);
+    const cookie = await signSessionDataCookie(sessionData, TEST_SECRET);
 
-    const result = await validateSessionData(cookie.value);
+    const result = await validateSessionData(cookie.value, TEST_SECRET);
 
     expect(result.valid).toBe(false);
     expect(result.error).toContain('exp');
@@ -93,31 +79,31 @@ describe('validateSessionData', () => {
 
   test('should reject tampered session data', async () => {
     const sessionData = createTestSessionData();
-    const cookie = await signSessionDataCookie(sessionData);
+    const cookie = await signSessionDataCookie(sessionData, TEST_SECRET);
 
     const parts = cookie.value.split('.');
     const tamperedPayload = parts[1].slice(0, -1) + 'X';
     const tamperedData = `${parts[0]}.${tamperedPayload}.${parts[2]}`;
 
-    const result = await validateSessionData(tamperedData);
+    const result = await validateSessionData(tamperedData, TEST_SECRET);
 
     expect(result.valid).toBe(false);
   });
 
   test('should reject non-JWT format strings', async () => {
-    const result = await validateSessionData('not-a-jwt-token');
+    const result = await validateSessionData('not-a-jwt-token', TEST_SECRET);
     expect(result.valid).toBe(false);
     expect(result.error).toBeDefined();
   });
 
   test('should reject JWT with missing parts', async () => {
-    const result = await validateSessionData('header.payload'); // Missing signature
+    const result = await validateSessionData('header.payload', TEST_SECRET); // Missing signature
     expect(result.valid).toBe(false);
     expect(result.error).toBeDefined();
   });
 
   test('should reject empty cookie value', async () => {
-    const result = await validateSessionData('');
+    const result = await validateSessionData('', TEST_SECRET);
     expect(result.valid).toBe(false);
     expect(result.error).toBeDefined();
   });
@@ -126,13 +112,13 @@ describe('validateSessionData', () => {
 describe('signSessionDataCookie', () => {
   test('should convert session data to signed cookie', async () => {
     const sessionData = createTestSessionData();
-    const result = await signSessionDataCookie(sessionData);
+    const result = await signSessionDataCookie(sessionData, TEST_SECRET);
 
     expect(result.value).toBeTypeOf('string');
     expect(result.expiresAt).toBeInstanceOf(Date);
 
     // Validate the session data
-    const validation = await validateSessionData(result.value);
+    const validation = await validateSessionData(result.value, TEST_SECRET);
     expect(validation.valid).toBe(true);
     expect(validation.payload?.user?.id).toBe(TEST_USER_ID);
     expect(validation.payload?.user?.email).toBe(TEST_EMAIL);
@@ -144,7 +130,7 @@ describe('signSessionDataCookie', () => {
     const sessionData = createTestSessionData();
     sessionData.session.expiresAt = new Date(Date.now() + 7_200_000); // 2 hours
 
-    const result = await signSessionDataCookie(sessionData);
+    const result = await signSessionDataCookie(sessionData, TEST_SECRET);
 
     // Should use 5-minute TTL, not session expiry
     const fiveMinutesFromNow = Date.now() + (5 * 60 * 1000);
@@ -162,7 +148,7 @@ describe('signSessionDataCookie', () => {
     expect(typeof sessionData.session.expiresAt.getTime).toBe('function');
 
     // Should successfully create signed cookie without throwing
-    const result = await signSessionDataCookie(sessionData);
+    const result = await signSessionDataCookie(sessionData, TEST_SECRET);
     expect(result.value).toBeTypeOf('string');
     expect(result.expiresAt).toBeInstanceOf(Date);
   });
@@ -171,7 +157,7 @@ describe('signSessionDataCookie', () => {
     const twoMinutesFromNow = new Date(Date.now() + 2 * 60 * 1000);
     const sessionData = createTestSessionData(twoMinutesFromNow);
 
-    const result = await signSessionDataCookie(sessionData);
+    const result = await signSessionDataCookie(sessionData, TEST_SECRET);
 
     // Should use session expiry (2 min), not 5-min TTL
     const timeDiff = Math.abs(result.expiresAt.getTime() - twoMinutesFromNow.getTime());
@@ -179,31 +165,19 @@ describe('signSessionDataCookie', () => {
   });
 });
 
-describe('Environment Variable Handling', () => {
-  const originalSecret = process.env.NEON_AUTH_COOKIE_SECRET;
-
-  afterEach(() => {
-    process.env.NEON_AUTH_COOKIE_SECRET = originalSecret;
+describe('assertCookieSecret', () => {
+  test('assertCookieSecret throws when no secret provided', () => {
+    expect(() => assertCookieSecret()).toThrow(ERRORS.MISSING_COOKIE_SECRET);
+    expect(() => assertCookieSecret()).toThrow(ERRORS.MISSING_COOKIE_SECRET);
   });
 
-  test('isSessionCacheEnabled returns false when secret is missing', () => {
-    delete process.env.NEON_AUTH_COOKIE_SECRET;
-    expect(isSessionCacheEnabled()).toBe(false);
+  test('assertCookieSecret uses provided secret instead of env', () => {
+    const providedSecret = 'provided-secret-at-least-32-chars!';
+    expect(() => assertCookieSecret(providedSecret)).not.toThrow();
   });
 
-  test('isSessionCacheEnabled returns true when secret is set', () => {
-    process.env.NEON_AUTH_COOKIE_SECRET = TEST_SECRET;
-    expect(isSessionCacheEnabled()).toBe(true);
-  });
-
-  test('getCookieSecret throws when secret is missing', () => {
-    delete process.env.NEON_AUTH_COOKIE_SECRET;
-    expect(() => getCookieSecret()).toThrow(ERRORS.MISSING_COOKIE_SECRET);
-  });
-
-  test('getCookieSecret throws when secret is too short', () => {
-    process.env.NEON_AUTH_COOKIE_SECRET = 'short'; // < 32 chars
-    expect(() => getCookieSecret()).toThrow(ERRORS.COOKIE_SECRET_TOO_SHORT);
+  test('assertCookieSecret throws when provided secret is too short', () => {
+    expect(() => assertCookieSecret('short')).toThrow(ERRORS.COOKIE_SECRET_TOO_SHORT);
   });
 });
 
@@ -287,7 +261,7 @@ describe('parseSessionData', () => {
 describe('getSessionDataFromCookie', () => {
   test('returns null when cookie header is missing', async () => {
     const request = new Request('https://example.com', {});
-    const result = await getSessionDataFromCookie(request, 'session_data');
+    const result = await getSessionDataFromCookie(request, 'session_data', TEST_SECRET);
     expect(result).toBe(null);
   });
 
@@ -295,19 +269,19 @@ describe('getSessionDataFromCookie', () => {
     const request = new Request('https://example.com', {
       headers: { Cookie: 'other_cookie=value' },
     });
-    const result = await getSessionDataFromCookie(request, 'session_data');
+    const result = await getSessionDataFromCookie(request, 'session_data', TEST_SECRET);
     expect(result).toBe(null);
   });
 
   test('extracts and validates session data from valid cookie', async () => {
     const sessionData = createTestSessionData();
-    const cookie = await signSessionDataCookie(sessionData);
+    const cookie = await signSessionDataCookie(sessionData, TEST_SECRET);
 
     const request = new Request('https://example.com', {
       headers: { Cookie: `session_data=${cookie.value}` },
     });
 
-    const result = await getSessionDataFromCookie(request, 'session_data');
+    const result = await getSessionDataFromCookie(request, 'session_data', TEST_SECRET);
     expect(result).not.toBe(null);
     expect(result?.session?.id).toBe('session-123');
     expect(result?.user?.id).toBe(TEST_USER_ID);
@@ -318,13 +292,13 @@ describe('getSessionDataFromCookie', () => {
       headers: { Cookie: 'session_data=invalid.jwt.token' },
     });
 
-    const result = await getSessionDataFromCookie(request, 'session_data');
+    const result = await getSessionDataFromCookie(request, 'session_data', TEST_SECRET);
     expect(result).toBe(null);
   });
 
   test('handles multiple cookies in header', async () => {
     const sessionData = createTestSessionData();
-    const cookie = await signSessionDataCookie(sessionData);
+    const cookie = await signSessionDataCookie(sessionData, TEST_SECRET);
 
     const request = new Request('https://example.com', {
       headers: {
@@ -332,7 +306,7 @@ describe('getSessionDataFromCookie', () => {
       },
     });
 
-    const result = await getSessionDataFromCookie(request, 'session_data');
+    const result = await getSessionDataFromCookie(request, 'session_data', TEST_SECRET);
     expect(result?.session?.id).toBe('session-123');
   });
 });
