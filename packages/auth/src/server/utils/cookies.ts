@@ -54,6 +54,7 @@ export const parseSetCookies = (setCookieHeader: string): ParsedCookie[] => {
       name,
       value: decodeURIComponent(parsedCookie.value),
       path: parsedCookie.path,
+      domain: parsedCookie.domain,
       maxAge: parsedCookie['max-age'] ?? parsedCookie.maxAge,
       httpOnly: parsedCookie.httponly ?? true,
       secure: parsedCookie.secure ?? true,
@@ -65,5 +66,44 @@ export const parseSetCookies = (setCookieHeader: string): ParsedCookie[] => {
   return cookies;
 }
 
+/**
+ * Serializes a parsed cookie object back into a Set-Cookie header string
+ *
+ * @param cookie - The parsed cookie object
+ * @returns The Set-Cookie header string
+ */
+export const serializeSetCookie = (cookie: ParsedCookie): string => {
+  // Start with name=value
+  let result = `${cookie.name}=${encodeURIComponent(cookie.value)}`;
 
+  // Add attributes in conventional order
+  if (cookie.path) result += `; Path=${cookie.path}`;
+  if (cookie.domain) result += `; Domain=${cookie.domain}`;
+  if (cookie.maxAge !== undefined) result += `; Max-Age=${cookie.maxAge}`;
+  if (cookie.expires) result += `; Expires=${cookie.expires.toUTCString()}`;
+  if (cookie.httpOnly) result += '; HttpOnly';
+  if (cookie.secure) result += '; Secure';
+  if (cookie.sameSite) {
+    // Capitalize first letter (lax -> Lax, strict -> Strict, none -> None)
+    const sameSite = cookie.sameSite.charAt(0).toUpperCase() + cookie.sameSite.slice(1);
+    result += `; SameSite=${sameSite}`;
+  }
+  if (cookie.partitioned) result += '; Partitioned';
+
+  return result;
+};
+
+/**
+ * Extract a single cookie value by name from a cookie header string
+ *
+ * @param cookieString - The cookie header string (e.g., "name=value; name2=value2")
+ * @param name - The cookie name to extract
+ * @returns The cookie value or null if not found
+ */
+export const parseCookieValue = (cookieString: string, name: string): string | null => {
+  if (!cookieString) return null;
+
+  const parsedCookies = parseCookies(cookieString);
+  return parsedCookies.get(name) ?? null;
+}
 

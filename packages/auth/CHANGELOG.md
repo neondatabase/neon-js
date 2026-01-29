@@ -10,7 +10,128 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Next.js Session Data Caching**: Server-side session caching via signed cookie for `neonAuth()`. When `NEON_AUTH_COOKIE_SECRET` is set, sessions are cached in a signed cookie, reducing API calls. Falls back to API fetch when secret is not configured (backward compatible).
+- **Session Data Caching**: Next.js SDK now caches session details with `session_data` cookie. 
+  - Automatically created/refreshed when Neon Auth sets/refreshes `session_token` cookie
+  - The cookie is JWT token with session and user details
+  - The cookie needs to be signed with 32-characters long - `cookies.secret` 
+  - The `/api/auth/get-session`, `auth.getSession()` and the middleware will try to parse user details from 
+    `session_data` cookie with fallback on upstream `/get-session` 
+  - The cookie has default 5 minutes TTL, can be customized with `cookies.sessionDataTtl`
+
+- **Cross Domain Cookie**: Next.js SDK now supports settings `domain` attribute on cookie
+  - Optional `cookie.domain` for cross-subdomain cookie sharing
+
+- **Unified Entry Point**: New `createNeonAuth()` combines all server functionality in one place
+  - Returns an object with all Better Auth server methods (spread from base server)
+  - `.handler()` method for API route handlers (GET, POST, PUT, DELETE, PATCH)
+  - `.middleware(config?)` method for route protection and session management
+  - Single import instead of 3 separate imports
+  - Config defined once, used everywhere
+
+- **Framework-Agnostic Architecture**: All business logic moved to `packages/auth/src/server/`
+  - New `server/proxy/` utilities (handler, request, response)
+  - New `server/middleware/` utilities (processor, oauth, session, route-protection)
+  - New `server/config.ts` with framework-agnostic config types
+  - Next.js files now thin adapters (~40-50 lines, 38% smaller)
+
+- **Required Configuration**: Explicit configuration with validation
+  - `NeonAuthConfig` type with required `baseUrl` and `cookies` configuration
+  - No more implicit environment variable fallbacks
+
+### Changed
+
+- **BREAKING**: Changed `createAuthServer()` to `createNeonAuth()` with explicit config
+  - `baseUrl` and `cookies.secret` are mandatory parameters
+  - No fallback to `process.env.NEON_AUTH_BASE_URL` or other environment variables
+  - Environment variables must be explicitly passed to config objects
+
+### Removed
+
+- **BREAKING**: Removed `neonAuth()` utility function
+  - Use `auth.getSession()` from `createNeonAuth()` instead
+  - Returns consistent `{ data: session, error: null }` format
+- **BREAKING**: `authApiHandler()` and `neonAuthMiddleware()` direct exports
+  - Use `auth.handler()` from `createNeonAuth()` instead
+  - Use `auth.middleware()` from `createNeonAuth()` instead
+
+### Migration Guide
+
+#### 1. Unified Entry Point
+
+**Before:**
+```typescript
+// app/api/auth/[...path]/route.ts
+import { authApiHandler } from '@neondatabase/auth/next/server'; // ❌ No longer works
+
+export const { GET, POST } = authApiHandler();  // ❌ No longer works
+
+// middleware.ts
+import { neonAuthMiddleware } from '@neondatabase/auth/next/server'; // ❌ No longer works
+
+export default neonAuthMiddleware({       // ❌ No longer works
+  loginUrl: '/auth/sign-in',
+});
+
+
+// lib/auth/server.ts
+import { createAuthServer } from '@neondatabase/auth/next/server'; // ❌ No longer works
+
+export const authServer = createAuthServer();     // ❌ No longer works, 
+
+// app/components/header.tsx
+import { neonAuth } from '@neondatabase/auth/next/server';  // ❌ No longer works
+
+const session = await neonAuth();     // ❌ No longer works
+```
+
+**After:**
+```typescript
+
+// lib/auth/server.ts - Config once
+import { createNeonAuth } from '@neondatabase/auth/next/server';
+export const auth = createNeonAuth({
+  baseUrl: process.env.NEON_AUTH_BASE_URL!,
+  cookies: {
+    secret: process.env.NEON_AUTH_COOKIE_SECRET!,
+    sessionDataTtl: 300,       // Optional: session data cache TTL in seconds (default: 300 = 5min)
+    domain: '.example',        // Optional: for cross-subdomain cookies
+  },
+});
+
+// app/api/auth/[...path]/route.ts
+export const { GET, POST } = auth.handler();
+
+// middleware.ts
+export default auth.middleware({ loginUrl: '/auth/sign-in' });
+
+// Server Component - All methods available
+const { data: session } = await auth.getSession();
+await auth.signIn.email({ email, password });
+await auth.signOut();
+```
+
+#### 2. Migrating from `neonAuth()` to `auth.getSession()`
+
+**Before:**
+```typescript
+import { neonAuth } from '@neondatabase/auth/next/server';
+
+const session = await neonAuth();
+if (!session.user) {
+  // Not logged in
+}
+```
+
+**After:**
+```typescript
+import { auth } from '@/lib/auth/server';  // From createNeonAuth()
+
+const { data: session } = await auth.getSession();
+
+if (!session?.user) {
+  // Not logged in
+}
+```
 
 ## [0.1.0-beta.21] - 2026-01-14
 

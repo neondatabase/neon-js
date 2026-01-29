@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from "next/server"
 import { and, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { notes } from "@/lib/schema"
-import { authServer } from "@/lib/auth/server"
+import { auth } from "@/lib/auth/server"
 
 // DELETE - Delete a note by ID
 export async function DELETE(
     _: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    const { data: session } = await authServer.getSession()
+    const { data: session } = await auth.getSession()
     if (!session?.user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }

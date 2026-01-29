@@ -1,11 +1,10 @@
-import { getCookieSecret } from './signer';
 import type { RequireSessionData, SessionData, SessionDataCookie } from '@/server/types';
 import { validateSessionData } from './validator';
 import { parseCookies } from 'better-auth/cookies';
 import { SignJWT } from 'jose';
 
-// 5-minute TTL for session data cookie
-const SESSION_CACHE_TTL_MS = 5 * 60 * 1000;
+// Default 5-minute TTL for session data cookie (in seconds)
+export const DEFAULT_SESSION_CACHE_TTL_SECONDS = 300;
 const JWS_ALGO = 'HS256';
 
 /**
@@ -20,26 +19,23 @@ function parseDate(dateValue: unknown, fieldName: string): Date {
   return date;
 }
 
-/**
- * Check if session caching is enabled (secret is configured)
- */
-export function isSessionCacheEnabled(): boolean {
-  return process.env.NEON_AUTH_COOKIE_SECRET !== undefined;
-}
 
 /**
  * Convert session data from /get-session into a signed cookie
  * @param sessionData - Session and user data from Auth server
+ * @param secret - Secret for signing the cookie
+ * @param ttlSeconds - Time-to-live in seconds (default: 300 = 5 minutes)
  * @returns Signed session data cookie
  */
 export async function signSessionDataCookie(
-  sessionData: RequireSessionData
+  sessionData: RequireSessionData,
+  secret: string,
+  ttlSeconds: number = DEFAULT_SESSION_CACHE_TTL_SECONDS
 ): Promise<SessionDataCookie> {
-  const secret = getCookieSecret();
-
+  const ttlMs = ttlSeconds * 1000;
   const expiresAt = Math.min(
     sessionData.session.expiresAt.getTime(),
-    Date.now() + SESSION_CACHE_TTL_MS
+    Date.now() + ttlMs
   );
 
   const value = await signPayload(sessionData, expiresAt, secret);
@@ -118,30 +114,28 @@ export function parseSessionData(json: unknown): SessionData {
  *
  * @param request - Request object with cookie header
  * @param cookieName - Name of session data cookie
+ * @param cookieSecret - cookie secret for validation
  * @returns SessionData or null on validation failure
  */
 export async function getSessionDataFromCookie(
   request: Request,
-  cookieName: string
+  cookieName: string,
+  cookieSecret: string
 ): Promise<SessionData | null> {
   try {
-    // Extract cookie header
     const cookieHeader = request.headers.get('cookie');
     if (!cookieHeader) {
-      return null; // No cookies - expected case
+      return null;
     }
 
-    // Parse cookie header
     const parsedCookies = parseCookies(cookieHeader);
     const sessionDataCookie = parsedCookies.get(cookieName);
-
     if (!sessionDataCookie) {
-      return null; // Cookie not present - expected case
+      return null;
     }
 
     // Validate cookie signature and expiry
-    const result = await validateSessionData(sessionDataCookie);
-
+    const result = await validateSessionData(sessionDataCookie, cookieSecret);
     if (result.valid && result.payload) {
       return result.payload; // Valid cookie
     }
@@ -150,7 +144,6 @@ export async function getSessionDataFromCookie(
     console.warn('[getSessionDataFromCookie] Invalid session cookie:', {
       error: result.error,
       cookieName,
-      // Don't log cookie value for security
     });
 
     return null;

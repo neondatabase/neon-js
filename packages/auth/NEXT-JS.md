@@ -45,28 +45,48 @@ NEON_AUTH_COOKIE_SECRET=your-secret-at-least-32-characters-long
 openssl rand -base64 32
 ```
 
-### 3. Create an Auth Handler
+### 3. Setting up auth server
 
-To integrate Neon Auth with Next.js, mount the auth handler to an API route. Create a route file inside `/api/auth/[...path]` directory:
+The `createNeonAuth()` function provides a single entry point for all server-side functionalities:
+
+1. A auth route handler to proxy API calls from frontend client
+2. A middleware to verify session and protect application routes
+3. Auth APIs to be consumed from React server components and application API handlers
+
+```typescript
+// lib/auth/server.ts
+import { createNeonAuth } from '@neondatabase/auth/next/server';
+
+export const auth = createNeonAuth({
+  baseUrl: process.env.NEON_AUTH_BASE_URL!,
+  cookies: {
+    secret: process.env.NEON_AUTH_COOKIE_SECRET!,
+    sessionDataTtl: 300,          // Optional: session data cache TTL in seconds (default: 300 = 5 min)
+    domain: ".example.com",        // Optional: for cross-subdomain cookies
+  },
+});
+```
+
+**API Route Handler:**
+
+Create a route file inside `/api/auth/[...path]` directory with following content:
 
 ```typescript
 // app/api/auth/[...path]/route.ts
-import { authApiHandler } from "@neondatabase/auth/next/server"
+import { auth } from '@/lib/auth/server';
 
-export const { GET, POST } = authApiHandler()
+export const { GET, POST } = auth.handler();
 ```
 
-### 4. Set Up Middleware (Optional)
+**Proxy:**
 
-Create a `middleware.ts` file in your project root to protect routes and handle session validation:
+Create a `proxy.ts` file in your project root to protect routes and handle session validation:
 
 ```typescript
-// middleware.ts
-import { neonAuthMiddleware } from "@neondatabase/auth/next/server"
+// proxy.ts
+import { auth } from '@/lib/auth/server';
 
-export default neonAuthMiddleware({
-  loginUrl: "/auth/sign-in",
-})
+export default auth.middleware({ loginUrl: '/auth/sign-in' });
 
 export const config = {
   matcher: [
@@ -76,25 +96,51 @@ export const config = {
 }
 ```
 
-### 5. Create the Auth Client
+**Server Components:**
+```typescript
+// app/dashboard/page.tsx
+import { auth } from '@/lib/auth/server';
+
+// Server components using `auth` methods must be rendered dynamically
+export const dynamic = 'force-dynamic'
+
+export default async function Page() {
+  const { data: session } = await auth.getSession();
+  if (!session?.user) return <div>Not logged in</div>;
+  return <div>Hello {session.user.name}</div>;
+}
+```
+
+**Server Actions:**
+```typescript
+'use server';
+import { auth } from '@/lib/auth/server';
+import { redirect } from 'next/navigation';
+
+export async function signIn(formData: FormData) {
+  const { error } = await auth.signIn.email({
+    email: formData.get('email') as string,
+    password: formData.get('password') as string,
+  });
+  if (error) return { error: error.message };
+  redirect('/dashboard');
+}
+```
+
+### 4. Create the Auth Client
 
 Create a client instance that can be used in client components to sign up, sign in, and perform other auth-related actions:
 
 ```typescript
-// lib/auth-client.ts
+// lib/auth/client.ts
 "use client"
 
 import { createAuthClient } from "@neondatabase/auth/next"
 
 export const authClient = createAuthClient()
-
-// Or with anonymous access for unauthenticated users
-export const authClient = createAuthClient({
-  allowAnonymous: true, // Enable anonymous token for RLS
-})
 ```
 
-### 6. Set Up the Neon Auth UI Provider
+### 5. Set Up the Neon Auth UI Provider
 
 Create a providers component and wrap your application with `NeonAuthUIProvider`:
 
@@ -107,7 +153,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import type { ReactNode } from "react"
 
-import { authClient } from "@/lib/auth-client"
+import { authClient } from "@/lib/auth/client"
 
 export function Providers({ children }: { children: ReactNode }) {
   const router = useRouter()
@@ -157,7 +203,7 @@ export default function RootLayout({
 }
 ```
 
-### 7. Import CSS Styles
+### 6. Import CSS Styles
 
 Choose the import method based on your project setup:
 
@@ -184,7 +230,7 @@ If your project already uses Tailwind CSS v4, import the Tailwind-ready CSS to a
 
 This imports only the theme variables and component scanning directive. Your Tailwind build will generate the necessary utility classes, avoiding duplication with your existing Tailwind setup.
 
-### 8. Create Auth Pages
+### 7. Create Auth Pages
 
 #### Auth Page (Sign In, Sign Up, etc.)
 
@@ -289,14 +335,14 @@ export default async function OrganizationPage({
 
 ### React Server Components
 
-Use the `neonAuth()` function to access session and user data in React Server Components:
+Use the `auth.getSession()` function to access session and user data in React Server Components:
 
 ```typescript
 // app/components/session-card.tsx
-import { neonAuth } from "@neondatabase/auth/next/server"
+import { auth } from "@/lib/auth/server"
 
 export async function SessionCard() {
-  const { session, user } = await neonAuth()
+  const { session, user } = await auth.getSession()
   const isLoggedIn = !!session && !!user
 
   if (!isLoggedIn) {
@@ -322,7 +368,7 @@ For client components, use the `authClient.useSession()` hook:
 // app/dashboard/page.tsx
 "use client"
 
-import { authClient } from "@/lib/auth-client"
+import { authClient } from "@/lib/auth/client"
 
 export default function DashboardPage() {
   const { data: session, isPending } = authClient.useSession()
@@ -345,26 +391,18 @@ export default function DashboardPage() {
 }
 ```
 
-## Server-Side Auth Operations
-
-For Server Actions, Route Handlers, and other server-side auth operations, use `createAuthServer()` from `@neondatabase/auth/next/server`:
-
-```typescript
-// lib/auth/server.ts
-import { createAuthServer } from '@neondatabase/auth/next/server';
-export const authServer = createAuthServer();
-```
-
 ### Server Action Example
+
+For Server Actions, Route Handlers, and other server-side auth operations, use API methods through `auth` instance from `@/lib/auth/server`:
 
 ```typescript
 // app/actions.ts
 'use server';
-import { authServer } from '@/lib/auth/server';
+import { auth } from '@/lib/auth/server';
 import { redirect } from 'next/navigation';
 
 export async function signIn(formData: FormData) {
-  const { error } = await authServer.signIn.email({
+  const { error } = await auth.signIn.email({
     email: formData.get('email') as string,
     password: formData.get('password') as string,
   });
@@ -373,14 +411,14 @@ export async function signIn(formData: FormData) {
 }
 
 export async function signOut() {
-  await authServer.signOut();
+  await auth.signOut();
   redirect('/auth/sign-in');
 }
 ```
 
 ### Available APIs
 
-The `authServer` provides access to all Neon Auth APIs:
+The `auth` provides access to all Neon Auth APIs:
 
 - **Session**: `getSession()`, `listSessions()`, `revokeSession()`, `revokeOtherSessions()`
 - **Auth**: `signIn.email()`, `signIn.social()`, `signIn.emailOtp()`, `signUp.email()`, `signOut()`
@@ -413,9 +451,11 @@ app/
 └── globals.css               # Global styles with Neon Auth CSS
 
 lib/
-└── auth-client.ts            # Auth client instance
+└── auth
+│   └── client.ts              # Auth client instance
+│   └── server.ts              # Auth server instance
 
-middleware.ts                 # Route protection
+proxy.ts                       # Next.js middleware for session validation and route protection
 ```
 
 ## Learn More
