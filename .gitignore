@@ -23,3 +23,9 @@ e2e/blob-report/
 
 # Auth state (may contain tokens)
 playwright/.auth/
+
+.env*
+!.env*.example
+
+# SSL certificates (local development only)
+certs/
