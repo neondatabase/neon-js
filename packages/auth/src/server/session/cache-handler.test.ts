@@ -43,7 +43,7 @@ describe('trySessionCache', () => {
 
     const request = new Request('https://example.com/api/auth/get-session', {
       headers: {
-        Cookie: `__Secure-neon-auth.local.session_data=${cookie.value}`,
+        Cookie: `__Secure-neon-auth.session_token=some-token; __Secure-neon-auth.local.session_data=${cookie.value}`,
       },
     });
 
@@ -97,7 +97,7 @@ describe('trySessionCache', () => {
 
     const request = new Request('https://example.com/api/auth/get-session', {
       headers: {
-        Cookie: `__Secure-neon-auth.local.session_data=${cookie.value}`,
+        Cookie: `__Secure-neon-auth.session_token=some-token; __Secure-neon-auth.local.session_data=${cookie.value}`,
       },
     });
 
@@ -177,7 +177,7 @@ describe('trySessionCache', () => {
 
     const request = new Request('https://example.com/api/auth/get-session', {
       headers: {
-        Cookie: `other=value; __Secure-neon-auth.local.session_data=${cookie.value}; another=123`,
+        Cookie: `other=value; __Secure-neon-auth.session_token=some-token; __Secure-neon-auth.local.session_data=${cookie.value}; another=123`,
       },
     });
 
@@ -209,7 +209,7 @@ describe('trySessionCache', () => {
 
     const request = new Request('https://example.com/api/auth/get-session?disableCookieCache=false', {
       headers: {
-        Cookie: `__Secure-neon-auth.local.session_data=${cookie.value}`,
+        Cookie: `__Secure-neon-auth.session_token=some-token; __Secure-neon-auth.local.session_data=${cookie.value}`,
       },
     });
 
