@@ -54,9 +54,11 @@ const localReporters = [
 
 export default defineConfig({
   testDir: './tests',
-  // Filter tests based on app - Next.js only runs auth-flow tests (no Todos)
+  // Filter tests based on app - React app has todos tests, Next.js has notes/account/org tests
   testMatch:
-    targetApp === 'nextjs-neon-auth' ? '**/auth-flow.spec.ts' : '**/*.spec.ts',
+    targetApp === 'nextjs-neon-auth'
+      ? '**/{auth-flow,account-settings,organizations,notes}.spec.ts'
+      : '**/*.spec.ts',
 
   // Parallel execution - 2 workers balances speed and stability
   fullyParallel: true,
