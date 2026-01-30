@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  # Main application (port 3000)
+  main-app:
+    build:
+      context: ../..
+      dockerfile: examples/nextjs-neon-auth/Dockerfile
+      args:
+        - APP_DIR=examples/nextjs-neon-auth
+    ports:
+      - "3000:3000"
+    environment:
+      - NEON_AUTH_BASE_URL=${NEON_AUTH_BASE_URL}
+      - NEON_AUTH_COOKIE_SECRET=${NEON_AUTH_COOKIE_SECRET}
+      - COOKIE_DOMAIN=${COOKIE_DOMAIN}
+      - DATABASE_URL=${DATABASE_URL}
+    networks:
+      neon-network:
+        aliases:
+          - app.myapp.local
+    extra_hosts:
+      - "myapp.local:127.0.0.1"
+      - "app.myapp.local:127.0.0.1"
+      - "admin.myapp.local:127.0.0.1"
+
+  # Admin portal (port 3001)
+  admin-portal:
+    build:
+      context: ../..
+      dockerfile: examples/nextjs-admin-portal/Dockerfile
+      args:
+        - APP_DIR=examples/nextjs-admin-portal
+    ports:
+      - "3001:3001"
+    environment:
+      - NEON_AUTH_BASE_URL=${NEON_AUTH_BASE_URL}
+      - NEON_AUTH_COOKIE_SECRET=${NEON_AUTH_COOKIE_SECRET}
+      - COOKIE_DOMAIN=${COOKIE_DOMAIN}
+      - MAIN_APP_URL=${MAIN_APP_URL}
+    networks:
+      neon-network:
+        aliases:
+          - admin.myapp.local
+    extra_hosts:
+      - "myapp.local:127.0.0.1"
+      - "app.myapp.local:127.0.0.1"
+      - "admin.myapp.local:127.0.0.1"
+
+  # Nginx reverse proxy for subdomain routing
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    networks:
+      - neon-network
+    depends_on:
+      - main-app
+      - admin-portal
+
+networks:
+  neon-network:
+    driver: bridge
