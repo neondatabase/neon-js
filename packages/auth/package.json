@@ -16,7 +16,8 @@
     "better-auth",
     "supabase",
     "react",
-    "nextjs"
+    "nextjs",
+    "tanstack-start"
   ],
   "homepage": "https://github.com/neondatabase/neon-js/tree/main/packages/auth#readme",
   "bugs": {
@@ -75,6 +76,14 @@
       "types": "./dist/next/server/index.d.mts",
       "default": "./dist/next/server/index.mjs"
     },
+    "./tanstack/start": {
+      "types": "./dist/tanstack/start/index.d.mts",
+      "default": "./dist/tanstack/start/index.mjs"
+    },
+    "./tanstack/start/server": {
+      "types": "./dist/tanstack/start/server/index.d.mts",
+      "default": "./dist/tanstack/start/server/index.mjs"
+    },
     "./ui/css": {
       "types": "./dist/ui/css.d.ts",
       "default": "./dist/ui/css.css"
@@ -119,7 +128,9 @@
   "peerDependencies": {
     "react": ">=18.0.0",
     "react-dom": ">=18.0.0",
-    "next": ">=16.0.6"
+    "next": ">=16.0.6",
+    "@tanstack/react-start": ">=1.0.0",
+    "@tanstack/react-router": ">=1.0.0"
   },
   "peerDependenciesMeta": {
     "react": {
@@ -129,6 +140,12 @@
       "optional": true
     },
     "next": {
+      "optional": true
+    },
+    "@tanstack/react-start": {
+      "optional": true
+    },
+    "@tanstack/react-router": {
       "optional": true
     }
   }

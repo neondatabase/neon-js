@@ -20,9 +20,17 @@ export default defineConfig(
 
       'src/next/index.ts',
       'src/next/server/index.ts',
+
+      'src/tanstack/start/index.ts',
+      'src/tanstack/start/server/index.ts',
     ],
     skipNodeModulesBundle: true,
     noExternal: ['@neondatabase/internal'],
+    external: [
+      '@tanstack/react-start',
+      '@tanstack/react-start/server',
+      '@tanstack/react-router',
+    ],
     plugins: [
       preserveDirectives({
         clientPackages: ['@neondatabase/auth-ui'],
