@@ -10,7 +10,7 @@
   ],
   "scripts": {
     "link:neon-js": "cd packages/auth && bun link && cd ../postgrest-js && bun link && cd ../auth-ui && bun link && cd ../neon-js && bun link",
-    "build": "bun run --filter '@neondatabase/internal' build && bun run --filter '@neondatabase/postgrest-js' build && bun run --filter '@neondatabase/auth-ui' build && bun run --filter '@neondatabase/auth' build && bun run --filter '@neondatabase/neon-js' build",
+    "build": "bun run --filter '@neondatabase/internal' build && bun run --filter '@neondatabase/postgrest-js' build && bun run --filter '@neondatabase/auth' build && bun run --filter '@neondatabase/auth-ui' build && bun run --filter '@neondatabase/neon-js' build",
     "dev": "bun run --filter '@neondatabase/postgrest-js' dev & bun run --filter '@neondatabase/auth' dev & bun run --filter '@neondatabase/auth-ui' dev & bun run --filter '@neondatabase/neon-js' dev",
     "test": "bun run --filter '@neondatabase/postgrest-js' test && bun run --filter '@neondatabase/auth' test && bun run --filter '@neondatabase/auth-ui' test && bun run --filter '@neondatabase/neon-js' test",
     "test:node": "bun run --filter '@neondatabase/postgrest-js' test:node && bun run --filter '@neondatabase/auth' test:node && bun run --filter '@neondatabase/auth-ui' test:node && bun run --filter '@neondatabase/neon-js' test:node",
@@ -42,7 +42,7 @@
     "publint": "0.3.16",
     "tsdown": "0.17.0",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.53.0",
+    "typescript-eslint": "^8.54.0",
     "vite-tsconfig-paths": "5.1.4",
     "vitest": "4.0.7"
   },

@@ -5,6 +5,6 @@ export type {
   NeonAuthAdapter,
   NeonAuthConfig,
   NeonAuthPublicApi,
-  ReactBetterAuthClient,
-  VanillaBetterAuthClient,
 } from './neon-auth';
+
+export { type VanillaBetterAuthClient, type ReactBetterAuthClient } from './types';
