@@ -11,7 +11,7 @@ import {
 import { parseSetCookies, parseCookieValue } from '@/server/utils/cookies';
 import { validateSessionData } from '@/server/session/validator';
 import { NEON_AUTH_SESSION_COOKIE_NAME, NEON_AUTH_SESSION_DATA_COOKIE_NAME } from './constants';
-import { mintSessionData } from './proxy';
+import { mintSessionDataFromResponse } from './session/minting';
 
 export interface NeonAuthServerConfig {
   baseUrl: string;
@@ -80,11 +80,15 @@ export function createAuthServerInternal(
 
       // Mint session data cookie if session_token was set
       try {
-        const sessionDataCookie = await mintSessionData(response.headers, baseUrl, {
-          secret: cookieSecret,
-          sessionDataTtl,
-          domain,
-        });
+        const sessionDataCookie = await mintSessionDataFromResponse(
+          response.headers,
+          baseUrl,
+          {
+            secret: cookieSecret,
+            sessionDataTtl,
+            domain,
+          }
+        );
 
         if (sessionDataCookie) {
           // Parse the Set-Cookie string to extract cookie details

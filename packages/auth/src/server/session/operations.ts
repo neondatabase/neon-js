@@ -160,3 +160,53 @@ export async function getSessionDataFromCookie(
     return null; // Fallback to API call
   }
 }
+
+/**
+ * Fetch session data from upstream using session token cookie
+ *
+ * @param sessionTokenCookie - Session token cookie string (can be Set-Cookie header or "name=value" format)
+ * @param baseUrl - Auth server base URL
+ * @returns Session data from upstream
+ */
+export async function fetchSessionWithCookie(
+  sessionTokenCookie: string,
+  baseUrl: string
+): Promise<SessionData> {
+  // Parse cookie value - handle both Set-Cookie header format and simple "name=value" format
+  let cookieName: string;
+  let cookieValue: string;
+
+  if (sessionTokenCookie.includes('=')) {
+    // Extract name and value from cookie string
+    const parts = sessionTokenCookie.split(';')[0].trim(); // Get first part before any attributes
+    const [name, ...valueParts] = parts.split('=');
+    cookieName = name.trim();
+    cookieValue = valueParts.join('=').trim(); // Rejoin in case value contains '='
+  } else {
+    throw new Error('Invalid session token cookie format');
+  }
+
+  if (!cookieName.includes('session_token')) {
+    throw new Error('session_token not found in cookie');
+  }
+
+  const response = await fetch(`${baseUrl}/get-session`, {
+    headers: {
+      Cookie: `${cookieName}=${cookieValue}`,
+    },
+    signal: AbortSignal.timeout(3000), // 3s timeout
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch session data: ${response.status} ${response.statusText}`);
+  }
+
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch (error) {
+    throw new Error(`Failed to parse /get-session response as JSON: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  return parseSessionData(body);
+}

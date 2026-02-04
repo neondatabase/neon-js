@@ -5,8 +5,13 @@ import type { RequireSessionData } from '@/server/types';
 import type { BetterAuthSession, BetterAuthUser } from '@/core/better-auth-types';
 
 const TEST_SECRET = 'test-secret-at-least-32-characters-long!';
+const TEST_BASE_URL = 'https://auth.example.com';
 const TEST_USER_ID = 'user-123';
 const TEST_EMAIL = 'test@example.com';
+const TEST_COOKIE_CONFIG = {
+  secret: TEST_SECRET,
+  sessionDataTtl: 300,
+};
 
 const createTestSessionData = (expiresAt: Date = new Date(Date.now() + 3_600_000)): RequireSessionData => {
   return {
@@ -47,7 +52,7 @@ describe('trySessionCache', () => {
       },
     });
 
-    const response = await trySessionCache(request, TEST_SECRET);
+    const response = await trySessionCache(request, TEST_BASE_URL, TEST_COOKIE_CONFIG);
 
     expect(response).not.toBe(null);
     expect(response?.status).toBe(200);
@@ -62,7 +67,7 @@ describe('trySessionCache', () => {
   test('returns null when cookie is missing (cache miss)', async () => {
     const request = new Request('https://example.com/api/auth/get-session');
 
-    const response = await trySessionCache(request, TEST_SECRET);
+    const response = await trySessionCache(request, TEST_BASE_URL, TEST_COOKIE_CONFIG);
 
     expect(response).toBe(null);
   });
@@ -77,7 +82,7 @@ describe('trySessionCache', () => {
       },
     });
 
-    const response = await trySessionCache(request, TEST_SECRET);
+    const response = await trySessionCache(request, TEST_BASE_URL, TEST_COOKIE_CONFIG);
 
     expect(response).toBe(null);
   });
@@ -101,7 +106,7 @@ describe('trySessionCache', () => {
       },
     });
 
-    const response = await trySessionCache(request, TEST_SECRET);
+    const response = await trySessionCache(request, TEST_BASE_URL, TEST_COOKIE_CONFIG);
 
     // With valid cookie, should return the session
     expect(response).not.toBe(null);
@@ -114,7 +119,7 @@ describe('trySessionCache', () => {
       },
     });
 
-    const response = await trySessionCache(request, TEST_SECRET);
+    const response = await trySessionCache(request, TEST_BASE_URL, TEST_COOKIE_CONFIG);
 
     expect(response).toBe(null);
   });
@@ -133,7 +138,7 @@ describe('trySessionCache', () => {
       },
     });
 
-    const response = await trySessionCache(request, TEST_SECRET);
+    const response = await trySessionCache(request, TEST_BASE_URL, TEST_COOKIE_CONFIG);
 
     expect(response).toBe(null);
   });
@@ -149,7 +154,7 @@ describe('trySessionCache', () => {
       },
     });
 
-    const response = await trySessionCache(request, TEST_SECRET);
+    const response = await trySessionCache(request, TEST_BASE_URL, TEST_COOKIE_CONFIG);
 
     expect(response).toBe(null);
   });
@@ -166,7 +171,7 @@ describe('trySessionCache', () => {
       },
     });
 
-    const response = await trySessionCache(request, wrongSecret);
+    const response = await trySessionCache(request, TEST_BASE_URL, { secret: wrongSecret });
 
     expect(response).toBe(null);
   });
@@ -181,7 +186,7 @@ describe('trySessionCache', () => {
       },
     });
 
-    const response = await trySessionCache(request, TEST_SECRET);
+    const response = await trySessionCache(request, TEST_BASE_URL, TEST_COOKIE_CONFIG);
 
     expect(response).not.toBe(null);
     const data = await response!.json();
@@ -198,7 +203,7 @@ describe('trySessionCache', () => {
       },
     });
 
-    const response = await trySessionCache(request, TEST_SECRET);
+    const response = await trySessionCache(request, TEST_BASE_URL, TEST_COOKIE_CONFIG);
 
     expect(response).toBe(null);
   });
@@ -213,7 +218,7 @@ describe('trySessionCache', () => {
       },
     });
 
-    const response = await trySessionCache(request, TEST_SECRET);
+    const response = await trySessionCache(request, TEST_BASE_URL, TEST_COOKIE_CONFIG);
 
     expect(response).not.toBe(null);
   });
