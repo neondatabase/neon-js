@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Reactive Session Minting**: `session_data` cookie is now automatically minted when missing, expired, or invalid
+  - Middleware and session handlers now propagate newly minted cookies in response headers
+  - Test coverage added for reactive minting scenarios
+
+
+
+## [0.2.0-beta.1] - 2026-01-29
+
 ### Added
 
 - **Session Data Caching**: Next.js SDK now caches session details with `session_data` cookie. 
