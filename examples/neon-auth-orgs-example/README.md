@@ -1,6 +1,6 @@
 # Multi-Tenant Todo App with Neon Auth & Organizations
 
-![Example](example.gif)
+![Example](https://raw.githubusercontent.com/thekauer/neon-auth-orgs-example/main/example.gif)
 
 A multi-tenant todo app using **Neon Auth** for authentication and the **Organizations plugin** for team management. Every todo is scoped to an organization, and members can be invited, have their roles changed, or be removed.
 
@@ -24,15 +24,15 @@ A multi-tenant todo app using **Neon Auth** for authentication and the **Organiz
 
 ### Prerequisites
 
-- Node.js 18+
+- [Bun](https://bun.sh) (or Node.js 18+)
 - A [Neon](https://neon.tech) project with **Neon Auth** and the **Organizations plugin** enabled
 
-### 1. Clone and install
+### 1. Install dependencies
+
+From the monorepo root:
 
 ```bash
-git clone <repo-url>
-cd neon-auth-orgs-example
-npm install
+bun install
 ```
 
 ### 2. Configure environment variables
@@ -52,7 +52,7 @@ DATABASE_URL=postgresql://neondb_owner:<password>@<endpoint>-pooler.c-4.us-east-
 ### 3. Push the database schema
 
 ```bash
-npx drizzle-kit push
+bunx drizzle-kit push
 ```
 
 This creates the `todo` table. The `neon_auth` schema (organizations, members, invitations) is managed automatically by Neon Auth.
@@ -60,7 +60,7 @@ This creates the `todo` table. The `neon_auth` schema (organizations, members, i
 To pull the `neon_auth` schema into Drizzle for type-safe access (used by the admin endpoint):
 
 ```bash
-npx drizzle-kit pull
+bunx drizzle-kit pull
 ```
 
 This works because `drizzle.config.ts` includes `schemaFilter: ["public", "neon_auth"]`.
@@ -68,7 +68,7 @@ This works because `drizzle.config.ts` includes `schemaFilter: ["public", "neon_
 ### 4. Run the dev server
 
 ```bash
-npm run dev
+bun run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000). You'll be redirected to sign in via email OTP, then land on the dashboard.
@@ -84,10 +84,10 @@ To use the admin org creation endpoint, set a user's role to `"admin"` in the Ne
 ### Dependencies
 
 ```bash
-npm install @neondatabase/auth @neondatabase/serverless
+bun add @neondatabase/auth @neondatabase/serverless
 ```
 
-The auth package is `@neondatabase/auth` (currently `0.2.0-beta.1`). The serverless driver (`@neondatabase/serverless`) is used for database access over HTTP.
+The auth package is `@neondatabase/auth` (used as a workspace dependency). The serverless driver (`@neondatabase/serverless`) is used for database access over HTTP.
 
 ### Environment Variables
 
@@ -205,7 +205,7 @@ export default defineConfig({
 });
 ```
 
-Run `npx drizzle-kit push` to sync the schema to the database.
+Run `bunx drizzle-kit push` to sync the schema to the database.
 
 ---
 
@@ -230,7 +230,7 @@ By default Drizzle only sees the `public` schema. Adding `"neon_auth"` tells it 
 ### Step 2. Pull the schema
 
 ```bash
-npx drizzle-kit pull
+bunx drizzle-kit pull
 ```
 
 This introspects both schemas and generates typed table definitions in `drizzle/schema.ts` — including all `neon_auth` tables (`organization`, `member`, `invitation`, `user`, `session`, `jwks`, `verification`, `project_config`).
