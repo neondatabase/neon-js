@@ -9,7 +9,7 @@
  * TypeScript will error if you try to add a key that doesn't exist in VanillaBetterAuthClient.
  */
 
-import type { VanillaBetterAuthClient } from '@/neon-auth';
+import type { VanillaBetterAuthClient } from '@/types';
 
 export interface EndpointConfig {
   path: string;

@@ -7,6 +7,7 @@ import * as response from './response';
 
 const TEST_SECRET = 'test-secret-at-least-32-characters-long!';
 const BASE_URL = 'https://auth.example.com';
+const TEST_BASE_URL = BASE_URL;
 
 const createTestConfig = (overrides?: Partial<AuthProxyConfig>): AuthProxyConfig => ({
   request: new Request('https://app.com/api/auth/get-session'),
@@ -40,7 +41,11 @@ describe('handleAuthProxyRequest', () => {
 
       const result = await handleAuthProxyRequest(config);
 
-      expect(trySessionCacheSpy).toHaveBeenCalledWith(config.request, TEST_SECRET);
+      expect(trySessionCacheSpy).toHaveBeenCalledWith(config.request, TEST_BASE_URL, {
+        secret: TEST_SECRET,
+        sessionDataTtl: undefined,
+        domain: undefined,
+      });
       expect(result).toBe(cachedResponse);
       // Should NOT call upstream on cache hit
       expect(handleAuthRequestSpy).not.toHaveBeenCalled();

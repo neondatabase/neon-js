@@ -18,6 +18,24 @@ export * from 'better-auth/types';
 // Error types
 export type { BetterFetchError } from '@better-fetch/fetch';
 
+/**
+ * Type representing the Better Auth React client
+ */
+export type ReactBetterAuthClient = ReturnType<
+  typeof createReactAuthClient<{
+    plugins: SupportedBetterAuthClientPlugins;
+  }>
+>;
+
+/**
+ * Type representing the Better Auth Vanilla client
+ */
+export type VanillaBetterAuthClient = ReturnType<
+  typeof createVanillaAuthClient<{
+    plugins: SupportedBetterAuthClientPlugins;
+  }>
+>;
+
 // ============================================
 // Plugin types (all supported plugins)
 // ============================================
@@ -62,14 +80,7 @@ export type { EmailOTPOptions } from 'better-auth/plugins/email-otp';
 // ============================================
 // Backwards compatibility aliases
 // ============================================
-export type BetterAuthInstance = ReturnType<
-  | typeof createVanillaAuthClient<{
-      plugins: SupportedBetterAuthClientPlugins;
-    }>
-  | typeof createReactAuthClient<{
-      plugins: SupportedBetterAuthClientPlugins;
-    }>
->;
+export type BetterAuthInstance = VanillaBetterAuthClient | ReactBetterAuthClient;
 
 export {
   type BetterAuthErrorResponse,

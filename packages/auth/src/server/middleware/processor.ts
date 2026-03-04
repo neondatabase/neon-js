@@ -11,7 +11,7 @@ import { serializeSetCookie } from '../utils/cookies';
  * Result of middleware processing (framework-agnostic decision)
  */
 export type MiddlewareResult =
-	| { action: 'allow'; headers?: Record<string, string> }
+	| { action: 'allow'; headers?: Record<string, string>; cookies?: string[] }
 	| { action: 'redirect_oauth'; redirectUrl: URL; cookies: string[] }
 	| { action: 'redirect_login'; redirectUrl: URL; cookies?: string[] };
 
@@ -100,6 +100,7 @@ export async function processAuthMiddleware(
 	const hasStaleSessionData = hasSessionData && !hasSessionToken;
 
 	let sessionData: SessionData = { session: null, user: null };
+	let sessionCookies: string[] = [];
 
 	if (hasSessionToken) {
 		// Session token present - get session by calling handleAuthProxyRequest
@@ -120,6 +121,9 @@ export async function processAuthMiddleware(
 				sessionData = data as SessionData;
 			}
 		}
+
+		// Extract Set-Cookie headers (e.g., minted session_data cookie)
+		sessionCookies = sessionResponse.headers.getSetCookie();
 	}
 
 	// Check if session is required for this route
@@ -132,6 +136,7 @@ export async function processAuthMiddleware(
 			headers: {
 				[NEON_AUTH_HEADER_MIDDLEWARE_NAME]: 'true',
 			},
+			cookies: sessionCookies,
 		};
 	}
 

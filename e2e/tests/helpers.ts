@@ -66,3 +66,80 @@ export async function expectLoggedIn(page: Page): Promise<void> {
     timeout: 10_000,
   });
 }
+
+/**
+ * Navigate to account settings page
+ */
+export async function navigateToAccountSettings(page: Page): Promise<void> {
+  await page.goto('/account/settings');
+  await expect(page).toHaveURL('/account/settings');
+}
+
+/**
+ * Update user name in account settings
+ */
+export async function updateUserName(page: Page, newName: string): Promise<void> {
+  // Better Auth UI uses heading "Name" followed by input with specific placeholder text
+  // The input field already contains "Test User" - select all and replace
+  const nameInput = page.locator('input[value="Test User"]').first();
+
+  // Triple-click to select all text, then type to replace
+  await nameInput.click({ clickCount: 3 });
+  await nameInput.fill(newName);
+
+  // Click the Save button for the Name section
+  await page.getByRole('button', { name: /save/i }).first().click();
+
+  // Wait for success indication
+  await page.waitForTimeout(1000);
+}
+
+/**
+ * Navigate to organization settings page
+ */
+export async function navigateToOrganizationSettings(page: Page): Promise<void> {
+  await page.goto('/organization/settings');
+  await expect(page).toHaveURL('/organization/settings');
+}
+
+/**
+ * Create a new note
+ */
+export async function createNote(page: Page, noteTitle: string): Promise<void> {
+  await page.getByPlaceholder(/add a quick note/i).fill(noteTitle);
+
+  // Click the add button (Plus icon)
+  await page.locator('button[type="submit"]').click();
+
+  // Wait for note to be added
+  await expect(page.getByText(noteTitle)).toBeVisible({ timeout: 5_000 });
+}
+
+/**
+ * Delete a note by title
+ */
+export async function deleteNote(page: Page, noteTitle: string): Promise<void> {
+  // Find the note item and hover to show delete button
+  const noteItem = page.locator('.group.flex').filter({ hasText: noteTitle });
+  await noteItem.hover();
+
+  // Click the delete button (Trash icon)
+  await noteItem.getByRole('button').last().click();
+
+  // Wait for note to be removed
+  await expect(noteItem).not.toBeVisible({ timeout: 5_000 });
+}
+
+/**
+ * Verify note exists in the list
+ */
+export async function expectNoteExists(page: Page, noteTitle: string): Promise<void> {
+  await expect(page.getByText(noteTitle)).toBeVisible({ timeout: 5_000 });
+}
+
+/**
+ * Verify note does not exist in the list
+ */
+export async function expectNoteNotExists(page: Page, noteTitle: string): Promise<void> {
+  await expect(page.getByText(noteTitle)).not.toBeVisible({ timeout: 5_000 });
+}

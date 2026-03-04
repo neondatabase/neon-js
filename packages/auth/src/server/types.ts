@@ -1,4 +1,4 @@
-import type { VanillaBetterAuthClient } from '@/neon-auth';
+import type { VanillaBetterAuthClient } from '@/types';
 import type { API_ENDPOINTS } from './endpoints';
 import type {
   BetterAuthSession as Session,

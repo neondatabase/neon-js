@@ -1,12 +1,19 @@
-import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { describe, test, expect, vi, beforeEach, beforeAll, afterAll, afterEach } from 'vitest';
+import { setupServer } from 'msw/node';
+import { http, HttpResponse } from 'msw';
 import { trySessionCache } from './cache-handler';
 import { signSessionDataCookie } from './operations';
 import type { RequireSessionData } from '@/server/types';
 import type { BetterAuthSession, BetterAuthUser } from '@/core/better-auth-types';
 
 const TEST_SECRET = 'test-secret-at-least-32-characters-long!';
+const TEST_BASE_URL = 'https://auth.example.com';
 const TEST_USER_ID = 'user-123';
 const TEST_EMAIL = 'test@example.com';
+const TEST_COOKIE_CONFIG = {
+  secret: TEST_SECRET,
+  sessionDataTtl: 300,
+};
 
 const createTestSessionData = (expiresAt: Date = new Date(Date.now() + 3_600_000)): RequireSessionData => {
   return {
@@ -32,6 +39,13 @@ const createTestSessionData = (expiresAt: Date = new Date(Date.now() + 3_600_000
   };
 };
 
+// MSW server setup for reactive minting tests
+const server = setupServer();
+
+beforeAll(() => server.listen({ onUnhandledRequest: 'warn' }));
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
+
 describe('trySessionCache', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -47,7 +61,7 @@ describe('trySessionCache', () => {
       },
     });
 
-    const response = await trySessionCache(request, TEST_SECRET);
+    const response = await trySessionCache(request, TEST_BASE_URL, TEST_COOKIE_CONFIG);
 
     expect(response).not.toBe(null);
     expect(response?.status).toBe(200);
@@ -62,7 +76,7 @@ describe('trySessionCache', () => {
   test('returns null when cookie is missing (cache miss)', async () => {
     const request = new Request('https://example.com/api/auth/get-session');
 
-    const response = await trySessionCache(request, TEST_SECRET);
+    const response = await trySessionCache(request, TEST_BASE_URL, TEST_COOKIE_CONFIG);
 
     expect(response).toBe(null);
   });
@@ -77,7 +91,7 @@ describe('trySessionCache', () => {
       },
     });
 
-    const response = await trySessionCache(request, TEST_SECRET);
+    const response = await trySessionCache(request, TEST_BASE_URL, TEST_COOKIE_CONFIG);
 
     expect(response).toBe(null);
   });
@@ -101,7 +115,7 @@ describe('trySessionCache', () => {
       },
     });
 
-    const response = await trySessionCache(request, TEST_SECRET);
+    const response = await trySessionCache(request, TEST_BASE_URL, TEST_COOKIE_CONFIG);
 
     // With valid cookie, should return the session
     expect(response).not.toBe(null);
@@ -114,7 +128,7 @@ describe('trySessionCache', () => {
       },
     });
 
-    const response = await trySessionCache(request, TEST_SECRET);
+    const response = await trySessionCache(request, TEST_BASE_URL, TEST_COOKIE_CONFIG);
 
     expect(response).toBe(null);
   });
@@ -133,7 +147,7 @@ describe('trySessionCache', () => {
       },
     });
 
-    const response = await trySessionCache(request, TEST_SECRET);
+    const response = await trySessionCache(request, TEST_BASE_URL, TEST_COOKIE_CONFIG);
 
     expect(response).toBe(null);
   });
@@ -149,7 +163,7 @@ describe('trySessionCache', () => {
       },
     });
 
-    const response = await trySessionCache(request, TEST_SECRET);
+    const response = await trySessionCache(request, TEST_BASE_URL, TEST_COOKIE_CONFIG);
 
     expect(response).toBe(null);
   });
@@ -166,7 +180,7 @@ describe('trySessionCache', () => {
       },
     });
 
-    const response = await trySessionCache(request, wrongSecret);
+    const response = await trySessionCache(request, TEST_BASE_URL, { secret: wrongSecret });
 
     expect(response).toBe(null);
   });
@@ -181,7 +195,7 @@ describe('trySessionCache', () => {
       },
     });
 
-    const response = await trySessionCache(request, TEST_SECRET);
+    const response = await trySessionCache(request, TEST_BASE_URL, TEST_COOKIE_CONFIG);
 
     expect(response).not.toBe(null);
     const data = await response!.json();
@@ -198,7 +212,7 @@ describe('trySessionCache', () => {
       },
     });
 
-    const response = await trySessionCache(request, TEST_SECRET);
+    const response = await trySessionCache(request, TEST_BASE_URL, TEST_COOKIE_CONFIG);
 
     expect(response).toBe(null);
   });
@@ -213,8 +227,243 @@ describe('trySessionCache', () => {
       },
     });
 
-    const response = await trySessionCache(request, TEST_SECRET);
+    const response = await trySessionCache(request, TEST_BASE_URL, TEST_COOKIE_CONFIG);
 
     expect(response).not.toBe(null);
+  });
+
+  describe('Reactive Minting', () => {
+    test('mints new session_data cookie when missing but session_token exists', async () => {
+      const sessionData = createTestSessionData();
+
+      // Mock upstream /get-session endpoint
+      server.use(
+        http.get(`${TEST_BASE_URL}/get-session`, ({ request }) => {
+          const cookie = request.headers.get('Cookie');
+          expect(cookie).toContain('__Secure-neon-auth.session_token=valid-token');
+          return HttpResponse.json(sessionData);
+        })
+      );
+
+      const request = new Request('https://example.com/api/auth/get-session', {
+        headers: {
+          Cookie: '__Secure-neon-auth.session_token=valid-token; Path=/; HttpOnly; Secure',
+        },
+      });
+
+      const response = await trySessionCache(request, TEST_BASE_URL, TEST_COOKIE_CONFIG);
+
+      expect(response).not.toBe(null);
+      expect(response?.status).toBe(200);
+
+      // Verify response contains session data
+      const data = await response!.json();
+      expect(data.session).toBeDefined();
+      expect(data.session.id).toBe('session-123');
+      expect(data.user.email).toBe(TEST_EMAIL);
+
+      // Verify Set-Cookie header was added for session_data
+      const setCookieHeader = response!.headers.get('Set-Cookie');
+      expect(setCookieHeader).not.toBe(null);
+      expect(setCookieHeader).toContain('__Secure-neon-auth.local.session_data=');
+      expect(setCookieHeader).toContain('HttpOnly');
+      expect(setCookieHeader).toContain('Secure');
+    });
+
+    test('mints new session_data cookie when expired', async () => {
+      const sessionData = createTestSessionData();
+      const expiredDate = new Date(Date.now() - 3_600_000); // 1 hour ago
+      const expiredSessionData = createTestSessionData(expiredDate);
+      const expiredCookie = await signSessionDataCookie(expiredSessionData, TEST_SECRET);
+
+      // Mock upstream /get-session endpoint to return fresh session
+      server.use(
+        http.get(`${TEST_BASE_URL}/get-session`, () => {
+          return HttpResponse.json(sessionData);
+        })
+      );
+
+      const request = new Request('https://example.com/api/auth/get-session', {
+        headers: {
+          Cookie: `__Secure-neon-auth.session_token=valid-token; __Secure-neon-auth.local.session_data=${expiredCookie.value}`,
+        },
+      });
+
+      const response = await trySessionCache(request, TEST_BASE_URL, TEST_COOKIE_CONFIG);
+
+      expect(response).not.toBe(null);
+      expect(response?.status).toBe(200);
+
+      // Verify fresh session data returned
+      const data = await response!.json();
+      expect(data.session).toBeDefined();
+      expect(data.session.expiresAt).not.toEqual(expiredDate.toISOString());
+
+      // Verify new Set-Cookie header was added
+      const setCookieHeader = response!.headers.get('Set-Cookie');
+      expect(setCookieHeader).not.toBe(null);
+      expect(setCookieHeader).toContain('__Secure-neon-auth.local.session_data=');
+    });
+
+    test('mints new session_data cookie when tampered/invalid', async () => {
+      const sessionData = createTestSessionData();
+      const validCookie = await signSessionDataCookie(sessionData, TEST_SECRET);
+
+      // Tamper with the signature
+      const parts = validCookie.value.split('.');
+      const tamperedValue = `${parts[0]}.${parts[1]}.${parts[2].slice(0, -1)}X`;
+
+      // Mock upstream /get-session endpoint
+      server.use(
+        http.get(`${TEST_BASE_URL}/get-session`, () => {
+          return HttpResponse.json(sessionData);
+        })
+      );
+
+      const request = new Request('https://example.com/api/auth/get-session', {
+        headers: {
+          Cookie: `__Secure-neon-auth.session_token=valid-token; __Secure-neon-auth.local.session_data=${tamperedValue}`,
+        },
+      });
+
+      const response = await trySessionCache(request, TEST_BASE_URL, TEST_COOKIE_CONFIG);
+
+      expect(response).not.toBe(null);
+      expect(response?.status).toBe(200);
+
+      // Verify fresh session data returned
+      const data = await response!.json();
+      expect(data.session).toBeDefined();
+      expect(data.session.id).toBe('session-123');
+
+      // Verify new valid Set-Cookie header was added
+      const setCookieHeader = response!.headers.get('Set-Cookie');
+      expect(setCookieHeader).not.toBe(null);
+      expect(setCookieHeader).toContain('__Secure-neon-auth.local.session_data=');
+
+      // Verify the new cookie is valid (not the tampered one)
+      const match = setCookieHeader!.match(/__Secure-neon-auth\.local\.session_data=([^;]+)/);
+      expect(match).not.toBe(null);
+      const newCookieValue = match![1];
+      expect(newCookieValue).not.toBe(tamperedValue);
+      expect(newCookieValue.split('.')).toHaveLength(3); // Valid JWT format
+    });
+
+    test('includes domain in minted cookie when domain is specified', async () => {
+      const sessionData = createTestSessionData();
+
+      server.use(
+        http.get(`${TEST_BASE_URL}/get-session`, () => {
+          return HttpResponse.json(sessionData);
+        })
+      );
+
+      const request = new Request('https://example.com/api/auth/get-session', {
+        headers: {
+          Cookie: '__Secure-neon-auth.session_token=valid-token; Path=/; HttpOnly',
+        },
+      });
+
+      const response = await trySessionCache(request, TEST_BASE_URL, {
+        ...TEST_COOKIE_CONFIG,
+        domain: '.example.com',
+      });
+
+      expect(response).not.toBe(null);
+
+      const setCookieHeader = response!.headers.get('Set-Cookie');
+      expect(setCookieHeader).not.toBe(null);
+      expect(setCookieHeader).toContain('Domain=.example.com');
+    });
+
+    test('returns null when reactive minting fails (upstream error)', async () => {
+      server.use(
+        http.get(`${TEST_BASE_URL}/get-session`, () => {
+          return HttpResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        })
+      );
+
+      const request = new Request('https://example.com/api/auth/get-session', {
+        headers: {
+          Cookie: '__Secure-neon-auth.session_token=invalid-token; Path=/; HttpOnly',
+        },
+      });
+
+      const response = await trySessionCache(request, TEST_BASE_URL, TEST_COOKIE_CONFIG);
+
+      expect(response).toBe(null);
+    });
+
+    test('returns null when reactive minting fails (network timeout)', async () => {
+      server.use(
+        http.get(`${TEST_BASE_URL}/get-session`, async () => {
+          // Simulate timeout by delaying longer than 3s (fetch has 3s timeout)
+          await new Promise((resolve) => setTimeout(resolve, 4000));
+          return HttpResponse.json({ error: 'Timeout' }, { status: 504 });
+        })
+      );
+
+      const request = new Request('https://example.com/api/auth/get-session', {
+        headers: {
+          Cookie: '__Secure-neon-auth.session_token=valid-token; Path=/; HttpOnly',
+        },
+      });
+
+      const response = await trySessionCache(request, TEST_BASE_URL, TEST_COOKIE_CONFIG);
+
+      expect(response).toBe(null);
+    });
+
+    test('does not mint when disableCookieCache=true even if session_data missing', async () => {
+      // Setup mock but it should NOT be called
+      server.use(
+        http.get(`${TEST_BASE_URL}/get-session`, () => {
+          throw new Error('Should not be called when disableCookieCache=true');
+        })
+      );
+
+      const request = new Request('https://example.com/api/auth/get-session?disableCookieCache=true', {
+        headers: {
+          Cookie: '__Secure-neon-auth.session_token=valid-token; Path=/; HttpOnly',
+        },
+      });
+
+      const response = await trySessionCache(request, TEST_BASE_URL, TEST_COOKIE_CONFIG);
+
+      expect(response).toBe(null);
+    });
+
+    test('mints cookie with correct Max-Age based on sessionDataTtl', async () => {
+      const sessionData = createTestSessionData();
+      const customTtl = 600; // 10 minutes
+
+      server.use(
+        http.get(`${TEST_BASE_URL}/get-session`, () => {
+          return HttpResponse.json(sessionData);
+        })
+      );
+
+      const request = new Request('https://example.com/api/auth/get-session', {
+        headers: {
+          Cookie: '__Secure-neon-auth.session_token=valid-token; Path=/; HttpOnly',
+        },
+      });
+
+      const response = await trySessionCache(request, TEST_BASE_URL, {
+        secret: TEST_SECRET,
+        sessionDataTtl: customTtl,
+      });
+
+      expect(response).not.toBe(null);
+
+      const setCookieHeader = response!.headers.get('Set-Cookie');
+      expect(setCookieHeader).not.toBe(null);
+      // Allow for ±2 seconds variance due to timing in JWT creation
+      const maxAgeMatch = setCookieHeader!.match(/Max-Age=(\d+)/);
+      expect(maxAgeMatch).not.toBe(null);
+      const actualMaxAge = Number.parseInt(maxAgeMatch![1], 10);
+      expect(actualMaxAge).toBeGreaterThanOrEqual(customTtl - 2);
+      expect(actualMaxAge).toBeLessThanOrEqual(customTtl);
+    });
   });
 });

@@ -1,29 +1,14 @@
-import type { createAuthClient as createReactAuthClient } from 'better-auth/react';
-import type { createAuthClient as createVanillaAuthClient } from 'better-auth/client';
+
 import { type BetterAuthReactAdapterInstance } from './adapters/better-auth-react/better-auth-react-adapter';
 import {
   BetterAuthVanillaAdapter,
   type BetterAuthVanillaAdapterInstance,
 } from './adapters/better-auth-vanilla/better-auth-vanilla-adapter';
 import { type SupabaseAuthAdapterInstance } from './adapters/supabase/supabase-adapter';
-import { type SupportedBetterAuthClientPlugins } from './core/adapter-core';
-/**
- * Type representing the Better Auth React client
- */
-export type ReactBetterAuthClient = ReturnType<
-  typeof createReactAuthClient<{
-    plugins: SupportedBetterAuthClientPlugins;
-  }>
->;
-
-/**
- * Type representing the Better Auth Vanilla client
- */
-export type VanillaBetterAuthClient = ReturnType<
-  typeof createVanillaAuthClient<{
-    plugins: SupportedBetterAuthClientPlugins;
-  }>
->;
+import type {
+  VanillaBetterAuthClient,
+  ReactBetterAuthClient,
+} from './types';
 
 /**
  * Union type of all supported auth adapter instances

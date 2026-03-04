@@ -13,7 +13,6 @@ export {
 
 export {
   handleAuthResponse,
-  mintSessionData,
 } from './response';
 
 export {

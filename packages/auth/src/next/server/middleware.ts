@@ -62,9 +62,19 @@ export function neonAuthMiddleware(config: NeonAuthMiddlewareConfig) {
       case 'allow': {
         const headers = new Headers(request.headers);
         if (result.headers) {
-          for (const [key, value] of Object.entries(result.headers)) headers.set(key, value);
+          for (const [key, value] of Object.entries(result.headers)) {
+            headers.set(key, value);
+          }
         }
-        return NextResponse.next({ request: { headers } });
+
+        const response = NextResponse.next({ request: { headers } });
+        if (result.cookies) {
+          for (const cookie of result.cookies) {
+            response.headers.append('Set-Cookie', cookie);
+          }
+        }
+
+        return response;
       }
 
       case 'redirect_oauth': {
