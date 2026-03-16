@@ -1,4 +1,15 @@
-import { pgTable, pgSchema, text, boolean, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  pgSchema,
+  text,
+  boolean,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
+
+// ---------------------------------------------------------------------------
+// App tables (public schema) — managed by `drizzle-kit push`
+// ---------------------------------------------------------------------------
 
 export const todo = pgTable("todo", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -20,8 +31,14 @@ export type Todo = typeof todo.$inferSelect;
 export type NewTodo = typeof todo.$inferInsert;
 
 // ---------------------------------------------------------------------------
-// neon_auth schema — pulled via `npx drizzle-kit pull` with
-// schemaFilter: ["public", "neon_auth"] in drizzle.config.ts
+// neon_auth schema — these tables are managed by Neon Auth, NOT by drizzle-kit push.
+//
+// The definitions below were obtained by running `drizzle-kit pull` with
+// schemaFilter: ["public", "neon_auth"] in drizzle.config.ts, then copying
+// only the tables needed for server-side operations (e.g. the admin org
+// creation endpoint) into this file.
+//
+// This file is the single source of truth for Drizzle schema in this app.
 // ---------------------------------------------------------------------------
 const neonAuth = pgSchema("neon_auth");
 
