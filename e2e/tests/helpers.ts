@@ -143,11 +143,3 @@ export async function expectNoteExists(page: Page, noteTitle: string): Promise<v
 export async function expectNoteNotExists(page: Page, noteTitle: string): Promise<void> {
   await expect(page.getByText(noteTitle)).not.toBeVisible({ timeout: 5_000 });
 }
-
-/**
- * Navigate to the magic link sign-in page and verify the form is visible
- */
-export async function navigateToMagicLink(page: Page): Promise<void> {
-  await page.goto('/auth/magic-link');
-  await expect(page.locator('form')).toBeVisible();
-}

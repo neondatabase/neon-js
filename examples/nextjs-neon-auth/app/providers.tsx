@@ -18,7 +18,6 @@ export function Providers({ children }: { children: ReactNode }) {
             onSessionChange={() => {
                 router.refresh()
             }}
-            magicLink
             emailOTP
             emailVerification
             social={{
