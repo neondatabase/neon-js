@@ -58,10 +58,10 @@ export function NeonAuthUIProvider<T extends NeonAuthAdapter>({
         */}
         <AuthUIProvider
           authClient={reactClient as unknown as AuthUIProviderProps['authClient']}
+          magicLink={false}
           {...props}
           multiSession={false}
           apiKey={false}
-          magicLink={false}
           passkey={false}
           oneTap={false}
           genericOAuth={undefined}
