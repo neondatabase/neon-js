@@ -75,6 +75,9 @@ export type {
 // Email OTP plugin
 export type { EmailOTPOptions } from 'better-auth/plugins/email-otp';
 
+// Magic Link plugin
+export type { MagicLinkOptions } from 'better-auth/plugins/magic-link';
+
 // Anonymous plugin - no additional types to export
 
 // ============================================
