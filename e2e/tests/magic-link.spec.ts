@@ -7,15 +7,18 @@ test.describe('Magic Link', () => {
 
     // Verify form renders with email input
     await expect(page.locator('form')).toBeVisible();
-    await expect(page.getByLabel(/email/i)).toBeVisible();
+    await expect(
+      page.getByRole('textbox', { name: /email/i }),
+    ).toBeVisible();
 
     // Fill email and submit
-    await page.getByLabel(/email/i).fill('test-magic-link@example.com');
-    await page.locator('button[type="submit"]').click();
+    await page.getByRole('textbox', { name: /email/i }).fill('test-magic-link@example.com');
+    await page.getByRole('button', { name: /send magic link/i }).click();
 
-    // Verify success state appears (check your email / magic link sent)
+    // After submit, better-auth-ui shows a toast via sonner.
+    // Verify the toast appears with the success message.
     await expect(
-      page.getByText(/check your email|magic link sent|email/i),
+      page.locator('[data-sonner-toast]').getByText(/check your email/i),
     ).toBeVisible({ timeout: 10_000 });
   });
 
@@ -37,10 +40,12 @@ test.describe('Magic Link', () => {
     });
 
     await page.goto('/auth/magic-link');
-    await expect(page.getByLabel(/email/i)).toBeVisible();
+    await expect(
+      page.getByRole('textbox', { name: /email/i }),
+    ).toBeVisible();
 
-    await page.getByLabel(/email/i).fill('test-magic-link-api@example.com');
-    await page.locator('button[type="submit"]').click();
+    await page.getByRole('textbox', { name: /email/i }).fill('test-magic-link-api@example.com');
+    await page.getByRole('button', { name: /send magic link/i }).click();
 
     // Wait for the request to be made
     await page.waitForTimeout(3000);
