@@ -5,8 +5,9 @@ name: Release
 # What this does (mirrors scripts/release.ts):
 #   1. Computes the cascade of packages to release (BFS over dependency graph)
 #   2. Builds and bumps the version of each package in order
-#       - The chosen package gets the selected bump type (patch/minor/major)
-#       - Reverse-dependents always get a patch bump
+#       - All packages in the cascade get the same bump type
+#         (e.g. a major bump on auth cascades as major to neon-js too,
+#          preserving the semver contract for consumers of neon-js)
 #   3. Updates bun.lock
 #   4. Publishes each package to npm with OIDC provenance attestation
 #   5. Pushes version commits and tags
@@ -28,7 +29,7 @@ on:
           - postgrest-js
           - neon-js
       bump:
-        description: 'Version bump type (reverse-dependents always get patch)'
+        description: 'Version bump type (applied to all packages in the cascade)'
         required: true
         type: choice
         options:
@@ -92,16 +93,10 @@ jobs:
             bun run --filter "@neondatabase/$pkg" build
 
             echo "Bumping version for @neondatabase/$pkg..."
-            # The chosen package gets the requested bump; reverse-dependents get patch
-            if [ "$pkg" = "${{ inputs.package }}" ]; then
-              bump="${{ inputs.bump }}"
-            else
-              bump="patch"
-            fi
 
             cd "$GITHUB_WORKSPACE/packages/$pkg"
             bunx bumpp \
-              --release "$bump" \
+              --release "${{ inputs.bump }}" \
               --tag "$pkg-v%s" \
               --commit "chore: release $pkg@v%s" \
               --no-push \
