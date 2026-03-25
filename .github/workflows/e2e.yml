@@ -44,7 +44,9 @@ permissions:
 jobs:
   # Validation job: Validates and sanitizes inputs for dispatch events
   validate:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: neondatabase-protected-runner-group
+      labels: linux-ubuntu-latest
     # Skip validation for push/PR events (they don't have dispatch payloads)
     if: github.event_name == 'repository_dispatch' || github.event_name == 'workflow_dispatch'
     outputs:
@@ -117,7 +119,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           # Use ref from dispatch events, otherwise default behavior
           ref: ${{ github.event.client_payload.ref || inputs.ref || '' }}
@@ -128,10 +130,10 @@ jobs:
           persist-credentials: ${{ github.event_name == 'repository_dispatch' }}
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
 
       - name: Cache Bun dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
@@ -143,7 +145,7 @@ jobs:
 
       - name: Restore build cache
         id: build-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             packages/internal/dist
@@ -165,7 +167,7 @@ jobs:
 
       - name: Create Neon branch
         id: create-branch
-        uses: neondatabase/create-branch-action@v6
+        uses: neondatabase/create-branch-action@72ed4f69a12b6be9c16aebfad893f6a21e9aba8b # v6
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_name: test-${{ matrix.app }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -200,7 +202,7 @@ jobs:
 
       # Cache browser binaries with restore-keys fallback
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
@@ -236,7 +238,7 @@ jobs:
       # Clean up: Delete Neon branch (runs even if tests fail)
       - name: Delete Neon branch
         if: always()
-        uses: neondatabase/delete-branch-action@v3
+        uses: neondatabase/delete-branch-action@c2005bb7d7caeba12ba3ec63857e9c9f9a4d695a # v3
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch: test-${{ matrix.app }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -246,7 +248,7 @@ jobs:
       # Upload HTML report (always, for debugging)
       - name: Upload test report
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: playwright-report-${{ matrix.app }}
           path: e2e/playwright-report/
@@ -255,7 +257,7 @@ jobs:
       # Upload screenshots/traces only on failure
       - name: Upload test artifacts
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: test-artifacts-${{ matrix.app }}
           path: e2e/test-results/
