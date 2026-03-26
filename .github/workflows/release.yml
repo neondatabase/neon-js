@@ -1,0 +1,133 @@
+name: Release
+
+# CI-based release with OIDC provenance. Replaces manual `bun scripts/release.ts`.
+#
+# What this does (mirrors scripts/release.ts):
+#   1. Computes the cascade of packages to release (BFS over dependency graph)
+#   2. Builds and bumps the version of each package in order
+#       - All packages in the cascade get the same bump type
+#         (e.g. a major bump on auth cascades as major to neon-js too,
+#          preserving the semver contract for consumers of neon-js)
+#   3. Updates bun.lock
+#   4. Publishes each package to npm with OIDC provenance attestation
+#   5. Pushes version commits and tags
+#
+# Prerequisites:
+#   - NPM_TOKEN secret: granular access token from npmjs.com with publish scope
+#     for all @neondatabase/* packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Package to release'
+        required: true
+        type: choice
+        options:
+          - auth
+          - auth-ui
+          - postgrest-js
+          - neon-js
+      bump:
+        description: 'Version bump type (applied to all packages in the cascade)'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: patch
+
+permissions:
+  contents: write  # push version bump commits and tags
+  id-token: write  # npm provenance attestation via OIDC
+
+jobs:
+  release:
+    runs-on:
+      group: neondatabase-protected-runner-group
+      labels: linux-ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0 # bumpp needs full tag history to compute next version
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # Compute the ordered list of packages to release.
+      # Dependency graph (same as scripts/release.ts):
+      #   postgrest-js -> neon-js
+      #   auth-ui -> auth -> neon-js
+      #   auth -> neon-js
+      - name: Compute release cascade
+        id: cascade
+        run: |
+          case "${{ inputs.package }}" in
+            postgrest-js) packages='["postgrest-js","neon-js"]' ;;
+            auth-ui)      packages='["auth-ui","auth","neon-js"]' ;;
+            auth)         packages='["auth","neon-js"]' ;;
+            neon-js)      packages='["neon-js"]' ;;
+          esac
+          echo "packages=$packages" >> "$GITHUB_OUTPUT"
+          echo "Release cascade: $packages" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build and bump versions
+        run: |
+          packages='${{ steps.cascade.outputs.packages }}'
+          for pkg in $(echo "$packages" | jq -r '.[]'); do
+            echo "::group::$pkg"
+
+            echo "Building @neondatabase/$pkg..."
+            bun run --filter "@neondatabase/$pkg" build
+
+            echo "Bumping version for @neondatabase/$pkg..."
+
+            cd "$GITHUB_WORKSPACE/packages/$pkg"
+            bunx bumpp \
+              --release "${{ inputs.bump }}" \
+              --tag "$pkg-v%s" \
+              --commit "chore: release $pkg@v%s" \
+              --no-push \
+              --yes
+            cd "$GITHUB_WORKSPACE"
+
+            echo "::endgroup::"
+          done
+
+      - name: Update lockfile
+        run: |
+          bun update
+          if ! git diff --quiet bun.lock; then
+            git add bun.lock
+            git commit -m "chore: update lock file"
+          fi
+
+      - name: Publish packages
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+          packages='${{ steps.cascade.outputs.packages }}'
+          for pkg in $(echo "$packages" | jq -r '.[]'); do
+            echo "Publishing @neondatabase/$pkg..."
+            cd "$GITHUB_WORKSPACE/packages/$pkg"
+            bun publish --tag latest
+            cd "$GITHUB_WORKSPACE"
+          done
+          rm -f ~/.npmrc
+
+      - name: Push commits and tags
+        run: git push --follow-tags
