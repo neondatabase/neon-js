@@ -50,10 +50,10 @@ export function NeonAuthUIProvider<T extends NeonAuthAdapter>({
       <ThemeProvider attribute="class" defaultTheme={defaultTheme} enableSystem>
         <AuthUIProvider
           authClient={reactClient}
+          magicLink={false}
           {...props}
           multiSession={false}
           apiKey={false}
-          magicLink={false}
           passkey={false}
           oneTap={false}
           genericOAuth={undefined}
