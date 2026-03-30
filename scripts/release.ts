@@ -2,6 +2,9 @@
 /**
  * Release script with automatic cascading version bumps.
  *
+ * This script is CI-only. Trigger releases from the GitHub Actions "Release"
+ * workflow on main instead of running local publish commands.
+ *
  * Usage:
  *   bun scripts/release.ts <package-name>
  *
@@ -27,6 +30,20 @@ const DEPENDENCY_GRAPH: Record<string, string[]> = {
 const VALID_PACKAGES = Object.keys(DEPENDENCY_GRAPH);
 
 const ROOT_DIR = path.resolve(import.meta.dirname, '..');
+
+function assertGitHubActionsRelease(): void {
+  if (process.env.GITHUB_ACTIONS === 'true') {
+    return;
+  }
+
+  console.error(
+    'Error: Releases must be triggered from the GitHub Actions "Release" workflow on main.'
+  );
+  console.error(
+    'Local release scripts are disabled so version bumps, tags, and publishes stay in CI.'
+  );
+  process.exit(1);
+}
 
 /**
  * Resolves all transitive dependents of a package using BFS.
@@ -145,7 +162,6 @@ function updateChangelog(
  */
 async function runBumpp(packageName: string): Promise<string> {
   const pkgPath = getPackagePath(packageName);
-  const tag = `${packageName}-v%s`;
 
   console.log(`\n📦 Running bumpp for ${packageName}...`);
 
@@ -154,11 +170,10 @@ async function runBumpp(packageName: string): Promise<string> {
     [
       'bunx',
       'bumpp',
-      '--tag',
-      tag,
+      '--no-tag',
       '--no-push',
       '--c',
-      `chore: release ${packageName}@-v%s`,
+      `chore: release ${packageName}@v%s`,
     ],
     {
       cwd: pkgPath,
@@ -177,12 +192,39 @@ async function runBumpp(packageName: string): Promise<string> {
 }
 
 /**
- * Builds a package.
+ * Builds all workspace packages before any version changes so internal
+ * dependencies are ready before dependent package bumps.
  */
-async function buildPackage(packageName: string): Promise<void> {
-  console.log(`  🔨 Building ${packageName}...`);
-  await $`bun install --filter @neondatabase/${packageName}`.quiet();
-  await $`bun run --filter @neondatabase/${packageName} build`.quiet();
+async function buildWorkspacePackages(): Promise<void> {
+  console.log(`  🔨 Building workspace packages...`);
+  await $`bun run build`.cwd(ROOT_DIR).quiet();
+}
+
+async function hasLockfileChanges(): Promise<boolean> {
+  const proc = spawn(['git', 'diff', '--quiet', '--', 'bun.lock'], {
+    cwd: ROOT_DIR,
+    stdio: ['ignore', 'ignore', 'ignore'],
+  });
+
+  const exitCode = await proc.exited;
+  if (exitCode === 0) {
+    return false;
+  }
+  if (exitCode === 1) {
+    return true;
+  }
+
+  throw new Error(`git diff exited with code ${exitCode}`);
+}
+
+async function createVersionTags(packageNames: string[]): Promise<void> {
+  for (const packageName of packageNames) {
+    const version = readPackageJson(packageName).version;
+    const tag = `${packageName}-v${version}`;
+
+    console.log(`  🏷️  Creating tag ${tag}...`);
+    await $`git tag ${tag}`.cwd(ROOT_DIR).quiet();
+  }
 }
 
 /**
@@ -210,10 +252,12 @@ async function publishPackage(packageName: string): Promise<void> {
  * Main release function.
  *
  * Flow:
- * 1. Version bumping phase - build & bumpp all packages (creates commits + tags)
- * 2. Lock file update - run `bun update` and amend last commit
- * 3. Publishing phase - publish all packages to npm
- * 4. Push commits and tags
+ * 1. Build all workspace packages
+ * 2. Version bumping phase - bump all packages (creates commits, tags deferred)
+ * 3. Lock file update - run `bun install` and commit the final lockfile state
+ * 4. Create version tags from the final commit state
+ * 5. Push commits and tags
+ * 6. Publish packages to npm
  */
 async function release(packageName: string): Promise<void> {
   console.log(`\n🎯 Starting release for: ${packageName}`);
@@ -230,54 +274,69 @@ async function release(packageName: string): Promise<void> {
   }
 
   // ============================================
-  // Phase 1: Version bumping (build + bumpp)
+  // Phase 1: Build workspace packages
   // ============================================
-  console.log(`\n📦 Phase 1: Version bumping`);
+  console.log(`\n🏗️  Phase 1: Build workspace packages`);
   console.log('─'.repeat(30));
 
-  // Build and bumpp main package
-  await buildPackage(packageName);
+  await buildWorkspacePackages();
+
+  // ============================================
+  // Phase 2: Version bumping
+  // ============================================
+  console.log(`\n📦 Phase 2: Version bumping`);
+  console.log('─'.repeat(30));
+
   const newVersion = await runBumpp(packageName);
   console.log(`✅ ${packageName} version: ${newVersion}`);
 
-  // Build and bumpp dependents
+  // Bump dependents after the primary package so the cascade order is preserved
   for (const dep of dependents) {
-    await buildPackage(dep);
     await runBumpp(dep);
   }
 
   // ============================================
-  // Phase 2: Lock file update
+  // Phase 3: Lock file update
   // ============================================
-  console.log(`\n🔄 Phase 2: Updating lock file`);
+  console.log(`\n🔄 Phase 3: Updating lock file`);
   console.log('─'.repeat(30));
 
-  console.log(`  📦 Running bun update...`);
-  await $`bun update`.cwd(ROOT_DIR).quiet();
+  console.log(`  📦 Running bun install...`);
+  await $`bun install`.cwd(ROOT_DIR).quiet();
 
-  // Create new commit with the lock file changes,
-  // amending to the last commit, removes the tag
-  console.log(`  📝 Adding lock file to last commit...`);
-  await $`git add bun.lock`.cwd(ROOT_DIR).quiet();
-  await $`git commit -m "chore: update lock file"`.cwd(ROOT_DIR).quiet();
+  if (await hasLockfileChanges()) {
+    console.log(`  📝 Committing lock file changes...`);
+    await $`git add bun.lock`.cwd(ROOT_DIR).quiet();
+    await $`git commit -m "chore: update lock file"`.cwd(ROOT_DIR).quiet();
+  } else {
+    console.log(`  ℹ️  No bun.lock changes detected.`);
+  }
 
   // ============================================
-  // Phase 3: Publishing
+  // Phase 4: Tagging
   // ============================================
-  console.log(`\n🚀 Phase 3: Publishing packages`);
+  console.log(`\n🏷️  Phase 4: Creating tags`);
+  console.log('─'.repeat(30));
+
+  await createVersionTags(allPackages);
+
+  // ============================================
+  // Phase 5: Push to remote
+  // ============================================
+  console.log(`\n📤 Phase 5: Pushing to remote`);
+  console.log('─'.repeat(30));
+
+  await $`git push --follow-tags`.cwd(ROOT_DIR).quiet();
+
+  // ============================================
+  // Phase 6: Publishing
+  // ============================================
+  console.log(`\n🚀 Phase 6: Publishing packages`);
   console.log('─'.repeat(30));
 
   for (const pkg of allPackages) {
     await publishPackage(pkg);
   }
-
-  // ============================================
-  // Phase 4: Push to remote
-  // ============================================
-  console.log(`\n📤 Phase 4: Pushing to remote`);
-  console.log('─'.repeat(30));
-
-  await $`git push --follow-tags`;
 
   // ============================================
   // Summary
@@ -293,6 +352,8 @@ async function release(packageName: string): Promise<void> {
 }
 
 // CLI entry point
+assertGitHubActionsRelease();
+
 const packageName = process.argv[2];
 
 if (!packageName) {

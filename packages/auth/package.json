@@ -101,7 +101,7 @@
     "test:types": "tsc --noEmit",
     "lint": "eslint .",
     "clean": "rm -rf node_modules dist",
-    "release": "bun run build && bumpp --tag 'auth-v%s' && bun publish --tag latest"
+    "release": "bun ../../scripts/release.ts auth"
   },
   "devDependencies": {
     "@neondatabase/internal": "workspace:*",

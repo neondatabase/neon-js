@@ -64,7 +64,7 @@
     "test:ci": "vitest run",
     "typecheck": "tsc --noEmit",
     "test:types": "tsc --noEmit",
-    "release": "bun run build && bumpp --tag 'auth-ui-v%s' && bun publish --tag latest",
+    "release": "bun ../../scripts/release.ts auth-ui",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "clean": "rm -rf node_modules dist"
