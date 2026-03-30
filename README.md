@@ -45,6 +45,22 @@ bun test             # Run tests
 bun typecheck        # Type check all packages
 ```
 
+## Releasing
+
+Releases must be triggered from the GitHub Actions `Release` workflow on the
+`main` branch. Local release scripts are intentionally blocked so version bumps,
+tags, lockfile updates, and npm publishes all happen in CI.
+
+When running the workflow:
+
+- choose the package to release: `auth`, `auth-ui`, `postgrest-js`, or `neon-js`
+- choose the bump type: `patch`, `minor`, or `major`
+- the workflow applies the same bump across the full release cascade and pushes
+  the final commits and tags before publishing
+
+Do not run `bun run release` or package-level `release` scripts from a local
+checkout.
+
 ## Support
 
 - [GitHub Issues](https://github.com/neondatabase/neon-js/issues)

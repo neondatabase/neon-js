@@ -1,16 +1,19 @@
 name: Release
 
-# CI-based release with OIDC provenance. Replaces manual `bun scripts/release.ts`.
+# CI-based release workflow. Local release scripts are blocked so that all
+# publishes go through GitHub Actions on the protected main branch.
 #
 # What this does (mirrors scripts/release.ts):
 #   1. Computes the cascade of packages to release (BFS over dependency graph)
-#   2. Builds and bumps the version of each package in order
+#   2. Builds all workspace packages before any version changes
+#   3. Bumps the version of each package in order
 #       - All packages in the cascade get the same bump type
 #         (e.g. a major bump on auth cascades as major to neon-js too,
 #          preserving the semver contract for consumers of neon-js)
-#   3. Updates bun.lock
-#   4. Publishes each package to npm with OIDC provenance attestation
-#   5. Pushes version commits and tags
+#   4. Refreshes bun.lock with the bumped workspace versions
+#   5. Creates version tags from the final lockfile commit state
+#   6. Pushes version commits and tags
+#   7. Publishes each package to npm
 #
 # Prerequisites:
 #   - NPM_TOKEN secret: granular access token from npmjs.com with publish scope
@@ -44,6 +47,8 @@ permissions:
 
 jobs:
   release:
+    if: github.ref == 'refs/heads/main'
+    environment: production
     runs-on:
       group: neondatabase-protected-runner-group
       labels: linux-ubuntu-latest
@@ -83,21 +88,21 @@ jobs:
           echo "packages=$packages" >> "$GITHUB_OUTPUT"
           echo "Release cascade: $packages" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Build and bump versions
+      - name: Build workspace packages
+        run: bun run build
+
+      - name: Bump versions
         run: |
           packages='${{ steps.cascade.outputs.packages }}'
           for pkg in $(echo "$packages" | jq -r '.[]'); do
             echo "::group::$pkg"
-
-            echo "Building @neondatabase/$pkg..."
-            bun run --filter "@neondatabase/$pkg" build
 
             echo "Bumping version for @neondatabase/$pkg..."
 
             cd "$GITHUB_WORKSPACE/packages/$pkg"
             bunx bumpp \
               --release "${{ inputs.bump }}" \
-              --tag "$pkg-v%s" \
+              --no-tag \
               --commit "chore: release $pkg@v%s" \
               --no-push \
               --yes
@@ -108,11 +113,22 @@ jobs:
 
       - name: Update lockfile
         run: |
-          bun update
+          bun install
           if ! git diff --quiet bun.lock; then
             git add bun.lock
             git commit -m "chore: update lock file"
           fi
+
+      - name: Create version tags
+        run: |
+          packages='${{ steps.cascade.outputs.packages }}'
+          for pkg in $(echo "$packages" | jq -r '.[]'); do
+            version=$(jq -r '.version' "$GITHUB_WORKSPACE/packages/$pkg/package.json")
+            git tag "$pkg-v$version"
+          done
+
+      - name: Push commits and tags
+        run: git push --follow-tags
 
       - name: Publish packages
         env:
@@ -128,6 +144,3 @@ jobs:
             cd "$GITHUB_WORKSPACE"
           done
           rm -f ~/.npmrc
-
-      - name: Push commits and tags
-        run: git push --follow-tags
