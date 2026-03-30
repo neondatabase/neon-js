@@ -1,9 +1,9 @@
 name: Release
 
-# CI-based release workflow. Local release scripts are blocked so that all
-# publishes go through GitHub Actions on the protected main branch.
+# CI-based release workflow. This is the only supported release implementation;
+# local release scripts only print guidance to use this workflow.
 #
-# What this does (mirrors scripts/release.ts):
+# What this does:
 #   1. Computes the cascade of packages to release (BFS over dependency graph)
 #   2. Builds all workspace packages before any version changes
 #   3. Bumps the version of each package in order
@@ -72,7 +72,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       # Compute the ordered list of packages to release.
-      # Dependency graph (same as scripts/release.ts):
+      # Dependency graph:
       #   postgrest-js -> neon-js
       #   auth-ui -> auth -> neon-js
       #   auth -> neon-js

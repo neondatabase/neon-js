@@ -19,7 +19,7 @@
     "test:types": "bun run --filter '*' test:types",
     "lint": "bun run --filter '@neondatabase/*' lint",
     "clean": "bun run --filter '@neondatabase/*' clean && rm -rf node_modules",
-    "release": "bun -e \"console.error('Releases must be triggered from the GitHub Actions Release workflow on main.'); process.exit(1)\"",
+    "release": "bun scripts/release.ts",
     "release:postgrest-js": "bun scripts/release.ts postgrest-js",
     "release:auth": "bun scripts/release.ts auth",
     "release:auth-ui": "bun scripts/release.ts auth-ui",
