@@ -76,6 +76,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Audit dependencies for vulnerabilities
+        run: npm audit --audit-level=high --production
+
       # Compute the ordered list of packages to release.
       # Dependency graph:
       #   postgrest-js -> neon-js
@@ -139,18 +142,23 @@ jobs:
             artifact_dir="$GITHUB_WORKSPACE/release-artifacts/$pkg"
             mkdir -p "$artifact_dir"
 
+            # Generate SBOM first so it can be included in the published tarball
+            bun scripts/generate-release-sbom.ts \
+              "$pkg" \
+              "$GITHUB_WORKSPACE/packages/$pkg/sbom.cdx.json"
+
             cd "$GITHUB_WORKSPACE/packages/$pkg"
             bun pm pack \
               --filename "$artifact_dir/package.tgz"
             cd "$GITHUB_WORKSPACE"
 
-            bun scripts/generate-release-sbom.ts \
-              "$pkg" \
+            # Also copy SBOM to artifact dir for attestation
+            cp "$GITHUB_WORKSPACE/packages/$pkg/sbom.cdx.json" \
               "$artifact_dir/sbom.cdx.json"
 
             {
               echo "### @neondatabase/$pkg@$version"
-              echo "- tarball: \`release-artifacts/$pkg/package.tgz\`"
+              echo "- tarball: \`release-artifacts/$pkg/package.tgz\` (includes sbom.cdx.json)"
               echo "- sbom: \`release-artifacts/$pkg/sbom.cdx.json\`"
             } >> "$GITHUB_STEP_SUMMARY"
 

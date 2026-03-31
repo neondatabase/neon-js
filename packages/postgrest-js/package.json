@@ -37,7 +37,8 @@
   },
   "sideEffects": false,
   "files": [
-    "dist"
+    "dist",
+    "sbom.cdx.json"
   ],
   "publishConfig": {
     "access": "public"

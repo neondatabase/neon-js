@@ -29,3 +29,6 @@ playwright/.auth/
 
 # SSL certificates (local development only)
 certs/
+
+# Generated SBOMs (produced during release)
+sbom.cdx.json

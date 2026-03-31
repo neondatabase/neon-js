@@ -97,7 +97,8 @@
   },
   "files": [
     "dist",
-    "llms.txt"
+    "llms.txt",
+    "sbom.cdx.json"
   ],
   "publishConfig": {
     "access": "public"
