@@ -11,9 +11,12 @@ name: Release
 #         (e.g. a major bump on auth cascades as major to neon-js too,
 #          preserving the semver contract for consumers of neon-js)
 #   4. Refreshes bun.lock with the bumped workspace versions
-#   5. Creates version tags from the final lockfile commit state
-#   6. Pushes version commits and tags
-#   7. Publishes each package to npm
+#   5. Rebuilds packages from the final bumped versions
+#   6. Packs the exact tarballs that will be published and generates CycloneDX SBOMs
+#   7. Creates GitHub artifact attestations for provenance and SBOMs
+#   8. Creates version tags from the final lockfile commit state
+#   9. Pushes version commits and tags
+#   10. Publishes each package from the attested tarballs
 #
 # Prerequisites:
 #   - NPM_TOKEN secret: granular access token from npmjs.com with publish scope
@@ -42,8 +45,10 @@ on:
         default: patch
 
 permissions:
-  contents: write  # push version bump commits and tags
-  id-token: write  # npm provenance attestation via OIDC
+  contents: write # push version bump commits and tags
+  id-token: write # artifact attestations via OIDC
+  attestations: write # persist attestations to GitHub
+  artifact-metadata: write # create storage records for attested artifacts
 
 jobs:
   release:
@@ -119,6 +124,91 @@ jobs:
             git commit -m "chore: update lock file"
           fi
 
+      - name: Rebuild workspace packages with bumped versions
+        run: bun run build
+
+      - name: Prepare release artifacts
+        run: |
+          packages='${{ steps.cascade.outputs.packages }}'
+          for pkg in $(echo "$packages" | jq -r '.[]'); do
+            version=$(jq -r '.version' "$GITHUB_WORKSPACE/packages/$pkg/package.json")
+
+            echo "::group::$pkg"
+            echo "Preparing attested release artifacts for @neondatabase/$pkg@$version..."
+
+            artifact_dir="$GITHUB_WORKSPACE/release-artifacts/$pkg"
+            mkdir -p "$artifact_dir"
+
+            cd "$GITHUB_WORKSPACE/packages/$pkg"
+            bun pm pack \
+              --filename "$artifact_dir/package.tgz"
+            cd "$GITHUB_WORKSPACE"
+
+            bun scripts/generate-release-sbom.ts \
+              "$pkg" \
+              "$artifact_dir/sbom.cdx.json"
+
+            {
+              echo "### @neondatabase/$pkg@$version"
+              echo "- tarball: \`release-artifacts/$pkg/package.tgz\`"
+              echo "- sbom: \`release-artifacts/$pkg/sbom.cdx.json\`"
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            echo "::endgroup::"
+          done
+
+      - name: Attest auth provenance
+        if: contains(fromJSON(steps.cascade.outputs.packages), 'auth')
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: ${{ github.workspace }}/release-artifacts/auth/package.tgz
+
+      - name: Attest auth SBOM
+        if: contains(fromJSON(steps.cascade.outputs.packages), 'auth')
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: ${{ github.workspace }}/release-artifacts/auth/package.tgz
+          sbom-path: ${{ github.workspace }}/release-artifacts/auth/sbom.cdx.json
+
+      - name: Attest auth-ui provenance
+        if: contains(fromJSON(steps.cascade.outputs.packages), 'auth-ui')
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: ${{ github.workspace }}/release-artifacts/auth-ui/package.tgz
+
+      - name: Attest auth-ui SBOM
+        if: contains(fromJSON(steps.cascade.outputs.packages), 'auth-ui')
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: ${{ github.workspace }}/release-artifacts/auth-ui/package.tgz
+          sbom-path: ${{ github.workspace }}/release-artifacts/auth-ui/sbom.cdx.json
+
+      - name: Attest postgrest-js provenance
+        if: contains(fromJSON(steps.cascade.outputs.packages), 'postgrest-js')
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: ${{ github.workspace }}/release-artifacts/postgrest-js/package.tgz
+
+      - name: Attest postgrest-js SBOM
+        if: contains(fromJSON(steps.cascade.outputs.packages), 'postgrest-js')
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: ${{ github.workspace }}/release-artifacts/postgrest-js/package.tgz
+          sbom-path: ${{ github.workspace }}/release-artifacts/postgrest-js/sbom.cdx.json
+
+      - name: Attest neon-js provenance
+        if: contains(fromJSON(steps.cascade.outputs.packages), 'neon-js')
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: ${{ github.workspace }}/release-artifacts/neon-js/package.tgz
+
+      - name: Attest neon-js SBOM
+        if: contains(fromJSON(steps.cascade.outputs.packages), 'neon-js')
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: ${{ github.workspace }}/release-artifacts/neon-js/package.tgz
+          sbom-path: ${{ github.workspace }}/release-artifacts/neon-js/sbom.cdx.json
+
       - name: Create version tags
         run: |
           packages='${{ steps.cascade.outputs.packages }}'
@@ -133,14 +223,13 @@ jobs:
       - name: Publish packages
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_CONFIG_PROVENANCE: 'true'
         run: |
           echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
           packages='${{ steps.cascade.outputs.packages }}'
           for pkg in $(echo "$packages" | jq -r '.[]'); do
             echo "Publishing @neondatabase/$pkg..."
-            cd "$GITHUB_WORKSPACE/packages/$pkg"
-            bun publish --tag latest
-            cd "$GITHUB_WORKSPACE"
+            bun publish \
+              --tag latest \
+              "$GITHUB_WORKSPACE/release-artifacts/$pkg/package.tgz"
           done
           rm -f ~/.npmrc

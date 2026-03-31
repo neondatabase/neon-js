@@ -57,6 +57,8 @@ When running the workflow:
 - choose the bump type: `patch`, `minor`, or `major`
 - the workflow applies the same bump across the full release cascade and pushes
   the final commits and tags before publishing
+- the workflow rebuilds the final package artifacts, generates CycloneDX SBOMs,
+  and creates GitHub artifact attestations before publish
 
 Do not run `bun run release` or package-level `release` scripts from a local
 checkout.
