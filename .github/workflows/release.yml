@@ -73,6 +73,12 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
 
+      - name: Set up Node.js for npm publish
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
       - name: Configure git
         run: |
           git config user.name "github-actions[bot]"
@@ -234,20 +240,23 @@ jobs:
         if: inputs.dry_run != true
         run: git push --follow-tags
 
+      # npm publish --provenance uses OIDC trusted publishing when configured on
+      # npmjs.com. NODE_AUTH_TOKEN with NPM_TOKEN is kept as a fallback until
+      # trusted publishers are configured for each @neondatabase/* package.
+      # Once OIDC is active per-package, the NPM_TOKEN secret can be removed.
       - name: Publish packages
         if: inputs.dry_run != true
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
           packages='${{ steps.cascade.outputs.packages }}'
           for pkg in $(echo "$packages" | jq -r '.[]'); do
             echo "Publishing @neondatabase/$pkg..."
-            bun publish \
+            npm publish \
+              --provenance \
               --tag latest \
               "$GITHUB_WORKSPACE/release-artifacts/$pkg/package.tgz"
           done
-          rm -f ~/.npmrc
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Dry run summary
         if: inputs.dry_run == true
