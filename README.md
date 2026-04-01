@@ -63,6 +63,30 @@ When running the workflow:
 Do not run `bun run release` or package-level `release` scripts from a local
 checkout.
 
+### Release cascade
+
+The dependency graph determines which packages get bumped together:
+
+```
+postgrest-js → neon-js
+auth-ui → auth → neon-js
+```
+
+When you release a package, all downstream dependents are bumped with the same
+semver increment. For example, releasing `auth` with a `minor` bump also bumps
+`neon-js` as `minor`, since `neon-js` re-exports `auth`.
+
+| You release    | Also bumped        |
+| -------------- | ------------------ |
+| `postgrest-js` | `neon-js`          |
+| `auth-ui`      | `auth`, `neon-js`  |
+| `auth`         | `neon-js`          |
+| `neon-js`      | _(none)_           |
+
+> **Note:** The cascade is currently hardcoded in the workflow. If you add a new
+> package, update the `case` statement in the "Compute release cascade" step of
+> `.github/workflows/release.yml`.
+
 ## Support
 
 - [GitHub Issues](https://github.com/neondatabase/neon-js/issues)

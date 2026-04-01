@@ -43,6 +43,11 @@ on:
           - minor
           - major
         default: patch
+      dry_run:
+        description: 'Dry run (validate without publishing)'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write # push version bump commits and tags
@@ -226,9 +231,11 @@ jobs:
           done
 
       - name: Push commits and tags
+        if: inputs.dry_run != true
         run: git push --follow-tags
 
       - name: Publish packages
+        if: inputs.dry_run != true
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
@@ -241,3 +248,10 @@ jobs:
               "$GITHUB_WORKSPACE/release-artifacts/$pkg/package.tgz"
           done
           rm -f ~/.npmrc
+
+      - name: Dry run summary
+        if: inputs.dry_run == true
+        run: |
+          echo "## 🏜️ Dry Run Complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "No packages were published. No commits or tags were pushed." >> "$GITHUB_STEP_SUMMARY"
+          echo "The above artifacts, attestations, and version bumps are validation-only." >> "$GITHUB_STEP_SUMMARY"
