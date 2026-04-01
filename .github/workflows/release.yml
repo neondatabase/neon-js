@@ -13,14 +13,20 @@ name: Release
 #   4. Refreshes bun.lock with the bumped workspace versions
 #   5. Rebuilds packages from the final bumped versions
 #   6. Packs the exact tarballs that will be published and generates CycloneDX SBOMs
-#   7. Creates GitHub artifact attestations for provenance and SBOMs
+#   7. Uploads tarballs and SBOMs as workflow artifacts
 #   8. Creates version tags from the final lockfile commit state
 #   9. Pushes version commits and tags
-#   10. Publishes each package from the attested tarballs
+#   10. (publish job) Downloads artifacts, attests provenance and SBOMs
+#   11. (publish job) Publishes each package from the attested tarballs
+#
+# The workflow is split into two jobs so that the publish job can run on a
+# GitHub-hosted runner, which is required for OIDC token exchange with npm
+# trusted publishing. This matches the pattern from neon-cloud PR #4554.
 #
 # Prerequisites:
 #   - NPM_TOKEN secret: granular access token from npmjs.com with publish scope
-#     for all @neondatabase/* packages
+#     for all @neondatabase/* packages (fallback until OIDC trusted publishers
+#     are configured per-package)
 
 on:
   workflow_dispatch:
@@ -49,20 +55,17 @@ on:
         type: boolean
         default: false
 
-permissions:
-  contents: write # push version bump commits and tags
-  id-token: write # artifact attestations via OIDC
-  attestations: write # persist attestations to GitHub
-  artifact-metadata: write # create storage records for attested artifacts
-
 jobs:
-  release:
+  build:
     if: github.ref == 'refs/heads/main'
-    environment: production
     runs-on:
       group: neondatabase-protected-runner-group
       labels: linux-ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: write # push version bump commits and tags
+    outputs:
+      packages: ${{ steps.cascade.outputs.packages }}
 
     steps:
       - name: Checkout code
@@ -72,12 +75,6 @@ jobs:
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
-
-      - name: Set up Node.js for npm publish
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: '24'
-          registry-url: 'https://registry.npmjs.org'
 
       - name: Configure git
         run: |
@@ -148,7 +145,7 @@ jobs:
             version=$(jq -r '.version' "$GITHUB_WORKSPACE/packages/$pkg/package.json")
 
             echo "::group::$pkg"
-            echo "Preparing attested release artifacts for @neondatabase/$pkg@$version..."
+            echo "Preparing release artifacts for @neondatabase/$pkg@$version..."
 
             artifact_dir="$GITHUB_WORKSPACE/release-artifacts/$pkg"
             mkdir -p "$artifact_dir"
@@ -176,57 +173,13 @@ jobs:
             echo "::endgroup::"
           done
 
-      - name: Attest auth provenance
-        if: contains(fromJSON(steps.cascade.outputs.packages), 'auth')
-        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          subject-path: ${{ github.workspace }}/release-artifacts/auth/package.tgz
-
-      - name: Attest auth SBOM
-        if: contains(fromJSON(steps.cascade.outputs.packages), 'auth')
-        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
-        with:
-          subject-path: ${{ github.workspace }}/release-artifacts/auth/package.tgz
-          sbom-path: ${{ github.workspace }}/release-artifacts/auth/sbom.cdx.json
-
-      - name: Attest auth-ui provenance
-        if: contains(fromJSON(steps.cascade.outputs.packages), 'auth-ui')
-        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
-        with:
-          subject-path: ${{ github.workspace }}/release-artifacts/auth-ui/package.tgz
-
-      - name: Attest auth-ui SBOM
-        if: contains(fromJSON(steps.cascade.outputs.packages), 'auth-ui')
-        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
-        with:
-          subject-path: ${{ github.workspace }}/release-artifacts/auth-ui/package.tgz
-          sbom-path: ${{ github.workspace }}/release-artifacts/auth-ui/sbom.cdx.json
-
-      - name: Attest postgrest-js provenance
-        if: contains(fromJSON(steps.cascade.outputs.packages), 'postgrest-js')
-        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
-        with:
-          subject-path: ${{ github.workspace }}/release-artifacts/postgrest-js/package.tgz
-
-      - name: Attest postgrest-js SBOM
-        if: contains(fromJSON(steps.cascade.outputs.packages), 'postgrest-js')
-        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
-        with:
-          subject-path: ${{ github.workspace }}/release-artifacts/postgrest-js/package.tgz
-          sbom-path: ${{ github.workspace }}/release-artifacts/postgrest-js/sbom.cdx.json
-
-      - name: Attest neon-js provenance
-        if: contains(fromJSON(steps.cascade.outputs.packages), 'neon-js')
-        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
-        with:
-          subject-path: ${{ github.workspace }}/release-artifacts/neon-js/package.tgz
-
-      - name: Attest neon-js SBOM
-        if: contains(fromJSON(steps.cascade.outputs.packages), 'neon-js')
-        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
-        with:
-          subject-path: ${{ github.workspace }}/release-artifacts/neon-js/package.tgz
-          sbom-path: ${{ github.workspace }}/release-artifacts/neon-js/sbom.cdx.json
+          name: release-artifacts
+          path: release-artifacts/
+          retention-days: 1
+          if-no-files-found: error
 
       - name: Create version tags
         run: |
@@ -240,27 +193,123 @@ jobs:
         if: inputs.dry_run != true
         run: git push --follow-tags
 
+  publish:
+    needs: build
+    if: inputs.dry_run != true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: production
+    permissions:
+      id-token: write # OIDC token for npm trusted publishing
+      attestations: write # persist attestations to GitHub
+      artifact-metadata: write # create storage records for attested artifacts
+
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-artifacts
+          path: release-artifacts/
+
+      - name: Set up Node.js for npm publish
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Attest auth provenance
+        if: contains(fromJSON(needs.build.outputs.packages), 'auth')
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: release-artifacts/auth/package.tgz
+
+      - name: Attest auth SBOM
+        if: contains(fromJSON(needs.build.outputs.packages), 'auth')
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: release-artifacts/auth/package.tgz
+          sbom-path: release-artifacts/auth/sbom.cdx.json
+
+      - name: Attest auth-ui provenance
+        if: contains(fromJSON(needs.build.outputs.packages), 'auth-ui')
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: release-artifacts/auth-ui/package.tgz
+
+      - name: Attest auth-ui SBOM
+        if: contains(fromJSON(needs.build.outputs.packages), 'auth-ui')
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: release-artifacts/auth-ui/package.tgz
+          sbom-path: release-artifacts/auth-ui/sbom.cdx.json
+
+      - name: Attest postgrest-js provenance
+        if: contains(fromJSON(needs.build.outputs.packages), 'postgrest-js')
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: release-artifacts/postgrest-js/package.tgz
+
+      - name: Attest postgrest-js SBOM
+        if: contains(fromJSON(needs.build.outputs.packages), 'postgrest-js')
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: release-artifacts/postgrest-js/package.tgz
+          sbom-path: release-artifacts/postgrest-js/sbom.cdx.json
+
+      - name: Attest neon-js provenance
+        if: contains(fromJSON(needs.build.outputs.packages), 'neon-js')
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: release-artifacts/neon-js/package.tgz
+
+      - name: Attest neon-js SBOM
+        if: contains(fromJSON(needs.build.outputs.packages), 'neon-js')
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: release-artifacts/neon-js/package.tgz
+          sbom-path: release-artifacts/neon-js/sbom.cdx.json
+
       # npm publish --provenance uses OIDC trusted publishing when configured on
       # npmjs.com. NODE_AUTH_TOKEN with NPM_TOKEN is kept as a fallback until
       # trusted publishers are configured for each @neondatabase/* package.
       # Once OIDC is active per-package, the NPM_TOKEN secret can be removed.
       - name: Publish packages
-        if: inputs.dry_run != true
         run: |
-          packages='${{ steps.cascade.outputs.packages }}'
+          packages='${{ needs.build.outputs.packages }}'
           for pkg in $(echo "$packages" | jq -r '.[]'); do
             echo "Publishing @neondatabase/$pkg..."
             npm publish \
               --provenance \
               --tag latest \
-              "$GITHUB_WORKSPACE/release-artifacts/$pkg/package.tgz"
+              "release-artifacts/$pkg/package.tgz"
           done
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+  summary:
+    needs: [build, publish]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    steps:
       - name: Dry run summary
         if: inputs.dry_run == true
         run: |
           echo "## 🏜️ Dry Run Complete" >> "$GITHUB_STEP_SUMMARY"
           echo "No packages were published. No commits or tags were pushed." >> "$GITHUB_STEP_SUMMARY"
           echo "The above artifacts, attestations, and version bumps are validation-only." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Release summary
+        if: inputs.dry_run != true
+        run: |
+          build_result="${{ needs.build.result }}"
+          publish_result="${{ needs.publish.result }}"
+          if [ "$build_result" = "success" ] && [ "$publish_result" = "success" ]; then
+            echo "## ✅ Release Complete" >> "$GITHUB_STEP_SUMMARY"
+            echo "All packages published successfully." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## ❌ Release Failed" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Build: $build_result" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Publish: $publish_result" >> "$GITHUB_STEP_SUMMARY"
+          fi
