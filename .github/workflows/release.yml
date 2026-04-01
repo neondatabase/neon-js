@@ -55,6 +55,10 @@ on:
         type: boolean
         default: false
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   build:
     if: github.ref == 'refs/heads/main'
@@ -216,6 +220,9 @@ jobs:
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
+
+      - name: Update npm
+        run: npm install -g npm@11.12.0
 
       - name: Attest auth provenance
         if: contains(fromJSON(needs.build.outputs.packages), 'auth')
