@@ -36,7 +36,7 @@ jobs:
   e2e:
     timeout-minutes: 20
     runs-on:
-      group: databricks-protected-runner-group
+      group: neondatabase-protected-runner-group
       labels: linux-ubuntu-latest
 
     # Matrix strategy: test both example apps in parallel

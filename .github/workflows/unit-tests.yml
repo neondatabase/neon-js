@@ -13,7 +13,7 @@ jobs:
   unit-tests:
     timeout-minutes: 15
     runs-on:
-      group: databricks-protected-runner-group
+      group: neondatabase-protected-runner-group
       labels: linux-ubuntu-latest
 
     steps:

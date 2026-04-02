@@ -63,7 +63,7 @@ jobs:
   build:
     if: github.ref == 'refs/heads/main'
     runs-on:
-      group: databricks-protected-runner-group
+      group: neondatabase-protected-runner-group
       labels: linux-ubuntu-latest
     timeout-minutes: 30
     permissions:
