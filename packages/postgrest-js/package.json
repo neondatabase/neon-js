@@ -50,7 +50,7 @@
     "test:ci": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit",
     "test:types": "tsc --noEmit",
-    "release": "bun run build && bumpp --tag 'postgrest-js-v%s' && bun publish --tag latest",
+    "release": "echo 'Use the GitHub Actions Release workflow. See README.md' && exit 1",
     "lint": "eslint .",
     "clean": "rm -rf node_modules dist"
   },

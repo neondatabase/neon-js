@@ -64,7 +64,7 @@
     "test:ci": "vitest run",
     "typecheck": "tsc --noEmit",
     "test:types": "tsc --noEmit",
-    "release": "bun run build && bumpp --tag 'auth-ui-v%s' && bun publish --tag latest",
+    "release": "echo 'Use the GitHub Actions Release workflow. See README.md' && exit 1",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "clean": "rm -rf node_modules dist"
@@ -75,6 +75,7 @@
     "@types/react": "^19.1.13",
     "@types/react-dom": "^19.1.9",
     "autoprefixer": "^10.4.20",
+    "better-auth": "1.4.6",
     "postcss": "^8.5.6",
     "postcss-import": "^16.1.1"
   },

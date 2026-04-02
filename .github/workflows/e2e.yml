@@ -31,6 +31,7 @@ on:
 # SECURITY: Limit permissions to minimum required
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   e2e:
@@ -68,19 +69,34 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
-
-      - name: Cache Bun dependencies
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      - name: Setup JFrog CLI with OIDC
+        id: setup-jfrog
+        uses: jfrog/setup-jfrog-cli@279b1f629f43dd5bc658d8361ac4802a7ef8d2d5 # v4.9.1
+        env:
+          JF_URL: https://databricks.jfrog.io
         with:
-          path: ~/.bun/install/cache
-          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            bun-${{ runner.os }}-
+          oidc-provider-name: github-actions
+
+      - name: Configure npm registry
+        run: |
+          npm config set registry https://databricks.jfrog.io/artifactory/api/npm/db-npm/
+          npm config set //databricks.jfrog.io/artifactory/api/npm/db-npm/:_authToken ${{ steps.setup-jfrog.outputs.oidc-token }}
+
+      - name: Setup pnpm
+        run: npm install -g pnpm@10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+
+      - name: Configure pnpm registry
+        run: |
+          echo "registry=https://databricks.jfrog.io/artifactory/api/npm/db-npm/" >> .npmrc
+          echo "//databricks.jfrog.io/artifactory/api/npm/db-npm/:_authToken=${{ steps.setup-jfrog.outputs.oidc-token }}" >> .npmrc
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Restore build cache
         id: build-cache
@@ -98,7 +114,7 @@ jobs:
 
       - name: Build packages
         if: steps.build-cache.outputs.cache-hit != 'true'
-        run: bun run build
+        run: pnpm run build
 
       # Create an isolated Neon branch for this PR/run
       - name: Get branch expiration date (2 hours from now)
@@ -120,7 +136,7 @@ jobs:
       # Build React example (uses VITE_ prefix)
       - name: Build React example app
         if: matrix.app == 'react-neon-js'
-        run: cd examples/react-neon-js && bun run build
+        run: cd examples/react-neon-js && pnpm run build
         env:
           VITE_NEON_AUTH_URL: ${{ steps.create-branch.outputs.auth_url }}
           VITE_NEON_DATA_API_URL: ${{ steps.create-branch.outputs.data_api_url }}
@@ -128,7 +144,7 @@ jobs:
       # Build Next.js example (uses NEON_AUTH_BASE_URL)
       - name: Build Next.js example app
         if: matrix.app == 'nextjs-neon-auth'
-        run: cd examples/nextjs-neon-auth && bun run build
+        run: cd examples/nextjs-neon-auth && pnpm run build
         env:
           NEON_AUTH_BASE_URL: ${{ steps.create-branch.outputs.auth_url }}
           DATABASE_URL: ${{ steps.create-branch.outputs.db_url }}
@@ -137,7 +153,7 @@ jobs:
       # Get Playwright version for cache key
       - name: Get Playwright version
         id: playwright-version
-        run: echo "version=$(cd e2e && bunx playwright --version | awk '{print $2}')" >> $GITHUB_OUTPUT
+        run: echo "version=$(cd e2e && pnpm exec playwright --version | awk '{print $2}')" >> $GITHUB_OUTPUT
 
       # Cache browser binaries with restore-keys fallback
       - name: Cache Playwright browsers
@@ -152,19 +168,19 @@ jobs:
       # Install browsers only on cache miss
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: cd e2e && bunx playwright install --with-deps chromium
+        run: cd e2e && pnpm exec playwright install --with-deps chromium
 
       # Install system deps if browsers were cached (they may need system libs)
       - name: Install system dependencies
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: cd e2e && bunx playwright install-deps chromium
+        run: cd e2e && pnpm exec playwright install-deps chromium
 
       - name: Run E2E tests
         run: |
           if [ "${{ matrix.app }}" = "react-neon-js" ]; then
-            bun run --filter e2e test:react:ci
+            pnpm --filter e2e run test:react:ci
           else
-            bun run --filter e2e test:nextjs:ci
+            pnpm --filter e2e run test:nextjs:ci
           fi
         env:
           CI: true
@@ -177,7 +193,7 @@ jobs:
       # Clean up: Delete Neon branch (runs even if tests fail)
       - name: Delete Neon branch
         if: always()
-        uses: neondatabase/delete-branch-action@c2005bb7d7caeba12ba3ec63857e9c9f9a4d695a # v3
+        uses: neondatabase/delete-branch-action@4468d825d5a88ef4012f1705a82f02ec3072f776 # v3.2.1
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch: test-${{ matrix.app }}-${{ github.run_id }}-${{ github.run_attempt }}

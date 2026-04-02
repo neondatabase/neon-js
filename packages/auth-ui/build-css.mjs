@@ -9,6 +9,8 @@ import postcss from 'postcss';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const rootDir = resolve(__dirname, '../..');
+const tailwindBin = resolve(rootDir, 'node_modules/.bin/tailwindcss');
 
 // Resolve the absolute path to better-auth-ui source (for build time scanning)
 const betterAuthUiSrc = resolve(
@@ -115,7 +117,7 @@ writeFileSync(tempThemeCssPath, themeCssWithSource, 'utf8');
 try {
   // Build pre-built CSS with all utilities (style.css)
   execSync(
-    `bunx tailwindcss -i ${tempIndexCssPath} -o ./dist/style.css --minify`,
+    `${tailwindBin} -i ${tempIndexCssPath} -o ./dist/style.css --minify`,
     {
       cwd: __dirname,
       stdio: 'inherit',
@@ -141,7 +143,7 @@ try {
 
   // Build theme.css through Tailwind to resolve @imports and inline external CSS
   // This resolves @import '@daveyplate/better-auth-ui/css' at build time
-  execSync(`bunx tailwindcss -i ${tempThemeCssPath} -o ./dist/theme.css`, {
+  execSync(`${tailwindBin} -i ${tempThemeCssPath} -o ./dist/theme.css`, {
     cwd: __dirname,
     stdio: 'inherit',
   });

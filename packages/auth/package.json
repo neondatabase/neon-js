@@ -101,7 +101,7 @@
     "test:types": "tsc --noEmit",
     "lint": "eslint .",
     "clean": "rm -rf node_modules dist",
-    "release": "bun run build && bumpp --tag 'auth-v%s' && bun publish --tag latest"
+    "release": "echo 'Use the GitHub Actions Release workflow. See README.md' && exit 1"
   },
   "devDependencies": {
     "@neondatabase/internal": "workspace:*",

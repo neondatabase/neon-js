@@ -10,7 +10,7 @@ A unified TypeScript SDK monorepo for Neon services, providing seamless integrat
 
 ## Monorepo Structure
 
-This is a Bun workspaces monorepo with four published packages and one private internal package:
+This is a pnpm workspaces monorepo with four published packages and one private internal package:
 
 ### `@neondatabase/internal` (packages/internal/) - PRIVATE
 Internal utilities shared across packages (not published to npm):
@@ -132,33 +132,33 @@ Run from repository root:
 
 ```bash
 # Install dependencies
-bun install
+pnpm install
 
 # Development (watch mode)
-bun dev
+pnpm dev
 
 # Build all packages
-bun build
+pnpm build
 
 # Build specific package
-bun run --filter '@neondatabase/auth' build
+pnpm run --filter '@neondatabase/auth' build
 
 # Run tests
-bun test              # Run all tests
-bun test:node         # Node.js runtime (recommended for MSW)
-bun test:ci           # CI mode (no watch)
+pnpm test              # Run all tests
+pnpm test:node         # Node.js runtime (recommended for MSW)
+pnpm test:ci           # CI mode (no watch)
 
 # Type checking
-bun typecheck
+pnpm typecheck
 
 # Publishing
-bun release           # Bump version and publish all packages
+pnpm release           # Bump version and publish all packages
 
 # Release individual packages
-bun release:postgrest-js
-bun release:auth
-bun release:auth-ui
-bun release:neon-js
+pnpm release:postgrest-js
+pnpm release:auth
+pnpm release:auth-ui
+pnpm release:neon-js
 ```
 
 ## Build Configuration
@@ -191,7 +191,7 @@ export default defineConfig(
 
 ### CSS Build Chain
 
-CSS flows through packages in dependency order (handled by Bun's topological sort):
+CSS flows through packages in dependency order (handled by pnpm's topological sort):
 
 ```
 auth-ui (generates CSS via TailwindCSS CLI)
@@ -663,9 +663,9 @@ Unit tests use Vitest with MSW for network mocking:
 
 **Run unit tests:**
 ```bash
-bun test              # Run all tests (watch mode)
-bun test:node         # Node.js runtime (recommended for MSW)
-bun test:ci           # CI mode (no watch, all packages)
+pnpm test              # Run all tests (watch mode)
+pnpm test:node         # Node.js runtime (recommended for MSW)
+pnpm test:ci           # CI mode (no watch, all packages)
 ```
 
 ### E2E Tests
@@ -683,11 +683,11 @@ End-to-end tests use Playwright with a real Neon backend:
 **Run E2E tests locally:**
 ```bash
 # Build packages and example app first
-bun run build
-cd examples/react-neon-js && bun run build
+pnpm run build
+cd examples/react-neon-js && pnpm run build
 
 # Run E2E tests
-bun run --filter e2e test:ci
+pnpm run --filter e2e test:ci
 ```
 
 **Note:** E2E tests require Neon Auth/Data API credentials configured in environment variables.

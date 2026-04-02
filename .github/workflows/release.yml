@@ -1,0 +1,347 @@
+name: Release
+
+# CI-based release workflow. This is the only supported release implementation;
+# local release scripts only print guidance to use this workflow.
+#
+# What this does:
+#   1. Computes the cascade of packages to release (BFS over dependency graph)
+#   2. Builds all workspace packages before any version changes
+#   3. Bumps the version of each package in order
+#       - All packages in the cascade get the same bump type
+#         (e.g. a major bump on auth cascades as major to neon-js too,
+#          preserving the semver contract for consumers of neon-js)
+#   4. Refreshes pnpm-lock.yaml with the bumped workspace versions
+#   5. Rebuilds packages from the final bumped versions
+#   6. Packs the exact tarballs that will be published and generates CycloneDX SBOMs
+#   7. Uploads tarballs and SBOMs as workflow artifacts
+#   8. Creates version tags from the final lockfile commit state
+#   9. Pushes version commits and tags
+#   10. (publish job) Downloads artifacts, attests provenance and SBOMs
+#   11. (publish job) Publishes each package from the attested tarballs
+#
+# The workflow is split into two jobs so that the publish job can run on a
+# GitHub-hosted runner, which is required for OIDC token exchange with npm
+# trusted publishing. This matches the pattern from neon-cloud PR #4554.
+#
+# Prerequisites:
+#   - NPM_TOKEN secret: granular access token from npmjs.com with publish scope
+#     for all @neondatabase/* packages (fallback until OIDC trusted publishers
+#     are configured per-package)
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Package to release'
+        required: true
+        type: choice
+        options:
+          - auth
+          - auth-ui
+          - postgrest-js
+          - neon-js
+      bump:
+        description: 'Version bump type (applied to all packages in the cascade)'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: patch
+      dry_run:
+        description: 'Dry run (validate without publishing)'
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on:
+      group: neondatabase-protected-runner-group
+      labels: linux-ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write # push version bump commits and tags
+      id-token: write # OIDC token for JFrog registry access
+    outputs:
+      packages: ${{ steps.cascade.outputs.packages }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0 # bumpp needs full tag history to compute next version
+
+      - name: Setup JFrog CLI with OIDC
+        id: setup-jfrog
+        uses: jfrog/setup-jfrog-cli@279b1f629f43dd5bc658d8361ac4802a7ef8d2d5 # v4.9.1
+        env:
+          JF_URL: https://databricks.jfrog.io
+        with:
+          oidc-provider-name: github-actions
+
+      - name: Configure npm registry
+        run: |
+          npm config set registry https://databricks.jfrog.io/artifactory/api/npm/db-npm/
+          npm config set //databricks.jfrog.io/artifactory/api/npm/db-npm/:_authToken ${{ steps.setup-jfrog.outputs.oidc-token }}
+
+      - name: Setup pnpm
+        run: npm install -g pnpm@10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+
+      - name: Configure pnpm registry
+        run: |
+          echo "registry=https://databricks.jfrog.io/artifactory/api/npm/db-npm/" >> .npmrc
+          echo "//databricks.jfrog.io/artifactory/api/npm/db-npm/:_authToken=${{ steps.setup-jfrog.outputs.oidc-token }}" >> .npmrc
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Audit dependencies for vulnerabilities
+        run: pnpm audit --audit-level=high
+
+      # Compute the ordered list of packages to release.
+      # Dependency graph:
+      #   postgrest-js -> neon-js
+      #   auth-ui -> auth -> neon-js
+      #   auth -> neon-js
+      - name: Compute release cascade
+        id: cascade
+        run: |
+          case "${{ inputs.package }}" in
+            postgrest-js) packages='["postgrest-js","neon-js"]' ;;
+            auth-ui)      packages='["auth-ui","auth","neon-js"]' ;;
+            auth)         packages='["auth","neon-js"]' ;;
+            neon-js)      packages='["neon-js"]' ;;
+          esac
+          echo "packages=$packages" >> "$GITHUB_OUTPUT"
+          echo "Release cascade: $packages" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build workspace packages
+        run: pnpm run build
+
+      - name: Bump versions
+        run: |
+          packages='${{ steps.cascade.outputs.packages }}'
+          for pkg in $(echo "$packages" | jq -r '.[]'); do
+            echo "::group::$pkg"
+
+            echo "Bumping version for @neondatabase/$pkg..."
+
+            cd "$GITHUB_WORKSPACE/packages/$pkg"
+            pnpm exec bumpp \
+              --release "${{ inputs.bump }}" \
+              --no-tag \
+              --commit "chore: release $pkg@v%s" \
+              --no-push \
+              --yes
+            cd "$GITHUB_WORKSPACE"
+
+            echo "::endgroup::"
+          done
+
+      - name: Update lockfile
+        run: |
+          pnpm install
+          if ! git diff --quiet pnpm-lock.yaml; then
+            git add pnpm-lock.yaml
+            git commit -m "chore: update lock file"
+          fi
+
+      - name: Rebuild workspace packages with bumped versions
+        run: pnpm run build
+
+      - name: Prepare release artifacts
+        run: |
+          packages='${{ steps.cascade.outputs.packages }}'
+          for pkg in $(echo "$packages" | jq -r '.[]'); do
+            version=$(jq -r '.version' "$GITHUB_WORKSPACE/packages/$pkg/package.json")
+
+            echo "::group::$pkg"
+            echo "Preparing release artifacts for @neondatabase/$pkg@$version..."
+
+            artifact_dir="$GITHUB_WORKSPACE/release-artifacts/$pkg"
+            mkdir -p "$artifact_dir"
+
+            # Generate SBOM first so it can be included in the published tarball
+            npx tsx scripts/generate-release-sbom.ts \
+              "$pkg" \
+              "$GITHUB_WORKSPACE/packages/$pkg/sbom.cdx.json"
+
+            cd "$GITHUB_WORKSPACE/packages/$pkg"
+            pnpm pack \
+              --pack-destination "$artifact_dir"
+            mv "$artifact_dir"/*.tgz "$artifact_dir/package.tgz"
+            cd "$GITHUB_WORKSPACE"
+
+            # Also copy SBOM to artifact dir for attestation
+            cp "$GITHUB_WORKSPACE/packages/$pkg/sbom.cdx.json" \
+              "$artifact_dir/sbom.cdx.json"
+
+            {
+              echo "### @neondatabase/$pkg@$version"
+              echo "- tarball: \`release-artifacts/$pkg/package.tgz\` (includes sbom.cdx.json)"
+              echo "- sbom: \`release-artifacts/$pkg/sbom.cdx.json\`"
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            echo "::endgroup::"
+          done
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-artifacts
+          path: release-artifacts/
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Create version tags
+        run: |
+          packages='${{ steps.cascade.outputs.packages }}'
+          for pkg in $(echo "$packages" | jq -r '.[]'); do
+            version=$(jq -r '.version' "$GITHUB_WORKSPACE/packages/$pkg/package.json")
+            git tag "$pkg-v$version"
+          done
+
+      - name: Push commits and tags
+        if: inputs.dry_run != true
+        run: git push --follow-tags
+
+  publish:
+    needs: build
+    if: inputs.dry_run != true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: production
+    permissions:
+      id-token: write # OIDC token for npm trusted publishing
+      attestations: write # persist attestations to GitHub
+      artifact-metadata: write # create storage records for attested artifacts
+
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-artifacts
+          path: release-artifacts/
+
+      - name: Set up Node.js for npm publish
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Update npm
+        run: npm install -g npm@11.12.0
+
+      - name: Attest auth provenance
+        if: contains(fromJSON(needs.build.outputs.packages), 'auth')
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: release-artifacts/auth/package.tgz
+
+      - name: Attest auth SBOM
+        if: contains(fromJSON(needs.build.outputs.packages), 'auth')
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: release-artifacts/auth/package.tgz
+          sbom-path: release-artifacts/auth/sbom.cdx.json
+
+      - name: Attest auth-ui provenance
+        if: contains(fromJSON(needs.build.outputs.packages), 'auth-ui')
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: release-artifacts/auth-ui/package.tgz
+
+      - name: Attest auth-ui SBOM
+        if: contains(fromJSON(needs.build.outputs.packages), 'auth-ui')
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: release-artifacts/auth-ui/package.tgz
+          sbom-path: release-artifacts/auth-ui/sbom.cdx.json
+
+      - name: Attest postgrest-js provenance
+        if: contains(fromJSON(needs.build.outputs.packages), 'postgrest-js')
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: release-artifacts/postgrest-js/package.tgz
+
+      - name: Attest postgrest-js SBOM
+        if: contains(fromJSON(needs.build.outputs.packages), 'postgrest-js')
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: release-artifacts/postgrest-js/package.tgz
+          sbom-path: release-artifacts/postgrest-js/sbom.cdx.json
+
+      - name: Attest neon-js provenance
+        if: contains(fromJSON(needs.build.outputs.packages), 'neon-js')
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: release-artifacts/neon-js/package.tgz
+
+      - name: Attest neon-js SBOM
+        if: contains(fromJSON(needs.build.outputs.packages), 'neon-js')
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: release-artifacts/neon-js/package.tgz
+          sbom-path: release-artifacts/neon-js/sbom.cdx.json
+
+      # npm publish --provenance uses OIDC trusted publishing when configured on
+      # npmjs.com. NODE_AUTH_TOKEN with NPM_TOKEN is kept as a fallback until
+      # trusted publishers are configured for each @neondatabase/* package.
+      # Once OIDC is active per-package, the NPM_TOKEN secret can be removed.
+      - name: Publish packages
+        run: |
+          packages='${{ needs.build.outputs.packages }}'
+          for pkg in $(echo "$packages" | jq -r '.[]'); do
+            echo "Publishing @neondatabase/$pkg..."
+            npm publish \
+              --provenance \
+              --tag latest \
+              "release-artifacts/$pkg/package.tgz"
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  summary:
+    needs: [build, publish]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    steps:
+      - name: Dry run summary
+        if: inputs.dry_run == true
+        run: |
+          echo "## 🏜️ Dry Run Complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "No packages were published. No commits or tags were pushed." >> "$GITHUB_STEP_SUMMARY"
+          echo "The above artifacts, attestations, and version bumps are validation-only." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Release summary
+        if: inputs.dry_run != true
+        run: |
+          build_result="${{ needs.build.result }}"
+          publish_result="${{ needs.publish.result }}"
+          if [ "$build_result" = "success" ] && [ "$publish_result" = "success" ]; then
+            echo "## ✅ Release Complete" >> "$GITHUB_STEP_SUMMARY"
+            echo "All packages published successfully." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## ❌ Release Failed" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Build: $build_result" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Publish: $publish_result" >> "$GITHUB_STEP_SUMMARY"
+          fi
