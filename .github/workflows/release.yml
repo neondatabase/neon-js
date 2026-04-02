@@ -177,11 +177,6 @@ jobs:
             echo "::endgroup::"
           done
 
-      # TODO: Add Databricks artifact scanning once gh-action-scan supports
-      # public repos in the neondatabase org. See Option 4 in the
-      # "How to add scanning to a non-paved-path release" guide.
-      # For now, bun audit --audit-level=high gates the pipeline.
-
       - name: Upload release artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
