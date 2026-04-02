@@ -31,15 +31,16 @@
     "@eslint/js": "^9.39.2",
     "@types/node": "24.7.2",
     "bumpp": "10.1.0",
+    "esbuild": "^0.27.4",
     "eslint": "^9.39.2",
     "eslint-plugin-unicorn": "^62.0.0",
     "msw": "2.6.8",
     "publint": "0.3.16",
     "tsdown": "0.17.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.54.0",
     "vite-tsconfig-paths": "5.1.4",
     "vitest": "4.0.7"
-  },
-  "dependencies": {}
+  }
 }
