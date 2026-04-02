@@ -70,6 +70,8 @@ jobs:
 
       - name: Setup pnpm
         run: corepack enable
+        env:
+          COREPACK_NPM_REGISTRY: https://npm-proxy.dev.databricks.com
 
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
