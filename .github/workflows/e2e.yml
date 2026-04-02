@@ -69,7 +69,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup pnpm
-        run: corepack enable && corepack prepare pnpm@10 --activate
+        run: corepack enable
 
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
