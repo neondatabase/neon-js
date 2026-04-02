@@ -63,7 +63,7 @@ jobs:
   build:
     if: github.ref == 'refs/heads/main'
     runs-on:
-      group: neondatabase-protected-runner-group
+      group: databricks-protected-runner-group
       labels: linux-ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -78,9 +78,7 @@ jobs:
           fetch-depth: 0 # bumpp needs full tag history to compute next version
 
       - name: Setup pnpm
-        run: corepack enable
-        env:
-          COREPACK_NPM_REGISTRY: https://npm-proxy.dev.databricks.com
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
 
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4

@@ -36,7 +36,7 @@ jobs:
   e2e:
     timeout-minutes: 20
     runs-on:
-      group: neondatabase-protected-runner-group
+      group: databricks-protected-runner-group
       labels: linux-ubuntu-latest
 
     # Matrix strategy: test both example apps in parallel
@@ -69,9 +69,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup pnpm
-        run: corepack enable
-        env:
-          COREPACK_NPM_REGISTRY: https://npm-proxy.dev.databricks.com
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
 
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
