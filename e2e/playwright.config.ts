@@ -11,14 +11,14 @@ const APP_CONFIG = {
   'react-neon-js': {
     port: 5173,
     dir: '../examples/react-neon-js',
-    devCommand: 'bun run dev',
-    previewCommand: 'bun run preview',
+    devCommand: 'pnpm run dev',
+    previewCommand: 'pnpm run preview',
   },
   'nextjs-neon-auth': {
     port: 3000,
     dir: '../examples/nextjs-neon-auth',
-    devCommand: 'bun run dev',
-    previewCommand: 'bun run start', // Next.js uses 'start' for production
+    devCommand: 'pnpm run dev',
+    previewCommand: 'pnpm run start', // Next.js uses 'start' for production
   },
 } as const;
 

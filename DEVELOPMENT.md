@@ -3,14 +3,14 @@
 1. Install dependencies
 
 ```bash
-bun install
+pnpm install
 ```
 
 2. To use locally built packages, run the following command:
 
 ```bash
-bun run build
-bun run link:neon-js
+pnpm run build
+pnpm run link:neon-js
 ```
 
 3. Add the packages to your project's package.json:
@@ -26,5 +26,5 @@ bun run link:neon-js
 4.  Whenever you make changes to the packages, just run the build command to update the links.
 
 ```bash
-bun run build
+pnpm run build
 ```
