@@ -24,7 +24,7 @@ A multi-tenant todo app using **Neon Auth** for authentication and the **Organiz
 
 ### Prerequisites
 
-- [Bun](https://bun.sh) (or Node.js 18+)
+- Node.js 18+ with pnpm
 - A [Neon](https://neon.tech) project with **Neon Auth** and the **Organizations plugin** enabled
 
 ### 1. Install dependencies
@@ -32,7 +32,7 @@ A multi-tenant todo app using **Neon Auth** for authentication and the **Organiz
 From the monorepo root:
 
 ```bash
-bun install
+pnpm install
 ```
 
 ### 2. Configure environment variables
@@ -52,17 +52,17 @@ DATABASE_URL=postgresql://neondb_owner:<password>@<endpoint>-pooler.c-4.us-east-
 ### 3. Push the database schema
 
 ```bash
-bunx drizzle-kit push
+pnpm exec drizzle-kit push
 ```
 
 This creates the `todo` table. The `neon_auth` schema (organizations, members, invitations) is managed automatically by Neon Auth.
 
-> **Note:** The `neon_auth` table definitions used by the admin endpoint are already checked in at `src/db/schema.ts`. If those tables ever change upstream, re-run `bunx drizzle-kit pull` and copy the updated definitions from `drizzle/schema.ts` into `src/db/schema.ts`. See [Section 3](#3-accessing-the-neon_auth-schema-with-drizzle) for details.
+> **Note:** The `neon_auth` table definitions used by the admin endpoint are already checked in at `src/db/schema.ts`. If those tables ever change upstream, re-run `pnpm exec drizzle-kit pull` and copy the updated definitions from `drizzle/schema.ts` into `src/db/schema.ts`. See [Section 3](#3-accessing-the-neon_auth-schema-with-drizzle) for details.
 
 ### 4. Run the dev server
 
 ```bash
-bun run dev
+pnpm dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000). You'll be redirected to sign in via email OTP, then land on the dashboard.
@@ -80,7 +80,7 @@ This is useful for **programmatic org provisioning** scenarios — for example, 
 ### Dependencies
 
 ```bash
-bun add @neondatabase/auth @neondatabase/serverless
+pnpm add @neondatabase/auth @neondatabase/serverless
 ```
 
 The auth package is `@neondatabase/auth` (used as a workspace dependency). The serverless driver (`@neondatabase/serverless`) is used for database access over HTTP.
@@ -201,7 +201,7 @@ export default defineConfig({
 });
 ```
 
-Run `bunx drizzle-kit push` to sync the schema to the database.
+Run `pnpm exec drizzle-kit push` to sync the schema to the database.
 
 ---
 
