@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@10.33.0",
+  "packageManager": "pnpm@10.32.1",
   "scripts": {
     "link:neon-js": "cd packages/auth && pnpm link && cd ../postgrest-js && pnpm link && cd ../auth-ui && pnpm link && cd ../neon-js && pnpm link",
     "build": "pnpm --filter '@neondatabase/internal' run build && pnpm --filter '@neondatabase/postgrest-js' run build && pnpm --filter '@neondatabase/auth-ui' run build && pnpm --filter '@neondatabase/auth' run build && pnpm --filter '@neondatabase/neon-js' run build",
