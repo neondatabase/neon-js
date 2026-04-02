@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 
 import * as esbuild from 'esbuild';
-import { $ } from 'bun';
+import { execSync } from 'node:child_process';
 import {
   existsSync,
   mkdtempSync,
@@ -184,7 +184,7 @@ try {
 
   writeFileSync(metafilePath, JSON.stringify(result.metafile, null, 2));
 
-  await $`${CYCLONEDX_CLI_PATH} --build-working-dir ${ROOT_DIR} --mc-type library --output-reproducible --output-file ${outputPath} ${metafilePath}`;
+  execSync(`${CYCLONEDX_CLI_PATH} --build-working-dir ${ROOT_DIR} --mc-type library --output-reproducible --output-file ${outputPath} ${metafilePath}`, { stdio: 'inherit' });
 } finally {
   process.chdir(previousCwd);
   rmSync(tempDir, { recursive: true, force: true });
