@@ -78,7 +78,7 @@ jobs:
           fetch-depth: 0 # bumpp needs full tag history to compute next version
 
       - name: Setup pnpm
-        run: npm install -g pnpm@10
+        run: corepack enable && corepack prepare pnpm@10 --activate
 
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4

@@ -69,7 +69,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup pnpm
-        run: npm install -g pnpm@10
+        run: corepack enable && corepack prepare pnpm@10 --activate
 
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -175,7 +175,7 @@ jobs:
       # Clean up: Delete Neon branch (runs even if tests fail)
       - name: Delete Neon branch
         if: always()
-        uses: neondatabase/delete-branch-action@c2005bb7d7caeba12ba3ec63857e9c9f9a4d695a # v3
+        uses: neondatabase/delete-branch-action@4468d825d5a88ef4012f1705a82f02ec3072f776 # v3.2.1
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch: test-${{ matrix.app }}-${{ github.run_id }}-${{ github.run_attempt }}
