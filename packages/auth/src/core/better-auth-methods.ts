@@ -200,6 +200,15 @@ export const BETTER_AUTH_METHODS_HOOKS: Record<string, MethodHook> = {
   },
   getSession: {
     beforeFetch: () => {
+      // When a session verifier is present (OAuth callback or magic link redirect),
+      // skip the cache so the request reaches the server to finalize the session.
+      if (isBrowser()) {
+        const params = new URLSearchParams(globalThis.window.location.search);
+        if (params.has(NEON_AUTH_SESSION_VERIFIER_PARAM_NAME)) {
+          return null;
+        }
+      }
+
       const cachedData = BETTER_AUTH_METHODS_CACHE.getCachedSession();
       if (!cachedData) {
         return null;
