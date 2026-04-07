@@ -1,0 +1,86 @@
+@import 'tailwindcss';
+@import '@neondatabase/auth/ui/tailwind';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.5rem;
+  /* Neon brand: dark theme by default */
+  --background: hsl(240 10% 4%);
+  --foreground: hsl(0 0% 95%);
+  --card: hsl(240 6% 8%);
+  --card-foreground: hsl(0 0% 95%);
+  --popover: hsl(240 6% 8%);
+  --popover-foreground: hsl(0 0% 95%);
+  /* Neon Green #00E599 ≈ hsl(156 100% 45%) */
+  --primary: hsl(156 100% 45%);
+  --primary-foreground: hsl(240 10% 4%);
+  --secondary: hsl(240 4% 14%);
+  --secondary-foreground: hsl(0 0% 95%);
+  --muted: hsl(240 4% 14%);
+  --muted-foreground: hsl(240 5% 55%);
+  --accent: hsl(240 4% 14%);
+  --accent-foreground: hsl(0 0% 95%);
+  --destructive: hsl(0 62.8% 30.6%);
+  --border: hsl(240 4% 16%);
+  --input: hsl(240 4% 16%);
+  --ring: hsl(156 100% 45%);
+}
+
+.dark {
+  --background: hsl(240 10% 4%);
+  --foreground: hsl(0 0% 95%);
+  --card: hsl(240 6% 8%);
+  --card-foreground: hsl(0 0% 95%);
+  --popover: hsl(240 6% 8%);
+  --popover-foreground: hsl(0 0% 95%);
+  --primary: hsl(156 100% 45%);
+  --primary-foreground: hsl(240 10% 4%);
+  --secondary: hsl(240 4% 14%);
+  --secondary-foreground: hsl(0 0% 95%);
+  --muted: hsl(240 4% 14%);
+  --muted-foreground: hsl(240 5% 55%);
+  --accent: hsl(240 4% 14%);
+  --accent-foreground: hsl(0 0% 95%);
+  --destructive: hsl(0 62.8% 30.6%);
+  --border: hsl(240 4% 16%);
+  --input: hsl(240 4% 16%);
+  --ring: hsl(156 100% 45%);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
