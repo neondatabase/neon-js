@@ -56,7 +56,7 @@ export const API_ENDPOINTS = {
     email: { path: 'sign-in/email', method: 'POST' },
     social: { path: 'sign-in/social', method: 'POST' },
     emailOtp: { path: 'sign-in/email-otp', method: 'POST' },
-    
+    magicLink: { path: 'sign-in/magic-link', method: 'POST' },
   },
   signUp: {
     email: { path: 'sign-up/email', method: 'POST' },
@@ -141,6 +141,11 @@ export const API_ENDPOINTS = {
     verifyEmail: { path: 'email-otp/verify-email', method: 'POST' },
     checkVerificationOtp: { path: 'email-otp/check-verification-otp', method: 'POST' },
     resetPassword: { path: 'email-otp/passcode', method: 'POST' },
+  },
+
+  // Magic Link
+  magicLink: {
+    verify: { path: 'magic-link/verify', method: 'GET' },
   },
 } as const satisfies ValidEndpointTree<VanillaBetterAuthClient>;
 
