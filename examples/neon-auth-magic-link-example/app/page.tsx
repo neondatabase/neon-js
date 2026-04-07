@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-secondary font-sans">
+    <div className="flex min-h-screen items-center justify-center bg-background font-sans">
       <main className="flex w-full max-w-md flex-col items-center justify-center gap-8 px-6 py-20">
         <div className="flex flex-col items-center gap-4 text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
@@ -29,20 +29,36 @@ export default function Home() {
               href="https://neon.tech/docs/guides/neon-auth"
               target="_blank"
               rel="noopener noreferrer"
-              className="font-semibold text-foreground underline decoration-muted-foreground transition-colors hover:decoration-foreground"
+              className="font-semibold text-primary transition-colors hover:text-primary/80"
             >
               Neon Auth
             </a>
-            . Enter your email, get a code, sign in.
+            . Enter your email, get a code, and you&apos;re in.
           </p>
         </div>
 
-        <Link
-          href="/auth/sign-in"
-          className="flex h-12 w-full items-center justify-center rounded-lg bg-primary px-8 text-base font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-        >
-          Sign in with Magic Link
-        </Link>
+        <div className="flex w-full flex-col gap-3">
+          <Link
+            href="/auth/sign-up"
+            className="flex h-12 w-full items-center justify-center rounded-lg bg-primary px-8 text-base font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            Sign Up
+          </Link>
+
+          <Link
+            href="/auth/sign-in"
+            className="flex h-12 w-full items-center justify-center rounded-lg border border-border bg-card px-8 text-base font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+          >
+            Sign In
+          </Link>
+
+          <Link
+            href="/webhooks"
+            className="flex h-12 w-full items-center justify-center rounded-lg border border-border bg-card px-8 text-base font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+          >
+            Webhooks
+          </Link>
+        </div>
 
         <p className="text-center text-sm text-muted-foreground">
           No password needed. We&apos;ll send a one-time code to your email.

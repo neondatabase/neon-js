@@ -2,13 +2,18 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 
 import { authClient } from "@/lib/auth/client"
 
 export default function DashboardPage() {
     const { data: session, isPending } = authClient.useSession()
     const router = useRouter()
+    const [mounted, setMounted] = useState(false)
+
+    useEffect(() => {
+        setMounted(true)
+    }, [])
 
     useEffect(() => {
         if (!isPending && !session) {
@@ -32,7 +37,7 @@ export default function DashboardPage() {
     }
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-secondary">
+        <div className="flex min-h-screen items-center justify-center bg-background">
             <div className="w-full max-w-md px-6">
                 <div className="rounded-xl border bg-card p-8 shadow-sm">
                     <div className="mb-6 flex items-center gap-3">
@@ -84,7 +89,7 @@ export default function DashboardPage() {
                                 Session expires
                             </p>
                             <p className="mt-1 text-sm text-foreground">
-                                {new Date(session.session.expiresAt).toLocaleString()}
+                                {mounted ? new Date(session.session.expiresAt).toLocaleString() : "\u00A0"}
                             </p>
                         </div>
                     </div>
@@ -95,7 +100,7 @@ export default function DashboardPage() {
                                 await authClient.signOut()
                                 router.push("/")
                             }}
-                            className="flex h-10 w-full items-center justify-center rounded-lg border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                            className="flex h-10 w-full items-center justify-center rounded-lg border border-border bg-card text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
                         >
                             Sign Out
                         </button>

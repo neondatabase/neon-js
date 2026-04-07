@@ -1,5 +1,5 @@
-import { AuthView } from '@neondatabase/auth/react/ui';
-import { authViewPaths } from '@neondatabase/auth/react/ui/server';
+import { MagicLinkForm } from "@/components/magic-link-form";
+import { authViewPaths } from "@neondatabase/auth/react/ui/server";
 
 export const dynamicParams = false;
 
@@ -12,11 +12,11 @@ export default async function AuthPage({
 }: {
   params: Promise<{ path: string }>;
 }) {
-  const { path } = await params;
+  await params;
 
   return (
-    <main className="flex min-h-screen items-center justify-center p-4">
-      <AuthView path={path} />
+    <main className="flex min-h-screen items-center justify-center bg-background p-4">
+      <MagicLinkForm />
     </main>
   );
 }
