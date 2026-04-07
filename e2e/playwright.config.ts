@@ -58,7 +58,7 @@ export default defineConfig({
   // Next.js has additional notes/account/org tests
   testMatch:
     targetApp === 'nextjs-neon-auth'
-      ? '**/{auth-flow,account-settings,organizations,notes}.spec.ts'
+      ? '**/{auth-flow,account-settings,organizations,notes,magic-link}.spec.ts'
       : '**/{auth-flow,neon-js}.spec.ts',
 
   // Parallel execution - 2 workers balances speed and stability
