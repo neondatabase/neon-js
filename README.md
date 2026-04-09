@@ -47,45 +47,39 @@ bun typecheck        # Type check all packages
 
 ## Releasing
 
-Releases must be triggered from the GitHub Actions `Release` workflow on the
-`main` branch. Local release scripts are intentionally blocked so version bumps,
-tags, lockfile updates, and npm publishes all happen in CI.
+Releases are published through the centralized secure publishing pipeline in
+[`secure-public-registry-releases-eng`](https://github.com/databricks/secure-public-registry-releases-eng).
 
-When running the workflow:
+### How it works
 
-- choose the package to release: `auth`, `auth-ui`, `postgrest-js`, or `neon-js`
-- choose the bump type: `patch`, `minor`, or `major`
-- the workflow applies the same bump across the full release cascade and pushes
-  the final commits and tags before publishing
-- the workflow rebuilds the final package artifacts, generates CycloneDX SBOMs,
-  and creates GitHub artifact attestations before publish
+1. Every push to `main` triggers the **Prepare Release** workflow in this repo
+2. The workflow detects changed packages, computes version bumps and cascade,
+   builds artifacts, and uploads an immutable release bundle
+3. The secure repo polls for new bundles, verifies integrity, scans for
+   vulnerabilities, and publishes via npm OIDC Trusted Publishing
+4. After publish, `neon-js-release[bot]` writes back version bumps, tags,
+   and changelog updates to this repo
 
-Do not run `bun run release` or package-level `release` scripts from a local
-checkout.
+Local releases are disabled. Running `bun run release` will show an error
+directing you to the secure pipeline.
 
-### Release cascade
+### Cascade rules
 
-The dependency graph determines which packages get bumped together:
+| Trigger package | Cascade                        |
+| --------------- | ------------------------------ |
+| `postgrest-js`  | postgrest-js, neon-js          |
+| `auth-ui`       | auth-ui, auth, neon-js         |
+| `auth`          | auth, neon-js                  |
+| `neon-js`       | neon-js only                   |
 
-```
-postgrest-js → neon-js
-auth-ui → auth → neon-js
-```
+### Release tooling
 
-When you release a package, all downstream dependents are bumped with the same
-semver increment. For example, releasing `auth` with a `minor` bump also bumps
-`neon-js` as `minor`, since `neon-js` re-exports `auth`.
+The release logic lives in `tools/`:
 
-| You release    | Also bumped        |
-| -------------- | ------------------ |
-| `postgrest-js` | `neon-js`          |
-| `auth-ui`      | `auth`, `neon-js`  |
-| `auth`         | `neon-js`          |
-| `neon-js`      | _(none)_           |
-
-> **Note:** The cascade is currently hardcoded in the workflow. If you add a new
-> package, update the `case` statement in the "Compute release cascade" step of
-> `.github/workflows/release.yml`.
+- `tools/sync-versions.ts plan` -- detect changes, compute cascade, write `release-manifest.json`
+- `tools/sync-versions.ts apply` -- rewrite package.json versions from the manifest
+- `tools/finalize-release.ts` -- write-back script called by the secure repo after publish
+- `tools/release-manifest.schema.json` -- JSON Schema contract between both repos
 
 ## Support
 

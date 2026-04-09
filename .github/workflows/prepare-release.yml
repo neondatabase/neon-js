@@ -1,0 +1,154 @@
+name: Prepare Release
+
+# Stage 1 of the two-stage secure publishing pipeline.
+#
+# This workflow runs on every push to main (excluding bot finalize commits)
+# and prepares immutable release artifacts for the secure publishing repo.
+#
+# What this does:
+#   1. Installs dependencies via JFrog OIDC proxy
+#   2. Runs tools/sync-versions.ts plan to compute the release manifest
+#   3. Exits cleanly if no packages need releasing
+#   4. Runs tools/sync-versions.ts apply to rewrite versions in the checkout
+#   5. Rebuilds all packages with bumped versions
+#   6. Packs tarballs for each package in the manifest
+#   7. Generates SHA256SUMS covering all artifacts
+#   8. Uploads the bundle as a workflow artifact
+#
+# What this does NOT do:
+#   - Commit, tag, or push anything
+#   - Publish to npm
+#   - Create GitHub Releases
+#
+# The secure repo (databricks/secure-public-registry-releases-eng) polls for
+# successful runs of this workflow, downloads the artifact bundle, verifies
+# integrity, scans, publishes via npm OIDC Trusted Publishing, and then runs
+# tools/finalize-release.ts to write version state back to this repo.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch, tag, or SHA to prepare from (for testing)'
+        required: false
+        default: 'main'
+
+concurrency:
+  group: prepare-release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash -euo pipefail {0}
+
+jobs:
+  prepare:
+    # Skip bot-driven finalize commits and [skip ci] markers
+    if: >-
+      github.actor != 'neon-js-release[bot]' &&
+      !contains(github.event.head_commit.message, '[skip ci]')
+    runs-on:
+      group: neondatabase-protected-runner-group
+      labels: linux-ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write # OIDC token for JFrog npm registry proxy
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0 # full history for tag-based version detection
+
+      - name: Setup JFrog CLI with OIDC
+        id: setup-jfrog
+        uses: jfrog/setup-jfrog-cli@279b1f629f43dd5bc658d8361ac4802a7ef8d2d5 # v4.9.1
+        env:
+          JF_URL: https://databricks.jfrog.io
+        with:
+          oidc-provider-name: github-actions
+
+      - name: Configure npm registry for JFrog
+        run: |
+          echo "registry=https://databricks.jfrog.io/artifactory/api/npm/db-npm/" >> .npmrc
+          echo "//databricks.jfrog.io/artifactory/api/npm/db-npm/:_authToken=${{ steps.setup-jfrog.outputs.oidc-token }}" >> .npmrc
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Audit dependencies for vulnerabilities
+        run: bun audit --audit-level=high
+
+      - name: Build workspace packages
+        run: bun run build
+
+      - name: Plan release
+        id: plan
+        run: |
+          bun tools/sync-versions.ts plan
+          if [ ! -f release-manifest.json ]; then
+            echo "No releasable changes detected. Exiting cleanly."
+            echo "has_release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "has_release=true" >> "$GITHUB_OUTPUT"
+          echo "### Release Manifest" >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat release-manifest.json >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Apply version bumps
+        if: steps.plan.outputs.has_release == 'true'
+        run: bun tools/sync-versions.ts apply
+
+      - name: Rebuild with bumped versions
+        if: steps.plan.outputs.has_release == 'true'
+        run: bun run build
+
+      - name: Pack tarballs
+        if: steps.plan.outputs.has_release == 'true'
+        run: |
+          mkdir -p prepared-release/packages
+
+          # Read packages from the manifest
+          packages=$(jq -r '.packages[].packageId' release-manifest.json)
+          for pkg in $packages; do
+            echo "::group::Pack $pkg"
+            cd "$GITHUB_WORKSPACE/packages/$pkg"
+            bun pm pack
+            cp *.tgz "$GITHUB_WORKSPACE/prepared-release/packages/"
+            cd "$GITHUB_WORKSPACE"
+            echo "::endgroup::"
+          done
+
+          # Copy the manifest into the bundle
+          cp release-manifest.json prepared-release/
+
+          echo "### Packed Artifacts" >> "$GITHUB_STEP_SUMMARY"
+          ls -lh prepared-release/packages/ >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Generate SHA256SUMS
+        if: steps.plan.outputs.has_release == 'true'
+        run: |
+          cd prepared-release
+          find . -type f ! -name SHA256SUMS | sort | xargs sha256sum > SHA256SUMS
+          echo "### SHA256SUMS" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat SHA256SUMS >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload release bundle
+        if: steps.plan.outputs.has_release == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: prepared-release
+          path: prepared-release/
+          retention-days: 14
+          if-no-files-found: error
