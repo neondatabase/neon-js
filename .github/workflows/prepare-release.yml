@@ -91,6 +91,8 @@ jobs:
 
       - name: Plan release
         id: plan
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: |
           bun tools/sync-versions.ts plan
           if [ ! -f release-manifest.json ]; then

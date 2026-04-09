@@ -9,6 +9,7 @@
     "sourceRepo",
     "sourceCommitSha",
     "sourceBranch",
+    "triggerEvent",
     "prepareWorkflowName",
     "prepareRunId",
     "prepareRunAttempt",
@@ -34,6 +35,10 @@
     "sourceBranch": {
       "type": "string",
       "description": "Branch name at prepare time, e.g. main."
+    },
+    "triggerEvent": {
+      "type": "string",
+      "description": "GitHub Actions event name that triggered the prepare workflow (e.g. push, workflow_dispatch)."
     },
     "prepareWorkflowName": {
       "type": "string",
@@ -74,7 +79,8 @@
         "directChange",
         "publishOrder",
         "tagName",
-        "tarballFilename"
+        "tarballFilename",
+        "internalDependencyUpdates"
       ],
       "additionalProperties": false,
       "properties": {

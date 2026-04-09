@@ -124,6 +124,7 @@ interface ReleaseManifest {
   sourceRepo: string;
   sourceCommitSha: string;
   sourceBranch: string;
+  triggerEvent: string;
   prepareWorkflowName: string;
   prepareRunId: string;
   prepareRunAttempt: string;
@@ -178,24 +179,31 @@ function changedFiles(sinceRef: string | null): string[] {
 
 /**
  * Parse conventional commit messages to determine the highest bump level.
+ * When paths are provided, only commits touching those paths are considered.
  */
-function commitBumpLevel(sinceRef: string | null): BumpType {
+function commitBumpLevel(sinceRef: string | null, paths: string[] = []): BumpType {
   const range = sinceRef ? `${sinceRef}..HEAD` : "HEAD";
+  const pathFilter = paths.length > 0 ? ` -- ${paths.join(" ")}` : "";
   let log: string;
   try {
-    log = git(`log --format=%s ${range}`);
+    log = git(`log --format=%B ${range}${pathFilter}`);
   } catch {
     return "patch";
   }
-  const lines = log.split("\n").filter(Boolean);
+
+  // Split on double-newline to process each commit's full message
+  const commits = log.split("\n\n").filter(Boolean);
 
   let level: BumpType = "patch";
-  for (const line of lines) {
-    if (/^.*!:/.test(line) || /BREAKING[\s-]CHANGE/i.test(line)) {
-      return "major";
-    }
-    if (/^feat(\(.*?\))?:/.test(line) && level !== "major") {
-      level = "minor";
+  for (const commit of commits) {
+    const lines = commit.split("\n").filter(Boolean);
+    for (const line of lines) {
+      if (/^.*!:/.test(line) || /BREAKING[\s-]CHANGE/i.test(line)) {
+        return "major";
+      }
+      if (/^feat(\(.*?\))?:/.test(line) && level !== "major") {
+        level = "minor";
+      }
     }
   }
   return level;
@@ -351,7 +359,8 @@ async function plan(): Promise<void> {
     }
 
     if (hasDirectChange) {
-      const bump = commitBumpLevel(tag);
+      const pkgPaths = [`packages/${pkgId}/`];
+      const bump = commitBumpLevel(tag, pkgPaths);
       directChanges.set(pkgId, bump);
     } else if (hasSharedChange) {
       directChanges.set(pkgId, "patch");
@@ -423,6 +432,7 @@ async function plan(): Promise<void> {
     sourceRepo: process.env.GITHUB_REPOSITORY ?? "neondatabase/neon-js",
     sourceCommitSha: headSha,
     sourceBranch: branch,
+    triggerEvent: process.env.GITHUB_EVENT_NAME ?? "local",
     prepareWorkflowName: "prepare-release.yml",
     prepareRunId: process.env.GITHUB_RUN_ID ?? "local",
     prepareRunAttempt: process.env.GITHUB_RUN_ATTEMPT ?? "1",

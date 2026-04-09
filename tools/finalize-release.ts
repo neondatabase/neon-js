@@ -57,6 +57,7 @@ interface ReleaseManifest {
   sourceRepo: string;
   sourceCommitSha: string;
   sourceBranch: string;
+  triggerEvent: string;
   prepareWorkflowName: string;
   prepareRunId: string;
   prepareRunAttempt: string;
@@ -255,8 +256,11 @@ async function main(): Promise<void> {
   // 7. Push commits and tags
   // -----------------------------------------------------------------------
   console.log("Pushing to remote...");
-  const remote = `https://x-access-token:${token}@github.com/${manifest.sourceRepo}.git`;
-  git(`push "${remote}" HEAD:${manifest.sourceBranch} --follow-tags`, repoDir);
+  const basicAuth = Buffer.from(`x-access-token:${token}`).toString("base64");
+  git(
+    `-c "http.https://github.com/.extraheader=Authorization: Basic ${basicAuth}" push origin HEAD:${manifest.sourceBranch} --follow-tags`,
+    repoDir
+  );
 
   console.log("Finalize complete.");
   console.log(
