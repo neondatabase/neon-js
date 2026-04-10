@@ -49,6 +49,13 @@
   "dependencies": {},
   "pnpm": {
     "overrides": {
+      "better-auth": "1.4.6",
+      "@better-auth/core": "1.4.6",
+      "@better-auth/utils": "0.3.0",
+      "@better-auth/passkey": "1.4.12",
+      "@better-auth/telemetry": "1.4.6",
+      "@better-fetch/fetch": "1.1.21",
+      "better-call": "1.1.5",
       "tailwindcss": "4.1.17",
       "@tailwindcss/cli": "4.1.17",
       "@tailwindcss/oxide": "4.1.17"

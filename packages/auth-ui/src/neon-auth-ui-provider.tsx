@@ -49,7 +49,7 @@ export function NeonAuthUIProvider<T extends NeonAuthAdapter>({
     <div className={cn('neon-auth-ui', className)}>
       <ThemeProvider attribute="class" defaultTheme={defaultTheme} enableSystem>
         <AuthUIProvider
-          authClient={reactClient as AuthUIProviderProps['authClient']}
+          authClient={reactClient as unknown as AuthUIProviderProps['authClient']}
           {...props}
           multiSession={false}
           apiKey={false}
