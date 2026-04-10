@@ -44,7 +44,7 @@ jobs:
           echo "//databricks.jfrog.io/artifactory/api/npm/db-npm/:_authToken=${JFROG_TOKEN}" >> ~/.npmrc
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install
 
       - name: Cache build artifacts
         id: build-cache
