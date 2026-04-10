@@ -81,6 +81,14 @@
     },
     "./ui/tailwind": {
       "default": "./dist/ui/tailwind.css"
+    },
+    "./start": {
+      "types": "./dist/start/index.d.mts",
+      "default": "./dist/start/index.mjs"
+    },
+    "./start/server": {
+      "types": "./dist/start/server/index.d.mts",
+      "default": "./dist/start/server/index.mjs"
     }
   },
   "files": [
@@ -105,6 +113,7 @@
   },
   "devDependencies": {
     "@neondatabase/internal": "workspace:*",
+    "@tanstack/react-start": "1.167.16",
     "msw": "2.6.8",
     "next": "16.0.6"
   },
@@ -119,7 +128,8 @@
   "peerDependencies": {
     "react": ">=18.0.0",
     "react-dom": ">=18.0.0",
-    "next": ">=16.0.6"
+    "next": ">=16.0.6",
+    "@tanstack/react-start": ">=1.167.16"
   },
   "peerDependenciesMeta": {
     "react": {
@@ -129,6 +139,9 @@
       "optional": true
     },
     "next": {
+      "optional": true
+    },
+    "@tanstack/react-start": {
       "optional": true
     }
   }
