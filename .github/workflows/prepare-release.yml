@@ -4,7 +4,7 @@ name: Prepare Release
 #
 # This workflow is triggered manually via workflow_dispatch. It:
 #
-#   1. Installs dependencies via JFrog OIDC proxy
+#   1. Installs dependencies
 #   2. Builds all workspace packages
 #   3. Computes the release cascade based on the selected trigger package
 #   4. Bumps versions (via bumpp) for each package in the cascade
@@ -68,7 +68,6 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write # push version commits + tags
-      id-token: write # OIDC token for JFrog npm registry proxy
 
     steps:
       - name: Checkout code
@@ -76,19 +75,6 @@ jobs:
         with:
           ref: ${{ inputs.ref || 'main' }}
           fetch-depth: 0 # full history for tag-based version detection
-
-      - name: Setup JFrog CLI with OIDC
-        id: setup-jfrog
-        uses: jfrog/setup-jfrog-cli@279b1f629f43dd5bc658d8361ac4802a7ef8d2d5 # v4.9.1
-        env:
-          JF_URL: https://databricks.jfrog.io
-        with:
-          oidc-provider-name: github-actions
-
-      - name: Configure npm registry for JFrog
-        run: |
-          echo "registry=https://databricks.jfrog.io/artifactory/api/npm/db-npm/" >> .npmrc
-          echo "//databricks.jfrog.io/artifactory/api/npm/db-npm/:_authToken=${{ steps.setup-jfrog.outputs.oidc-token }}" >> .npmrc
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
