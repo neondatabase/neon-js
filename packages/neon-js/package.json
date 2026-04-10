@@ -87,6 +87,14 @@
       "types": "./dist/auth/next/server/index.d.mts",
       "default": "./dist/auth/next/server/index.mjs"
     },
+    "./auth/start": {
+      "types": "./dist/auth/start/index.d.mts",
+      "default": "./dist/auth/start/index.mjs"
+    },
+    "./auth/start/server": {
+      "types": "./dist/auth/start/server/index.d.mts",
+      "default": "./dist/auth/start/server/index.mjs"
+    },
     "./ui/css": {
       "types": "./dist/ui/css.d.ts",
       "default": "./dist/ui/css.css"
