@@ -24,12 +24,6 @@ jobs:
         with:
           node-version: 22
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
-        with:
-          version: 9
-          standalone: true
-
       - name: Setup JFrog CLI with OIDC
         uses: jfrog/setup-jfrog-cli@5a4fbe1e30dbb570cc62d2513421c4b9bc3c9959 # v4
         env:
@@ -37,22 +31,10 @@ jobs:
         with:
           oidc-provider-name: github-actions
 
-      - name: Configure npm registry via JFrog
-        run: |
-          JFROG_TOKEN=$(jf config export setup-jfrog-cli-server | base64 -d | jq -r '.accessToken')
-          echo "registry=https://databricks.jfrog.io/artifactory/api/npm/db-npm/" > ~/.npmrc
-          echo "//databricks.jfrog.io/artifactory/api/npm/db-npm/:_authToken=${JFROG_TOKEN}" >> ~/.npmrc
-
-      - name: Cache pnpm store
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: ~/.local/share/pnpm/store
-          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            pnpm-${{ runner.os }}-
-
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: |
+          jf npmc --repo-resolve=db-npm
+          jf npm install
 
       - name: Cache build artifacts
         id: build-cache
@@ -67,11 +49,11 @@ jobs:
           key: build-${{ runner.os }}-${{ hashFiles('packages/*/src/**', 'packages/*/tsdown.config.ts', 'build/**', 'tsconfig.json') }}
 
       - name: Lint
-        run: pnpm run lint
+        run: npm run lint
 
       - name: Build
         if: steps.build-cache.outputs.cache-hit != 'true'
-        run: pnpm run build
+        run: npm run build
 
       - name: Typecheck
-        run: pnpm run typecheck
+        run: npm run typecheck
