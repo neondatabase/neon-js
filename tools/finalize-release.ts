@@ -1,18 +1,21 @@
 #!/usr/bin/env bun
 
 /**
- * finalize-release.ts -- Write-back script for the secure publishing repo
+ * finalize-release.ts -- Manual recovery utility (no longer part of the normal pipeline)
  *
- * Called by the central secure repo AFTER all packages have been successfully
- * published to npm. This script:
+ * HISTORY: This was previously the write-back script called by the secure repo
+ * after publishing. It committed version bumps, tags, and changelog updates back
+ * to the neon-js repo using a GitHub App token.
  *
- *   1. Verifies the checkout SHA matches the manifest's sourceCommitSha
- *   2. Verifies all packages exist on npm at their expected versions
- *   3. Applies the prepared versions to package.json files (via sync-versions apply)
- *   4. Updates CHANGELOG.md
- *   5. Commits with [skip ci] to prevent re-triggering prepare-release
- *   6. Creates annotated tags (one per package)
- *   7. Pushes via the provided GITHUB_TOKEN (GitHub App token)
+ * CURRENT STATUS: Stage 1 (prepare-release.yml) now handles version commits and
+ * tags directly before publishing. This script is retained only as a manual
+ * recovery tool in case you need to re-apply versions from a manifest after a
+ * failed or partial release.
+ *
+ * Typical recovery scenario:
+ *   - Stage 1 ran but the push failed or was partial
+ *   - You have a release-manifest.json from the failed run
+ *   - You want to re-apply versions and re-tag locally
  *
  * Usage:
  *   bun tools/finalize-release.ts \
@@ -20,7 +23,7 @@
  *     --repo-dir <path-to-neon-js-checkout>
  *
  * Environment:
- *   GITHUB_TOKEN -- GitHub App token for push and release creation
+ *   GITHUB_TOKEN -- (optional) GitHub token for push; omit to just apply locally
  */
 
 import { execSync } from "node:child_process";

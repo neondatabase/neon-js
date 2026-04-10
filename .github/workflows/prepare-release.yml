@@ -2,36 +2,51 @@ name: Prepare Release
 
 # Stage 1 of the two-stage secure publishing pipeline.
 #
-# This workflow runs on every push to main (excluding bot finalize commits)
-# and prepares immutable release artifacts for the secure publishing repo.
+# This workflow is triggered manually via workflow_dispatch. It:
 #
-# What this does:
 #   1. Installs dependencies via JFrog OIDC proxy
-#   2. Runs tools/sync-versions.ts plan to compute the release manifest
-#   3. Exits cleanly if no packages need releasing
-#   4. Runs tools/sync-versions.ts apply to rewrite versions in the checkout
-#   5. Rebuilds all packages with bumped versions
-#   6. Packs tarballs for each package in the manifest
-#   7. Generates SHA256SUMS covering all artifacts
-#   8. Uploads the bundle as a workflow artifact
+#   2. Builds all workspace packages
+#   3. Computes the release cascade based on the selected trigger package
+#   4. Bumps versions (via bumpp) for each package in the cascade
+#   5. Commits version bumps + updated lockfile
+#   6. Tags each package (e.g., auth@v0.2.1)
+#   7. Pushes commits and tags to the repo
+#   8. Rebuilds with bumped versions baked in
+#   9. Packs tarballs for each package in the cascade
+#  10. Generates SHA256SUMS covering all artifacts
+#  11. Uploads the bundle as a workflow artifact
 #
 # What this does NOT do:
-#   - Commit, tag, or push anything
-#   - Publish to npm
-#   - Create GitHub Releases
+#   - Publish to npm (that's Stage 2 in the secure repo)
+#   - Scan artifacts (that's also Stage 2)
 #
-# The secure repo (databricks/secure-public-registry-releases-eng) polls for
-# successful runs of this workflow, downloads the artifact bundle, verifies
-# integrity, scans, publishes via npm OIDC Trusted Publishing, and then runs
-# tools/finalize-release.ts to write version state back to this repo.
+# Stage 2 lives in databricks/secure-public-registry-releases-eng and is
+# triggered manually pointing at the tag/ref from this workflow. It downloads
+# artifacts, verifies SHA256, scans, and publishes via npm OIDC Trusted Publishing.
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
+      package:
+        description: 'Package to release (triggers cascade)'
+        required: true
+        type: choice
+        options:
+          - auth
+          - auth-ui
+          - postgrest-js
+          - neon-js
+      bump:
+        description: 'Version bump type'
+        required: true
+        type: choice
+        default: patch
+        options:
+          - patch
+          - minor
+          - major
       ref:
-        description: 'Branch, tag, or SHA to prepare from (for testing)'
+        description: 'Branch or SHA to release from (default: main)'
         required: false
         default: 'main'
 
@@ -45,23 +60,21 @@ defaults:
 
 jobs:
   prepare:
-    # Skip bot-driven finalize commits and [skip ci] markers
     if: >-
-      github.actor != 'neon-js-release[bot]' &&
       !contains(github.event.head_commit.message, '[skip ci]')
     runs-on:
       group: neondatabase-protected-runner-group
       labels: linux-ubuntu-latest
     timeout-minutes: 30
     permissions:
-      contents: read
+      contents: write # push version commits + tags
       id-token: write # OIDC token for JFrog npm registry proxy
 
     steps:
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          ref: ${{ inputs.ref || github.sha }}
+          ref: ${{ inputs.ref || 'main' }}
           fetch-depth: 0 # full history for tag-based version detection
 
       - name: Setup JFrog CLI with OIDC
@@ -80,6 +93,11 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
 
+      - name: Setup Node (for npx bumpp)
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: '22'
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
@@ -89,39 +107,90 @@ jobs:
       - name: Build workspace packages
         run: bun run build
 
-      - name: Plan release
-        id: plan
-        env:
-          GITHUB_EVENT_NAME: ${{ github.event_name }}
+      - name: Compute release cascade
+        id: cascade
         run: |
-          bun tools/sync-versions.ts plan
-          if [ ! -f release-manifest.json ]; then
-            echo "No releasable changes detected. Exiting cleanly."
-            echo "has_release=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "has_release=true" >> "$GITHUB_OUTPUT"
-          echo "### Release Manifest" >> "$GITHUB_STEP_SUMMARY"
-          echo '```json' >> "$GITHUB_STEP_SUMMARY"
-          cat release-manifest.json >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          PACKAGE="${{ inputs.package }}"
+          case "$PACKAGE" in
+            postgrest-js) PACKAGES='["postgrest-js","neon-js"]' ;;
+            auth-ui)      PACKAGES='["auth-ui","auth","neon-js"]' ;;
+            auth)         PACKAGES='["auth","neon-js"]' ;;
+            neon-js)      PACKAGES='["neon-js"]' ;;
+            *)            echo "Unknown package: $PACKAGE"; exit 1 ;;
+          esac
+          echo "packages=$PACKAGES" >> "$GITHUB_OUTPUT"
+          echo "### Release Cascade" >> "$GITHUB_STEP_SUMMARY"
+          echo "Trigger: \`$PACKAGE\` (${{ inputs.bump }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "Cascade: $PACKAGES" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Apply version bumps
-        if: steps.plan.outputs.has_release == 'true'
-        run: bun tools/sync-versions.ts apply
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump versions
+        id: versions
+        run: |
+          BUMP="${{ inputs.bump }}"
+          PACKAGES='${{ steps.cascade.outputs.packages }}'
+          VERSIONS='{}'
+          TAGS='[]'
+
+          for pkg in $(echo "$PACKAGES" | jq -r '.[]'); do
+            echo "::group::Bump $pkg ($BUMP)"
+            cd "packages/$pkg"
+            npx bumpp --release "$BUMP" --no-tag --no-commit --no-push --yes
+            version=$(jq -r '.version' package.json)
+            VERSIONS=$(echo "$VERSIONS" | jq --arg k "$pkg" --arg v "$version" '. + {($k): $v}')
+            TAGS=$(echo "$TAGS" | jq --arg t "${pkg}@v${version}" '. + [$t]')
+            cd "$GITHUB_WORKSPACE"
+            echo "::endgroup::"
+          done
+
+          echo "versions=$VERSIONS" >> "$GITHUB_OUTPUT"
+          echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
+          echo "### Versions" >> "$GITHUB_STEP_SUMMARY"
+          echo "$VERSIONS" | jq -r 'to_entries[] | "- **\(.key)** v\(.value)"' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Update lockfile
+        run: bun install
+
+      - name: Commit version bumps
+        run: |
+          PACKAGES='${{ steps.cascade.outputs.packages }}'
+          VERSIONS='${{ steps.versions.outputs.versions }}'
+
+          # Build the commit message
+          COMMIT_MSG="chore: release"
+          for pkg in $(echo "$PACKAGES" | jq -r '.[]'); do
+            version=$(echo "$VERSIONS" | jq -r --arg k "$pkg" '.[$k]')
+            COMMIT_MSG="$COMMIT_MSG @neondatabase/${pkg}@v${version}"
+          done
+          COMMIT_MSG="$COMMIT_MSG [skip ci]"
+
+          git add -A
+          git commit -m "$COMMIT_MSG"
+
+      - name: Create tags
+        run: |
+          TAGS='${{ steps.versions.outputs.tags }}'
+          for tag in $(echo "$TAGS" | jq -r '.[]'); do
+            echo "Tagging: $tag"
+            git tag -a "$tag" -m "Release $tag"
+          done
+
+      - name: Push commits and tags
+        run: git push --follow-tags
 
       - name: Rebuild with bumped versions
-        if: steps.plan.outputs.has_release == 'true'
         run: bun run build
 
       - name: Pack tarballs
-        if: steps.plan.outputs.has_release == 'true'
         run: |
           mkdir -p prepared-release/packages
+          PACKAGES='${{ steps.cascade.outputs.packages }}'
 
-          # Read packages from the manifest
-          packages=$(jq -r '.packages[].packageId' release-manifest.json)
-          for pkg in $packages; do
+          for pkg in $(echo "$PACKAGES" | jq -r '.[]'); do
             echo "::group::Pack $pkg"
             cd "$GITHUB_WORKSPACE/packages/$pkg"
             bun pm pack
@@ -130,14 +199,14 @@ jobs:
             echo "::endgroup::"
           done
 
-          # Copy the manifest into the bundle
-          cp release-manifest.json prepared-release/
+          # Write a release info file
+          VERSIONS='${{ steps.versions.outputs.versions }}'
+          echo "$VERSIONS" | jq '.' > prepared-release/release-info.json
 
           echo "### Packed Artifacts" >> "$GITHUB_STEP_SUMMARY"
           ls -lh prepared-release/packages/ >> "$GITHUB_STEP_SUMMARY"
 
       - name: Generate SHA256SUMS
-        if: steps.plan.outputs.has_release == 'true'
         run: |
           cd prepared-release
           find . -type f ! -name SHA256SUMS | sort | xargs sha256sum > SHA256SUMS
@@ -147,7 +216,6 @@ jobs:
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload release bundle
-        if: steps.plan.outputs.has_release == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: prepared-release

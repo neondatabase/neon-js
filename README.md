@@ -47,21 +47,22 @@ bun typecheck        # Type check all packages
 
 ## Releasing
 
-Releases are published through the centralized secure publishing pipeline in
-[`secure-public-registry-releases-eng`](https://github.com/databricks/secure-public-registry-releases-eng).
+Releases use a two-stage pipeline. No GitHub App is needed.
 
 ### How it works
 
-1. Every push to `main` triggers the **Prepare Release** workflow in this repo
-2. The workflow detects changed packages, computes version bumps and cascade,
-   builds artifacts, and uploads an immutable release bundle
-3. The secure repo polls for new bundles, verifies integrity, scans for
-   vulnerabilities, and publishes via npm OIDC Trusted Publishing
-4. After publish, `neon-js-release[bot]` writes back version bumps, tags,
-   and changelog updates to this repo
+**Stage 1** (`prepare-release.yml` in this repo, manual `workflow_dispatch`):
+1. Select the trigger package and bump type
+2. The workflow builds, bumps versions via cascade, commits, tags, and pushes
+3. Build artifacts (tarballs + SHA256SUMS) are uploaded as workflow artifacts
+
+**Stage 2** (`neon-js.yml` in [`secure-public-registry-releases-eng`](https://github.com/databricks/secure-public-registry-releases-eng), manual `workflow_dispatch`):
+1. Point it at the tag/ref from Stage 1
+2. It checks out the tagged commit, builds from source, scans, and publishes via npm OIDC
+3. If publish fails, a prominent warning is shown with remediation steps
 
 Local releases are disabled. Running `bun run release` will show an error
-directing you to the secure pipeline.
+directing you to the two-stage pipeline.
 
 ### Cascade rules
 
@@ -78,7 +79,7 @@ The release logic lives in `tools/`:
 
 - `tools/sync-versions.ts plan` -- detect changes, compute cascade, write `release-manifest.json`
 - `tools/sync-versions.ts apply` -- rewrite package.json versions from the manifest
-- `tools/finalize-release.ts` -- write-back script called by the secure repo after publish
+- `tools/finalize-release.ts` -- manual recovery utility (no longer part of normal pipeline)
 - `tools/release-manifest.schema.json` -- JSON Schema contract between both repos
 
 ## Support
