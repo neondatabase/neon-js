@@ -46,5 +46,12 @@
     "vite-tsconfig-paths": "5.1.4",
     "vitest": "4.0.7"
   },
-  "dependencies": {}
+  "dependencies": {},
+  "pnpm": {
+    "overrides": {
+      "tailwindcss": "4.1.17",
+      "@tailwindcss/cli": "4.1.17",
+      "@tailwindcss/oxide": "4.1.17"
+    }
+  }
 }
