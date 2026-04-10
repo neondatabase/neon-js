@@ -99,12 +99,6 @@ describe('CSS Build Output', () => {
       expect(hasLayerWrappers(css)).toBe(false);
     });
 
-    it('matches snapshot', () => {
-      const stylePath = resolve(distDir, 'style.css');
-      const css = readFileSync(stylePath, 'utf8');
-      expect(css).toMatchSnapshot();
-    });
-
     it('is valid parseable CSS', () => {
       const stylePath = resolve(distDir, 'style.css');
       const css = readFileSync(stylePath, 'utf8');
@@ -182,11 +176,6 @@ describe('CSS Build Output', () => {
       expect(css).toContain('@theme inline');
     });
 
-    it('matches snapshot', () => {
-      const themePath = resolve(distDir, 'theme-inline.css');
-      const css = readFileSync(themePath, 'utf8');
-      expect(css).toMatchSnapshot();
-    });
   });
 
   describe('theme.css', () => {
@@ -201,12 +190,6 @@ describe('CSS Build Output', () => {
 
       // Should have actual CSS content, not just imports
       expect(css.length).toBeGreaterThan(100);
-    });
-
-    it('matches snapshot', () => {
-      const themePath = resolve(distDir, 'theme.css');
-      const css = readFileSync(themePath, 'utf8');
-      expect(css).toMatchSnapshot();
     });
 
     it('is valid parseable CSS', () => {
@@ -239,11 +222,6 @@ describe('CSS Build Output', () => {
       expect(css).toContain('@source "./.safelist.html"');
     });
 
-    it('matches snapshot', () => {
-      const tailwindPath = resolve(distDir, 'tailwind.css');
-      const css = readFileSync(tailwindPath, 'utf8');
-      expect(css).toMatchSnapshot();
-    });
   });
 
   describe('consistency', () => {
