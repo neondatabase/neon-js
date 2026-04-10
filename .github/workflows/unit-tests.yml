@@ -26,6 +26,12 @@ jobs:
         with:
           node-version: 22
 
+      - name: Install pnpm
+        run: |
+          curl -fsSL https://github.com/pnpm/pnpm/releases/download/v9.15.9/pnpm-linux-x64 -o /usr/local/bin/pnpm
+          chmod +x /usr/local/bin/pnpm
+          pnpm --version
+
       - name: Setup JFrog CLI with OIDC
         uses: jfrog/setup-jfrog-cli@5a4fbe1e30dbb570cc62d2513421c4b9bc3c9959 # v4
         env:
@@ -33,10 +39,14 @@ jobs:
         with:
           oidc-provider-name: github-actions
 
-      - name: Install dependencies
+      - name: Configure npm registry via JFrog
         run: |
-          jf npmc --repo-resolve=db-npm
-          jf npm install
+          JFROG_TOKEN=$(jf config export setup-jfrog-cli-server | base64 -d | jq -r '.accessToken')
+          echo "registry=https://databricks.jfrog.io/artifactory/api/npm/db-npm/" > ~/.npmrc
+          echo "//databricks.jfrog.io/artifactory/api/npm/db-npm/:_authToken=${JFROG_TOKEN}" >> ~/.npmrc
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Restore build cache
         id: build-cache
@@ -54,10 +64,10 @@ jobs:
 
       - name: Build packages
         if: steps.build-cache.outputs.cache-hit != 'true'
-        run: npm run build
+        run: pnpm run build
 
       # Run unit tests using vitest
-      # Note: Uses `npm run test:ci` which runs `vitest run` for each package
+      # Note: Uses `pnpm run test:ci` which runs `vitest run` for each package
       # The CSS build tests in auth-ui require the build to complete first
       - name: Run unit tests
-        run: npm run test:ci
+        run: pnpm run test:ci
