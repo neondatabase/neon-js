@@ -31,12 +31,10 @@ jobs:
 
       - name: Configure JFrog npm proxy for Bun
         run: |
-          JFROG_AUTH_TOKEN=$(jf config show --format=json | jq -r '.[0].accessToken')
+          JFROG_AUTH_TOKEN=$(jf config export setup-jfrog-cli-server | base64 -d | jq -r '.accessToken')
           echo "JFROG_AUTH_TOKEN=$JFROG_AUTH_TOKEN" >> "$GITHUB_ENV"
-          cat > bunfig.toml <<EOF
-          [install]
-          registry = { url = "https://databricks.jfrog.io/artifactory/api/npm/db-npm/", token = "$JFROG_AUTH_TOKEN" }
-          EOF
+          echo "registry=https://databricks.jfrog.io/artifactory/api/npm/db-npm/" > .npmrc
+          echo "//databricks.jfrog.io/artifactory/api/npm/db-npm/:_authToken=${JFROG_AUTH_TOKEN}" >> .npmrc
 
       - name: Cache bun store
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
