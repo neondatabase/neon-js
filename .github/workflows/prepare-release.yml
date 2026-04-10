@@ -79,11 +79,6 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
 
-      - name: Setup Node (for npx bumpp)
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
-        with:
-          node-version: '22'
-
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
@@ -125,7 +120,7 @@ jobs:
           for pkg in $(echo "$PACKAGES" | jq -r '.[]'); do
             echo "::group::Bump $pkg ($BUMP)"
             cd "packages/$pkg"
-            npx bumpp --release "$BUMP" --no-tag --no-commit --no-push --yes
+            bunx bumpp --release "$BUMP" --no-tag --no-commit --no-push --yes
             version=$(jq -r '.version' package.json)
             VERSIONS=$(echo "$VERSIONS" | jq --arg k "$pkg" --arg v "$version" '. + {($k): $v}')
             TAGS=$(echo "$TAGS" | jq --arg t "${pkg}@v${version}" '. + [$t]')
