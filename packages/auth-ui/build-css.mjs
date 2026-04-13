@@ -115,7 +115,7 @@ writeFileSync(tempThemeCssPath, themeCssWithSource, 'utf8');
 try {
   // Build pre-built CSS with all utilities (style.css)
   execSync(
-    `bunx tailwindcss -i ${tempIndexCssPath} -o ./dist/style.css --minify`,
+    `pnpm exec tailwindcss -i ${tempIndexCssPath} -o ./dist/style.css --minify`,
     {
       cwd: __dirname,
       stdio: 'inherit',
@@ -141,7 +141,7 @@ try {
 
   // Build theme.css through Tailwind to resolve @imports and inline external CSS
   // This resolves @import '@daveyplate/better-auth-ui/css' at build time
-  execSync(`bunx tailwindcss -i ${tempThemeCssPath} -o ./dist/theme.css`, {
+  execSync(`pnpm exec tailwindcss -i ${tempThemeCssPath} -o ./dist/theme.css`, {
     cwd: __dirname,
     stdio: 'inherit',
   });

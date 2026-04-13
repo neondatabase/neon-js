@@ -69,11 +69,16 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install Bun
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+
+      - name: Install pnpm
         run: |
-          curl -fsSL https://bun.sh/install | bash
-          echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
-          echo "Bun version: $($HOME/.bun/bin/bun --version)"
+          curl -fsSL https://github.com/pnpm/pnpm/releases/download/v9.15.9/pnpm-linux-x64 -o /usr/local/bin/pnpm
+          chmod +x /usr/local/bin/pnpm
+          pnpm --version
 
       - name: Get JFrog OIDC token
         run: |
@@ -100,20 +105,20 @@ jobs:
           echo "JFROG_ACCESS_TOKEN=${ACCESS_TOKEN}" >> "$GITHUB_ENV"
           echo "JFrog OIDC token obtained successfully"
 
-      - name: Configure npm registry
+      - name: Configure npm
         run: |
           set -euo pipefail
 
-          cat > .npmrc << EOF
+          cat > ~/.npmrc << EOF
           registry=https://databricks.jfrog.io/artifactory/api/npm/db-npm/
           //databricks.jfrog.io/artifactory/api/npm/db-npm/:_authToken=${JFROG_ACCESS_TOKEN}
           always-auth=true
           EOF
 
-          echo "npm/.npmrc configured for JFrog registry (bun reads .npmrc)"
+          echo "npm configured to use JFrog registry"
 
       - name: Install dependencies
-        run: bun install --force --verbose
+        run: pnpm install --no-frozen-lockfile
 
       - name: Restore build cache
         id: build-cache
@@ -131,7 +136,7 @@ jobs:
 
       - name: Build packages
         if: steps.build-cache.outputs.cache-hit != 'true'
-        run: bun run build
+        run: pnpm run build
 
       # Create an isolated Neon branch for this PR/run
       - name: Get branch expiration date (2 hours from now)
@@ -153,7 +158,7 @@ jobs:
       # Build React example (uses VITE_ prefix)
       - name: Build React example app
         if: matrix.app == 'react-neon-js'
-        run: cd examples/react-neon-js && bun run build
+        run: cd examples/react-neon-js && pnpm run build
         env:
           VITE_NEON_AUTH_URL: ${{ steps.create-branch.outputs.auth_url }}
           VITE_NEON_DATA_API_URL: ${{ steps.create-branch.outputs.data_api_url }}
@@ -161,7 +166,7 @@ jobs:
       # Build Next.js example (uses NEON_AUTH_BASE_URL)
       - name: Build Next.js example app
         if: matrix.app == 'nextjs-neon-auth'
-        run: cd examples/nextjs-neon-auth && bun run build
+        run: cd examples/nextjs-neon-auth && pnpm run build
         env:
           NEON_AUTH_BASE_URL: ${{ steps.create-branch.outputs.auth_url }}
           DATABASE_URL: ${{ steps.create-branch.outputs.db_url }}
@@ -170,7 +175,7 @@ jobs:
       # Get Playwright version for cache key
       - name: Get Playwright version
         id: playwright-version
-        run: echo "version=$(cd e2e && bunx playwright --version | awk '{print $2}')" >> $GITHUB_OUTPUT
+        run: echo "version=$(cd e2e && pnpm exec playwright --version | awk '{print $2}')" >> $GITHUB_OUTPUT
 
       # Cache browser binaries with restore-keys fallback
       - name: Cache Playwright browsers
@@ -185,19 +190,19 @@ jobs:
       # Install browsers only on cache miss
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: cd e2e && bunx playwright install --with-deps chromium
+        run: cd e2e && pnpm exec playwright install --with-deps chromium
 
       # Install system deps if browsers were cached (they may need system libs)
       - name: Install system dependencies
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: cd e2e && bunx playwright install-deps chromium
+        run: cd e2e && pnpm exec playwright install-deps chromium
 
       - name: Run E2E tests
         run: |
           if [ "${{ matrix.app }}" = "react-neon-js" ]; then
-            bun run --filter e2e test:react:ci
+            pnpm run --filter e2e test:react:ci
           else
-            bun run --filter e2e test:nextjs:ci
+            pnpm run --filter e2e test:nextjs:ci
           fi
         env:
           CI: true
