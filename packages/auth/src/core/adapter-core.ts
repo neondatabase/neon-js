@@ -5,6 +5,7 @@ import {
   adminClient,
   emailOTPClient,
   organizationClient,
+  phoneNumberClient,
 } from 'better-auth/client/plugins';
 import {
   BETTER_AUTH_METHODS_HOOKS,
@@ -28,6 +29,7 @@ const supportedBetterAuthClientPlugins = [
   adminClient(),
   organizationClient(),
   emailOTPClient(),
+  phoneNumberClient(),
   anonymousTokenClient(),
 ] satisfies BetterAuthClientOptions['plugins'];
 
