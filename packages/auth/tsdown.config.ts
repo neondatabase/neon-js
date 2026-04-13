@@ -25,7 +25,7 @@ export default defineConfig(
     // Explicitly externalize workspace deps that skipNodeModulesBundle misses
     // (pnpm workspace symlinks resolve outside node_modules, so the
     // node_modules-based heuristic doesn't catch them)
-    external: ['@neondatabase/auth-ui'],
+    external: [/^@neondatabase\/auth-ui/],
     noExternal: ['@neondatabase/internal'],
     plugins: [
       preserveDirectives({
