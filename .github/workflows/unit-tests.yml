@@ -65,7 +65,7 @@ jobs:
           echo "npm/.npmrc configured for JFrog registry (bun reads .npmrc)"
 
       - name: Install dependencies
-        run: bun install
+        run: bun install --verbose
 
       - name: Restore build cache
         id: build-cache
