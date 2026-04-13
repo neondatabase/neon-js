@@ -56,9 +56,9 @@
       "@better-auth/telemetry": "1.4.6",
       "@better-fetch/fetch": "1.1.21",
       "better-call": "1.1.5",
-      "tailwindcss": "4.1.17",
-      "@tailwindcss/cli": "4.1.17",
-      "@tailwindcss/oxide": "4.1.17"
+      "tailwindcss": "4.2.1",
+      "@tailwindcss/cli": "4.2.1",
+      "@tailwindcss/oxide": "4.2.1"
     }
   }
 }
