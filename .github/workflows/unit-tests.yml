@@ -82,7 +82,7 @@ jobs:
             packages/auth-ui/dist
             packages/auth/dist
             packages/neon-js/dist
-          key: build-${{ runner.os }}-${{ hashFiles('packages/*/src/**', 'packages/*/tsdown.config.ts', 'build/**', 'tsconfig.json') }}
+          key: build-${{ runner.os }}-${{ hashFiles('packages/*/src/**', 'packages/*/tsdown.config.ts', 'build/**', 'tsconfig.json', 'pnpm-lock.yaml') }}
           restore-keys: |
             build-${{ runner.os }}-
 
