@@ -79,7 +79,7 @@ jobs:
           # Configure bun to use JFrog registry via project .npmrc
           printf 'registry=https://databricks.jfrog.io/artifactory/api/npm/db-npm/\n//databricks.jfrog.io/artifactory/api/npm/db-npm/:_authToken=%s\n' "${JFROG_ACCESS_TOKEN}" > .npmrc
 
-          bun install --frozen-lockfile
+          bun install
 
           # Clean up so pnpm doesn't pick up our .npmrc
           rm -f .npmrc
