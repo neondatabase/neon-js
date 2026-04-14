@@ -1,0 +1,33 @@
+name: Setup JFrog npm
+description: Authenticate to JFrog via OIDC and configure npm registry
+
+runs:
+  using: composite
+  steps:
+    - name: Setup JFrog CLI with OIDC
+      id: setup-jfrog
+      uses: jfrog/setup-jfrog-cli@279b1f629f43dd5bc658d8361ac4802a7ef8d2d5 # v4.9.1
+      env:
+        JF_URL: https://databricks.jfrog.io
+      with:
+        oidc-provider-name: github-actions
+
+    - name: Configure npm registry
+      shell: bash
+      run: |
+        JFROG_TOKEN="${{ steps.setup-jfrog.outputs.oidc-token }}"
+
+        if [ -z "$JFROG_TOKEN" ]; then
+          echo "::error::Failed to obtain JFrog OIDC token"
+          exit 1
+        fi
+
+        echo "::add-mask::${JFROG_TOKEN}"
+
+        cat > ~/.npmrc <<EOF
+        registry=https://databricks.jfrog.io/artifactory/api/npm/db-npm/
+        //databricks.jfrog.io/artifactory/api/npm/db-npm/:_authToken=${JFROG_TOKEN}
+        always-auth=true
+        EOF
+
+        echo "npm configured to use JFrog registry via OIDC"
