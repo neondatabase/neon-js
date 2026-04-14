@@ -45,6 +45,6 @@ jobs:
           additional_permissions: |
             actions: read
 
-          # Restrict tools to read-only operations + gh CLI + bun scripts only.
+          # Restrict tools to read-only operations + gh CLI + pnpm scripts only.
           # Blocks curl/wget/arbitrary bash to prevent exfiltration via prompt injection.
-          claude_args: '--allowed-tools "Read,Glob,Grep,Bash(gh:*),Bash(bun run:*),Bash(git diff:*),Bash(git log:*),Bash(git status)"'
+          claude_args: '--allowed-tools "Read,Glob,Grep,Bash(gh:*),Bash(pnpm run:*),Bash(git diff:*),Bash(git log:*),Bash(git status)"'

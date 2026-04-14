@@ -1,11 +1,12 @@
-#!/usr/bin/env bun
+#!/usr/bin/env npx tsx
 
-import { $ } from 'bun';
+import { execFileSync } from 'node:child_process';
 import {
   existsSync,
   mkdtempSync,
   mkdirSync,
   readFileSync,
+  writeFileSync,
   rmSync,
 } from 'node:fs';
 import path from 'node:path';
@@ -16,15 +17,6 @@ interface PackageJson {
   module?: string;
   bin?: string | Record<string, string>;
   exports?: unknown;
-}
-
-interface BuildLog {
-  message: string;
-  position?: {
-    file: string;
-    line: number;
-    column: number;
-  };
 }
 
 const ROOT_DIR = path.resolve(import.meta.dirname, '..');
@@ -38,7 +30,7 @@ const CYCLONEDX_CLI_PATH = path.join(
 
 function usage(): never {
   console.error(
-    'Usage: bun scripts/generate-release-sbom.ts <package-name> <output-path>'
+    'Usage: npx tsx scripts/generate-release-sbom.ts <package-name> <output-path>'
   );
   process.exit(1);
 }
@@ -114,17 +106,6 @@ function collectPackageEntrypoints(pkg: PackageJson): string[] {
   return [...entrypoints].toSorted();
 }
 
-function formatBuildLogs(logs: BuildLog[]): string {
-  return logs
-    .map((log) => {
-      const location = log.position
-        ? `${log.position.file}:${log.position.line}:${log.position.column}`
-        : '';
-      return [location, log.message].filter(Boolean).join(' ');
-    })
-    .join('\n');
-}
-
 const packageName = process.argv[2];
 const outputPathArg = process.argv[3];
 
@@ -134,7 +115,7 @@ if (!packageName || !outputPathArg) {
 
 if (!existsSync(CYCLONEDX_CLI_PATH)) {
   console.error(
-    `Missing cyclonedx-esbuild CLI at ${CYCLONEDX_CLI_PATH}. Run bun install first.`
+    `Missing cyclonedx-esbuild CLI at ${CYCLONEDX_CLI_PATH}. Run pnpm install first.`
   );
   process.exit(1);
 }
@@ -175,36 +156,39 @@ const buildEntrypoints = entrypoints.map((entrypoint) =>
   path.join(packageDir, entrypoint)
 );
 
-const previousCwd = process.cwd();
-
 try {
-  process.chdir(ROOT_DIR);
+  // Use esbuild directly (available via cyclonedx-esbuild's dependency)
+  const esbuild = await import('esbuild');
 
-  const result = await Bun.build({
-    entrypoints: buildEntrypoints,
+  const result = await esbuild.build({
+    entryPoints: buildEntrypoints,
     outdir: bundleOutdir,
     format: 'esm',
-    target: 'bun',
+    platform: 'node',
     metafile: true,
-    packages: 'bundle',
-    root: ROOT_DIR,
+    bundle: true,
+    external: [], // bundle everything to capture all deps
+    absWorkingDir: ROOT_DIR,
   });
-
-  if (!result.success) {
-    throw new Error(
-      `SBOM build failed for ${packageJson.name}\n${formatBuildLogs(result.logs)}`
-    );
-  }
 
   if (!result.metafile) {
     throw new Error(`No build metafile was produced for ${packageJson.name}`);
   }
 
-  await Bun.write(metafilePath, JSON.stringify(result.metafile, null, 2));
+  writeFileSync(metafilePath, JSON.stringify(result.metafile, null, 2));
 
-  await $`${CYCLONEDX_CLI_PATH} --build-working-dir ${ROOT_DIR} --mc-type library --output-reproducible --output-file ${outputPath} ${metafilePath}`;
+  execFileSync(
+    CYCLONEDX_CLI_PATH,
+    [
+      '--build-working-dir', ROOT_DIR,
+      '--mc-type', 'library',
+      '--output-reproducible',
+      '--output-file', outputPath,
+      metafilePath,
+    ],
+    { stdio: 'inherit' }
+  );
 } finally {
-  process.chdir(previousCwd);
   rmSync(tempDir, { recursive: true, force: true });
 }
 

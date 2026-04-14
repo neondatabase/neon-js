@@ -33,16 +33,16 @@ Pre-built login forms and auth pages are included in both `neon-js` and `auth` p
 
 ## Development
 
-This is a Bun workspaces monorepo. See [CLAUDE.md](./CLAUDE.md) for detailed development setup.
+This is a pnpm workspaces monorepo. See [CLAUDE.md](./CLAUDE.md) for detailed development setup.
 
 **Quick start:**
 
 ```bash
-bun install          # Install dependencies
-bun dev              # Watch mode for all packages
-bun run build        # Build all packages
-bun test             # Run tests
-bun typecheck        # Type check all packages
+pnpm install         # Install dependencies
+pnpm dev             # Watch mode for all packages
+pnpm run build       # Build all packages
+pnpm test            # Run tests
+pnpm typecheck       # Type check all packages
 ```
 
 ## Releasing
@@ -61,7 +61,7 @@ Releases use a two-stage pipeline. No GitHub App is needed.
 2. It checks out the tagged commit, builds from source, scans, and publishes via npm OIDC
 3. If publish fails, a prominent warning is shown with remediation steps
 
-Local releases are disabled. Running `bun run release` will show an error
+Local releases are disabled. Running `pnpm run release` will show an error
 directing you to the two-stage pipeline.
 
 ### Cascade rules

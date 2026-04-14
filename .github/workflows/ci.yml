@@ -67,23 +67,6 @@ jobs:
 
           echo "npm configured to use JFrog registry"
 
-      - name: Test bun install (bun#23607 fix validation)
-        timeout-minutes: 3
-        continue-on-error: true
-        run: |
-          curl -fsSL https://bun.sh/install | bash
-          export BUN_INSTALL="$HOME/.bun"
-          export PATH="$BUN_INSTALL/bin:$PATH"
-          bun --version
-
-          # Configure bun to use JFrog registry via project .npmrc
-          printf 'registry=https://databricks.jfrog.io/artifactory/api/npm/db-npm/\n//databricks.jfrog.io/artifactory/api/npm/db-npm/:_authToken=%s\n' "${JFROG_ACCESS_TOKEN}" > .npmrc
-
-          bun install
-
-          # Clean up so pnpm doesn't pick up our .npmrc
-          rm -f .npmrc
-
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 

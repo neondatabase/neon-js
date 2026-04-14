@@ -65,7 +65,7 @@
     "test:ci": "vitest run",
     "typecheck": "tsc --noEmit",
     "test:types": "tsc --noEmit",
-    "release": "bun ../../scripts/release.ts auth-ui",
+    "release": "npx tsx ../../scripts/release.ts auth-ui",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "clean": "rm -rf node_modules dist"

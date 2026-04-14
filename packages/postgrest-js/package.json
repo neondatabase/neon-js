@@ -51,7 +51,7 @@
     "test:ci": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit",
     "test:types": "tsc --noEmit",
-    "release": "bun ../../scripts/release.ts postgrest-js",
+    "release": "npx tsx ../../scripts/release.ts postgrest-js",
     "lint": "eslint .",
     "clean": "rm -rf node_modules dist"
   },

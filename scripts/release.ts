@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env npx tsx
 
 const packageName = process.argv[2];
 const packageSuffix = packageName ? ` for "${packageName}"` : '';

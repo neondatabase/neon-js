@@ -30,6 +30,10 @@ playwright/.auth/
 # SSL certificates (local development only)
 certs/
 
+# Bun lockfile (migrated to pnpm)
+bun.lock
+bun.lockb
+
 # Generated SBOMs (produced during release)
 sbom.cdx.json
 
