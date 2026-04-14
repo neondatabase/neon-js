@@ -120,7 +120,7 @@
   "peerDependencies": {
     "react": "18.0.0",
     "react-dom": "18.0.0",
-    "@neondatabase/auth": "0.1.0-alpha.8"
+    "@neondatabase/auth": "workspace:*"
   },
   "peerDependenciesMeta": {
     "@neondatabase/auth": {
