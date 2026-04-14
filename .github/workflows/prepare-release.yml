@@ -75,6 +75,7 @@ jobs:
           egress-policy: audit
 
       - name: Validate ref input
+        id: validate
         run: |
           REF="${{ inputs.ref || 'main' }}"
           if [[ "$REF" =~ ^[0-9a-f]{7,40}$ ]]; then
@@ -83,6 +84,7 @@ jobs:
           fi
 
       - name: Checkout code
+        id: checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           ref: ${{ inputs.ref || 'main' }}
@@ -105,6 +107,7 @@ jobs:
           echo "Cascade: $PACKAGES" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Configure git
+        id: git-config
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -149,6 +152,7 @@ jobs:
           echo "$VERSIONS" | jq -r 'to_entries[] | "- **\(.key)** v\(.value)"' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Commit version bumps
+        id: commit
         run: |
           PACKAGES='${{ steps.cascade.outputs.packages }}'
           VERSIONS='${{ steps.versions.outputs.versions }}'
@@ -165,6 +169,7 @@ jobs:
           git commit -m "$COMMIT_MSG"
 
       - name: Create tags
+        id: tags
         run: |
           TAGS='${{ steps.versions.outputs.tags }}'
           for tag in $(echo "$TAGS" | jq -r '.[]'); do
@@ -173,4 +178,103 @@ jobs:
           done
 
       - name: Push commits and tags
+        id: push
         run: git push --follow-tags
+
+      - name: Release failure guidance
+        if: failure()
+        run: |
+          PACKAGE="${{ inputs.package }}"
+          BUMP="${{ inputs.bump }}"
+          VERSIONS='${{ steps.versions.outputs.versions }}'
+          TAGS='${{ steps.versions.outputs.tags }}'
+
+          echo "## :x: Release Preparation Failed" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Trigger:** \`$PACKAGE\` ($BUMP)" >> "$GITHUB_STEP_SUMMARY"
+          if [[ -n "$VERSIONS" && "$VERSIONS" != "{}" ]]; then
+            echo "**Planned versions:** $VERSIONS" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          echo "### What failed" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "${{ steps.validate.outcome }}" == "failure" ]]; then
+            echo "**Ref validation** — the ref input was rejected." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Impact:** Nothing was modified. Provide a valid branch name and re-run." >> "$GITHUB_STEP_SUMMARY"
+
+          elif [[ "${{ steps.checkout.outcome }}" == "failure" ]]; then
+            echo "**Checkout** — could not check out ref \`${{ inputs.ref || 'main' }}\`." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Impact:** Nothing was modified. Verify the ref exists and re-run." >> "$GITHUB_STEP_SUMMARY"
+
+          elif [[ "${{ steps.cascade.outcome }}" == "failure" ]]; then
+            echo "**Cascade computation** — unknown package \`$PACKAGE\`." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Impact:** Nothing was modified. This is a workflow bug — the package choice list is out of sync." >> "$GITHUB_STEP_SUMMARY"
+
+          elif [[ "${{ steps.versions.outcome }}" == "failure" ]]; then
+            echo "**Version bump** — failed to compute or apply version bumps." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Impact:** Nothing was pushed. Local changes existed only on the runner (now discarded). Safe to re-run." >> "$GITHUB_STEP_SUMMARY"
+
+          elif [[ "${{ steps.commit.outcome }}" == "failure" ]]; then
+            echo "**Commit** — \`git commit\` failed (no changes staged, or git config issue)." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Impact:** Nothing was pushed. Safe to re-run." >> "$GITHUB_STEP_SUMMARY"
+
+          elif [[ "${{ steps.tags.outcome }}" == "failure" ]]; then
+            echo "**Tag creation** — \`git tag\` failed (tag already exists locally?)." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Impact:** Version bump was committed locally but nothing was pushed. Safe to re-run." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "If tags already exist on the remote from a previous attempt:" >> "$GITHUB_STEP_SUMMARY"
+            echo '```bash' >> "$GITHUB_STEP_SUMMARY"
+            echo "git ls-remote --tags origin | grep \"$PACKAGE\"" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+          elif [[ "${{ steps.push.outcome }}" == "failure" ]]; then
+            echo "**Push** — \`git push --follow-tags\` failed. Partial push is possible." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Impact:** The commit and tags were created locally. The push may have partially succeeded." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Check remote state:**" >> "$GITHUB_STEP_SUMMARY"
+            echo '```bash' >> "$GITHUB_STEP_SUMMARY"
+            echo "# Check if tags were pushed" >> "$GITHUB_STEP_SUMMARY"
+            echo "git ls-remote --tags origin | grep \"$PACKAGE\"" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "# Check if commit was pushed" >> "$GITHUB_STEP_SUMMARY"
+            echo "git log origin/main --oneline -5" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**If commit pushed but tags missing** — push tags manually:" >> "$GITHUB_STEP_SUMMARY"
+            echo '```bash' >> "$GITHUB_STEP_SUMMARY"
+            if [[ -n "$TAGS" && "$TAGS" != "[]" ]]; then
+              for tag in $(echo "$TAGS" | jq -r '.[]' 2>/dev/null); do
+                echo "git tag -a \"$tag\" -m \"Release $tag\" && git push origin \"$tag\"" >> "$GITHUB_STEP_SUMMARY"
+              done
+            else
+              echo "git tag -a \"<tag>\" -m \"Release <tag>\" && git push origin \"<tag>\"" >> "$GITHUB_STEP_SUMMARY"
+            fi
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**If tags pushed but commit missing** — delete orphan tags:" >> "$GITHUB_STEP_SUMMARY"
+            echo '```bash' >> "$GITHUB_STEP_SUMMARY"
+            if [[ -n "$TAGS" && "$TAGS" != "[]" ]]; then
+              for tag in $(echo "$TAGS" | jq -r '.[]' 2>/dev/null); do
+                echo "git push --delete origin \"$tag\"" >> "$GITHUB_STEP_SUMMARY"
+              done
+            else
+              echo "git push --delete origin \"<tag>\"" >> "$GITHUB_STEP_SUMMARY"
+            fi
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+          else
+            echo "An unexpected step failed. Check the workflow log above for details." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "---" >> "$GITHUB_STEP_SUMMARY"
+          echo ":book: [Release Runbook](../docs/release-runbook.md) — full failure recovery guide" >> "$GITHUB_STEP_SUMMARY"
