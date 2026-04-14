@@ -19,10 +19,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
+          cache: 'pnpm'
 
       - name: Get JFrog OIDC token
         run: |
@@ -48,23 +52,6 @@ jobs:
 
           echo "JFROG_ACCESS_TOKEN=${ACCESS_TOKEN}" >> "$GITHUB_ENV"
           echo "JFrog OIDC token obtained successfully"
-
-      - name: Install pnpm via corepack
-        id: corepack
-        run: |
-          corepack enable
-          corepack install
-          pnpm --version
-        env:
-          COREPACK_NPM_REGISTRY: https://databricks.jfrog.io/artifactory/api/npm/db-npm
-          COREPACK_NPM_TOKEN: ${{ env.JFROG_ACCESS_TOKEN }}
-
-      # - name: Install pnpm via curl (fallback)
-      #   if: steps.corepack.outcome != 'success'
-      #   run: |
-      #     curl -fsSL https://github.com/pnpm/pnpm/releases/download/v9.15.9/pnpm-linux-x64 -o /usr/local/bin/pnpm
-      #     chmod +x /usr/local/bin/pnpm
-      #     pnpm --version
 
       - name: Configure npm
         run: |
