@@ -172,5 +172,5 @@ jobs:
             git tag -a "$tag" -m "Release $tag"
           done
 
-      - name: Push version bump commit
-        run: git push
+      - name: Push commits and tags
+        run: git push --follow-tags
