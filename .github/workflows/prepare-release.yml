@@ -74,6 +74,14 @@ jobs:
         with:
           egress-policy: audit
 
+      - name: Validate ref input
+        run: |
+          REF="${{ inputs.ref || 'main' }}"
+          if [[ "$REF" =~ ^[0-9a-f]{7,40}$ ]]; then
+            echo "::error::Raw SHA refs are not supported. Please use a branch name (e.g., 'main')."
+            exit 1
+          fi
+
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
