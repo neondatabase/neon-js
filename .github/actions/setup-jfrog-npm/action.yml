@@ -1,11 +1,12 @@
 name: Setup JFrog npm
-description: Authenticate to JFrog via OIDC and configure npm registry
+description: Authenticate to JFrog via OIDC and configure npm registry (best-effort — falls back to public npmjs.org)
 
 runs:
   using: composite
   steps:
     - name: Setup JFrog CLI with OIDC
       id: setup-jfrog
+      continue-on-error: true
       uses: jfrog/setup-jfrog-cli@279b1f629f43dd5bc658d8361ac4802a7ef8d2d5 # v4.9.1
       env:
         JF_URL: https://databricks.jfrog.io
@@ -18,8 +19,8 @@ runs:
         JFROG_TOKEN="${{ steps.setup-jfrog.outputs.oidc-token }}"
 
         if [ -z "$JFROG_TOKEN" ]; then
-          echo "::error::Failed to obtain JFrog OIDC token"
-          exit 1
+          echo "::warning::JFrog OIDC token not available — using public npmjs.org registry"
+          exit 0
         fi
 
         echo "::add-mask::${JFROG_TOKEN}"
