@@ -75,12 +75,10 @@ directing you to the two-stage pipeline.
 
 ### Release tooling
 
-The release logic lives in `tools/`:
+All release logic lives inside the two GitHub Actions workflows:
 
-- `tools/sync-versions.ts plan` -- detect changes, compute cascade, write `release-manifest.json`
-- `tools/sync-versions.ts apply` -- rewrite package.json versions from the manifest
-- `tools/finalize-release.ts` -- manual recovery utility (no longer part of normal pipeline)
-- `tools/release-manifest.schema.json` -- JSON Schema contract between both repos
+- **`prepare-release.yml`** (this repo) -- bumps versions via cascade, commits, tags, and uploads build artifacts
+- **`neon-js.yml`** (`secure-public-registry-releases-eng`) -- checks out the tagged commit, builds from source, scans, and publishes via npm OIDC
 
 ## Support
 
