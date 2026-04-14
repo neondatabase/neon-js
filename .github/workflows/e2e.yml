@@ -101,21 +101,20 @@ jobs:
 
       - name: Install pnpm via corepack
         id: corepack
-        continue-on-error: true
         run: |
           corepack enable
           corepack install
           pnpm --version
         env:
-          COREPACK_NPM_REGISTRY: https://databricks.jfrog.io/artifactory/api/npm/db-npm/
+          COREPACK_NPM_REGISTRY: https://databricks.jfrog.io/artifactory/api/npm/db-npm
           COREPACK_NPM_TOKEN: ${{ env.JFROG_ACCESS_TOKEN }}
 
-      - name: Install pnpm via curl (fallback)
-        if: steps.corepack.outcome != 'success'
-        run: |
-          curl -fsSL https://github.com/pnpm/pnpm/releases/download/v9.15.9/pnpm-linux-x64 -o /usr/local/bin/pnpm
-          chmod +x /usr/local/bin/pnpm
-          pnpm --version
+      # - name: Install pnpm via curl (fallback)
+      #   if: steps.corepack.outcome != 'success'
+      #   run: |
+      #     curl -fsSL https://github.com/pnpm/pnpm/releases/download/v9.15.9/pnpm-linux-x64 -o /usr/local/bin/pnpm
+      #     chmod +x /usr/local/bin/pnpm
+      #     pnpm --version
 
       - name: Configure npm
         run: |
