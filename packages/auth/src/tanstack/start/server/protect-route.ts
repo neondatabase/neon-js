@@ -74,37 +74,29 @@ export async function protectRoute(
 	});
 
 	switch (result.action) {
-		case 'allow':
-			// Access allowed, return normally
+		case 'allow': {
 			return;
+		}
 
 		case 'redirect_oauth': {
-			// Handle OAuth redirect with cookies
-			// Note: TanStack Router's redirect doesn't support headers directly
-			// Cookies will be set via the response context
 			if (result.cookies && result.cookies.length > 0) {
 				const { setResponseHeader } = await import('@tanstack/react-start/server');
 				for (const cookie of result.cookies) {
 					setResponseHeader('Set-Cookie', cookie);
 				}
 			}
-			throw redirect({
-				to: result.redirectUrl.toString(),
-			});
+			const oauthPath = result.redirectUrl.pathname + result.redirectUrl.search;
+			throw redirect({ to: oauthPath });
 		}
 
 		case 'redirect_login': {
-			// Redirect to login page
-			// Clear stale cookies if present
 			if (result.cookies && result.cookies.length > 0) {
 				const { setResponseHeader } = await import('@tanstack/react-start/server');
 				for (const cookie of result.cookies) {
 					setResponseHeader('Set-Cookie', cookie);
 				}
 			}
-			throw redirect({
-				to: result.redirectUrl.toString(),
-			});
+			throw redirect({ to: result.redirectUrl.pathname });
 		}
 	}
 }

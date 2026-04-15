@@ -28,8 +28,8 @@ bun add @neondatabase/auth @tanstack/react-start @tanstack/react-router
 
 ### Required Peer Dependencies
 
-- `@tanstack/react-start` >= 1.0.0
-- `@tanstack/react-router` >= 1.0.0
+- `@tanstack/react-start` >= 1.100.0
+- `@tanstack/react-router` >= 1.100.0
 - `react` >= 18.0.0
 - `react-dom` >= 18.0.0
 
@@ -54,13 +54,15 @@ Create a server auth instance:
 // app/lib/auth-server.ts
 import { createNeonAuth } from '@neondatabase/auth/tanstack/start/server';
 
-export const auth = createNeonAuth({
+// Config callback is deferred — only called server-side on first use.
+// This keeps process.env reads safe in TanStack Start's isomorphic modules.
+export const auth = createNeonAuth(() => ({
   baseUrl: process.env.NEON_AUTH_BASE_URL!,
   cookies: {
     secret: process.env.NEON_AUTH_COOKIE_SECRET!,
     sessionDataTtl: 300, // 5 minutes (optional, default: 300)
   },
-});
+}));
 ```
 
 ### 3. Export Server Functions
@@ -121,21 +123,25 @@ All routes under `_authed/` are now protected!
 
 ## Configuration
 
-### `createNeonAuth(config)`
+### `createNeonAuth(getConfig)`
 
 **Server-Side Configuration:**
+
+Takes a callback that returns configuration. The callback is deferred — only invoked
+server-side on first use, keeping `process.env` access safe in TanStack Start's
+isomorphic modules.
 
 ```typescript
 import { createNeonAuth } from '@neondatabase/auth/tanstack/start/server';
 
-const auth = createNeonAuth({
+const auth = createNeonAuth(() => ({
   baseUrl: 'https://your-auth-server.com',  // Required
   cookies: {
     secret: 'your-secret-key',               // Required (min 32 chars)
     sessionDataTtl: 300,                     // Optional (default: 300 seconds)
     domain: '.example.com',                  // Optional (for cross-subdomain)
   },
-});
+}));
 ```
 
 **Options:**
@@ -399,9 +405,10 @@ import {
 
 ### Server-Side
 
-#### `createNeonAuth(config)`
+#### `createNeonAuth(getConfig)`
 
-Creates a Neon Auth instance for server-side use.
+Creates a Neon Auth instance for server-side use. Accepts a callback returning
+config — deferred until first server-side use.
 
 **Returns:** `NeonAuth` object with:
 - All Better Auth methods (via Proxy)
@@ -666,7 +673,7 @@ bun add @tanstack/react-start @tanstack/react-router
 - [TanStack Start Documentation](https://tanstack.com/start/docs)
 - [Better Auth Documentation](https://www.better-auth.com/docs)
 - [Neon Auth UI Components](../auth-ui/README.md)
-- [Example Application](../../examples/tanstack-start-neon-auth/)
+- [Example Application](../../examples/with-tanstack-start/)
 
 ---
 

@@ -1,7 +1,8 @@
 import { createAuthServerInternal } from '../../../server';
 import { createTanStackStartRequestContext } from './adapter';
 import { createAuthHandler } from './handler';
-import { protectRoute, type ProtectRouteConfig } from './protect-route';
+import type { ProtectRouteConfig } from './protect-route';
+import { protectRoute } from './protect-route';
 import type { NeonAuthConfig } from '../../../server/config';
 import { validateCookieConfig } from '../../../server/config';
 import type { NeonAuthServer } from '../../../server/types';
@@ -22,42 +23,48 @@ import type { NeonAuthServer } from '../../../server/types';
  * - Route Loaders
  * - `beforeLoad` hooks
  *
- * @param config - Required configuration
- * @param config.baseUrl - Base URL of your Neon Auth instance
- * @param config.cookies - Cookie configuration
- * @param config.cookies.secret - Secret for signing session cookies (minimum 32 characters)
- * @param config.cookies.sessionDataTtl - Optional TTL for session cache in seconds (default: 300)
- * @param config.cookies.domain - Optional cookie domain (default: current domain)
+ * **Important:** TanStack Start's isomorphic execution model means all module-level
+ * code runs on both client and server. The config callback is deferred — it is only
+ * invoked server-side on first use, so `process.env` access for secrets is safe.
+ *
+ * @param getConfig - Callback returning NeonAuthConfig. Only called server-side on first use.
+ * @param getConfig.baseUrl - Base URL of your Neon Auth instance
+ * @param getConfig.cookies - Cookie configuration
+ * @param getConfig.cookies.secret - Secret for signing session cookies (minimum 32 characters)
+ * @param getConfig.cookies.sessionDataTtl - Optional TTL for session cache in seconds (default: 300)
+ * @param getConfig.cookies.domain - Optional cookie domain (default: current domain)
  * @returns Unified auth instance with server methods, handler, and protectRoute
- * @throws Error if `cookies.secret` is less than 32 characters
+ * @throws Error if `cookies.secret` is less than 32 characters (on first use)
  *
  * @example
  * ```typescript
  * // lib/auth-server.ts - Create a singleton instance
  * import { createNeonAuth } from '@neondatabase/auth/tanstack/start/server';
  *
- * export const auth = createNeonAuth({
+ * // Safe — callback deferred until server-side execution
+ * export const auth = createNeonAuth(() => ({
  *   baseUrl: process.env.NEON_AUTH_BASE_URL!,
  *   cookies: {
  *     secret: process.env.NEON_AUTH_COOKIE_SECRET!,
  *     sessionDataTtl: 300, // 5 minutes (default)
  *   },
- * });
+ * }));
  * ```
  *
  * @example
  * ```typescript
- * // app/api.ts - Export server functions for client access
- * import { createServerFn } from '@tanstack/start';
- * import { auth } from './lib/auth-server';
+ * // routes/api/auth/$.ts - Auth API proxy route
+ * import { createFileRoute } from '@tanstack/react-router';
+ * import { auth } from '@/lib/auth-server';
  *
- * // Export auth handler as server function
- * export const authHandler = createServerFn({ method: 'POST' })
- *   .handler(auth.handler());
- *
- * // Export other auth methods as needed
- * export const getSession = createServerFn({ method: 'GET' })
- *   .handler(() => auth.getSession());
+ * export const Route = createFileRoute('/api/auth/$')({
+ *   server: {
+ *     handlers: {
+ *       GET: auth.handler(),
+ *       POST: auth.handler(),
+ *     },
+ *   },
+ * });
  * ```
  *
  * @example
@@ -99,72 +106,54 @@ import type { NeonAuthServer } from '../../../server/types';
  * }
  * ```
  */
-export function createNeonAuth(config: NeonAuthConfig) {
-	const { baseUrl, cookies } = config;
+export function createNeonAuth(getConfig: () => NeonAuthConfig) {
+	let resolvedConfig: NeonAuthConfig | null = null;
+	let cachedServer: NeonAuthServer | null = null;
 
-	validateCookieConfig(cookies);
+	function getValidatedConfig(): NeonAuthConfig {
+		if (!resolvedConfig) {
+			resolvedConfig = getConfig();
+			validateCookieConfig(resolvedConfig.cookies);
+		}
+		return resolvedConfig;
+	}
 
-	// Create base server with all Better Auth methods using proxy pattern
-	// This gives us all methods (signIn, signOut, getSession, etc.) automatically
-	const server = createAuthServerInternal({
-		baseUrl,
-		context: createTanStackStartRequestContext,
-		cookieSecret: cookies.secret,
-		sessionDataTtl: cookies.sessionDataTtl,
-		domain: cookies.domain,
+	function getServer(): NeonAuthServer {
+		if (!cachedServer) {
+			const config = getValidatedConfig();
+			cachedServer = createAuthServerInternal({
+				baseUrl: config.baseUrl,
+				context: createTanStackStartRequestContext,
+				cookieSecret: config.cookies.secret,
+				sessionDataTtl: config.cookies.sessionDataTtl,
+				domain: config.cookies.domain,
+			});
+
+			(cachedServer as NeonAuth).handler = () => createAuthHandler(config);
+
+			(cachedServer as NeonAuth).protectRoute = (
+				routeConfig: Pick<ProtectRouteConfig, 'loginUrl' | 'pathname'>
+			) => protectRoute(config, routeConfig);
+		}
+		return cachedServer as NeonAuth;
+	}
+
+	// Return a proxy that defers server creation until first property access.
+	// This keeps `process.env` reads out of module-level evaluation.
+	return new Proxy({} as NeonAuth, {
+		get(_target, prop) {
+			if (typeof prop === 'symbol') return;
+			const server = getServer();
+			const value = (server as Record<string, unknown>)[prop];
+			if (typeof value === 'function') return value.bind(server);
+			return value;
+		},
+		has(_target, prop) {
+			if (typeof prop === 'symbol') return false;
+			const server = getServer();
+			return prop in server;
+		},
 	});
-
-	// Attach TanStack Start-specific helpers to the server proxy object
-	/**
-	 * Creates an auth API handler function for TanStack Start server functions
-	 *
-	 * This returns a handler function that should be wrapped with `createServerFn()`
-	 * and exported from your API file.
-	 *
-	 * @returns Handler function for use with createServerFn()
-	 *
-	 * @example
-	 * ```typescript
- * // app/api.ts
-	 * import { createServerFn } from '@tanstack/start';
-	 * import { auth } from '@/lib/auth-server';
-	 *
-	 * export const authHandler = createServerFn({ method: 'POST' })
-	 *   .handler(auth.handler());
-	 * ```
-	 */
-	(server as NeonAuth).handler = () => createAuthHandler(config);
-
-	/**
-	 * Protects a route from unauthenticated access
-	 *
-	 * Use this in TanStack Router's `beforeLoad` hook to validate session.
-	 * Throws redirect() if authentication fails.
-	 *
-	 * @param routeConfig - Route protection configuration
-	 * @param routeConfig.pathname - Current pathname being accessed
-	 * @param routeConfig.loginUrl - URL to redirect to when not authenticated (default: '/auth/sign-in')
-	 * @returns Promise that resolves if access is allowed
-	 * @throws redirect() - Throws TanStack Router redirect if authentication fails
-	 *
-	 * @example
-	 * ```typescript
-	 * // routes/_authed.tsx
-	 * export const Route = createFileRoute('/_authed')({
-	 *   beforeLoad: async ({ location }) => {
-	 *     await auth.protectRoute({
-	 *       pathname: location.pathname,
-	 *       loginUrl: '/auth/sign-in',
-	 *     });
-	 *   },
-	 * });
-	 * ```
-	 */
-	(server as NeonAuth).protectRoute = (
-		routeConfig: Pick<ProtectRouteConfig, 'loginUrl' | 'pathname'>
-	) => protectRoute(config, routeConfig);
-
-	return server as NeonAuth;
 }
 
 /**
@@ -172,11 +161,11 @@ export function createNeonAuth(config: NeonAuthConfig) {
  * Includes all Better Auth server methods plus handler() and protectRoute()
  */
 export type NeonAuth = NeonAuthServer & {
-	handler: () => ReturnType<typeof createAuthHandler>;
+	handler: () => (request: Request, data: { path?: string }) => Promise<Response>;
 	protectRoute: (
 		config: Pick<ProtectRouteConfig, 'loginUrl' | 'pathname'>
-	) => ReturnType<typeof protectRoute>;
+	) => Promise<void>;
 };
 
-// Re-export types for convenience
-export type { NeonAuthConfig, ProtectRouteConfig };
+export type { NeonAuthConfig } from '../../../server/config';
+export type { ProtectRouteConfig } from './protect-route';
