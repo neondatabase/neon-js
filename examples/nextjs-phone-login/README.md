@@ -82,6 +82,16 @@ cd examples/nextjs-phone-login
 bun dev
 ```
 
+### Testing webhooks locally
+
+Neon Auth's webhook delivery requires a publicly reachable HTTPS URL (localhost is blocked by SSRF protection). To receive webhook events during local development, use [ngrok](https://ngrok.com/) to tunnel your local server:
+
+```bash
+ngrok http 3000
+```
+
+Then configure the ngrok HTTPS URL as your webhook URL in the Neon Console (e.g., `https://xxxx.ngrok-free.dev/api/webhooks/neon-auth`).
+
 ## Project Structure
 
 ```
