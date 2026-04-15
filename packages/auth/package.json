@@ -121,7 +121,7 @@
     "@better-fetch/fetch": "1.1.21",
     "@neondatabase/auth-ui": "workspace:*",
     "@supabase/auth-js": "2.79.0",
-    "better-auth": "1.4.6",
+    "better-auth": "1.4.12",
     "jose": "6.1.2",
     "zod": "4.1.12"
   },
