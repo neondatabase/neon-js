@@ -11,6 +11,15 @@ import type {
 } from './types';
 
 /**
+ * Sentinel for same-origin auth requests (no base URL needed).
+ * Used by framework adapters where the client calls a local `/api/auth` proxy.
+ *
+ * Must be imported from this module. Creating a new `Symbol('same-origin')`
+ * will NOT match, since every `Symbol()` call produces a unique value.
+ */
+export const SAME_ORIGIN = Symbol("same-origin");
+
+/**
  * Union type of all supported auth adapter instances
  */
 export type NeonAuthAdapter =
@@ -79,7 +88,7 @@ export type NeonAuth<T extends NeonAuthAdapter> = {
 /**
  * Create a NeonAuth instance that exposes the appropriate API based on the adapter.
  *
- * @param url - The auth service URL (e.g., 'https://auth.example.com')
+ * @param url - The auth service URL (e.g., 'https://auth.example.com') or SAME_ORIGIN for same-origin requests
  * @param config - Configuration with adapter builder
  * @returns NeonAuth instance with the adapter's API exposed directly
  *
@@ -125,11 +134,12 @@ export type NeonAuth<T extends NeonAuthAdapter> = {
  */
 export function createInternalNeonAuth<
   T extends NeonAuthAdapter = BetterAuthVanillaAdapterInstance,
->(url: string, config?: NeonAuthConfigInternal<T>): NeonAuth<T> {
+>(url: string | typeof SAME_ORIGIN, config?: NeonAuthConfigInternal<T>): NeonAuth<T> {
+  const resolvedUrl = url === SAME_ORIGIN ? '' : url;
   // Default to BetterAuthVanillaAdapter if no adapter specified
   const adapterBuilder = config?.adapter ?? BetterAuthVanillaAdapter();
   const { fetchOptions } = config ?? {};
-  const adapter = adapterBuilder(url, fetchOptions) as T;
+  const adapter = adapterBuilder(resolvedUrl, fetchOptions) as T;
 
   // Capture allowAnonymous at creation time
   const allowAnonymous = config?.allowAnonymous ?? false;
@@ -153,7 +163,8 @@ export function createInternalNeonAuth<
 
 export function createAuthClient<
   T extends NeonAuthAdapter = BetterAuthVanillaAdapterInstance,
->(url: string, config?: NeonAuthConfig<T>): NeonAuthPublicApi<T> {
-  const internalAuth = createInternalNeonAuth(url, config);
+>(url: string | typeof SAME_ORIGIN, config?: NeonAuthConfig<T>): NeonAuthPublicApi<T> {
+  const resolvedUrl = url === SAME_ORIGIN ? '' : url;
+  const internalAuth = createInternalNeonAuth(resolvedUrl, config);
   return internalAuth.adapter;
 }
