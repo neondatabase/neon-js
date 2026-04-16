@@ -17,10 +17,8 @@ vi.mock("./adapter", () => ({
 	createTanStackStartRequestContext: vi.fn(),
 }));
 
-// Mock @tanstack/react-start — createIsomorphicFn is compile-time only,
-// tests exercise createNeonAuthServer directly.
+// Mock @tanstack/react-start — tests exercise createNeonAuthServer directly.
 vi.mock("@tanstack/react-start", () => ({
-	createIsomorphicFn: vi.fn(),
 	createMiddleware: vi.fn(() => ({
 		server: vi.fn((fn) => fn),
 	})),

@@ -51,10 +51,11 @@ export function createNeonAuthServer(config: NeonAuthConfig): NeonAuth {
  * - Server functions (`createServerFn`)
  * - Server route handlers (`server.handlers`)
  *
- * **Isomorphic safety:** Uses `createIsomorphicFn` to ensure server-only code
- * (config resolution, secret access, auth server creation) is stripped from the
- * client bundle at compile time. On the client, only a minimal stub with the
- * middleware factory is available — enough for `createServerFn().middleware([auth.middleware()])`.
+ * **Server-only:** This module is guarded by `@tanstack/react-start/server-only`
+ * and must not be imported from client code. Server functions that use
+ * `auth.middleware()` are safe to call from the client because TanStack Start's
+ * Vite plugin transforms them into RPC stubs — but they must be imported
+ * directly from their file, not through a barrel/index re-export.
  *
  * @param getConfig - Callback returning {@link NeonAuthConfig}. Using a callback
  *   defers `process.env` reads past the `createNeonAuth()` call site, which is
