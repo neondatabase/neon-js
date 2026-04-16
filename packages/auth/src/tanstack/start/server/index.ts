@@ -1,12 +1,39 @@
-import { createAuthServerInternal } from "@/server";
-import type { NeonAuthConfig } from "@/server/config";
-import { validateCookieConfig } from "@/server/config";
-import type { NeonAuthServer } from "@/server/types";
+import "@tanstack/react-start/server-only";
 
+import type { NeonAuthConfig } from "@/server/config";
+import type { NeonAuthServer } from "@/server/types";
+import type { ProtectRouteConfig } from "./protect-route";
+import type { TanStackStartAuthHandler } from "./handler";
+import type { TanStackStartAuthMiddleware } from "./middleware";
+
+import { createAuthServerInternal } from "@/server";
+import { validateCookieConfig } from "@/server/config";
 import { createTanStackStartRequestContext } from "./adapter";
-import { createHandlerFromConfig, type TanStackStartAuthHandler } from "./handler";
-import { createMiddlewareFromServer, type TanStackStartAuthMiddleware } from "./middleware";
-import { protectRoute, type ProtectRouteConfig } from "./protect-route";
+import { createHandlerFromConfig } from "./handler";
+import { createMiddlewareFromServer } from "./middleware";
+import { protectRoute } from "./protect-route";
+
+/** @internal Creates the auth server from resolved config. Exported for testing. */
+export function createNeonAuthServer(config: NeonAuthConfig): NeonAuth {
+	validateCookieConfig(config.cookies);
+
+	const server = createAuthServerInternal({
+		baseUrl: config.baseUrl,
+		context: createTanStackStartRequestContext,
+		cookieSecret: config.cookies.secret,
+		sessionDataTtl: config.cookies.sessionDataTtl,
+		domain: config.cookies.domain,
+	}) as NeonAuth;
+
+	const middleware = createMiddlewareFromServer(() => server);
+
+	server.handler = () => createHandlerFromConfig(config);
+	server.middleware = () => middleware;
+	server.protectRoute = (routeConfig: ProtectRouteConfig) =>
+		protectRoute(config, routeConfig);
+
+	return server;
+}
 
 /**
  * Unified entry point for Neon Auth in TanStack Start.
@@ -15,8 +42,8 @@ import { protectRoute, type ProtectRouteConfig } from "./protect-route";
  * a single entry point that combines all server-side functionality.
  *
  * **Features:**
- * - `.handler` - Auth API proxy handler for catch-all `/api/auth/$` server route
- * - `.middleware` - Function-level middleware that injects `context.auth` with session data
+ * - `.handler()` - Auth API proxy handler for catch-all `/api/auth/$` server route
+ * - `.middleware()` - Function-level middleware that injects `context.auth` with session data
  * - `.protectRoute()` - Route protection helper for `beforeLoad` hooks (redirects unauthenticated users)
  * - `.getSession()` - Direct session retrieval for use in server functions
  *
@@ -24,23 +51,23 @@ import { protectRoute, type ProtectRouteConfig } from "./protect-route";
  * - Server functions (`createServerFn`)
  * - Server route handlers (`server.handlers`)
  *
- * **Important:** TanStack Start's isomorphic execution model means all module-level
- * code runs on both client and server. The config callback is deferred — it is only
- * invoked server-side on first use, so `process.env` access for secrets is safe.
+ * **Isomorphic safety:** Uses `createIsomorphicFn` to ensure server-only code
+ * (config resolution, secret access, auth server creation) is stripped from the
+ * client bundle at compile time. On the client, only a minimal stub with the
+ * middleware factory is available — enough for `createServerFn().middleware([auth.middleware()])`.
  *
- * @param getConfig - Callback returning NeonAuthConfig. Only called server-side on first use.
- * @param getConfig.baseUrl - Base URL of your Neon Auth instance
- * @param getConfig.cookies - Cookie configuration
- * @param getConfig.cookies.secret - Secret for signing session cookies (minimum 32 characters)
- * @param getConfig.cookies.sessionDataTtl - Optional TTL for session cache in seconds (default: 300)
- * @param getConfig.cookies.domain - Optional cookie domain (default: current domain)
+ * @param getConfig - Callback returning {@link NeonAuthConfig}. Using a callback
+ *   defers `process.env` reads past the `createNeonAuth()` call site, which is
+ *   necessary in Vite's dev server where env vars may not be populated yet at
+ *   the point the import is declared.
  * @returns Auth instance with handler, middleware, and server methods
- * @throws Error if `cookies.secret` is less than 32 characters
+ * @throws Error if `cookies.secret` is missing or less than 32 characters
  *
  * @example
  * **Step 1: Create the auth instance**
  * ```typescript
  * // src/server/lib/auth.ts
+ * import '@tanstack/react-start/server-only';
  * import { createNeonAuth } from '@neondatabase/auth/tanstack/start/server';
  *
  * export const auth = createNeonAuth(() => ({
@@ -126,66 +153,9 @@ import { protectRoute, type ProtectRouteConfig } from "./protect-route";
  * });
  * ```
  */
-export function createNeonAuth(getConfig: () => NeonAuthConfig) {
-	let cachedConfig: NeonAuthConfig | null = null;
-	let cachedServer: NeonAuth | null = null;
 
-	function resolveConfig(): NeonAuthConfig {
-		if (!cachedConfig) {
-			const config = getConfig();
-			validateCookieConfig(config.cookies);
-			cachedConfig = config;
-		}
-		return cachedConfig;
-	}
-
-	// Built eagerly — createMiddleware() is a pure builder with no side effects.
-	// The .server() callback defers getServer() to actual server-side execution.
-	const middleware = createMiddlewareFromServer(getServer);
-
-	function getServer(): NeonAuth {
-		if (!cachedServer) {
-			const config = resolveConfig();
-			cachedServer = createAuthServerInternal({
-				baseUrl: config.baseUrl,
-				context: createTanStackStartRequestContext,
-				cookieSecret: config.cookies.secret,
-				sessionDataTtl: config.cookies.sessionDataTtl,
-				domain: config.cookies.domain,
-			}) as NeonAuth;
-
-			cachedServer.handler = () => createHandlerFromConfig(config);
-			cachedServer.middleware = () => middleware;
-			cachedServer.protectRoute = (routeConfig: ProtectRouteConfig) =>
-				protectRoute(config, routeConfig);
-		}
-		return cachedServer;
-	}
-
-	// Factory functions that are safe to access on the client.
-	// TanStack Start evaluates createServerFn().middleware([auth.middleware()])
-	// isomorphically — these must NOT trigger getServer() or config resolution.
-	const clientSafeProps: Record<string, unknown> = {
-		middleware: () => middleware,
-		handler: () => createHandlerFromConfig(resolveConfig()),
-	};
-
-	return new Proxy({} as NeonAuth, {
-		get(_target, prop: string) {
-			if (prop in clientSafeProps) return clientSafeProps[prop];
-
-			const server = getServer();
-			const value = (server as Record<string, unknown>)[prop];
-			if (typeof value === "function") return value.bind(server);
-			return value;
-		},
-		has(_target, prop) {
-			if (typeof prop === "symbol") return false;
-			if (prop in clientSafeProps) return true;
-			const server = getServer();
-			return prop in server;
-		},
-	});
+export function createNeonAuth(getConfig: () => NeonAuthConfig): NeonAuth {
+	return createNeonAuthServer(getConfig());
 }
 
 export type NeonAuth = NeonAuthServer & {
@@ -193,4 +163,3 @@ export type NeonAuth = NeonAuthServer & {
 	middleware: () => TanStackStartAuthMiddleware;
 	protectRoute: (config: ProtectRouteConfig) => Promise<void>;
 };
-
