@@ -1,5 +1,6 @@
-import { processAuthMiddleware } from "@/server/middleware";
 import type { NeonAuthConfig } from "@/server/config";
+
+import { processAuthMiddleware } from "@/server/middleware";
 
 export interface ProtectRouteConfig {
 	/** URL to redirect to when user is not authenticated (default: '/auth/sign-in') */
@@ -81,8 +82,7 @@ export async function protectRoute(
 					setResponseHeader("Set-Cookie", cookie);
 				}
 			}
-			const oauthPath =
-				result.redirectUrl.pathname + result.redirectUrl.search;
+			const oauthPath = result.redirectUrl.pathname + result.redirectUrl.search;
 			throw redirect({ to: oauthPath });
 		}
 
