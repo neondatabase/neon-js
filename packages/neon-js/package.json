@@ -87,6 +87,14 @@
       "types": "./dist/auth/next/server/index.d.mts",
       "default": "./dist/auth/next/server/index.mjs"
     },
+    "./auth/tanstack/start": {
+      "types": "./dist/auth/tanstack/start/index.d.mts",
+      "default": "./dist/auth/tanstack/start/index.mjs"
+    },
+    "./auth/tanstack/start/server": {
+      "types": "./dist/auth/tanstack/start/server/index.d.mts",
+      "default": "./dist/auth/tanstack/start/server/index.mjs"
+    },
     "./ui/css": {
       "types": "./dist/ui/css.d.ts",
       "default": "./dist/ui/css.css"
