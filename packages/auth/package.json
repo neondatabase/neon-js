@@ -114,6 +114,7 @@
   "devDependencies": {
     "@neondatabase/internal": "workspace:*",
     "@tanstack/react-start": "1.167.16",
+    "@tanstack/react-router": "1.168.22",
     "msw": "2.6.8",
     "next": "16.0.6"
   },
@@ -129,7 +130,8 @@
     "react": ">=18.0.0",
     "react-dom": ">=18.0.0",
     "next": ">=16.0.6",
-    "@tanstack/react-start": ">=1.167.16"
+    "@tanstack/react-start": ">=1.167.41",
+    "@tanstack/react-router": ">=1.168.22"
   },
   "peerDependenciesMeta": {
     "react": {
