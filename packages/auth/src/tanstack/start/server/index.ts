@@ -4,8 +4,9 @@ import { validateCookieConfig } from "@/server/config";
 import type { NeonAuthServer } from "@/server/types";
 
 import { createTanStackStartRequestContext } from "./adapter";
-import { createHandlerFromConfig } from "./handler";
-import { createMiddlewareFromServer } from "./middleware";
+import { createHandlerFromConfig, type TanStackStartAuthHandler } from "./handler";
+import { createMiddlewareFromServer, type TanStackStartAuthMiddleware } from "./middleware";
+import { protectRoute, type ProtectRouteConfig } from "./protect-route";
 
 /**
  * Unified entry point for Neon Auth in TanStack Start.
@@ -16,6 +17,7 @@ import { createMiddlewareFromServer } from "./middleware";
  * **Features:**
  * - `.handler` - Auth API proxy handler for catch-all `/api/auth/$` server route
  * - `.middleware` - Function-level middleware that injects `context.auth` with session data
+ * - `.protectRoute()` - Route protection helper for `beforeLoad` hooks (redirects unauthenticated users)
  * - `.getSession()` - Direct session retrieval for use in server functions
  *
  * **Where to use:**
@@ -39,7 +41,7 @@ import { createMiddlewareFromServer } from "./middleware";
  * **Step 1: Create the auth instance**
  * ```typescript
  * // src/server/lib/auth.ts
- * import { createNeonAuth } from '@neondatabase/auth/start/server';
+ * import { createNeonAuth } from '@neondatabase/auth/tanstack/start/server';
  *
  * export const auth = createNeonAuth(() => ({
  *   baseUrl: process.env.NEON_AUTH_URL!,
@@ -53,7 +55,7 @@ import { createMiddlewareFromServer } from "./middleware";
  * **Step 2: Create the client auth**
  * ```typescript
  * // src/integrations/auth/client.ts
- * import { createAuthClient } from '@neondatabase/auth/start';
+ * import { createAuthClient } from '@neondatabase/auth/tanstack/start';
  *
  * export const authClient = createAuthClient();
  * ```
@@ -71,8 +73,8 @@ import { createMiddlewareFromServer } from "./middleware";
  * export const Route = createFileRoute('/api/auth/$')({
  *   server: {
  *     handlers: {
- *       GET: auth.handler,
- *       POST: auth.handler,
+ *       GET: auth.handler(),
+ *       POST: auth.handler(),
  *     },
  *   },
  * });
@@ -88,11 +90,31 @@ import { createMiddlewareFromServer } from "./middleware";
  * import { auth } from '@/server/lib/auth';
  *
  * const getUser = createServerFn()
- *   .middleware([auth.middleware])
+ *   .middleware([auth.middleware()])
  *   .handler(async ({ context }) => {
  *     if (!context.auth.user) throw new Error('Not authenticated');
  *     return context.auth.user;
  *   });
+ * ```
+ *
+ * @example
+ * **Step 5: Protect routes from unauthenticated access**
+ *
+ * Use `protectRoute` in TanStack Router's `beforeLoad` hook to redirect
+ * unauthenticated users. Works with layout routes for group protection.
+ * ```typescript
+ * // src/routes/_authed.tsx
+ * import { createFileRoute } from '@tanstack/react-router';
+ * import { auth } from '@/server/lib/auth';
+ *
+ * export const Route = createFileRoute('/_authed')({
+ *   beforeLoad: async ({ location }) => {
+ *     await auth.protectRoute({
+ *       pathname: location.pathname,
+ *       loginUrl: '/auth/sign-in',
+ *     });
+ *   },
+ * });
  * ```
  *
  * @example
@@ -105,37 +127,70 @@ import { createMiddlewareFromServer } from "./middleware";
  * ```
  */
 export function createNeonAuth(getConfig: () => NeonAuthConfig) {
-	let cachedServer: NeonAuthServer | null = null;
+	let cachedConfig: NeonAuthConfig | null = null;
+	let cachedServer: NeonAuth | null = null;
 
-	function getServer(): NeonAuthServer {
-		if (!cachedServer) {
+	function resolveConfig(): NeonAuthConfig {
+		if (!cachedConfig) {
 			const config = getConfig();
 			validateCookieConfig(config.cookies);
+			cachedConfig = config;
+		}
+		return cachedConfig;
+	}
+
+	// Built eagerly — createMiddleware() is a pure builder with no side effects.
+	// The .server() callback defers getServer() to actual server-side execution.
+	const middleware = createMiddlewareFromServer(getServer);
+
+	function getServer(): NeonAuth {
+		if (!cachedServer) {
+			const config = resolveConfig();
 			cachedServer = createAuthServerInternal({
 				baseUrl: config.baseUrl,
 				context: createTanStackStartRequestContext,
 				cookieSecret: config.cookies.secret,
 				sessionDataTtl: config.cookies.sessionDataTtl,
 				domain: config.cookies.domain,
-			});
+			}) as NeonAuth;
+
+			cachedServer.handler = () => createHandlerFromConfig(config);
+			cachedServer.middleware = () => middleware;
+			cachedServer.protectRoute = (routeConfig: ProtectRouteConfig) =>
+				protectRoute(config, routeConfig);
 		}
 		return cachedServer;
 	}
 
-	const handler = createHandlerFromConfig(getConfig);
-	const middleware = createMiddlewareFromServer(getServer);
+	// Factory functions that are safe to access on the client.
+	// TanStack Start evaluates createServerFn().middleware([auth.middleware()])
+	// isomorphically — these must NOT trigger getServer() or config resolution.
+	const clientSafeProps: Record<string, unknown> = {
+		middleware: () => middleware,
+		handler: () => createHandlerFromConfig(resolveConfig()),
+	};
 
-	return new Proxy({} as NeonAuthServer & {
-		handler: ReturnType<typeof createHandlerFromConfig>;
-		middleware: ReturnType<typeof createMiddlewareFromServer>;
-	}, {
+	return new Proxy({} as NeonAuth, {
 		get(_target, prop: string) {
-			if (prop === "handler") return handler;
-			if (prop === "middleware") return middleware;
+			if (prop in clientSafeProps) return clientSafeProps[prop];
+
 			const server = getServer();
 			const value = (server as Record<string, unknown>)[prop];
 			if (typeof value === "function") return value.bind(server);
 			return value;
 		},
+		has(_target, prop) {
+			if (typeof prop === "symbol") return false;
+			if (prop in clientSafeProps) return true;
+			const server = getServer();
+			return prop in server;
+		},
 	});
 }
+
+export type NeonAuth = NeonAuthServer & {
+	handler: () => TanStackStartAuthHandler;
+	middleware: () => TanStackStartAuthMiddleware;
+	protectRoute: (config: ProtectRouteConfig) => Promise<void>;
+};
+

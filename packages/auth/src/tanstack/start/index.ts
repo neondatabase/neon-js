@@ -1,19 +1,19 @@
-import { BetterAuthReactAdapter } from '../adapters/better-auth-react/better-auth-react-adapter';
-import { createAuthClient as createNeonAuthClient } from '../neon-auth';
+import { BetterAuthReactAdapter } from '../../adapters/better-auth-react/better-auth-react-adapter';
+import { createAuthClient as createNeonAuthClient, SAME_ORIGIN } from '../../neon-auth';
 
 /**
  * Creates a Neon Auth client for TanStack Start.
  *
  * The client SDK sends auth requests to your app's `/api/auth` proxy route
  * (not directly to the Neon Auth server). This requires mounting the server
- * handler — see `createNeonAuth` from `@neondatabase/auth/start/server`.
+ * handler — see `createNeonAuth` from `@neondatabase/auth/tanstack/start/server`.
  *
  * @returns Auth client with React hooks (useSession) and auth methods (signIn, signUp, signOut, etc.)
  *
  * @example
  * ```typescript
  * // src/integrations/auth/client.ts
- * import { createAuthClient } from '@neondatabase/auth/start';
+ * import { createAuthClient } from '@neondatabase/auth/tanstack/start';
  *
  * export const authClient = createAuthClient();
  * ```
@@ -31,8 +31,7 @@ import { createAuthClient as createNeonAuthClient } from '../neon-auth';
  * ```
  */
 export function createAuthClient() {
-  // @ts-expect-error - no baseUrl needed; client calls same-origin /api/auth proxy
-  return createNeonAuthClient(undefined, {
+  return createNeonAuthClient(SAME_ORIGIN, {
     adapter: BetterAuthReactAdapter(),
   });
 }

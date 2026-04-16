@@ -182,7 +182,7 @@ describe("createNeonAuth", () => {
 			expect(result).toEqual({ data: null, error: null });
 		});
 	});
-
+	
 	describe("return value structure", () => {
 		test("returns object with handler as a function", () => {
 			const auth = createNeonAuth(() => createAuthConfig());
@@ -200,6 +200,12 @@ describe("createNeonAuth", () => {
 			const auth = createNeonAuth(() => createAuthConfig());
 
 			expect(typeof auth.getSession).toBe("function");
+		});
+
+		test("returns object with protectRoute as a function", () => {
+			const auth = createNeonAuth(() => createAuthConfig());
+
+			expect(typeof auth.protectRoute).toBe("function");
 		});
 	});
 });

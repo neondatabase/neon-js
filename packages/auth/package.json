@@ -82,13 +82,13 @@
     "./ui/tailwind": {
       "default": "./dist/ui/tailwind.css"
     },
-    "./start": {
-      "types": "./dist/start/index.d.mts",
-      "default": "./dist/start/index.mjs"
+    "./tanstack/start": {
+      "types": "./dist/tanstack/start/index.d.mts",
+      "default": "./dist/tanstack/start/index.mjs"
     },
-    "./start/server": {
-      "types": "./dist/start/server/index.d.mts",
-      "default": "./dist/start/server/index.mjs"
+    "./tanstack/start/server": {
+      "types": "./dist/tanstack/start/server/index.d.mts",
+      "default": "./dist/tanstack/start/server/index.mjs"
     }
   },
   "files": [

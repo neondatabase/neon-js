@@ -21,8 +21,8 @@ export default defineConfig(
       'src/next/index.ts',
       'src/next/server/index.ts',
 
-      'src/start/index.ts',
-      'src/start/server/index.ts',
+      'src/tanstack/start/index.ts',
+      'src/tanstack/start/server/index.ts',
     ],
     skipNodeModulesBundle: true,
     noExternal: ['@neondatabase/internal'],

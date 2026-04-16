@@ -1,4 +1,4 @@
-# @neondatabase/auth/start
+# @neondatabase/auth/tanstack/start
 
 [![npm downloads](https://img.shields.io/npm/dm/@neondatabase/auth.svg)](https://www.npmjs.com/package/@neondatabase/auth)
 
@@ -58,7 +58,7 @@ The `createNeonAuth()` function provides a single entry point for all server-sid
 
 ```typescript
 // src/server/lib/auth.ts
-import { createNeonAuth } from '@neondatabase/auth/start/server';
+import { createNeonAuth } from '@neondatabase/auth/tanstack/start/server';
 
 export const auth = createNeonAuth(() => ({
   baseUrl: process.env.NEON_AUTH_URL!,
@@ -78,7 +78,7 @@ The client SDK sends auth requests to your app's `/api/auth` proxy route (not di
 
 ```typescript
 // src/integrations/auth/client.ts
-import { createAuthClient } from '@neondatabase/auth/start';
+import { createAuthClient } from '@neondatabase/auth/tanstack/start';
 
 export const authClient = createAuthClient();
 ```

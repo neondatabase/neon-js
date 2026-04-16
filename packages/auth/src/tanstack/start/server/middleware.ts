@@ -1,6 +1,8 @@
 import { createMiddleware } from '@tanstack/react-start';
 import type { NeonAuthServer } from '@/server/types';
 
+export type TanStackStartAuthMiddleware = ReturnType<typeof createMiddlewareFromServer>;
+
 /**
  * @internal
  * Creates a middleware from a server instance getter. Used by createNeonAuth.
