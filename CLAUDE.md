@@ -10,7 +10,7 @@ A unified TypeScript SDK monorepo for Neon services, providing seamless integrat
 
 ## Monorepo Structure
 
-This is a Bun workspaces monorepo with four published packages and one private internal package:
+This is a pnpm workspaces monorepo with four published packages and one private internal package:
 
 ### `@neondatabase/internal` (packages/internal/) - PRIVATE
 Internal utilities shared across packages (not published to npm):
@@ -121,9 +121,9 @@ Example applications demonstrating SDK usage:
 **Build and run:**
 ```bash
 cd examples/react-neon-js  # or nextjs-neon-auth, react-auth-external-ui
-bun install
-bun run dev   # Development server
-bun run build # Production build
+pnpm install
+pnpm run dev   # Development server
+pnpm run build # Production build
 ```
 
 ## Development Commands
@@ -132,34 +132,29 @@ Run from repository root:
 
 ```bash
 # Install dependencies
-bun install
+pnpm install
 
 # Development (watch mode)
-bun dev
+pnpm dev
 
 # Build all packages
-bun build
+pnpm run build
 
 # Build specific package
-bun run --filter '@neondatabase/auth' build
+pnpm run --filter '@neondatabase/auth' build
 
 # Run tests
-bun test              # Run all tests
-bun test:node         # Node.js runtime (recommended for MSW)
-bun test:ci           # CI mode (no watch)
+pnpm test              # Run all tests
+pnpm test:node         # Node.js runtime (recommended for MSW)
+pnpm test:ci           # CI mode (no watch)
 
 # Type checking
-bun typecheck
-
-# Publishing
-bun release           # Bump version and publish all packages
-
-# Release individual packages
-bun release:postgrest-js
-bun release:auth
-bun release:auth-ui
-bun release:neon-js
+pnpm typecheck
 ```
+
+> **Note:** Local releases are disabled. Use the two-stage pipeline
+> (`prepare-release.yml` workflow dispatch followed by secure repo publish).
+> Running `pnpm run release` will show an error directing you to the pipeline.
 
 ## Build Configuration
 
@@ -191,7 +186,7 @@ export default defineConfig(
 
 ### CSS Build Chain
 
-CSS flows through packages in dependency order (handled by Bun's topological sort):
+CSS flows through packages in dependency order (handled by pnpm's topological sort):
 
 ```
 auth-ui (generates CSS via TailwindCSS CLI)
@@ -332,7 +327,7 @@ Auth-UI CSS is designed to **never override user's theme**. This is achieved thr
 
 **Tests**: `src/__tests__/`
 - Uses real Better Auth SDK with MSW for network mocking
-- Run with `bun test:node` for reliable MSW interception
+- Run with `pnpm test:node` for reliable MSW interception
 
 ### Auth-Integrated Client Layer (`packages/neon-js/`)
 
@@ -663,9 +658,9 @@ Unit tests use Vitest with MSW for network mocking:
 
 **Run unit tests:**
 ```bash
-bun test              # Run all tests (watch mode)
-bun test:node         # Node.js runtime (recommended for MSW)
-bun test:ci           # CI mode (no watch, all packages)
+pnpm test              # Run all tests (watch mode)
+pnpm test:node         # Node.js runtime (recommended for MSW)
+pnpm test:ci           # CI mode (no watch, all packages)
 ```
 
 ### E2E Tests
@@ -683,11 +678,11 @@ End-to-end tests use Playwright with a real Neon backend:
 **Run E2E tests locally:**
 ```bash
 # Build packages and example app first
-bun run build
-cd examples/react-neon-js && bun run build
+pnpm run build
+cd examples/react-neon-js && pnpm run build
 
 # Run E2E tests
-bun run --filter e2e test:ci
+pnpm run --filter e2e test:ci
 ```
 
 **Note:** E2E tests require Neon Auth/Data API credentials configured in environment variables.
@@ -704,7 +699,7 @@ GitHub Actions workflows in `.github/workflows/`:
 ### `unit-tests.yml` - Unit Tests
 - Runs on: Push to main, PRs to main
 - Steps: Install deps → Build (cached) → Run vitest
-- Caches Bun dependencies and build artifacts
+- Caches pnpm dependencies and build artifacts
 
 ### `e2e.yml` - E2E Tests
 - Runs on: Push to main, PRs to main, `repository_dispatch` (cross-repo), `workflow_dispatch` (manual)

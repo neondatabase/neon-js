@@ -85,7 +85,8 @@
   },
   "files": [
     "dist",
-    "llms.txt"
+    "llms.txt",
+    "sbom.cdx.json"
   ],
   "publishConfig": {
     "access": "public"
@@ -101,7 +102,7 @@
     "test:types": "tsc --noEmit",
     "lint": "eslint .",
     "clean": "rm -rf node_modules dist",
-    "release": "bun run build && bumpp --tag 'auth-v%s' && bun publish --tag latest"
+    "release": "pnpm exec tsx ../../scripts/release.ts auth"
   },
   "devDependencies": {
     "@neondatabase/internal": "workspace:*",
@@ -119,7 +120,7 @@
   "peerDependencies": {
     "react": ">=18.0.0",
     "react-dom": ">=18.0.0",
-    "next": ">=16.0.6"
+    "next": ">=16.0.0"
   },
   "peerDependenciesMeta": {
     "react": {

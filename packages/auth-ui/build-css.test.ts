@@ -315,8 +315,9 @@ describe('CSS Build Output', () => {
 
       // SVG sizing should use calc(var(--spacing)*4) for size-4
       // This ensures icons are properly sized (16px with default spacing)
+      // Note: tailwindcss v4.2+ emits spaces around * in calc(), allow both forms
       expect(css).toMatch(
-        /svg:not\(\[class\*=size-\]\)\{width:calc\(var\(--spacing\)\*4\)/
+        /svg:not\(\[class\*=size-\]\)\{width:calc\(var\(--spacing\)\s*\*\s*4\)/
       );
     });
   });

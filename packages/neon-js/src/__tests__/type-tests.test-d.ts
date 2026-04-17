@@ -1,6 +1,6 @@
 /**
  * Type tests for createClient
- * Run with: vitest --typecheck or bun test:types
+ * Run with: vitest --typecheck or pnpm test:types
  *
  * These tests verify that TypeScript correctly infers types based on the adapter.
  */

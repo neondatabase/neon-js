@@ -97,7 +97,8 @@
   },
   "files": [
     "dist",
-    "llms.txt"
+    "llms.txt",
+    "sbom.cdx.json"
   ],
   "publishConfig": {
     "access": "public"
@@ -110,7 +111,7 @@
     "test:ci": "vitest run --typecheck --passWithNoTests",
     "typecheck": "tsc --noEmit",
     "test:types": "vitest --typecheck.only --run",
-    "release": "bun run build && bumpp --tag 'neon-js-v%s' && bun publish --tag latest",
+    "release": "npx tsx ../../scripts/release.ts neon-js",
     "lint": "eslint .",
     "clean": "rm -rf node_modules dist"
   },

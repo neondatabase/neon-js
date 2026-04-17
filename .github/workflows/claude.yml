@@ -21,9 +21,7 @@ jobs:
        contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.review.author_association)) ||
       (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')) &&
        contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.issue.author_association))
-    runs-on:
-      group: neondatabase-protected-runner-group
-      labels: linux-ubuntu-latest
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: read
@@ -45,6 +43,6 @@ jobs:
           additional_permissions: |
             actions: read
 
-          # Restrict tools to read-only operations + gh CLI + bun scripts only.
+          # Restrict tools to read-only operations + gh CLI + pnpm scripts only.
           # Blocks curl/wget/arbitrary bash to prevent exfiltration via prompt injection.
-          claude_args: '--allowed-tools "Read,Glob,Grep,Bash(gh:*),Bash(bun run:*),Bash(git diff:*),Bash(git log:*),Bash(git status)"'
+          claude_args: '--allowed-tools "Read,Glob,Grep,Bash(gh:*),Bash(pnpm run:*),Bash(git diff:*),Bash(git log:*),Bash(git status)"'

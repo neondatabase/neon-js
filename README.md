@@ -33,17 +33,52 @@ Pre-built login forms and auth pages are included in both `neon-js` and `auth` p
 
 ## Development
 
-This is a Bun workspaces monorepo. See [CLAUDE.md](./CLAUDE.md) for detailed development setup.
+This is a pnpm workspaces monorepo. See [CLAUDE.md](./CLAUDE.md) for detailed development setup.
 
 **Quick start:**
 
 ```bash
-bun install          # Install dependencies
-bun dev              # Watch mode for all packages
-bun run build        # Build all packages
-bun test             # Run tests
-bun typecheck        # Type check all packages
+pnpm install         # Install dependencies
+pnpm dev             # Watch mode for all packages
+pnpm run build       # Build all packages
+pnpm test            # Run tests
+pnpm typecheck       # Type check all packages
 ```
+
+## Releasing
+
+Releases use a two-stage pipeline. No GitHub App is needed.
+
+### How it works
+
+**Stage 1** (`prepare-release.yml` in this repo, manual `workflow_dispatch`):
+1. Select the trigger package and bump type
+2. The workflow builds, bumps versions via cascade, commits, tags, and pushes
+3. Build artifacts (tarballs + SHA256SUMS) are uploaded as workflow artifacts
+
+**Stage 2** (`neon-js.yml` in [`secure-public-registry-releases-eng`](https://github.com/databricks/secure-public-registry-releases-eng), manual `workflow_dispatch`):
+1. Point it at the tag/ref from Stage 1
+2. It checks out the tagged commit, builds from source, scans, and publishes via npm OIDC
+3. If publish fails, a prominent warning is shown with remediation steps
+
+Local releases are disabled. Running `pnpm run release` will show an error
+directing you to the two-stage pipeline.
+
+### Cascade rules
+
+| Trigger package | Cascade                        |
+| --------------- | ------------------------------ |
+| `postgrest-js`  | postgrest-js, neon-js          |
+| `auth-ui`       | auth-ui, auth, neon-js         |
+| `auth`          | auth, neon-js                  |
+| `neon-js`       | neon-js only                   |
+
+### Release tooling
+
+All release logic lives inside the two GitHub Actions workflows:
+
+- **`prepare-release.yml`** (this repo) -- bumps versions via cascade, commits, tags, and uploads build artifacts
+- **`neon-js.yml`** (`secure-public-registry-releases-eng`) -- checks out the tagged commit, builds from source, scans, and publishes via npm OIDC
 
 ## Support
 

@@ -137,9 +137,18 @@ describe('trySessionCache', () => {
     const sessionData = createTestSessionData();
     const cookie = await signSessionDataCookie(sessionData, TEST_SECRET);
 
-    // Tamper with the signature
+    // Flip a character in the MIDDLE of the signature, not the last.
+    // HMAC-SHA256 = 32 bytes → 43 base64url chars → 258 bits, but only 256 are
+    // real signature. The last char's bottom 2 bits are padding — replacing it
+    // has a 1-in-16 chance of producing the same decoded bytes (e.g. U→X both
+    // decode identically), making the "tampered" JWT still valid. Middle chars
+    // are fully significant so flipping one always changes the decoded output.
     const parts = cookie.value.split('.');
-    const tamperedValue = `${parts[0]}.${parts[1]}.${parts[2].slice(0, -1)}X`;
+    const sig = parts[2];
+    const mid = Math.floor(sig.length / 2);
+    const flipped = sig[mid] === 'A' ? 'B' : 'A';
+    const tamperedSig = sig.slice(0, mid) + flipped + sig.slice(mid + 1);
+    const tamperedValue = `${parts[0]}.${parts[1]}.${tamperedSig}`;
 
     const request = new Request('https://example.com/api/auth/get-session', {
       headers: {
@@ -309,9 +318,14 @@ describe('trySessionCache', () => {
       const sessionData = createTestSessionData();
       const validCookie = await signSessionDataCookie(sessionData, TEST_SECRET);
 
-      // Tamper with the signature
+      // Tamper with the signature (flip a character in the middle, not the last —
+      // the last base64url char has padding bits that may not affect decoded bytes)
       const parts = validCookie.value.split('.');
-      const tamperedValue = `${parts[0]}.${parts[1]}.${parts[2].slice(0, -1)}X`;
+      const sig = parts[2];
+      const mid = Math.floor(sig.length / 2);
+      const flipped = sig[mid] === 'A' ? 'B' : 'A';
+      const tamperedSig = sig.slice(0, mid) + flipped + sig.slice(mid + 1);
+      const tamperedValue = `${parts[0]}.${parts[1]}.${tamperedSig}`;
 
       // Mock upstream /get-session endpoint
       server.use(

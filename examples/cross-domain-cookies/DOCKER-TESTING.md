@@ -203,9 +203,9 @@ Open your browser and navigate to:
 
 **Solutions:**
 1. Ensure you're in the `examples/cross-domain-cookies/` directory when running `docker-compose up`
-2. Check that `bun.lockb` exists in the monorepo root
+2. Check that `pnpm-lock.yaml` exists in the monorepo root
 3. Try cleaning Docker cache: `docker-compose build --no-cache`
-4. Verify all packages are properly built from monorepo root: `bun run build`
+4. Verify all packages are properly built from monorepo root: `pnpm run build`
 
 ### Port Already in Use
 

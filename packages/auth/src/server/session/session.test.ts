@@ -82,7 +82,14 @@ describe('validateSessionData', () => {
     const cookie = await signSessionDataCookie(sessionData, TEST_SECRET);
 
     const parts = cookie.value.split('.');
-    const tamperedPayload = parts[1].slice(0, -1) + 'X';
+    // Flip a character in the MIDDLE of the payload, not the last.
+    // Base64url's last char can have padding bits that don't affect decoded
+    // output (1-in-16 chance of collision), causing flaky signature validation.
+    // Middle chars are fully significant so flipping one always changes the bytes.
+    const payload = parts[1];
+    const mid = Math.floor(payload.length / 2);
+    const flipped = payload[mid] === 'A' ? 'B' : 'A';
+    const tamperedPayload = payload.slice(0, mid) + flipped + payload.slice(mid + 1);
     const tamperedData = `${parts[0]}.${tamperedPayload}.${parts[2]}`;
 
     const result = await validateSessionData(tamperedData, TEST_SECRET);
