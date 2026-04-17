@@ -48,6 +48,16 @@ export function NeonAuthUIProvider<T extends NeonAuthAdapter>({
   return (
     <div className={cn('neon-auth-ui', className)}>
       <ThemeProvider attribute="class" defaultTheme={defaultTheme} enableSystem>
+        {/*
+          `as unknown` cast is a pnpm-migration artifact, not a real type bug.
+          Under pnpm's isolated node_modules, @daveyplate/better-auth-ui's
+          `better-auth` peer can resolve to a different instance than the one
+          @neondatabase/auth uses, producing TS2322 even when byte-identical.
+          Pinned via pnpm.overrides + direct dep on packages/auth-ui/package.json.
+          History: first cast 9b02f94, widened to `as unknown as` at d6317e5.
+          See scripts/check-better-auth-pin.mjs for the invariant that keeps
+          this safe.
+        */}
         <AuthUIProvider
           authClient={reactClient as unknown as AuthUIProviderProps['authClient']}
           {...props}
