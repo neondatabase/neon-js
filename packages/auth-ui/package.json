@@ -118,8 +118,8 @@
     "zod": "4.1.12"
   },
   "peerDependencies": {
-    "react": "18.0.0",
-    "react-dom": "18.0.0",
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0",
     "@neondatabase/auth": "workspace:*"
   },
   "peerDependenciesMeta": {
