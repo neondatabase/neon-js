@@ -55,8 +55,6 @@ export function NeonAuthUIProvider<T extends NeonAuthAdapter>({
           @neondatabase/auth uses, producing TS2322 even when byte-identical.
           Pinned via pnpm.overrides + direct dep on packages/auth-ui/package.json.
           History: first cast 9b02f94, widened to `as unknown as` at d6317e5.
-          See scripts/check-better-auth-pin.mjs for the invariant that keeps
-          this safe.
         */}
         <AuthUIProvider
           authClient={reactClient as unknown as AuthUIProviderProps['authClient']}
