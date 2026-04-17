@@ -482,10 +482,10 @@ importers:
         specifier: 6.1.2
         version: 6.1.2
       react:
-        specifier: 18.0.0
+        specifier: '>=18.0.0'
         version: 18.0.0
       react-dom:
-        specifier: 18.0.0
+        specifier: '>=18.0.0'
         version: 18.0.0(react@18.0.0)
       zod:
         specifier: 4.1.12
@@ -582,10 +582,10 @@ importers:
         specifier: 0.4.6
         version: 0.4.6(react-dom@18.0.0(react@18.0.0))(react@18.0.0)
       react:
-        specifier: 18.0.0
+        specifier: '>=18.0.0'
         version: 18.0.0
       react-dom:
-        specifier: 18.0.0
+        specifier: '>=18.0.0'
         version: 18.0.0(react@18.0.0)
       react-google-recaptcha:
         specifier: 3.1.0
