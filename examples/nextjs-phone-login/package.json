@@ -43,8 +43,8 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "20.19.0",
-    "@types/react": "19.1.5",
-    "@types/react-dom": "19.1.5",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
     "baseline-browser-mapping": "^2.10.18",
     "drizzle-kit": "0.31.7",
     "eslint": "9.30.1",
