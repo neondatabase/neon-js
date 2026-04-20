@@ -16,7 +16,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       emailOTP
       social={{ providers: ['google'] }}
       redirectTo="/dashboard"
-      signUpFields={['name']}
+      signUp={{ fields: ['name'] }}
     >
       {children}
     </NeonAuthUIProvider>
