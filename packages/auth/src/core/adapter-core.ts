@@ -15,6 +15,7 @@ import {
 import { anonymousTokenClient } from '../plugins/anonymous-token';
 import { injectClientInfo } from '../utils/client-info';
 import type { BetterAuthInstance } from '../types';
+import { normalizeBetterAuthError } from './better-auth-helpers';
 
 export interface NeonAuthAdapterCoreAuthOptions extends Omit<
   BetterAuthClientOptions,
@@ -74,18 +75,22 @@ export abstract class NeonAuthAdapterCore {
             headers.delete(FORCE_FETCH_HEADER);
             const response = await fetch(url, { ...init, headers });
 
-            // Check for HTTP errors
+            // Check for HTTP errors. Route through normalizeBetterAuthError
+            // so consumers always get a typed AuthApiError with `.status` + `.code`.
             if (!response.ok) {
               const body = await response
                 .clone()
                 .json()
                 .catch(() => ({}));
-              const err = new Error(
-                body.message || `HTTP ${response.status} ${response.statusText}`
-              );
-              (err as any).status = response.status;
-              (err as any).statusText = response.statusText;
-              throw err;
+              throw normalizeBetterAuthError({
+                status: response.status,
+                statusText: response.statusText,
+                message:
+                  body.message ||
+                  `HTTP ${response.status} ${response.statusText}`,
+                code: body.code,
+                body,
+              });
             }
 
             return response;
@@ -113,19 +118,23 @@ export abstract class NeonAuthAdapterCore {
               fetch(url, { ...init, headers })
             );
 
-          // Check for HTTP errors before returning
+          // Check for HTTP errors before returning. Route through
+          // normalizeBetterAuthError so consumers always get a typed
+          // AuthApiError with `.status` + `.code`.
           if (!response.ok) {
             const errorBody = await response
               .clone()
               .json()
               .catch(() => ({}));
-            const err = new Error(
-              errorBody.message ||
-                `HTTP ${response.status} ${response.statusText}`
-            );
-            (err as any).status = response.status;
-            (err as any).statusText = response.statusText;
-            throw err;
+            throw normalizeBetterAuthError({
+              status: response.status,
+              statusText: response.statusText,
+              message:
+                errorBody.message ||
+                `HTTP ${response.status} ${response.statusText}`,
+              code: errorBody.code,
+              body: errorBody,
+            });
           }
 
           // Clone the response so each caller gets a fresh body stream
