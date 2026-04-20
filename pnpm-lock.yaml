@@ -507,19 +507,19 @@ importers:
         specifier: 1.4.12
         version: 1.4.12(@better-auth/core@1.4.6(@better-auth/utils@0.3.1)(@better-fetch/fetch@1.1.21)(better-call@2.0.2(zod@4.3.6))(jose@6.2.2)(kysely@0.28.15)(nanostores@1.2.0))(@better-auth/utils@0.3.1)(@better-fetch/fetch@1.1.21)(better-auth@1.4.6(next@16.1.6(@opentelemetry/api@1.9.1)(@playwright/test@1.59.0)(react-dom@18.0.0(react@18.0.0))(react@18.0.0))(react-dom@18.0.0(react@18.0.0))(react@18.0.0))(better-call@2.0.2(zod@4.3.6))(nanostores@1.2.0)
       '@captchafox/react':
-        specifier: '>=1.10.0'
+        specifier: ^1.11.0
         version: 1.11.0(react-dom@18.0.0(react@18.0.0))(react@18.0.0)
       '@daveyplate/better-auth-ui':
         specifier: 3.3.9
         version: 3.3.9(mpcja72xn6zcsduljxdxulowfq)
       '@hcaptcha/react-hcaptcha':
-        specifier: '>=1.12.1'
+        specifier: ^2.0.2
         version: 2.0.2
       '@hookform/resolvers':
         specifier: ^5.2.2
         version: 5.2.2(react-hook-form@7.72.0(react@18.0.0))
       '@marsidev/react-turnstile':
-        specifier: '>=1.1.0'
+        specifier: ^1.5.0
         version: 1.5.0(react-dom@18.0.0(react@18.0.0))(react@18.0.0)
       '@radix-ui/react-avatar':
         specifier: ^1.1.11
@@ -561,7 +561,7 @@ importers:
         specifier: ^1.1.1
         version: 1.1.1(@types/react@19.1.13)(react@18.0.0)
       '@wojtekmaj/react-recaptcha-v3':
-        specifier: '>=0.1.4'
+        specifier: ^0.1.4
         version: 0.1.4(@types/react@19.1.13)(react-dom@18.0.0(react@18.0.0))(react@18.0.0)
       better-auth:
         specifier: 1.4.6
@@ -588,7 +588,7 @@ importers:
         specifier: '>=18.0.0'
         version: 18.0.0(react@18.0.0)
       react-google-recaptcha:
-        specifier: '>=3.1.0'
+        specifier: ^3.1.0
         version: 3.1.0(react@18.0.0)
       react-hook-form:
         specifier: ^7.66.1
