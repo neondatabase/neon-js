@@ -107,7 +107,7 @@ describe('createAuthServerInternal error branch', () => {
       name: 'Dup',
     })) as { data: unknown; error: ServerErrorPojo };
 
-    const serialized = JSON.parse(JSON.stringify(result.error));
+    const serialized = structuredClone(result.error);
     expect(serialized.message).toBeDefined();
     expect(serialized.status).toBe(409);
     expect(serialized.statusText).toBe('Conflict');
