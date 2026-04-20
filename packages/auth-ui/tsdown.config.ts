@@ -15,19 +15,15 @@ export default defineConfig(
       '@neondatabase/auth',
       'better-auth',
       /^@better-auth\//,
-    ],
-    plugins: [preserveDirectives()],
-    // Inline daveyplate and the captcha SDKs it imports at module scope.
-    // Bundling them means consumer webpack `resolve.alias = false` stubs
-    // cannot replace these imports with undefined and crash `useCaptcha`.
-    noExternal: [
-      /^@daveyplate\/better-auth-ui/,
+      // Captcha SDKs — external so consumers can stub/tree-shake them
       '@wojtekmaj/react-recaptcha-v3',
       '@hcaptcha/react-hcaptcha',
       '@captchafox/react',
       '@marsidev/react-turnstile',
       'react-google-recaptcha',
     ],
+    plugins: [preserveDirectives()],
+    noExternal: [/^@daveyplate\/better-auth-ui/],
     hooks: {
       'build:done': async () => {
         // Transform workspace:* deps and copy package.json to dist/
