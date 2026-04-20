@@ -13,6 +13,7 @@ import { parseSetCookies, parseCookieValue } from '@/server/utils/cookies';
 import { validateSessionData } from '@/server/session/validator';
 import { NEON_AUTH_SESSION_COOKIE_NAME, NEON_AUTH_SESSION_DATA_COOKIE_NAME } from './constants';
 import { mintSessionDataFromResponse } from './session/minting';
+import { maybeRefreshSessionDataAfterResponse } from './session/post-response-refresh';
 import { normalizeBetterAuthError } from '@/core/better-auth-helpers';
 import type { ResolvedNeonAuthLogging } from './logger';
 import { classifyFetchFailure } from './network-error';
@@ -133,8 +134,9 @@ export function createAuthServerInternal(
       });
     }
 
-    // Handle response cookies 
+    // Handle response cookies
     const setCookieHeaders = response.headers.getSetCookie();
+    let sessionDataCookie: string | null = null;
     if (setCookieHeaders.length > 0) {
       for (const setCookieHeader of setCookieHeaders) {
         const parsedCookies = parseSetCookies(setCookieHeader);
@@ -155,7 +157,7 @@ export function createAuthServerInternal(
 
       // Mint session data cookie if session_token was set
       try {
-        const sessionDataCookie = await mintSessionDataFromResponse(
+        sessionDataCookie = await mintSessionDataFromResponse(
           response.headers,
           baseUrl,
           {
@@ -184,6 +186,36 @@ export function createAuthServerInternal(
           err: error,
         });
       }
+    }
+
+    // Post-response refresh fallback: covers mutation routes (update-user,
+    // phone-number/verify, update-email) where upstream returns fresh
+    // user/session in the body but doesn't rotate session_token — so no
+    // Set-Cookie header is present at all.
+    try {
+      const fallback = await maybeRefreshSessionDataAfterResponse({
+        requestCookieHeader: cookies,
+        response,
+        baseUrl,
+        cookieConfig: { secret: cookieSecret, sessionDataTtl, domain, sameSite },
+        alreadyMintedFromHeader: sessionDataCookie !== null,
+      });
+      if (fallback) {
+        const [parsedFallback] = parseSetCookies(fallback);
+        if (parsedFallback) {
+          await ctx.setCookie(
+            parsedFallback.name,
+            parsedFallback.value,
+            parsedFallback
+          );
+        }
+      }
+    } catch (error) {
+      log?.warn('[neon-auth] Post-response refresh failed', {
+        component: 'server-api',
+        detail: error instanceof Error ? error.message : String(error),
+        err: error,
+      });
     }
 
     const responseData = await response.json().catch(() => null);

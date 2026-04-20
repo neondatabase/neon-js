@@ -164,12 +164,17 @@ describe('handleAuthProxyRequest', () => {
 
       await handleAuthProxyRequest(config);
 
-      expect(handleAuthResponseSpy).toHaveBeenCalledWith(upstreamResponse, BASE_URL, {
-        secret: TEST_SECRET,
-        sessionDataTtl: 600,
-        domain: '.example.com',
-        sameSite: undefined,
-      });
+      expect(handleAuthResponseSpy).toHaveBeenCalledWith(
+        upstreamResponse,
+        BASE_URL,
+        {
+          secret: TEST_SECRET,
+          sessionDataTtl: 600,
+          domain: '.example.com',
+          sameSite: undefined,
+        },
+        expect.objectContaining({})
+      );
     });
 
     test('returns processed response from handleAuthResponse', async () => {
@@ -212,7 +217,8 @@ describe('handleAuthProxyRequest', () => {
         BASE_URL,
         expect.objectContaining({
           sessionDataTtl: 900,
-        })
+        }),
+        expect.objectContaining({})
       );
     });
 
@@ -239,7 +245,8 @@ describe('handleAuthProxyRequest', () => {
         BASE_URL,
         expect.objectContaining({
           domain: '.custom-domain.com',
-        })
+        }),
+        expect.objectContaining({})
       );
     });
 
@@ -261,12 +268,17 @@ describe('handleAuthProxyRequest', () => {
 
       await handleAuthProxyRequest(config);
 
-      expect(handleAuthResponseSpy).toHaveBeenCalledWith(upstreamResponse, BASE_URL, {
-        secret: TEST_SECRET,
-        sessionDataTtl: undefined,
-        domain: undefined,
-        sameSite: undefined,
-      });
+      expect(handleAuthResponseSpy).toHaveBeenCalledWith(
+        upstreamResponse,
+        BASE_URL,
+        {
+          secret: TEST_SECRET,
+          sessionDataTtl: undefined,
+          domain: undefined,
+          sameSite: undefined,
+        },
+        expect.objectContaining({})
+      );
     });
   });
 
