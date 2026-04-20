@@ -12,6 +12,7 @@ import { parseSetCookies, parseCookieValue } from '@/server/utils/cookies';
 import { validateSessionData } from '@/server/session/validator';
 import { NEON_AUTH_SESSION_COOKIE_NAME, NEON_AUTH_SESSION_DATA_COOKIE_NAME } from './constants';
 import { mintSessionDataFromResponse } from './session/minting';
+import { normalizeBetterAuthError } from '@/core/better-auth-helpers';
 
 export interface NeonAuthServerConfig {
   baseUrl: string;
@@ -109,13 +110,17 @@ export function createAuthServerInternal(
 
     const responseData = await response.json().catch(() => null);
     if (!response.ok) {
+      // Route through normalizeBetterAuthError so consumers can rely on
+      // `error instanceof AuthApiError` with `.status` + `.code`.
       return {
         data: null,
-        error: {
-          message: responseData?.message || response.statusText,
+        error: normalizeBetterAuthError({
           status: response.status,
           statusText: response.statusText,
-        },
+          message: responseData?.message || response.statusText,
+          code: responseData?.code,
+          body: responseData,
+        }),
       };
     }
 
