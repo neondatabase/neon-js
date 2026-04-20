@@ -47,8 +47,25 @@ export function PhoneSignInForm() {
       setState('success');
       router.push('/dashboard');
     } catch (err) {
-      setState('error');
-      setError(err instanceof Error ? err.message : 'Verification failed');
+      // Preserve status-aware behavior: a 400 INVALID_OTP means the user can
+      // retry against the SAME OTP (allowedAttempts is only consumed by
+      // repeated attempts on one OTP — re-sending resets the counter).
+      // A 403 TOO_MANY_ATTEMPTS means the OTP has been invalidated; the user
+      // must request a new one via Start over / Use a different number.
+      const status = (err as { status?: number } | undefined)?.status;
+      const message =
+        err instanceof Error ? err.message : 'Verification failed';
+      setError(message);
+      if (status === 400) {
+        // Stay in verify state so the user can enter another code and
+        // actually consume the server-side allowedAttempts budget.
+        setState('verify');
+        setCode('');
+      } else {
+        // TOO_MANY_ATTEMPTS, OTP_EXPIRED, network error — OTP is unusable;
+        // force the user through the resend flow.
+        setState('error');
+      }
     }
   }
 
