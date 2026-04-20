@@ -61,6 +61,11 @@
       "tailwindcss": "4.2.1",
       "@tailwindcss/cli": "4.2.1",
       "@tailwindcss/oxide": "4.2.1"
+    },
+    "supportedArchitectures": {
+      "os": ["linux", "darwin", "win32"],
+      "cpu": ["x64", "arm64"],
+      "libc": ["glibc", "musl"]
     }
   }
 }
