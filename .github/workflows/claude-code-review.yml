@@ -22,9 +22,7 @@ jobs:
       (github.event.pull_request.draft == false &&
        contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association))
 
-    runs-on:
-      group: neondatabase-protected-runner-group
-      labels: linux-ubuntu-latest
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
@@ -68,8 +66,8 @@ jobs:
 
             ## What's Already Automated (Don't Review)
 
-            - ❌ Lint errors → `bun run lint` (automated by pr.yml)
-            - ❌ Build failures → `bun run build` (automated by pr.yml)
+            - ❌ Lint errors → `pnpm run lint` (automated by pr.yml)
+            - ❌ Build failures → `pnpm run build` (automated by pr.yml)
             - ❌ Formatting issues → Automated
 
             ## Review Process

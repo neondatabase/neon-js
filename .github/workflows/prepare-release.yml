@@ -1,0 +1,280 @@
+name: Prepare Release
+
+# Stage 1 of the two-stage secure publishing pipeline.
+#
+# This workflow is triggered manually via workflow_dispatch. It:
+#
+#   1. Checks out the code (full history for tag detection)
+#   2. Computes the release cascade based on the selected trigger package
+#   3. Bumps versions for each package in the cascade (pure bash + jq)
+#   4. Commits version bumps
+#   5. Tags each package (e.g., auth@v0.2.1)
+#   6. Pushes commits and tags to the repo
+#
+# What this does NOT do:
+#   - Install dependencies (that's Stage 2)
+#   - Build packages (that's Stage 2)
+#   - Pack tarballs (that's Stage 2)
+#   - Scan artifacts (that's Stage 2)
+#   - Publish to npm (that's Stage 2)
+#
+# Stage 2 lives in databricks/secure-public-registry-releases-eng and is
+# triggered manually pointing at the tag/ref from this workflow. It downloads
+# the source, installs, builds, packs, scans, and publishes via npm OIDC
+# Trusted Publishing.
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Package to release (triggers cascade)'
+        required: true
+        type: choice
+        options:
+          - auth
+          - auth-ui
+          - postgrest-js
+          - neon-js
+      bump:
+        description: 'Version bump type'
+        required: true
+        type: choice
+        default: patch
+        options:
+          - patch
+          - minor
+          - major
+      ref:
+        description: 'Branch or SHA to release from (default: main)'
+        required: false
+        default: 'main'
+
+concurrency:
+  group: prepare-release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash -euo pipefail {0}
+
+jobs:
+  prepare:
+    if: >-
+      !contains(github.event.head_commit.message, '[skip ci]')
+    runs-on:
+      group: neondatabase-protected-runner-group
+      labels: linux-ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write # push version commits + tags
+
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        with:
+          egress-policy: audit
+
+      - name: Validate ref input
+        id: validate
+        run: |
+          REF="${{ inputs.ref || 'main' }}"
+          if [[ "$REF" =~ ^[0-9a-f]{7,40}$ ]]; then
+            echo "::error::Raw SHA refs are not supported. Please use a branch name (e.g., 'main')."
+            exit 1
+          fi
+
+      - name: Checkout code
+        id: checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ inputs.ref || 'main' }}
+          fetch-depth: 0 # full history for tag-based version detection
+
+      - name: Compute release cascade
+        id: cascade
+        run: |
+          PACKAGE="${{ inputs.package }}"
+          case "$PACKAGE" in
+            postgrest-js) PACKAGES='["postgrest-js","neon-js"]' ;;
+            auth-ui)      PACKAGES='["auth-ui","auth","neon-js"]' ;;
+            auth)         PACKAGES='["auth","neon-js"]' ;;
+            neon-js)      PACKAGES='["neon-js"]' ;;
+            *)            echo "Unknown package: $PACKAGE"; exit 1 ;;
+          esac
+          echo "packages=$PACKAGES" >> "$GITHUB_OUTPUT"
+          echo "### Release Cascade" >> "$GITHUB_STEP_SUMMARY"
+          echo "Trigger: \`$PACKAGE\` (${{ inputs.bump }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "Cascade: $PACKAGES" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Configure git
+        id: git-config
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump versions
+        id: versions
+        run: |
+          BUMP="${{ inputs.bump }}"
+          PACKAGES='${{ steps.cascade.outputs.packages }}'
+          VERSIONS='{}'
+          TAGS='[]'
+
+          for pkg in $(echo "$PACKAGES" | jq -r '.[]'); do
+            echo "::group::Bump $pkg ($BUMP)"
+            cd "packages/$pkg"
+
+            current=$(jq -r '.version' package.json)
+            echo "Current version: $current"
+
+            # Strip any prerelease suffix (e.g. 0.2.1-beta.1 -> 0.2.1)
+            base="${current%%-*}"
+            IFS='.' read -r major minor patch <<< "$base"
+
+            case "$BUMP" in
+              major) new="$((major+1)).0.0" ;;
+              minor) new="${major}.$((minor+1)).0" ;;
+              patch) new="${major}.${minor}.$((patch+1))" ;;
+            esac
+
+            echo "New version: $new"
+            jq --arg v "$new" '.version = $v' package.json > tmp.json && mv tmp.json package.json
+
+            VERSIONS=$(echo "$VERSIONS" | jq --arg k "$pkg" --arg v "$new" '. + {($k): $v}')
+            TAGS=$(echo "$TAGS" | jq --arg t "${pkg}@v${new}" '. + [$t]')
+            cd "$GITHUB_WORKSPACE"
+            echo "::endgroup::"
+          done
+
+          echo "versions=$VERSIONS" >> "$GITHUB_OUTPUT"
+          echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
+          echo "### Versions" >> "$GITHUB_STEP_SUMMARY"
+          echo "$VERSIONS" | jq -r 'to_entries[] | "- **\(.key)** v\(.value)"' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit version bumps
+        id: commit
+        run: |
+          PACKAGES='${{ steps.cascade.outputs.packages }}'
+          VERSIONS='${{ steps.versions.outputs.versions }}'
+
+          # Build the commit message
+          COMMIT_MSG="chore: release"
+          for pkg in $(echo "$PACKAGES" | jq -r '.[]'); do
+            version=$(echo "$VERSIONS" | jq -r --arg k "$pkg" '.[$k]')
+            COMMIT_MSG="$COMMIT_MSG @neondatabase/${pkg}@v${version}"
+          done
+          COMMIT_MSG="$COMMIT_MSG [skip ci]"
+
+          git add -A
+          git commit -m "$COMMIT_MSG"
+
+      - name: Create tags
+        id: tags
+        run: |
+          TAGS='${{ steps.versions.outputs.tags }}'
+          for tag in $(echo "$TAGS" | jq -r '.[]'); do
+            echo "Tagging: $tag"
+            git tag -a "$tag" -m "Release $tag"
+          done
+
+      - name: Push commits and tags
+        id: push
+        run: git push --follow-tags
+
+      - name: Release failure guidance
+        if: failure()
+        run: |
+          PACKAGE="${{ inputs.package }}"
+          BUMP="${{ inputs.bump }}"
+          VERSIONS='${{ steps.versions.outputs.versions }}'
+          TAGS='${{ steps.versions.outputs.tags }}'
+
+          echo "## :x: Release Preparation Failed" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Trigger:** \`$PACKAGE\` ($BUMP)" >> "$GITHUB_STEP_SUMMARY"
+          if [[ -n "$VERSIONS" && "$VERSIONS" != "{}" ]]; then
+            echo "**Planned versions:** $VERSIONS" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          echo "### What failed" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "${{ steps.validate.outcome }}" == "failure" ]]; then
+            echo "**Ref validation** — the ref input was rejected." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Impact:** Nothing was modified. Provide a valid branch name and re-run." >> "$GITHUB_STEP_SUMMARY"
+
+          elif [[ "${{ steps.checkout.outcome }}" == "failure" ]]; then
+            echo "**Checkout** — could not check out ref \`${{ inputs.ref || 'main' }}\`." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Impact:** Nothing was modified. Verify the ref exists and re-run." >> "$GITHUB_STEP_SUMMARY"
+
+          elif [[ "${{ steps.cascade.outcome }}" == "failure" ]]; then
+            echo "**Cascade computation** — unknown package \`$PACKAGE\`." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Impact:** Nothing was modified. This is a workflow bug — the package choice list is out of sync." >> "$GITHUB_STEP_SUMMARY"
+
+          elif [[ "${{ steps.versions.outcome }}" == "failure" ]]; then
+            echo "**Version bump** — failed to compute or apply version bumps." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Impact:** Nothing was pushed. Local changes existed only on the runner (now discarded). Safe to re-run." >> "$GITHUB_STEP_SUMMARY"
+
+          elif [[ "${{ steps.commit.outcome }}" == "failure" ]]; then
+            echo "**Commit** — \`git commit\` failed (no changes staged, or git config issue)." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Impact:** Nothing was pushed. Safe to re-run." >> "$GITHUB_STEP_SUMMARY"
+
+          elif [[ "${{ steps.tags.outcome }}" == "failure" ]]; then
+            echo "**Tag creation** — \`git tag\` failed (tag already exists locally?)." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Impact:** Version bump was committed locally but nothing was pushed. Safe to re-run." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "If tags already exist on the remote from a previous attempt:" >> "$GITHUB_STEP_SUMMARY"
+            echo '```bash' >> "$GITHUB_STEP_SUMMARY"
+            echo "git ls-remote --tags origin | grep \"$PACKAGE\"" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+          elif [[ "${{ steps.push.outcome }}" == "failure" ]]; then
+            echo "**Push** — \`git push --follow-tags\` failed. Partial push is possible." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Impact:** The commit and tags were created locally. The push may have partially succeeded." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Check remote state:**" >> "$GITHUB_STEP_SUMMARY"
+            echo '```bash' >> "$GITHUB_STEP_SUMMARY"
+            echo "# Check if tags were pushed" >> "$GITHUB_STEP_SUMMARY"
+            echo "git ls-remote --tags origin | grep \"$PACKAGE\"" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "# Check if commit was pushed" >> "$GITHUB_STEP_SUMMARY"
+            echo "git log origin/main --oneline -5" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**If commit pushed but tags missing** — push tags manually:" >> "$GITHUB_STEP_SUMMARY"
+            echo '```bash' >> "$GITHUB_STEP_SUMMARY"
+            if [[ -n "$TAGS" && "$TAGS" != "[]" ]]; then
+              for tag in $(echo "$TAGS" | jq -r '.[]' 2>/dev/null); do
+                echo "git tag -a \"$tag\" -m \"Release $tag\" && git push origin \"$tag\"" >> "$GITHUB_STEP_SUMMARY"
+              done
+            else
+              echo "git tag -a \"<tag>\" -m \"Release <tag>\" && git push origin \"<tag>\"" >> "$GITHUB_STEP_SUMMARY"
+            fi
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**If tags pushed but commit missing** — delete orphan tags:" >> "$GITHUB_STEP_SUMMARY"
+            echo '```bash' >> "$GITHUB_STEP_SUMMARY"
+            if [[ -n "$TAGS" && "$TAGS" != "[]" ]]; then
+              for tag in $(echo "$TAGS" | jq -r '.[]' 2>/dev/null); do
+                echo "git push --delete origin \"$tag\"" >> "$GITHUB_STEP_SUMMARY"
+              done
+            else
+              echo "git push --delete origin \"<tag>\"" >> "$GITHUB_STEP_SUMMARY"
+            fi
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+          else
+            echo "An unexpected step failed. Check the workflow log above for details." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "---" >> "$GITHUB_STEP_SUMMARY"
+          echo ":book: [Release Runbook](../docs/release-runbook.md) — full failure recovery guide" >> "$GITHUB_STEP_SUMMARY"
