@@ -110,17 +110,28 @@ export function createAuthServerInternal(
 
     const responseData = await response.json().catch(() => null);
     if (!response.ok) {
-      // Route through normalizeBetterAuthError so consumers can rely on
-      // `error instanceof AuthApiError` with `.status` + `.code`.
+      // Normalize through `normalizeBetterAuthError` to get a mapped
+      // `.code` + canonical `.message`, but return the values as a plain
+      // serializable object. An `AuthApiError` instance has a non-enumerable
+      // `message`, no `statusText`, and is an `Error` subclass — shapes that
+      // break `{...error}` spread and `JSON.stringify(error)` on the server
+      // return surface. Keep the POJO contract `{ message, status,
+      // statusText, code }` intact for server consumers.
+      const normalized = normalizeBetterAuthError({
+        status: response.status,
+        statusText: response.statusText,
+        message: responseData?.message || response.statusText,
+        code: responseData?.code,
+        body: responseData,
+      });
       return {
         data: null,
-        error: normalizeBetterAuthError({
-          status: response.status,
+        error: {
+          message: normalized.message,
+          status: normalized.status ?? response.status,
           statusText: response.statusText,
-          message: responseData?.message || response.statusText,
-          code: responseData?.code,
-          body: responseData,
-        }),
+          code: normalized.code,
+        },
       };
     }
 

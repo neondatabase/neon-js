@@ -6,6 +6,17 @@ import { authApiHandler } from './handler';
 import { neonAuthMiddleware } from './middleware';
 import type { NeonAuthServer } from '@/server/types';
 
+// Re-export auth error classes + type guards for server-side consumers
+// importing from `@neondatabase/auth/next/server`. The error field returned
+// from server methods is a POJO, but thrown errors from adapter internals
+// still benefit from `instanceof` narrowing.
+export {
+  AuthError,
+  AuthApiError,
+  isAuthError,
+  isAuthApiError,
+} from '@/adapters/supabase/auth-interface';
+
 /**
  * Unified entry point for Neon Auth in Next.js
  *
