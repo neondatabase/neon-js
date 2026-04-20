@@ -11,17 +11,7 @@ export default defineConfig(
   createPackageConfig({
     entry: ['src/index.ts', 'src/server.ts'],
     clean: false, // Don't clean dist since CSS is generated first by TailwindCSS CLI
-    external: [
-      '@neondatabase/auth',
-      'better-auth',
-      /^@better-auth\//,
-      // Captcha SDKs — external so consumers can stub/tree-shake them
-      '@wojtekmaj/react-recaptcha-v3',
-      '@hcaptcha/react-hcaptcha',
-      '@captchafox/react',
-      '@marsidev/react-turnstile',
-      'react-google-recaptcha',
-    ],
+    external: ['@neondatabase/auth', 'better-auth', /^@better-auth\//],
     plugins: [preserveDirectives()],
     noExternal: [/^@daveyplate\/better-auth-ui/],
     hooks: {
