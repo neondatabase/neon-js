@@ -146,8 +146,8 @@ jobs:
             echo "::endgroup::"
           done
 
-          echo "versions=$VERSIONS" >> "$GITHUB_OUTPUT"
-          echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
+          echo "versions=$(echo "$VERSIONS" | jq -c .)" >> "$GITHUB_OUTPUT"
+          echo "tags=$(echo "$TAGS" | jq -c .)" >> "$GITHUB_OUTPUT"
           echo "### Versions" >> "$GITHUB_STEP_SUMMARY"
           echo "$VERSIONS" | jq -r 'to_entries[] | "- **\(.key)** v\(.value)"' >> "$GITHUB_STEP_SUMMARY"
 
