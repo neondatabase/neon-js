@@ -27,11 +27,7 @@ export default defineConfig(
     // node_modules-based heuristic doesn't catch them)
     external: [/^@neondatabase\/auth-ui/],
     noExternal: ['@neondatabase/internal'],
-    plugins: [
-      preserveDirectives({
-        clientPackages: ['@neondatabase/auth-ui'],
-      }),
-    ],
+    plugins: [preserveDirectives()],
     report: {
       gzip: true,
       brotli: true,

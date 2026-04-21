@@ -11,9 +11,19 @@ export default defineConfig(
   createPackageConfig({
     entry: ['src/index.ts', 'src/server.ts'],
     clean: false, // Don't clean dist since CSS is generated first by TailwindCSS CLI
-    external: ['@neondatabase/auth', 'better-auth', /^@better-auth\//],
+    external: ['@neondatabase/auth', 'better-auth'],
+    platform: 'browser',
+    fixedExtension: true,
     plugins: [preserveDirectives()],
-    noExternal: [/^@daveyplate\/better-auth-ui/],
+    noExternal: [
+      /^@daveyplate\/better-auth-ui/,
+      /^@better-auth\//,
+      '@wojtekmaj/react-recaptcha-v3',
+      'react-google-recaptcha',
+      '@hcaptcha/react-hcaptcha',
+      '@captchafox/react',
+      '@marsidev/react-turnstile',
+    ],
     hooks: {
       'build:done': async () => {
         // Transform workspace:* deps and copy package.json to dist/
