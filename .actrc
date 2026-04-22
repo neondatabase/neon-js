@@ -1,0 +1,3 @@
+-P neondatabase-protected-runner-group=catthehacker/ubuntu:medium-latest
+-P linux-ubuntu-latest=catthehacker/ubuntu:medium-latest
+-P ubuntu-latest=catthehacker/ubuntu:medium-latest

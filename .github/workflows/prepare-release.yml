@@ -82,6 +82,7 @@ jobs:
           egress-policy: audit
 
       - name: Check actor has admin/maintain role
+        if: env.ACT != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -280,10 +281,12 @@ jobs:
 
       - name: Push release branch
         id: push
+        if: env.ACT != 'true'
         run: |
           git push origin "HEAD:${{ steps.meta.outputs.branch }}"
 
       - name: Ensure `release` label exists
+        if: env.ACT != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -291,6 +294,7 @@ jobs:
 
       - name: Open PR
         id: open-pr
+        if: env.ACT != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           # Pass these via env rather than inline ${{ }} interpolation so that

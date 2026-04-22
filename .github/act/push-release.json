@@ -1,0 +1,11 @@
+{
+  "ref": "refs/heads/main",
+  "repository": { "default_branch": "main", "name": "neon-js", "full_name": "neondatabase/neon-js" },
+  "pusher": { "name": "thekauer" },
+  "sender": { "login": "thekauer", "type": "User" },
+  "head_commit": {
+    "id": "fakesha0000000000000000000000000000000000",
+    "message": "chore: release @neondatabase/postgrest-js@v0.1.0-alpha.3 @neondatabase/neon-js@v0.2.0-beta.2 (#90)",
+    "author": { "name": "thekauer", "email": "thekauer@users.noreply.github.com" }
+  }
+}
