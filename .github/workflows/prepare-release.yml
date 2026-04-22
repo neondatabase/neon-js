@@ -73,7 +73,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write      # push release branch
-      pull-requests: write # open PR + enable auto-merge
+      pull-requests: write # open PR
 
     steps:
       - name: Harden the runner
@@ -247,8 +247,13 @@ jobs:
             echo ""
             echo "### Next steps"
             echo "1. An approver (Andras or Shridhar) reviews + approves this PR."
-            echo "2. Required checks run; the PR auto-merges on green."
-            echo "3. \`post-release.yml\` fires on merge, tags the squash commit, and comments here with Stage 2 (npm publish) dispatch instructions."
+            echo "2. Required checks run."
+            echo "3. On green, the approver **manually clicks \"Squash and merge\"** in the UI. **Do NOT use auto-merge.**"
+            echo "4. \`post-release.yml\` fires on the push to \`main\`, tags the squash commit, and comments here with Stage 2 (npm publish) dispatch instructions."
+            echo ""
+            echo "> :warning: **Why manual merge?** GitHub Actions suppresses downstream \`on: push\` workflows for pushes caused by \`GITHUB_TOKEN\` (including auto-merge enabled from a workflow). A human clicking merge in the UI attributes the push to that user, so \`post-release.yml\` fires correctly."
+            echo ""
+            echo "> :warning: **Do not edit this PR's title** and do not add \`[skip ci]\`, \`[ci skip]\`, or similar markers. Those would either break the commit-subject parser in \`post-release.yml\` or suppress the workflow entirely."
             echo ""
             echo "### Recovery"
             echo "**Before Stage 2 runs:** if something's wrong, delete the bad tag(s) manually (\`git push origin :refs/tags/<pkg>@v<ver>\`) and rerun post-release."
@@ -284,7 +289,7 @@ jobs:
         run: |
           gh label create release --color "0E8A16" --description "Automated release PR" --force || true
 
-      - name: Open PR + enable auto-merge
+      - name: Open PR
         id: open-pr
         env:
           GH_TOKEN: ${{ github.token }}
@@ -295,6 +300,12 @@ jobs:
           PR_TITLE: ${{ steps.meta.outputs.pr_title }}
           PR_BODY: ${{ steps.meta.outputs.body }}
         run: |
+          # NOTE: We intentionally do NOT enable auto-merge. Auto-merge enabled
+          # by GITHUB_TOKEN causes the eventual squash-merge push to main to be
+          # suppressed from triggering downstream `on: push` workflows (including
+          # post-release.yml). The approver must click "Squash and merge" manually
+          # in the UI so the push is attributed to a human and post-release fires.
+          # See https://docs.github.com/en/actions/concepts/security/github_token
           PR_URL=$(gh pr create \
             --base main \
             --head "$PR_BRANCH" \
@@ -303,8 +314,7 @@ jobs:
             --label release)
 
           echo "Opened: $PR_URL"
-          gh pr merge "$PR_URL" --auto --squash
-          echo "Auto-merge enabled on: $PR_URL"
+          echo "Reminder: approver must click 'Squash and merge' manually (not auto-merge)."
 
           echo "### PR" >> "$GITHUB_STEP_SUMMARY"
           echo "$PR_URL" >> "$GITHUB_STEP_SUMMARY"
@@ -359,11 +369,11 @@ jobs:
             echo "**Impact:** The commit exists only on the runner (now discarded). Nothing was pushed. Safe to re-run." >> "$GITHUB_STEP_SUMMARY"
 
           elif [[ "${{ steps.open-pr.outcome }}" == "failure" ]]; then
-            echo "**Open PR / enable auto-merge** — \`gh pr create\` or \`gh pr merge --auto\` failed." >> "$GITHUB_STEP_SUMMARY"
+            echo "**Open PR** — \`gh pr create\` failed." >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "**Impact:** The release branch \`${{ steps.meta.outputs.branch }}\` was pushed but the PR was not opened (or auto-merge was not enabled)." >> "$GITHUB_STEP_SUMMARY"
+            echo "**Impact:** The release branch \`${{ steps.meta.outputs.branch }}\` was pushed but the PR was not opened." >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "**Recovery:** Open the PR manually from the pushed branch and enable squash auto-merge." >> "$GITHUB_STEP_SUMMARY"
+            echo "**Recovery:** Open the PR manually from the pushed branch." >> "$GITHUB_STEP_SUMMARY"
             echo '```bash' >> "$GITHUB_STEP_SUMMARY"
             echo "gh pr create --base main --head \"${{ steps.meta.outputs.branch }}\" --title \"${{ steps.meta.outputs.pr_title }}\" --label release" >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"

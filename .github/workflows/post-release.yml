@@ -38,6 +38,27 @@ jobs:
         with:
           egress-policy: audit
 
+      - name: Diagnostic — confirm event identity
+        # Logs actor + sender + ref + sha of the triggering push. On first
+        # successful run, verify `actor` is a human (not `github-actions[bot]`).
+        # If it IS `github-actions[bot]`, the push was caused by GITHUB_TOKEN
+        # (likely auto-merge), GitHub will suppress downstream triggers, and
+        # this workflow won't fire at all — meaning you never see this log.
+        # If you CAN see this log, the trigger chain is healthy.
+        run: |
+          echo "actor:  ${{ github.actor }}"
+          echo "sender: ${{ github.event.sender.login }}"
+          echo "ref:    ${{ github.ref }}"
+          echo "sha:    ${{ github.sha }}"
+          {
+            echo "### Event identity"
+            echo "- **actor:** \`${{ github.actor }}\`"
+            echo "- **sender:** \`${{ github.event.sender.login }}\`"
+            echo "- **ref:** \`${{ github.ref }}\`"
+            echo "- **sha:** \`${{ github.sha }}\`"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
