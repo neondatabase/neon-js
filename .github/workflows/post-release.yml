@@ -49,7 +49,11 @@ jobs:
           MSG: ${{ github.event.head_commit.message }}
         run: |
           # Message shape: "chore: release @neondatabase/auth@v0.3.0 @neondatabase/neon-js@v0.3.0 (#123)"
-          # Extract each @neondatabase/<pkg>@v<ver> token and the trailing PR number.
+          # Parse the SUBJECT LINE ONLY (first line of the commit message) — the squash body can
+          # contain extra @neondatabase/<pkg>@v<ver> tokens from concatenated branch commit
+          # subjects, which would otherwise pollute the order and duplicate tags in the handoff.
+          SUBJECT=$(echo "$MSG" | head -n 1)
+
           TAGS='[]'
           PACKAGES='[]'
           VERSIONS='[]'
@@ -60,18 +64,18 @@ jobs:
             TAGS=$(echo "$TAGS" | jq --arg t "${pkg}@v${ver}" '. + [$t]')
             PACKAGES=$(echo "$PACKAGES" | jq --arg p "$pkg" '. + [$p]')
             VERSIONS=$(echo "$VERSIONS" | jq --arg v "$ver" '. + [$v]')
-          done < <(echo "$MSG" | grep -oE '@neondatabase/[a-z0-9-]+@v[0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9.]+)?')
+          done < <(echo "$SUBJECT" | grep -oE '@neondatabase/[a-z0-9-]+@v[0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9.]+)?')
 
           if [[ "$(echo "$TAGS" | jq 'length')" == "0" ]]; then
-            echo "No @neondatabase/* tokens found in commit message — skipping."
+            echo "No @neondatabase/* tokens found in commit subject — skipping."
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          # PR number is the last `(#NNN)` token in the message (squash merges add this automatically).
-          # `|| true` keeps this non-fatal under `bash -euo pipefail` when the commit has no (#N) token —
+          # PR number is the last `(#NNN)` token in the subject (squash merges add this automatically).
+          # `|| true` keeps this non-fatal under `bash -euo pipefail` when the subject has no (#N) token —
           # we still want to tag + write the summary; just skip the PR-comment step.
-          PR_NUM=$(echo "$MSG" | grep -oE '\(#[0-9]+\)' | tail -1 | grep -oE '[0-9]+' || true)
+          PR_NUM=$(echo "$SUBJECT" | grep -oE '\(#[0-9]+\)' | tail -1 | grep -oE '[0-9]+' || true)
 
           echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
           echo "packages=$PACKAGES" >> "$GITHUB_OUTPUT"
@@ -126,9 +130,9 @@ jobs:
             echo "body<<HANDOFF_EOF"
             echo "## 🚀 Tagged — ready for Stage 2 (npm publish)"
             echo ""
-            echo "Release tagged on commit [\`${GITHUB_SHA:0:7}\`](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}). Dispatch Stage 2 once per package below to publish to npm."
+            echo "Release tagged on commit [\`${GITHUB_SHA:0:7}\`](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}). **Publish the packages below in the listed order (leaf packages first — downstream packages resolve the new deps at publish time).**"
             echo ""
-            # Iterate pairs.
+            # Per-package sections (CLI + UI).
             paste <(echo "$PACKAGES" | jq -r '.[]') <(echo "$TAGS" | jq -r '.[]') \
             | while IFS=$'\t' read -r pkg tag; do
                 echo "### \`@neondatabase/${pkg}\` → \`${tag}\`"
@@ -141,9 +145,21 @@ jobs:
                 echo "  -f dry-run=false"
                 echo '```'
                 echo ""
-                echo "**UI:** [Dispatch \`neon-js.yml\`](${UI_LINK}) — set \`package=${pkg}\`, \`ref=${tag}\`, \`dry-run=false\`."
+                echo "**UI:** [Dispatch \`neon-js.yml\`](${UI_LINK}) — fill in the form with \`package=${pkg}\`, \`ref=${tag}\`, untick \`dry-run\`."
                 echo ""
               done
+            # Publish-all one-liner: paste once, runs every dispatch sequentially and waits on each.
+            echo "### 🔁 Publish all (paste in terminal, runs sequentially)"
+            echo ""
+            echo '```bash'
+            echo "set -e"
+            paste <(echo "$PACKAGES" | jq -r '.[]') <(echo "$TAGS" | jq -r '.[]') \
+            | while IFS=$'\t' read -r pkg tag; do
+                echo "gh workflow run -R ${SECPUB_OWNER}/${SECPUB_REPO} neon-js.yml -f package=${pkg} -f ref=${tag} -f dry-run=false"
+                echo "gh run watch -R ${SECPUB_OWNER}/${SECPUB_REPO} --exit-status"
+              done
+            echo '```'
+            echo ""
             echo "---"
             echo ""
             echo "**If anything's wrong before Stage 2 runs:** delete the bad tag(s) manually (\`git push origin :refs/tags/<pkg>@v<ver>\`) and rerun post-release."
