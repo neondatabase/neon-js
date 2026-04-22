@@ -169,18 +169,6 @@ jobs:
                 echo "**UI:** [Dispatch \`neon-js.yml\`](${UI_LINK}) — fill in the form with \`package=${pkg}\`, \`ref=${tag}\`, untick \`dry-run\`."
                 echo ""
               done
-            # Publish-all one-liner: paste once, runs every dispatch sequentially and waits on each.
-            echo "### 🔁 Publish all (paste in terminal, runs sequentially)"
-            echo ""
-            echo '```bash'
-            echo "set -e"
-            paste <(echo "$PACKAGES" | jq -r '.[]') <(echo "$TAGS" | jq -r '.[]') \
-            | while IFS=$'\t' read -r pkg tag; do
-                echo "gh workflow run -R ${SECPUB_OWNER}/${SECPUB_REPO} neon-js.yml -f package=${pkg} -f ref=${tag} -f dry-run=false"
-                echo "gh run watch -R ${SECPUB_OWNER}/${SECPUB_REPO} --exit-status"
-              done
-            echo '```'
-            echo ""
             echo "---"
             echo ""
             echo "**If anything's wrong before Stage 2 runs:** delete the bad tag(s) manually (\`git push origin :refs/tags/<pkg>@v<ver>\`) and rerun post-release."
