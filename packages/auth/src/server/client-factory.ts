@@ -73,7 +73,14 @@ export function createAuthServerInternal(
       for (const setCookieHeader of setCookieHeaders) {
         const parsedCookies = parseSetCookies(setCookieHeader);
         for (const cookie of parsedCookies) {
-          const cookieOptions = domain ? { ...cookie, domain } : cookie;
+          const cookieOptions = {
+            ...cookie,
+            partitioned: undefined ,
+            sameSite: 'lax' as const,
+          };
+          if (domain) {
+            cookieOptions.domain = domain;
+          }
           await ctx.setCookie(cookie.name, cookie.value, cookieOptions);
         }
       }

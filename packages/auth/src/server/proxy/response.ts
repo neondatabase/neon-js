@@ -49,6 +49,8 @@ const prepareResponseHeaders = (response: Response, domain?: string) => {
           const parsedCookies = parseSetCookies(cookieHeader);
           for (const parsedCookie of parsedCookies) {
             parsedCookie.domain = domain;
+            parsedCookie.partitioned = undefined;
+            parsedCookie.sameSite = 'lax';
             headers.append('Set-Cookie', serializeSetCookie(parsedCookie));
           }
         } else {
