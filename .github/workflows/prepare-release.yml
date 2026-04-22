@@ -66,13 +66,25 @@ jobs:
       labels: linux-ubuntu-latest
     timeout-minutes: 30
     permissions:
-      contents: write # push version commits + tags
+      contents: write      # push release branch
+      pull-requests: write # open PR + enable auto-merge
 
     steps:
       - name: Harden the runner
         uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
         with:
           egress-policy: audit
+
+      - name: Check actor has admin/maintain role
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          role=$(gh api "repos/${GITHUB_REPOSITORY}/collaborators/${GITHUB_ACTOR}/permission" --jq '.role_name')
+          if [[ "$role" != "admin" && "$role" != "maintain" ]]; then
+            echo "ERROR: Actor '${GITHUB_ACTOR}' has role '${role}', but 'admin' or 'maintain' is required to dispatch a release."
+            exit 1
+          fi
+          echo "Actor ${GITHUB_ACTOR} passes gate (role: ${role})."
 
       - name: Validate ref input
         id: validate
@@ -151,35 +163,93 @@ jobs:
           echo "### Versions" >> "$GITHUB_STEP_SUMMARY"
           echo "$VERSIONS" | jq -r 'to_entries[] | "- **\(.key)** v\(.value)"' >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Compute release branch + PR metadata
+        id: meta
+        run: |
+          PACKAGES='${{ steps.cascade.outputs.packages }}'
+          VERSIONS='${{ steps.versions.outputs.versions }}'
+          TAGS='${{ steps.versions.outputs.tags }}'
+          RUN_ID="${GITHUB_RUN_ID}"
+
+          PRIMARY="${{ inputs.package }}"
+          BRANCH="release/${PRIMARY}-${RUN_ID}"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+
+          TITLE="chore: release"
+          for pkg in $(echo "$PACKAGES" | jq -r '.[]'); do
+            version=$(echo "$VERSIONS" | jq -r --arg k "$pkg" '.[$k]')
+            TITLE="$TITLE @neondatabase/${pkg}@v${version}"
+          done
+          echo "pr_title=$TITLE" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "body<<PR_EOF"
+            echo "Automated release cut by \`prepare-release.yml\` (run [${RUN_ID}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}))."
+            echo ""
+            echo "### Cascade"
+            echo "Trigger: \`${PRIMARY}\` (${{ inputs.bump }})"
+            echo ""
+            echo "### Packages"
+            echo "$VERSIONS" | jq -r 'to_entries[] | "- **\(.key)** → v\(.value)"'
+            echo ""
+            echo "### Tags (created post-merge)"
+            echo "$TAGS" | jq -r '.[] | "- \(.)"'
+            echo ""
+            echo "### Next steps"
+            echo "1. An approver (Andras or Shridhar) reviews + approves this PR."
+            echo "2. Required checks run; the PR auto-merges on green."
+            echo "3. \`post-release.yml\` fires on merge, tags the squash commit, and comments here with Stage 2 (npm publish) dispatch instructions."
+            echo ""
+            echo "### Revert"
+            echo "Dispatch [\`revert-release.yml\`](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/workflows/revert-release.yml) with the squash commit SHA."
+            echo "PR_EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Commit version bumps
         id: commit
         run: |
           PACKAGES='${{ steps.cascade.outputs.packages }}'
           VERSIONS='${{ steps.versions.outputs.versions }}'
 
-          # Build the commit message
           COMMIT_MSG="chore: release"
           for pkg in $(echo "$PACKAGES" | jq -r '.[]'); do
             version=$(echo "$VERSIONS" | jq -r --arg k "$pkg" '.[$k]')
             COMMIT_MSG="$COMMIT_MSG @neondatabase/${pkg}@v${version}"
           done
-          COMMIT_MSG="$COMMIT_MSG [skip ci]"
+          # No [skip ci] — we need checks to run on the PR.
 
           git add -A
           git commit -m "$COMMIT_MSG"
 
-      - name: Create tags
-        id: tags
-        run: |
-          TAGS='${{ steps.versions.outputs.tags }}'
-          for tag in $(echo "$TAGS" | jq -r '.[]'); do
-            echo "Tagging: $tag"
-            git tag -a "$tag" -m "Release $tag"
-          done
-
-      - name: Push commits and tags
+      - name: Push release branch
         id: push
-        run: git push --follow-tags
+        run: |
+          git push origin "HEAD:${{ steps.meta.outputs.branch }}"
+
+      - name: Ensure `release` label exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create release --color "0E8A16" --description "Automated release PR" --force || true
+
+      - name: Open PR + enable auto-merge
+        id: open-pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_URL=$(gh pr create \
+            --base main \
+            --head "${{ steps.meta.outputs.branch }}" \
+            --title "${{ steps.meta.outputs.pr_title }}" \
+            --body "${{ steps.meta.outputs.body }}" \
+            --label release)
+
+          echo "Opened: $PR_URL"
+          gh pr merge "$PR_URL" --auto --squash
+          echo "Auto-merge enabled on: $PR_URL"
+
+          echo "### PR" >> "$GITHUB_STEP_SUMMARY"
+          echo "$PR_URL" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Release failure guidance
         if: failure()
@@ -225,50 +295,19 @@ jobs:
             echo "" >> "$GITHUB_STEP_SUMMARY"
             echo "**Impact:** Nothing was pushed. Safe to re-run." >> "$GITHUB_STEP_SUMMARY"
 
-          elif [[ "${{ steps.tags.outcome }}" == "failure" ]]; then
-            echo "**Tag creation** — \`git tag\` failed (tag already exists locally?)." >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "**Impact:** Version bump was committed locally but nothing was pushed. Safe to re-run." >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "If tags already exist on the remote from a previous attempt:" >> "$GITHUB_STEP_SUMMARY"
-            echo '```bash' >> "$GITHUB_STEP_SUMMARY"
-            echo "git ls-remote --tags origin | grep \"$PACKAGE\"" >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-
           elif [[ "${{ steps.push.outcome }}" == "failure" ]]; then
-            echo "**Push** — \`git push --follow-tags\` failed. Partial push is possible." >> "$GITHUB_STEP_SUMMARY"
+            echo "**Push release branch** — \`git push origin HEAD:<branch>\` failed." >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "**Impact:** The commit and tags were created locally. The push may have partially succeeded." >> "$GITHUB_STEP_SUMMARY"
+            echo "**Impact:** The commit exists only on the runner (now discarded). Nothing was pushed. Safe to re-run." >> "$GITHUB_STEP_SUMMARY"
+
+          elif [[ "${{ steps.open-pr.outcome }}" == "failure" ]]; then
+            echo "**Open PR / enable auto-merge** — \`gh pr create\` or \`gh pr merge --auto\` failed." >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "**Check remote state:**" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Impact:** The release branch \`${{ steps.meta.outputs.branch }}\` was pushed but the PR was not opened (or auto-merge was not enabled)." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Recovery:** Open the PR manually from the pushed branch and enable squash auto-merge." >> "$GITHUB_STEP_SUMMARY"
             echo '```bash' >> "$GITHUB_STEP_SUMMARY"
-            echo "# Check if tags were pushed" >> "$GITHUB_STEP_SUMMARY"
-            echo "git ls-remote --tags origin | grep \"$PACKAGE\"" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "# Check if commit was pushed" >> "$GITHUB_STEP_SUMMARY"
-            echo "git log origin/main --oneline -5" >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "**If commit pushed but tags missing** — push tags manually:" >> "$GITHUB_STEP_SUMMARY"
-            echo '```bash' >> "$GITHUB_STEP_SUMMARY"
-            if [[ -n "$TAGS" && "$TAGS" != "[]" ]]; then
-              for tag in $(echo "$TAGS" | jq -r '.[]' 2>/dev/null); do
-                echo "git tag -a \"$tag\" -m \"Release $tag\" && git push origin \"$tag\"" >> "$GITHUB_STEP_SUMMARY"
-              done
-            else
-              echo "git tag -a \"<tag>\" -m \"Release <tag>\" && git push origin \"<tag>\"" >> "$GITHUB_STEP_SUMMARY"
-            fi
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "**If tags pushed but commit missing** — delete orphan tags:" >> "$GITHUB_STEP_SUMMARY"
-            echo '```bash' >> "$GITHUB_STEP_SUMMARY"
-            if [[ -n "$TAGS" && "$TAGS" != "[]" ]]; then
-              for tag in $(echo "$TAGS" | jq -r '.[]' 2>/dev/null); do
-                echo "git push --delete origin \"$tag\"" >> "$GITHUB_STEP_SUMMARY"
-              done
-            else
-              echo "git push --delete origin \"<tag>\"" >> "$GITHUB_STEP_SUMMARY"
-            fi
+            echo "gh pr create --base main --head \"${{ steps.meta.outputs.branch }}\" --title \"${{ steps.meta.outputs.pr_title }}\" --label release" >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
 
           else

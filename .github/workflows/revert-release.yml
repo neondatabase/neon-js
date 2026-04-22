@@ -1,0 +1,237 @@
+name: Revert Release
+
+# Revert a release commit produced by prepare-release + post-release.
+#
+# Effects:
+#   - Deletes every @neondatabase/<pkg>@v<ver> tag referenced in the commit msg
+#   - Opens a `git revert` PR with auto-merge enabled
+#   - Surfaces whether each version was already published to npm (informational only;
+#     we do NOT auto-deprecate — manual `npm deprecate` if needed)
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: 'Squash commit SHA from main (produced by prepare-release)'
+        required: true
+
+concurrency:
+  group: revert-release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash -euo pipefail {0}
+
+jobs:
+  revert:
+    runs-on:
+      group: neondatabase-protected-runner-group
+      labels: linux-ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        with:
+          egress-policy: audit
+
+      - name: Check actor has admin/maintain role
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          role=$(gh api "repos/${GITHUB_REPOSITORY}/collaborators/${GITHUB_ACTOR}/permission" --jq '.role_name')
+          if [[ "$role" != "admin" && "$role" != "maintain" ]]; then
+            echo "ERROR: Actor '${GITHUB_ACTOR}' has role '${role}', but 'admin' or 'maintain' is required to dispatch a revert."
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Verify commit is a release commit on main
+        id: verify
+        env:
+          SHA: ${{ inputs.commit }}
+        run: |
+          if ! git merge-base --is-ancestor "$SHA" origin/main; then
+            echo "ERROR: $SHA is not an ancestor of main — refusing to revert."
+            exit 1
+          fi
+          MSG=$(git log -1 --format=%B "$SHA")
+          if ! grep -q '^chore: release @neondatabase/' <<< "$MSG"; then
+            echo "ERROR: $SHA is not a release commit (no 'chore: release @neondatabase/' header)."
+            exit 1
+          fi
+          {
+            echo "msg<<EOF"
+            echo "$MSG"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Parse tags from commit
+        id: parse
+        env:
+          MSG: ${{ steps.verify.outputs.msg }}
+        run: |
+          TAGS='[]'
+          while IFS= read -r token; do
+            stripped="${token#@neondatabase/}"
+            pkg="${stripped%@v*}"
+            ver="${stripped#*@v}"
+            TAGS=$(echo "$TAGS" | jq --arg t "${pkg}@v${ver}" '. + [$t]')
+          done < <(echo "$MSG" | grep -oE '@neondatabase/[a-z0-9-]+@v[0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9.]+)?')
+          echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
+
+      - name: Check npm publication status
+        id: npmcheck
+        env:
+          TAGS: ${{ steps.parse.outputs.tags }}
+        run: |
+          published_list=""
+          any_published=false
+          for tag in $(echo "$TAGS" | jq -r '.[]'); do
+            pkg="${tag%@v*}"
+            ver="${tag#*@v}"
+            full="@neondatabase/${pkg}"
+            status=$(curl -s -o /dev/null -w '%{http_code}' "https://registry.npmjs.org/${full}/${ver}")
+            if [[ "$status" == "200" ]]; then
+              published_list="${published_list}- \`${full}@${ver}\`\n"
+              any_published=true
+            fi
+          done
+
+          {
+            if [[ "$any_published" == "true" ]]; then
+              echo "# 🚨🚨🚨 ALREADY-PUBLISHED VERSIONS DETECTED 🚨🚨🚨"
+              echo ""
+              echo "> **This revert will NOT undo the npm publish.**"
+              echo "> The following versions are **live on npm** and consumers may already be depending on them:"
+              echo ""
+              echo -e "$published_list"
+              echo ""
+              echo "**This revert only rolls back the git history.** Users who ran \`npm install\` before the revert still have the bad version."
+              echo ""
+              echo "**Manual action may be required** (not handled by this workflow):"
+              echo "1. Decide whether to \`npm deprecate <pkg>@<ver> \"broken, use @<prev-ver> instead\"\` — warns anyone who installs."
+              echo "2. Within 72h of publish, you can \`npm unpublish\` — after that, deprecate is the only lever."
+              echo "3. Cut a new patch release with the fix so consumers have a good version to upgrade to."
+            else
+              echo "## ✅ Clean revert — no versions on npm yet"
+              echo ""
+              echo "None of the tagged versions have been published to npm. Deleting the tags + reverting the commit fully undoes the release."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "published<<EOF" >> "$GITHUB_OUTPUT"
+          echo -e "$published_list" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          echo "any_published=$any_published" >> "$GITHUB_OUTPUT"
+
+      - name: Delete tags from origin
+        env:
+          TAGS: ${{ steps.parse.outputs.tags }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for tag in $(echo "$TAGS" | jq -r '.[]'); do
+            if git ls-remote --tags origin "refs/tags/$tag" | grep -q .; then
+              echo "Deleting remote tag $tag"
+              git push origin ":refs/tags/$tag"
+            else
+              echo "Tag $tag not on origin — skipping."
+            fi
+          done
+
+      - name: Open revert PR with auto-merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ inputs.commit }}
+          MSG: ${{ steps.verify.outputs.msg }}
+          RUN_ID: ${{ github.run_id }}
+          PUBLISHED: ${{ steps.npmcheck.outputs.published }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          BRANCH="revert/release-${SHA:0:7}-${RUN_ID}"
+          git checkout -b "$BRANCH"
+          git revert --no-edit "$SHA"
+          git push origin "$BRANCH"
+
+          HEADER=$(echo "$MSG" | head -1)
+          ANY_PUBLISHED="${{ steps.npmcheck.outputs.any_published }}"
+
+          # Prefix title with loud warning if anything already on npm.
+          if [[ "$ANY_PUBLISHED" == "true" ]]; then
+            TITLE="🚨 REVERTING ALREADY-PUBLISHED RELEASE — \"$HEADER\""
+          else
+            TITLE="Revert \"$HEADER\""
+          fi
+
+          BODY_FILE=$(mktemp)
+          {
+            if [[ "$ANY_PUBLISHED" == "true" ]]; then
+              echo "# 🚨🚨🚨 WARNING — THIS DOES NOT UNDO THE NPM PUBLISH 🚨🚨🚨"
+              echo ""
+              echo "> ### The following versions are **LIVE ON NPM** right now:"
+              echo -e "$PUBLISHED"
+              echo ""
+              echo "> ### Consumers who ran \`npm install\` before this revert still have the bad version."
+              echo "> ### This PR rolls back git only. The npm registry is untouched."
+              echo ""
+              echo "**Do NOT merge this PR expecting it to fix published consumers.** It will not."
+              echo ""
+              echo "### What you probably need to do next"
+              echo ""
+              echo "1. **Within 72h of publish:** consider \`npm unpublish @neondatabase/<pkg>@<ver>\` to remove the version entirely."
+              echo "2. **After 72h (or if you don't want to unpublish):** \`npm deprecate @neondatabase/<pkg>@<ver> \"broken — upgrade to <next-good-ver>\"\` warns anyone who installs."
+              echo "3. **Cut a new patch release** with the fix so consumers have somewhere to upgrade to."
+              echo ""
+              echo "This workflow intentionally does NOT run \`npm deprecate\` or \`npm unpublish\` — those are deliberate human decisions."
+              echo ""
+              echo "---"
+              echo ""
+            fi
+            echo "Automated revert of [\`${SHA}\`](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${SHA})."
+            echo ""
+            echo "Original commit:"
+            echo "> ${HEADER}"
+            echo ""
+            echo "Tags deleted:"
+            echo '${{ steps.parse.outputs.tags }}' | jq -r '.[] | "- \(.)"'
+            echo ""
+            if [[ "$ANY_PUBLISHED" != "true" ]]; then
+              echo "### npm status"
+              echo "✅ Clean revert — none of the tagged versions were published to npm. Merging this PR fully undoes the release."
+              echo ""
+            fi
+            echo "Revert dispatched by @${GITHUB_ACTOR} via [run ${RUN_ID}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID})."
+          } > "$BODY_FILE"
+
+          # Ensure labels exist (idempotent).
+          gh label create revert --color "D93F0B" --description "Automated release revert PR" --force || true
+          gh label create release --color "0E8A16" --description "Automated release PR" --force || true
+          if [[ "$ANY_PUBLISHED" == "true" ]]; then
+            gh label create "npm-published" --color "B60205" --description "Revert is for a version already on npm — manual deprecate/unpublish required" --force || true
+            EXTRA_LABEL="--label npm-published"
+          else
+            EXTRA_LABEL=""
+          fi
+
+          PR_URL=$(gh pr create \
+            --base main \
+            --head "$BRANCH" \
+            --title "$TITLE" \
+            --body-file "$BODY_FILE" \
+            --label revert --label release $EXTRA_LABEL)
+          rm -f "$BODY_FILE"
+
+          gh pr merge "$PR_URL" --auto --squash
+          echo "### Revert PR" >> "$GITHUB_STEP_SUMMARY"
+          echo "$PR_URL" >> "$GITHUB_STEP_SUMMARY"

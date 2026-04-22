@@ -1,0 +1,156 @@
+name: Post-release (tag + handoff)
+
+# Fires when a prepare-release PR merges. Steps:
+#   1. Parse the squash commit message
+#   2. Create tags on the merge commit
+#   3. Push tags
+#   4. Post a comment on the merged PR with Stage 2 (npm publish) dispatch instructions
+#   5. Write the same instructions to the workflow run summary
+#
+# No cross-repo dispatch. Stage 2 is triggered by a human from the PR comment or summary.
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: post-release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash -euo pipefail {0}
+
+jobs:
+  tag-and-handoff:
+    if: "startsWith(github.event.head_commit.message, 'chore: release @neondatabase/')"
+    runs-on:
+      group: neondatabase-protected-runner-group
+      labels: linux-ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write      # push tags
+      pull-requests: write # comment on PR
+
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Parse release metadata from commit message
+        id: parse
+        env:
+          MSG: ${{ github.event.head_commit.message }}
+        run: |
+          # Message shape: "chore: release @neondatabase/auth@v0.3.0 @neondatabase/neon-js@v0.3.0 (#123)"
+          # Extract each @neondatabase/<pkg>@v<ver> token and the trailing PR number.
+          TAGS='[]'
+          PACKAGES='[]'
+          VERSIONS='[]'
+          while IFS= read -r token; do
+            stripped="${token#@neondatabase/}"   # auth@v0.3.0
+            pkg="${stripped%@v*}"                # auth
+            ver="${stripped#*@v}"                # 0.3.0
+            TAGS=$(echo "$TAGS" | jq --arg t "${pkg}@v${ver}" '. + [$t]')
+            PACKAGES=$(echo "$PACKAGES" | jq --arg p "$pkg" '. + [$p]')
+            VERSIONS=$(echo "$VERSIONS" | jq --arg v "$ver" '. + [$v]')
+          done < <(echo "$MSG" | grep -oE '@neondatabase/[a-z0-9-]+@v[0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9.]+)?')
+
+          if [[ "$(echo "$TAGS" | jq 'length')" == "0" ]]; then
+            echo "No @neondatabase/* tokens found in commit message — skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # PR number is the last `(#NNN)` token in the message (squash merges add this automatically).
+          PR_NUM=$(echo "$MSG" | grep -oE '\(#[0-9]+\)' | tail -1 | grep -oE '[0-9]+')
+
+          echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
+          echo "packages=$PACKAGES" >> "$GITHUB_OUTPUT"
+          echo "versions=$VERSIONS" >> "$GITHUB_OUTPUT"
+          echo "pr_number=${PR_NUM:-}" >> "$GITHUB_OUTPUT"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Create + push tags on merge commit
+        if: steps.parse.outputs.skip != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          TAGS='${{ steps.parse.outputs.tags }}'
+          SHA="${{ github.sha }}"
+
+          for tag in $(echo "$TAGS" | jq -r '.[]'); do
+            if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+              echo "Tag $tag already exists — skipping (idempotent rerun)."
+              continue
+            fi
+            git tag -a "$tag" "$SHA" -m "Release $tag (commit $SHA)"
+            echo "Created tag $tag → $SHA"
+          done
+          git push origin --tags
+
+      - name: Build Stage 2 handoff message
+        if: steps.parse.outputs.skip != 'true'
+        id: handoff
+        run: |
+          PACKAGES='${{ steps.parse.outputs.packages }}'
+          TAGS='${{ steps.parse.outputs.tags }}'
+          SECPUB_OWNER="databricks"
+          SECPUB_REPO="secure-public-registry-releases-eng"
+          UI_LINK="${GITHUB_SERVER_URL}/${SECPUB_OWNER}/${SECPUB_REPO}/actions/workflows/neon-js.yml"
+
+          {
+            echo "body<<HANDOFF_EOF"
+            echo "## 🚀 Tagged — ready for Stage 2 (npm publish)"
+            echo ""
+            echo "Release tagged on commit [\`${GITHUB_SHA:0:7}\`](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}). Dispatch Stage 2 once per package below to publish to npm."
+            echo ""
+            # Iterate pairs.
+            paste <(echo "$PACKAGES" | jq -r '.[]') <(echo "$TAGS" | jq -r '.[]') \
+            | while IFS=$'\t' read -r pkg tag; do
+                echo "### \`@neondatabase/${pkg}\` → \`${tag}\`"
+                echo ""
+                echo "**CLI** (one-liner):"
+                echo '```bash'
+                echo "gh workflow run -R ${SECPUB_OWNER}/${SECPUB_REPO} neon-js.yml \\"
+                echo "  -f package=${pkg} \\"
+                echo "  -f ref=${tag} \\"
+                echo "  -f dry-run=false"
+                echo '```'
+                echo ""
+                echo "**UI:** [Dispatch \`neon-js.yml\`](${UI_LINK}) — set \`package=${pkg}\`, \`ref=${tag}\`, \`dry-run=false\`."
+                echo ""
+              done
+            echo "---"
+            echo ""
+            echo "If anything's wrong, dispatch [\`revert-release.yml\`](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/workflows/revert-release.yml) with commit \`${GITHUB_SHA}\`."
+            echo "HANDOFF_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Write handoff to workflow summary
+        if: steps.parse.outputs.skip != 'true'
+        run: |
+          cat <<'SUMMARY_EOF' >> "$GITHUB_STEP_SUMMARY"
+          ${{ steps.handoff.outputs.body }}
+          SUMMARY_EOF
+
+      - name: Post handoff as PR comment
+        if: steps.parse.outputs.skip != 'true' && steps.parse.outputs.pr_number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUM: ${{ steps.parse.outputs.pr_number }}
+        run: |
+          # Use a heredoc via gh CLI --body-file to preserve formatting.
+          BODY_FILE=$(mktemp)
+          cat <<'BODY_EOF' > "$BODY_FILE"
+          ${{ steps.handoff.outputs.body }}
+          BODY_EOF
+          gh pr comment "$PR_NUM" --body-file "$BODY_FILE"
+          rm -f "$BODY_FILE"
