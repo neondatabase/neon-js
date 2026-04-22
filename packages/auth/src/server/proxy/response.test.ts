@@ -53,7 +53,19 @@ describe('handleAuthResponse – cookie sanitization', () => {
     expect(cookies[0]).not.toContain('SameSite=None');
   });
 
-  test('forces SameSite=Lax even when upstream does not set a SameSite attribute', async () => {
+  test('forces SameSite=Lax overriding upstream SameSite=Strict', async () => {
+    const upstream = upstreamResponse([
+      '__Secure-neon-auth.session_challange=abc; Path=/; Secure; SameSite=Strict',
+    ]);
+
+    const result = await handleAuthResponse(upstream, BASE_URL, COOKIE_CONFIG);
+
+    const cookies = result.headers.getSetCookie();
+    expect(cookies[0]).toContain('SameSite=Lax');
+    expect(cookies[0]).not.toContain('SameSite=Strict');
+  });
+
+  test('sets SameSite=Lax when upstream omits SameSite (parser default)', async () => {
     const upstream = upstreamResponse([
       '__Secure-neon-auth.session_challange=xyz; Path=/; HttpOnly; Secure',
     ]);
@@ -152,5 +164,14 @@ describe('handleAuthResponse – response passthrough', () => {
     const upstream = new Response(null, { status: 401 });
     const result = await handleAuthResponse(upstream, BASE_URL, COOKIE_CONFIG);
     expect(result.status).toBe(401);
+  });
+
+  test('emits no Set-Cookie headers when upstream sets none', async () => {
+    const upstream = new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+    const result = await handleAuthResponse(upstream, BASE_URL, COOKIE_CONFIG);
+    expect(result.headers.getSetCookie()).toHaveLength(0);
   });
 });

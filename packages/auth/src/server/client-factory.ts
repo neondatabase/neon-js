@@ -73,14 +73,16 @@ export function createAuthServerInternal(
       for (const setCookieHeader of setCookieHeaders) {
         const parsedCookies = parseSetCookies(setCookieHeader);
         for (const cookie of parsedCookies) {
+          // Mirror sanitization from prepareResponseHeaders (response.ts):
+          // strip Partitioned and force SameSite=Lax for Safari compatibility.
+          // Always override domain: use local config if set, otherwise strip any
+          // upstream Domain attribute to avoid leaking the auth server's domain.
           const cookieOptions = {
             ...cookie,
-            partitioned: undefined ,
+            domain: domain,
+            partitioned: undefined,
             sameSite: 'lax' as const,
           };
-          if (domain) {
-            cookieOptions.domain = domain;
-          }
           await ctx.setCookie(cookie.name, cookie.value, cookieOptions);
         }
       }

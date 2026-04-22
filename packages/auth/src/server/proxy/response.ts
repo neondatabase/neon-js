@@ -44,9 +44,14 @@ const prepareResponseHeaders = (response: Response, domain?: string) => {
     if (header === 'set-cookie') {
       const cookies = response.headers.getSetCookie();
       for (const cookieHeader of cookies) {
-        // Always strip upstream Partitioned/SameSite=None flags (Safari drops Partitioned cookies
-        // on top-level navigations, breaking the OAuth challenge cookie exchange).
-        // Domain assignment is the only conditional part.
+        // Always sanitize upstream cookie flags before forwarding to the browser:
+        // - Strip Partitioned: Safari does not send Partitioned cookies on top-level navigations,
+        //   which breaks the OAuth challenge exchange when the callback hits a middleware route.
+        //   The flag is also only meaningful for third-party contexts; proxied cookies are first-party.
+        // - Force SameSite=Lax: upstream sends SameSite=None (required alongside Partitioned).
+        //   Lax is correct for first-party cookies and safe for cross-subdomain use — subdomains
+        //   share the same registrable domain (eTLD+1) and are considered same-site by browsers.
+        // Domain assignment is the only conditional step.
         const parsedCookies = parseSetCookies(cookieHeader);
         for (const parsedCookie of parsedCookies) {
           parsedCookie.partitioned = undefined;
