@@ -38,6 +38,27 @@ jobs:
         with:
           egress-policy: audit
 
+      - name: Diagnostic — confirm event identity
+        # Logs actor + sender + ref + sha of the triggering push. On first
+        # successful run, verify `actor` is a human (not `github-actions[bot]`).
+        # If it IS `github-actions[bot]`, the push was caused by GITHUB_TOKEN
+        # (likely auto-merge), GitHub will suppress downstream triggers, and
+        # this workflow won't fire at all — meaning you never see this log.
+        # If you CAN see this log, the trigger chain is healthy.
+        run: |
+          echo "actor:  ${{ github.actor }}"
+          echo "sender: ${{ github.event.sender.login }}"
+          echo "ref:    ${{ github.ref }}"
+          echo "sha:    ${{ github.sha }}"
+          {
+            echo "### Event identity"
+            echo "- **actor:** \`${{ github.actor }}\`"
+            echo "- **sender:** \`${{ github.event.sender.login }}\`"
+            echo "- **ref:** \`${{ github.ref }}\`"
+            echo "- **sha:** \`${{ github.sha }}\`"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -49,7 +70,11 @@ jobs:
           MSG: ${{ github.event.head_commit.message }}
         run: |
           # Message shape: "chore: release @neondatabase/auth@v0.3.0 @neondatabase/neon-js@v0.3.0 (#123)"
-          # Extract each @neondatabase/<pkg>@v<ver> token and the trailing PR number.
+          # Parse the SUBJECT LINE ONLY (first line of the commit message) — the squash body can
+          # contain extra @neondatabase/<pkg>@v<ver> tokens from concatenated branch commit
+          # subjects, which would otherwise pollute the order and duplicate tags in the handoff.
+          SUBJECT=$(echo "$MSG" | head -n 1)
+
           TAGS='[]'
           PACKAGES='[]'
           VERSIONS='[]'
@@ -60,18 +85,18 @@ jobs:
             TAGS=$(echo "$TAGS" | jq --arg t "${pkg}@v${ver}" '. + [$t]')
             PACKAGES=$(echo "$PACKAGES" | jq --arg p "$pkg" '. + [$p]')
             VERSIONS=$(echo "$VERSIONS" | jq --arg v "$ver" '. + [$v]')
-          done < <(echo "$MSG" | grep -oE '@neondatabase/[a-z0-9-]+@v[0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9.]+)?')
+          done < <(echo "$SUBJECT" | grep -oE '@neondatabase/[a-z0-9-]+@v[0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9.]+)?')
 
           if [[ "$(echo "$TAGS" | jq 'length')" == "0" ]]; then
-            echo "No @neondatabase/* tokens found in commit message — skipping."
+            echo "No @neondatabase/* tokens found in commit subject — skipping."
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          # PR number is the last `(#NNN)` token in the message (squash merges add this automatically).
-          # `|| true` keeps this non-fatal under `bash -euo pipefail` when the commit has no (#N) token —
+          # PR number is the last `(#NNN)` token in the subject (squash merges add this automatically).
+          # `|| true` keeps this non-fatal under `bash -euo pipefail` when the subject has no (#N) token —
           # we still want to tag + write the summary; just skip the PR-comment step.
-          PR_NUM=$(echo "$MSG" | grep -oE '\(#[0-9]+\)' | tail -1 | grep -oE '[0-9]+' || true)
+          PR_NUM=$(echo "$SUBJECT" | grep -oE '\(#[0-9]+\)' | tail -1 | grep -oE '[0-9]+' || true)
 
           echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
           echo "packages=$PACKAGES" >> "$GITHUB_OUTPUT"
@@ -126,12 +151,27 @@ jobs:
             echo "body<<HANDOFF_EOF"
             echo "## 🚀 Tagged — ready for Stage 2 (npm publish)"
             echo ""
-            echo "Release tagged on commit [\`${GITHUB_SHA:0:7}\`](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}). Dispatch Stage 2 once per package below to publish to npm."
+            echo "Release tagged on commit [\`${GITHUB_SHA:0:7}\`](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA})."
             echo ""
-            # Iterate pairs.
+            echo "### ⚠️ Publish order (leaf first)"
+            echo ""
+            echo "Dispatch Stage 2 one package at a time, **in the order listed below**. Each downstream package's published tarball references its dependency's version — that dependency must already be on npm when the dependent publishes, or consumers will hit \`npm install\` failures."
+            echo ""
+            # Ordered overview list (e.g. "1. auth-ui → auth-ui@v0.1.0-alpha.12").
+            i=1
             paste <(echo "$PACKAGES" | jq -r '.[]') <(echo "$TAGS" | jq -r '.[]') \
             | while IFS=$'\t' read -r pkg tag; do
-                echo "### \`@neondatabase/${pkg}\` → \`${tag}\`"
+                echo "${i}. \`@neondatabase/${pkg}\` → \`${tag}\`"
+                i=$((i+1))
+              done
+            echo ""
+            echo "---"
+            echo ""
+            # Per-package sections (CLI + UI), same order.
+            i=1
+            paste <(echo "$PACKAGES" | jq -r '.[]') <(echo "$TAGS" | jq -r '.[]') \
+            | while IFS=$'\t' read -r pkg tag; do
+                echo "### ${i}. \`@neondatabase/${pkg}\` → \`${tag}\`"
                 echo ""
                 echo "**CLI** (one-liner):"
                 echo '```bash'
@@ -141,8 +181,11 @@ jobs:
                 echo "  -f dry-run=false"
                 echo '```'
                 echo ""
-                echo "**UI:** [Dispatch \`neon-js.yml\`](${UI_LINK}) — set \`package=${pkg}\`, \`ref=${tag}\`, \`dry-run=false\`."
+                echo "**UI:** [Dispatch \`neon-js.yml\`](${UI_LINK}) — fill in the form with \`package=${pkg}\`, \`ref=${tag}\`, untick \`dry-run\`."
                 echo ""
+                echo "**Wait until this run finishes successfully before dispatching the next package.**"
+                echo ""
+                i=$((i+1))
               done
             echo "---"
             echo ""
