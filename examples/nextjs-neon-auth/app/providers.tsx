@@ -23,7 +23,7 @@ export function Providers({ children }: { children: ReactNode }) {
             social={{
                 providers: ["google"]
             }}
-            redirectTo="/notes"
+            redirectTo="/dashboard"
             Link={Link}
             organization
             credentials={{

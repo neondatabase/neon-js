@@ -6,10 +6,6 @@ export interface TestUser {
   password: string;
 }
 
-// nextjs-neon-auth redirects to /notes; react-neon-js redirects to /dashboard
-const POST_LOGIN_URL =
-  process.env.E2E_TARGET_APP === 'nextjs-neon-auth' ? '/notes' : '/dashboard';
-
 /**
  * Generate unique test user credentials
  */
@@ -33,7 +29,7 @@ export async function registerUser(page: Page, user: TestUser): Promise<void> {
   await page.getByLabel(/password/i).fill(user.password);
   await page.locator('button[type="submit"]').click();
 
-  await expect(page).toHaveURL(POST_LOGIN_URL, { timeout: 15_000 });
+  await expect(page).toHaveURL('/dashboard', { timeout: 15_000 });
 }
 
 /**
@@ -47,7 +43,7 @@ export async function loginUser(page: Page, user: TestUser): Promise<void> {
   await page.getByLabel(/password/i).fill(user.password);
   await page.locator('button[type="submit"]').click();
 
-  await expect(page).toHaveURL(POST_LOGIN_URL, { timeout: 15_000 });
+  await expect(page).toHaveURL('/dashboard', { timeout: 15_000 });
 }
 
 /**
