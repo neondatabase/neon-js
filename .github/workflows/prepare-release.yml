@@ -36,14 +36,20 @@ on:
           - postgrest-js
           - neon-js
       bump:
-        description: 'Version bump type'
-        required: true
+        description: 'Semver bump kind (ignored if `version` is set)'
+        required: false
         type: choice
-        default: patch
+        default: prerelease
         options:
+          - prerelease
           - patch
           - minor
           - major
+      version:
+        description: 'Full custom version string (overrides `bump` if set, e.g. 0.3.0-beta.1). Applies to the TRIGGER package only; cascade packages still use `bump`.'
+        required: false
+        type: string
+        default: ''
       ref:
         description: 'Branch or SHA to release from (default: main)'
         required: false
@@ -126,11 +132,28 @@ jobs:
 
       - name: Bump versions
         id: versions
+        env:
+          BUMP: ${{ inputs.bump }}
+          VERSION_INPUT: ${{ inputs.version }}
+          TRIGGER: ${{ inputs.package }}
         run: |
-          BUMP="${{ inputs.bump }}"
           PACKAGES='${{ steps.cascade.outputs.packages }}'
           VERSIONS='{}'
           TAGS='[]'
+
+          # Version resolution preamble.
+          echo "### Version resolution" >> "$GITHUB_STEP_SUMMARY"
+          if [[ -n "$VERSION_INPUT" ]]; then
+            MODE="CUSTOM_VERSION"
+            echo "- Mode: **CUSTOM_VERSION**" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Trigger package ($TRIGGER) uses explicit version: \`$VERSION_INPUT\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Cascade packages still follow bump kind: \`$BUMP\`" >> "$GITHUB_STEP_SUMMARY"
+          else
+            MODE="BUMP"
+            echo "- Mode: **BUMP**" >> "$GITHUB_STEP_SUMMARY"
+            echo "- All packages use bump kind: \`$BUMP\`" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "" >> "$GITHUB_STEP_SUMMARY"
 
           for pkg in $(echo "$PACKAGES" | jq -r '.[]'); do
             echo "::group::Bump $pkg ($BUMP)"
@@ -139,15 +162,42 @@ jobs:
             current=$(jq -r '.version' package.json)
             echo "Current version: $current"
 
-            # Strip any prerelease suffix (e.g. 0.2.1-beta.1 -> 0.2.1)
-            base="${current%%-*}"
-            IFS='.' read -r major minor patch <<< "$base"
+            if [[ "$MODE" == "CUSTOM_VERSION" && "$pkg" == "$TRIGGER" ]]; then
+              # Trigger package gets the exact version the user typed.
+              new="$VERSION_INPUT"
+            else
+              # Parse semver: major.minor.patch(-preid.prenum)?
+              if [[ "$current" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-([a-zA-Z][a-zA-Z0-9]*)(\.([0-9]+))?)?$ ]]; then
+                cur_major="${BASH_REMATCH[1]}"
+                cur_minor="${BASH_REMATCH[2]}"
+                cur_patch="${BASH_REMATCH[3]}"
+                pre_id="${BASH_REMATCH[5]:-}"
+                pre_num="${BASH_REMATCH[7]:-}"
+              else
+                echo "::error::Could not parse current version '$current' for package $pkg (expected semver)"
+                exit 1
+              fi
 
-            case "$BUMP" in
-              major) new="$((major+1)).0.0" ;;
-              minor) new="${major}.$((minor+1)).0" ;;
-              patch) new="${major}.${minor}.$((patch+1))" ;;
-            esac
+              case "$BUMP" in
+                major) new="$((cur_major+1)).0.0" ;;
+                minor) new="${cur_major}.$((cur_minor+1)).0" ;;
+                patch) new="${cur_major}.${cur_minor}.$((cur_patch+1))" ;;
+                prerelease)
+                  if [[ -n "$pre_id" ]]; then
+                    # Already on a prerelease track — increment counter (default to 0 if missing).
+                    next_num=$(( ${pre_num:-0} + 1 ))
+                    new="${cur_major}.${cur_minor}.${cur_patch}-${pre_id}.${next_num}"
+                  else
+                    # Stable version — start a new -beta.1 chain.
+                    new="${cur_major}.${cur_minor}.${cur_patch}-beta.1"
+                  fi
+                  ;;
+                *)
+                  echo "::error::Unknown bump kind '$BUMP'"
+                  exit 1
+                  ;;
+              esac
+            fi
 
             echo "New version: $new"
             jq --arg v "$new" '.version = $v' package.json > tmp.json && mv tmp.json package.json
@@ -238,12 +288,18 @@ jobs:
         id: open-pr
         env:
           GH_TOKEN: ${{ github.token }}
+          # Pass these via env rather than inline ${{ }} interpolation so that
+          # backticks / shell metacharacters in the body stay literal when
+          # bash parses the rendered script.
+          PR_BRANCH: ${{ steps.meta.outputs.branch }}
+          PR_TITLE: ${{ steps.meta.outputs.pr_title }}
+          PR_BODY: ${{ steps.meta.outputs.body }}
         run: |
           PR_URL=$(gh pr create \
             --base main \
-            --head "${{ steps.meta.outputs.branch }}" \
-            --title "${{ steps.meta.outputs.pr_title }}" \
-            --body "${{ steps.meta.outputs.body }}" \
+            --head "$PR_BRANCH" \
+            --title "$PR_TITLE" \
+            --body "$PR_BODY" \
             --label release)
 
           echo "Opened: $PR_URL"
