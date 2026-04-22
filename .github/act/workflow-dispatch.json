@@ -1,0 +1,8 @@
+{
+  "inputs": {
+    "package": "postgrest-js",
+    "bump": "prerelease",
+    "version": "",
+    "ref": "main"
+  }
+}

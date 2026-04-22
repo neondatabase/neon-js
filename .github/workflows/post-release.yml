@@ -105,7 +105,7 @@ jobs:
           echo "skip=false" >> "$GITHUB_OUTPUT"
 
       - name: Create + push tags on merge commit
-        if: steps.parse.outputs.skip != 'true'
+        if: steps.parse.outputs.skip != 'true' && env.ACT != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -203,7 +203,7 @@ jobs:
           SUMMARY_EOF
 
       - name: Post handoff as PR comment
-        if: steps.parse.outputs.skip != 'true' && steps.parse.outputs.pr_number != ''
+        if: steps.parse.outputs.skip != 'true' && steps.parse.outputs.pr_number != '' && env.ACT != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUM: ${{ steps.parse.outputs.pr_number }}
