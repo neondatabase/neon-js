@@ -44,17 +44,17 @@ const prepareResponseHeaders = (response: Response, domain?: string) => {
     if (header === 'set-cookie') {
       const cookies = response.headers.getSetCookie();
       for (const cookieHeader of cookies) {
-        // Parse and add domain if specified
-        if (domain) {
-          const parsedCookies = parseSetCookies(cookieHeader);
-          for (const parsedCookie of parsedCookies) {
+        // Always strip upstream Partitioned/SameSite=None flags (Safari drops Partitioned cookies
+        // on top-level navigations, breaking the OAuth challenge cookie exchange).
+        // Domain assignment is the only conditional part.
+        const parsedCookies = parseSetCookies(cookieHeader);
+        for (const parsedCookie of parsedCookies) {
+          parsedCookie.partitioned = undefined;
+          parsedCookie.sameSite = 'lax';
+          if (domain) {
             parsedCookie.domain = domain;
-            parsedCookie.partitioned = undefined;
-            parsedCookie.sameSite = 'lax';
-            headers.append('Set-Cookie', serializeSetCookie(parsedCookie));
           }
-        } else {
-          headers.append('Set-Cookie', cookieHeader);
+          headers.append('Set-Cookie', serializeSetCookie(parsedCookie));
         }
       }
     } else {
