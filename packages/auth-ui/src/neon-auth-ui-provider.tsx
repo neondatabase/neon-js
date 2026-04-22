@@ -57,7 +57,7 @@ export function NeonAuthUIProvider<T extends NeonAuthAdapter>({
           History: first cast 9b02f94, widened to `as unknown as` at d6317e5.
         */}
         <AuthUIProvider
-          authClient={reactClient as unknown as AuthUIProviderProps['authClient']}
+          authClient={reactClient as AuthUIProviderProps['authClient']}
           {...props}
           multiSession={false}
           apiKey={false}
