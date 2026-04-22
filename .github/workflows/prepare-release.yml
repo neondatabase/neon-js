@@ -200,8 +200,10 @@ jobs:
             echo "2. Required checks run; the PR auto-merges on green."
             echo "3. \`post-release.yml\` fires on merge, tags the squash commit, and comments here with Stage 2 (npm publish) dispatch instructions."
             echo ""
-            echo "### Revert"
-            echo "Dispatch [\`revert-release.yml\`](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/workflows/revert-release.yml) with the squash commit SHA."
+            echo "### Recovery"
+            echo "**Before Stage 2 runs:** if something's wrong, delete the bad tag(s) manually (\`git push origin :refs/tags/<pkg>@v<ver>\`) and rerun post-release."
+            echo ""
+            echo "**After Stage 2 publishes:** npm versions are immutable — cut a new patch release with the fix rather than reverting (npm will reject republishing the same version)."
             echo "PR_EOF"
           } >> "$GITHUB_OUTPUT"
 

@@ -69,7 +69,9 @@ jobs:
           fi
 
           # PR number is the last `(#NNN)` token in the message (squash merges add this automatically).
-          PR_NUM=$(echo "$MSG" | grep -oE '\(#[0-9]+\)' | tail -1 | grep -oE '[0-9]+')
+          # `|| true` keeps this non-fatal under `bash -euo pipefail` when the commit has no (#N) token —
+          # we still want to tag + write the summary; just skip the PR-comment step.
+          PR_NUM=$(echo "$MSG" | grep -oE '\(#[0-9]+\)' | tail -1 | grep -oE '[0-9]+' || true)
 
           echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
           echo "packages=$PACKAGES" >> "$GITHUB_OUTPUT"
@@ -88,13 +90,27 @@ jobs:
 
           for tag in $(echo "$TAGS" | jq -r '.[]'); do
             if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
-              echo "Tag $tag already exists — skipping (idempotent rerun)."
-              continue
+              # `git tag -a` creates an annotated tag with its own object SHA,
+              # distinct from the commit it points to. Peel with ^{commit} to
+              # compare the actual target commit, not the tag-object SHA.
+              existing_sha=$(git rev-parse "refs/tags/$tag^{commit}") || {
+                echo "::error::Tag $tag exists but does not resolve to a commit."
+                exit 1
+              }
+              if [[ "$existing_sha" == "$SHA" ]]; then
+                echo "Tag $tag already points to $SHA — skipping (idempotent rerun)."
+                continue
+              fi
+              echo "::error::Tag $tag exists at $existing_sha, expected $SHA."
+              echo "::error::Refusing to retarget a release tag automatically."
+              echo "::error::If Stage 2 hasn't started: delete the bad tag (\`git push origin :refs/tags/$tag\`) and rerun post-release."
+              echo "::error::If anything was already published to npm: cut a new patch release instead of moving the tag."
+              exit 1
             fi
             git tag -a "$tag" "$SHA" -m "Release $tag (commit $SHA)"
-            echo "Created tag $tag → $SHA"
+            git push origin "refs/tags/$tag"
+            echo "Created + pushed tag $tag -> $SHA"
           done
-          git push origin --tags
 
       - name: Build Stage 2 handoff message
         if: steps.parse.outputs.skip != 'true'
@@ -130,7 +146,9 @@ jobs:
               done
             echo "---"
             echo ""
-            echo "If anything's wrong, dispatch [\`revert-release.yml\`](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/workflows/revert-release.yml) with commit \`${GITHUB_SHA}\`."
+            echo "**If anything's wrong before Stage 2 runs:** delete the bad tag(s) manually (\`git push origin :refs/tags/<pkg>@v<ver>\`) and rerun post-release."
+            echo ""
+            echo "**If anything's wrong after Stage 2 publishes:** npm versions are immutable, so cut a new patch release with the fix — do NOT try to revert the release commit (npm will reject republishing the same version)."
             echo "HANDOFF_EOF"
           } >> "$GITHUB_OUTPUT"
 
