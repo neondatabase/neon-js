@@ -1,4 +1,4 @@
-import { describe, test, expect, vi } from 'vitest';
+import { describe, test, expect } from 'vitest';
 import { handleAuthResponse } from './response';
 
 const TEST_SECRET = 'test-secret-at-least-32-characters-long!';
@@ -167,10 +167,7 @@ describe('handleAuthResponse – response passthrough', () => {
   });
 
   test('emits no Set-Cookie headers when upstream sets none', async () => {
-    const upstream = new Response(JSON.stringify({ ok: true }), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    });
+    const upstream = Response.json({ ok: true });
     const result = await handleAuthResponse(upstream, BASE_URL, COOKIE_CONFIG);
     expect(result.headers.getSetCookie()).toHaveLength(0);
   });
