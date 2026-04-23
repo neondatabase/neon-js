@@ -98,9 +98,11 @@ jobs:
           # we still want to tag + write the summary; just skip the PR-comment step.
           PR_NUM=$(echo "$SUBJECT" | grep -oE '\(#[0-9]+\)' | tail -1 | grep -oE '[0-9]+' || true)
 
-          echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
-          echo "packages=$PACKAGES" >> "$GITHUB_OUTPUT"
-          echo "versions=$VERSIONS" >> "$GITHUB_OUTPUT"
+          # jq without -c pretty-prints with newlines, which breaks $GITHUB_OUTPUT's
+          # single-line key=value format ("Invalid format" error). Compact JSON fixes it.
+          echo "tags=$(echo "$TAGS" | jq -c .)" >> "$GITHUB_OUTPUT"
+          echo "packages=$(echo "$PACKAGES" | jq -c .)" >> "$GITHUB_OUTPUT"
+          echo "versions=$(echo "$VERSIONS" | jq -c .)" >> "$GITHUB_OUTPUT"
           echo "pr_number=${PR_NUM:-}" >> "$GITHUB_OUTPUT"
           echo "skip=false" >> "$GITHUB_OUTPUT"
 
