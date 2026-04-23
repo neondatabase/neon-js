@@ -15,12 +15,21 @@ updates:
         patterns:
           - "better-auth"
           - "@better-auth/*"
-      minor-and-patch:
+      patch-only:
         update-types:
-          - minor
           - patch
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-major"
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-major"
