@@ -36,14 +36,20 @@ on:
           - postgrest-js
           - neon-js
       bump:
-        description: 'Version bump type'
-        required: true
+        description: 'Semver bump kind (ignored if `version` is set)'
+        required: false
         type: choice
-        default: patch
+        default: prerelease
         options:
+          - prerelease
           - patch
           - minor
           - major
+      version:
+        description: 'Full custom version string (overrides `bump` if set, e.g. 0.3.0-beta.1). Applies to the TRIGGER package only; cascade packages still use `bump`.'
+        required: false
+        type: string
+        default: ''
       ref:
         description: 'Branch or SHA to release from (default: main)'
         required: false
@@ -66,13 +72,25 @@ jobs:
       labels: linux-ubuntu-latest
     timeout-minutes: 30
     permissions:
-      contents: write # push version commits + tags
+      contents: write      # push release branch
+      pull-requests: write # open PR
 
     steps:
       - name: Harden the runner
         uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
         with:
           egress-policy: audit
+
+      - name: Check actor has admin/maintain role
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          role=$(gh api "repos/${GITHUB_REPOSITORY}/collaborators/${GITHUB_ACTOR}/permission" --jq '.role_name')
+          if [[ "$role" != "admin" && "$role" != "maintain" ]]; then
+            echo "ERROR: Actor '${GITHUB_ACTOR}' has role '${role}', but 'admin' or 'maintain' is required to dispatch a release."
+            exit 1
+          fi
+          echo "Actor ${GITHUB_ACTOR} passes gate (role: ${role})."
 
       - name: Validate ref input
         id: validate
@@ -114,11 +132,28 @@ jobs:
 
       - name: Bump versions
         id: versions
+        env:
+          BUMP: ${{ inputs.bump }}
+          VERSION_INPUT: ${{ inputs.version }}
+          TRIGGER: ${{ inputs.package }}
         run: |
-          BUMP="${{ inputs.bump }}"
           PACKAGES='${{ steps.cascade.outputs.packages }}'
           VERSIONS='{}'
           TAGS='[]'
+
+          # Version resolution preamble.
+          echo "### Version resolution" >> "$GITHUB_STEP_SUMMARY"
+          if [[ -n "$VERSION_INPUT" ]]; then
+            MODE="CUSTOM_VERSION"
+            echo "- Mode: **CUSTOM_VERSION**" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Trigger package ($TRIGGER) uses explicit version: \`$VERSION_INPUT\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Cascade packages still follow bump kind: \`$BUMP\`" >> "$GITHUB_STEP_SUMMARY"
+          else
+            MODE="BUMP"
+            echo "- Mode: **BUMP**" >> "$GITHUB_STEP_SUMMARY"
+            echo "- All packages use bump kind: \`$BUMP\`" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "" >> "$GITHUB_STEP_SUMMARY"
 
           for pkg in $(echo "$PACKAGES" | jq -r '.[]'); do
             echo "::group::Bump $pkg ($BUMP)"
@@ -127,15 +162,42 @@ jobs:
             current=$(jq -r '.version' package.json)
             echo "Current version: $current"
 
-            # Strip any prerelease suffix (e.g. 0.2.1-beta.1 -> 0.2.1)
-            base="${current%%-*}"
-            IFS='.' read -r major minor patch <<< "$base"
+            if [[ "$MODE" == "CUSTOM_VERSION" && "$pkg" == "$TRIGGER" ]]; then
+              # Trigger package gets the exact version the user typed.
+              new="$VERSION_INPUT"
+            else
+              # Parse semver: major.minor.patch(-preid.prenum)?
+              if [[ "$current" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-([a-zA-Z][a-zA-Z0-9]*)(\.([0-9]+))?)?$ ]]; then
+                cur_major="${BASH_REMATCH[1]}"
+                cur_minor="${BASH_REMATCH[2]}"
+                cur_patch="${BASH_REMATCH[3]}"
+                pre_id="${BASH_REMATCH[5]:-}"
+                pre_num="${BASH_REMATCH[7]:-}"
+              else
+                echo "::error::Could not parse current version '$current' for package $pkg (expected semver)"
+                exit 1
+              fi
 
-            case "$BUMP" in
-              major) new="$((major+1)).0.0" ;;
-              minor) new="${major}.$((minor+1)).0" ;;
-              patch) new="${major}.${minor}.$((patch+1))" ;;
-            esac
+              case "$BUMP" in
+                major) new="$((cur_major+1)).0.0" ;;
+                minor) new="${cur_major}.$((cur_minor+1)).0" ;;
+                patch) new="${cur_major}.${cur_minor}.$((cur_patch+1))" ;;
+                prerelease)
+                  if [[ -n "$pre_id" ]]; then
+                    # Already on a prerelease track — increment counter (default to 0 if missing).
+                    next_num=$(( ${pre_num:-0} + 1 ))
+                    new="${cur_major}.${cur_minor}.${cur_patch}-${pre_id}.${next_num}"
+                  else
+                    # Stable version — start a new -beta.1 chain.
+                    new="${cur_major}.${cur_minor}.${cur_patch}-beta.1"
+                  fi
+                  ;;
+                *)
+                  echo "::error::Unknown bump kind '$BUMP'"
+                  exit 1
+                  ;;
+              esac
+            fi
 
             echo "New version: $new"
             jq --arg v "$new" '.version = $v' package.json > tmp.json && mv tmp.json package.json
@@ -151,35 +213,111 @@ jobs:
           echo "### Versions" >> "$GITHUB_STEP_SUMMARY"
           echo "$VERSIONS" | jq -r 'to_entries[] | "- **\(.key)** v\(.value)"' >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Compute release branch + PR metadata
+        id: meta
+        run: |
+          PACKAGES='${{ steps.cascade.outputs.packages }}'
+          VERSIONS='${{ steps.versions.outputs.versions }}'
+          TAGS='${{ steps.versions.outputs.tags }}'
+          RUN_ID="${GITHUB_RUN_ID}"
+
+          PRIMARY="${{ inputs.package }}"
+          BRANCH="release/${PRIMARY}-${RUN_ID}"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+
+          TITLE="chore: release"
+          for pkg in $(echo "$PACKAGES" | jq -r '.[]'); do
+            version=$(echo "$VERSIONS" | jq -r --arg k "$pkg" '.[$k]')
+            TITLE="$TITLE @neondatabase/${pkg}@v${version}"
+          done
+          echo "pr_title=$TITLE" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "body<<PR_EOF"
+            echo "Automated release cut by \`prepare-release.yml\` (run [${RUN_ID}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}))."
+            echo ""
+            echo "### Cascade"
+            echo "Trigger: \`${PRIMARY}\` (${{ inputs.bump }})"
+            echo ""
+            echo "### Packages"
+            echo "$VERSIONS" | jq -r 'to_entries[] | "- **\(.key)** → v\(.value)"'
+            echo ""
+            echo "### Tags (created post-merge)"
+            echo "$TAGS" | jq -r '.[] | "- \(.)"'
+            echo ""
+            echo "### Next steps"
+            echo "1. An approver (Andras or Shridhar) reviews + approves this PR."
+            echo "2. Required checks run."
+            echo "3. On green, the approver **manually clicks \"Squash and merge\"** in the UI. **Do NOT use auto-merge.**"
+            echo "4. \`post-release.yml\` fires on the push to \`main\`, tags the squash commit, and comments here with Stage 2 (npm publish) dispatch instructions."
+            echo ""
+            echo "> :warning: **Why manual merge?** GitHub Actions suppresses downstream \`on: push\` workflows for pushes caused by \`GITHUB_TOKEN\` (including auto-merge enabled from a workflow). A human clicking merge in the UI attributes the push to that user, so \`post-release.yml\` fires correctly."
+            echo ""
+            echo "> :warning: **Do not edit this PR's title** and do not add \`[skip ci]\`, \`[ci skip]\`, or similar markers. Those would either break the commit-subject parser in \`post-release.yml\` or suppress the workflow entirely."
+            echo ""
+            echo "### Recovery"
+            echo "**Before Stage 2 runs:** if something's wrong, delete the bad tag(s) manually (\`git push origin :refs/tags/<pkg>@v<ver>\`) and rerun post-release."
+            echo ""
+            echo "**After Stage 2 publishes:** npm versions are immutable — cut a new patch release with the fix rather than reverting (npm will reject republishing the same version)."
+            echo "PR_EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Commit version bumps
         id: commit
         run: |
           PACKAGES='${{ steps.cascade.outputs.packages }}'
           VERSIONS='${{ steps.versions.outputs.versions }}'
 
-          # Build the commit message
           COMMIT_MSG="chore: release"
           for pkg in $(echo "$PACKAGES" | jq -r '.[]'); do
             version=$(echo "$VERSIONS" | jq -r --arg k "$pkg" '.[$k]')
             COMMIT_MSG="$COMMIT_MSG @neondatabase/${pkg}@v${version}"
           done
-          COMMIT_MSG="$COMMIT_MSG [skip ci]"
+          # No [skip ci] — we need checks to run on the PR.
 
           git add -A
           git commit -m "$COMMIT_MSG"
 
-      - name: Create tags
-        id: tags
-        run: |
-          TAGS='${{ steps.versions.outputs.tags }}'
-          for tag in $(echo "$TAGS" | jq -r '.[]'); do
-            echo "Tagging: $tag"
-            git tag -a "$tag" -m "Release $tag"
-          done
-
-      - name: Push commits and tags
+      - name: Push release branch
         id: push
-        run: git push --follow-tags
+        run: |
+          git push origin "HEAD:${{ steps.meta.outputs.branch }}"
+
+      - name: Ensure `release` label exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create release --color "0E8A16" --description "Automated release PR" --force || true
+
+      - name: Open PR
+        id: open-pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Pass these via env rather than inline ${{ }} interpolation so that
+          # backticks / shell metacharacters in the body stay literal when
+          # bash parses the rendered script.
+          PR_BRANCH: ${{ steps.meta.outputs.branch }}
+          PR_TITLE: ${{ steps.meta.outputs.pr_title }}
+          PR_BODY: ${{ steps.meta.outputs.body }}
+        run: |
+          # NOTE: We intentionally do NOT enable auto-merge. Auto-merge enabled
+          # by GITHUB_TOKEN causes the eventual squash-merge push to main to be
+          # suppressed from triggering downstream `on: push` workflows (including
+          # post-release.yml). The approver must click "Squash and merge" manually
+          # in the UI so the push is attributed to a human and post-release fires.
+          # See https://docs.github.com/en/actions/concepts/security/github_token
+          PR_URL=$(gh pr create \
+            --base main \
+            --head "$PR_BRANCH" \
+            --title "$PR_TITLE" \
+            --body "$PR_BODY" \
+            --label release)
+
+          echo "Opened: $PR_URL"
+          echo "Reminder: approver must click 'Squash and merge' manually (not auto-merge)."
+
+          echo "### PR" >> "$GITHUB_STEP_SUMMARY"
+          echo "$PR_URL" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Release failure guidance
         if: failure()
@@ -225,50 +363,19 @@ jobs:
             echo "" >> "$GITHUB_STEP_SUMMARY"
             echo "**Impact:** Nothing was pushed. Safe to re-run." >> "$GITHUB_STEP_SUMMARY"
 
-          elif [[ "${{ steps.tags.outcome }}" == "failure" ]]; then
-            echo "**Tag creation** — \`git tag\` failed (tag already exists locally?)." >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "**Impact:** Version bump was committed locally but nothing was pushed. Safe to re-run." >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "If tags already exist on the remote from a previous attempt:" >> "$GITHUB_STEP_SUMMARY"
-            echo '```bash' >> "$GITHUB_STEP_SUMMARY"
-            echo "git ls-remote --tags origin | grep \"$PACKAGE\"" >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-
           elif [[ "${{ steps.push.outcome }}" == "failure" ]]; then
-            echo "**Push** — \`git push --follow-tags\` failed. Partial push is possible." >> "$GITHUB_STEP_SUMMARY"
+            echo "**Push release branch** — \`git push origin HEAD:<branch>\` failed." >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "**Impact:** The commit and tags were created locally. The push may have partially succeeded." >> "$GITHUB_STEP_SUMMARY"
+            echo "**Impact:** The commit exists only on the runner (now discarded). Nothing was pushed. Safe to re-run." >> "$GITHUB_STEP_SUMMARY"
+
+          elif [[ "${{ steps.open-pr.outcome }}" == "failure" ]]; then
+            echo "**Open PR** — \`gh pr create\` failed." >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "**Check remote state:**" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Impact:** The release branch \`${{ steps.meta.outputs.branch }}\` was pushed but the PR was not opened." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Recovery:** Open the PR manually from the pushed branch." >> "$GITHUB_STEP_SUMMARY"
             echo '```bash' >> "$GITHUB_STEP_SUMMARY"
-            echo "# Check if tags were pushed" >> "$GITHUB_STEP_SUMMARY"
-            echo "git ls-remote --tags origin | grep \"$PACKAGE\"" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "# Check if commit was pushed" >> "$GITHUB_STEP_SUMMARY"
-            echo "git log origin/main --oneline -5" >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "**If commit pushed but tags missing** — push tags manually:" >> "$GITHUB_STEP_SUMMARY"
-            echo '```bash' >> "$GITHUB_STEP_SUMMARY"
-            if [[ -n "$TAGS" && "$TAGS" != "[]" ]]; then
-              for tag in $(echo "$TAGS" | jq -r '.[]' 2>/dev/null); do
-                echo "git tag -a \"$tag\" -m \"Release $tag\" && git push origin \"$tag\"" >> "$GITHUB_STEP_SUMMARY"
-              done
-            else
-              echo "git tag -a \"<tag>\" -m \"Release <tag>\" && git push origin \"<tag>\"" >> "$GITHUB_STEP_SUMMARY"
-            fi
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "**If tags pushed but commit missing** — delete orphan tags:" >> "$GITHUB_STEP_SUMMARY"
-            echo '```bash' >> "$GITHUB_STEP_SUMMARY"
-            if [[ -n "$TAGS" && "$TAGS" != "[]" ]]; then
-              for tag in $(echo "$TAGS" | jq -r '.[]' 2>/dev/null); do
-                echo "git push --delete origin \"$tag\"" >> "$GITHUB_STEP_SUMMARY"
-              done
-            else
-              echo "git push --delete origin \"<tag>\"" >> "$GITHUB_STEP_SUMMARY"
-            fi
+            echo "gh pr create --base main --head \"${{ steps.meta.outputs.branch }}\" --title \"${{ steps.meta.outputs.pr_title }}\" --label release" >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
 
           else
