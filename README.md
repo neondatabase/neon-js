@@ -53,11 +53,11 @@ Releases use a two-stage pipeline. No GitHub App is needed.
 
 **Stage 1** (`prepare-release.yml` in this repo, manual `workflow_dispatch`):
 1. Select the trigger package and bump type
-2. The workflow builds, bumps versions via cascade, commits, tags, and pushes
-3. Build artifacts (tarballs + SHA256SUMS) are uploaded as workflow artifacts
+2. The workflow bumps versions via cascade, pushes a release branch, and opens a PR
+3. After manual squash merge, `post-release.yml` tags the merge commit and posts Stage 2 dispatch instructions
 
 **Stage 2** (`neon-js.yml` in [`secure-public-registry-releases-eng`](https://github.com/databricks/secure-public-registry-releases-eng), manual `workflow_dispatch`):
-1. Point it at the tag/ref from Stage 1
+1. Point it at the tag/ref from the post-release handoff
 2. It checks out the tagged commit, builds from source, scans, and publishes via npm OIDC
 3. If publish fails, a prominent warning is shown with remediation steps
 
@@ -72,12 +72,18 @@ directing you to the two-stage pipeline.
 | `auth-ui`       | auth-ui, auth, neon-js         |
 | `auth`          | auth, neon-js                  |
 | `neon-js`       | neon-js only                   |
+| `all`           | postgrest-js, auth-ui, auth, neon-js |
+
+`all` releases every public package together, while keeping independent package
+versions. It bumps each package once from its own current version; it does not
+force every package to share the same version number.
 
 ### Release tooling
 
 All release logic lives inside the two GitHub Actions workflows:
 
-- **`prepare-release.yml`** (this repo) -- bumps versions via cascade, commits, tags, and uploads build artifacts
+- **`prepare-release.yml`** (this repo) -- bumps versions via cascade and opens the release PR
+- **`post-release.yml`** (this repo) -- tags the merged release commit and writes the Stage 2 handoff
 - **`neon-js.yml`** (`secure-public-registry-releases-eng`) -- checks out the tagged commit, builds from source, scans, and publishes via npm OIDC
 
 ## Support

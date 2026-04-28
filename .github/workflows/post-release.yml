@@ -148,6 +148,12 @@ jobs:
           SECPUB_OWNER="databricks"
           SECPUB_REPO="secure-public-registry-releases-eng"
           UI_LINK="${GITHUB_SERVER_URL}/${SECPUB_OWNER}/${SECPUB_REPO}/actions/workflows/neon-js.yml"
+          ALL_RELEASE_PACKAGES='["postgrest-js","auth-ui","auth","neon-js"]'
+          IS_ALL_RELEASE=false
+          if jq -e --argjson packages "$PACKAGES" --argjson all "$ALL_RELEASE_PACKAGES" -n '$packages == $all' >/dev/null; then
+            IS_ALL_RELEASE=true
+          fi
+          ALL_REF=$(jq -rn --argjson packages "$PACKAGES" --argjson tags "$TAGS" '($packages | index("neon-js")) as $idx | if $idx == null then empty else $tags[$idx] end')
 
           {
             echo "body<<HANDOFF_EOF"
@@ -155,42 +161,64 @@ jobs:
             echo ""
             echo "Release tagged on commit [\`${GITHUB_SHA:0:7}\`](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA})."
             echo ""
-            echo "### ⚠️ Publish order (leaf first)"
-            echo ""
-            echo "Dispatch Stage 2 one package at a time, **in the order listed below**. Each downstream package's published tarball references its dependency's version — that dependency must already be on npm when the dependent publishes, or consumers will hit \`npm install\` failures."
-            echo ""
-            # Ordered overview list (e.g. "1. auth-ui → auth-ui@v0.1.0-alpha.12").
-            i=1
-            paste <(echo "$PACKAGES" | jq -r '.[]') <(echo "$TAGS" | jq -r '.[]') \
-            | while IFS=$'\t' read -r pkg tag; do
-                echo "${i}. \`@neondatabase/${pkg}\` → \`${tag}\`"
-                i=$((i+1))
-              done
-            echo ""
-            echo "---"
-            echo ""
-            # Per-package sections (CLI + UI), same order.
-            i=1
-            paste <(echo "$PACKAGES" | jq -r '.[]') <(echo "$TAGS" | jq -r '.[]') \
-            | while IFS=$'\t' read -r pkg tag; do
-                echo "### ${i}. \`@neondatabase/${pkg}\` → \`${tag}\`"
-                echo ""
-                echo "**CLI** (one-liner):"
-                echo '```bash'
-                echo "gh workflow run -R ${SECPUB_OWNER}/${SECPUB_REPO} neon-js.yml \\"
-                echo "  -f package=${pkg} \\"
-                echo "  -f ref=${tag} \\"
-                echo "  -f dry-run=false"
-                echo '```'
-                echo ""
-                echo "**UI:** [Dispatch \`neon-js.yml\`](${UI_LINK}) — fill in the form with \`package=${pkg}\`, \`ref=${tag}\`, untick \`dry-run\`."
-                echo ""
-                echo "**Wait until this run finishes successfully before dispatching the next package.**"
-                echo ""
-                i=$((i+1))
-              done
-            echo "---"
-            echo ""
+            if [[ "$IS_ALL_RELEASE" == "true" ]]; then
+              echo "### Full release set"
+              echo ""
+              echo "Dispatch Stage 2 once for the full release set. Use the \`neon-js\` tag as the ref; all tags point at the same merge commit."
+              echo ""
+              paste <(echo "$PACKAGES" | jq -r '.[]') <(echo "$TAGS" | jq -r '.[]') \
+              | while IFS=$'\t' read -r pkg tag; do
+                  echo "- \`@neondatabase/${pkg}\` → \`${tag}\`"
+                done
+              echo ""
+              echo "**CLI** (one-liner):"
+              echo '```bash'
+              echo "gh workflow run -R ${SECPUB_OWNER}/${SECPUB_REPO} neon-js.yml \\"
+              echo "  -f package=all \\"
+              echo "  -f ref=${ALL_REF} \\"
+              echo "  -f dry-run=false"
+              echo '```'
+              echo ""
+              echo "**UI:** [Dispatch \`neon-js.yml\`](${UI_LINK}) — fill in the form with \`package=all\`, \`ref=${ALL_REF}\`, untick \`dry-run\`."
+              echo ""
+            else
+              echo "### ⚠️ Publish order (leaf first)"
+              echo ""
+              echo "Dispatch Stage 2 one package at a time, **in the order listed below**. Each downstream package's published tarball references its dependency's version — that dependency must already be on npm when the dependent publishes, or consumers will hit \`npm install\` failures."
+              echo ""
+              # Ordered overview list (e.g. "1. auth-ui → auth-ui@v0.1.0-alpha.12").
+              i=1
+              paste <(echo "$PACKAGES" | jq -r '.[]') <(echo "$TAGS" | jq -r '.[]') \
+              | while IFS=$'\t' read -r pkg tag; do
+                  echo "${i}. \`@neondatabase/${pkg}\` → \`${tag}\`"
+                  i=$((i+1))
+                done
+              echo ""
+              echo "---"
+              echo ""
+              # Per-package sections (CLI + UI), same order.
+              i=1
+              paste <(echo "$PACKAGES" | jq -r '.[]') <(echo "$TAGS" | jq -r '.[]') \
+              | while IFS=$'\t' read -r pkg tag; do
+                  echo "### ${i}. \`@neondatabase/${pkg}\` → \`${tag}\`"
+                  echo ""
+                  echo "**CLI** (one-liner):"
+                  echo '```bash'
+                  echo "gh workflow run -R ${SECPUB_OWNER}/${SECPUB_REPO} neon-js.yml \\"
+                  echo "  -f package=${pkg} \\"
+                  echo "  -f ref=${tag} \\"
+                  echo "  -f dry-run=false"
+                  echo '```'
+                  echo ""
+                  echo "**UI:** [Dispatch \`neon-js.yml\`](${UI_LINK}) — fill in the form with \`package=${pkg}\`, \`ref=${tag}\`, untick \`dry-run\`."
+                  echo ""
+                  echo "**Wait until this run finishes successfully before dispatching the next package.**"
+                  echo ""
+                  i=$((i+1))
+                done
+              echo "---"
+              echo ""
+            fi
             echo "**If anything's wrong before Stage 2 runs:** delete the bad tag(s) manually (\`git push origin :refs/tags/<pkg>@v<ver>\`) and rerun post-release."
             echo ""
             echo "**If anything's wrong after Stage 2 publishes:** npm versions are immutable, so cut a new patch release with the fix — do NOT try to revert the release commit (npm will reject republishing the same version)."
