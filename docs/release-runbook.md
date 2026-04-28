@@ -6,9 +6,11 @@ The neon-js release pipeline has two stages:
 
 1. **Stage 1 — `prepare-release.yml`** (this repo, `neondatabase/neon-js`):
    Computes the release cascade from the selected trigger package, bumps versions
-   in each `packages/*/package.json`, commits the version bumps, creates annotated
-   git tags (e.g. `auth@v0.2.1`), and pushes everything to the repo. No build,
-   no publish — just version bookkeeping.
+   in each `packages/*/package.json`, commits the version bumps to a release
+   branch, and opens a release PR. After the PR is manually squash-merged,
+   `post-release.yml` creates annotated git tags (e.g. `auth@v0.2.1`) on the
+   merge commit and comments with Stage 2 dispatch instructions. No build, no
+   pack, no scan, no publish — just version bookkeeping and handoff.
 
 2. **Stage 2 — `neon-js.yml`** (`databricks/secure-public-registry-releases-eng`):
    Checks out the tagged source, installs dependencies (via JFrog proxy), audits,
@@ -41,20 +43,24 @@ hardened runners and security scanning mandate lives in
 3. Click **Run workflow**. Stage 1 will:
    - Compute the cascade (e.g. `auth` triggers `["auth", "neon-js"]`)
    - Bump versions in each cascaded package
-   - Commit with message `chore: release @neondatabase/auth@vX.Y.Z @neondatabase/neon-js@vX.Y.Z [skip ci]`
-   - Create annotated tags (e.g. `auth@v0.2.1`, `neon-js@v1.3.5`)
-   - Push commit + tags
-4. Go to **secure-public-registry-releases-eng > Actions > neon-js** (`neon-js.yml`).
-5. Select the **same package and bump type**. Set **ref** to the tag or `main`.
+   - Push a release branch
+   - Open a release PR with a title like `chore: release @neondatabase/auth@vX.Y.Z @neondatabase/neon-js@vX.Y.Z`
+4. Have an approver manually click **Squash and merge**. Do not use auto-merge.
+   The merge commit triggers `post-release.yml`, which creates the annotated tags
+   and comments with Stage 2 dispatch instructions.
+5. Go to **secure-public-registry-releases-eng > Actions > neon-js** (`neon-js.yml`).
+6. Select the **same package**. For an all-packages release, select `all` and use
+   the `neon-js@v...` tag from the post-release handoff as the canonical **ref**
+   (all release tags point at the same merge commit).
    Set **dry-run** to `false` for a real publish.
-6. Click **Run workflow**. Stage 2 will:
+7. Click **Run workflow**. Stage 2 will:
    - Check actor permissions
    - Checkout neon-js source at the specified ref
    - Install deps, audit, build
    - Pack tarballs for all cascaded packages
    - Run security scan
    - Publish each package to npm via OIDC (skips already-published versions)
-7. Verify on npmjs.com that all packages were published at the expected versions.
+8. Verify on npmjs.com that all packages were published at the expected versions.
 
 ### Cascade Reference
 
@@ -64,6 +70,11 @@ hardened runners and security scanning mandate lives in
 | `auth-ui` | `auth-ui`, `auth`, `neon-js` |
 | `auth` | `auth`, `neon-js` |
 | `neon-js` | `neon-js` |
+| `all` | `postgrest-js`, `auth-ui`, `auth`, `neon-js` |
+
+`all` releases every public package together, but it does **not** align all
+packages to one shared version. Each package is bumped once from its own current
+version.
 
 ## Dry Run
 
@@ -80,12 +91,12 @@ A dry run does not modify any state — no tags, no npm publishes.
 
 ## Failure Scenarios & Recovery
 
-### 1. Stage 1 fails before push
+### 1. Stage 1 fails before branch push
 
-**Symptoms**: Workflow fails at version bump, commit, or tag step.
+**Symptoms**: Workflow fails at version bump or commit step.
 
-**State**: Nothing was pushed. The commit and tags existed only on the
-ephemeral runner and are discarded when it terminates.
+**State**: Nothing was pushed. The commit existed only on the ephemeral runner
+and is discarded when it terminates.
 
 **Recovery**: Just re-run the workflow. No cleanup needed.
 
@@ -93,36 +104,24 @@ ephemeral runner and are discarded when it terminates.
 
 ---
 
-### 2. Stage 1 push fails (partial push)
+### 2. Stage 1 branch push or PR creation fails
 
-**Symptoms**: The "Push commits and tags" step fails. Since `git push --follow-tags`
-is a single command, it may have partially succeeded.
+**Symptoms**: The "Push release branch" or "Open PR" step fails.
 
-**State**: One of three states:
-- Commit pushed but tags missing
-- Tags pushed but commit missing (unlikely but possible with network issues)
-- Nothing pushed (push rejected entirely)
+**State**: Either nothing was pushed, or a release branch exists without a PR.
+No tags are created by Stage 1.
 
 **Recovery**:
 
 ```bash
-# Check what got pushed
-git ls-remote --tags origin | grep "@v"
-git log origin/main --oneline -5
+# Check for a pushed release branch
+git ls-remote --heads origin "release/*"
 
-# If commit is on main but tags are missing, push tags manually:
-git fetch origin main
-git checkout origin/main
-git tag -a "auth@v0.2.1" -m "Release auth@v0.2.1"
-git push origin "auth@v0.2.1"
-
-# If tags exist but commit is missing (very unlikely), delete the orphan tags:
-git push --delete origin "auth@v0.2.1"
-# Then re-run Stage 1
+# If the branch exists, open the PR manually or delete the branch and rerun Stage 1
+git push origin --delete "release/<package>-<run-id>"
 ```
 
-**Verify**: Both `git log origin/main` and `git ls-remote --tags origin` show
-consistent versions.
+**Verify**: The release PR exists, or the bad release branch is gone.
 
 ---
 
@@ -273,9 +272,12 @@ fetched from JFrog.
   pipeline (install, build, scan) without touching npm. Always do a dry run
   first for major or minor releases.
 
-- **No secrets in Stage 1**: The prepare-release workflow only needs
-  `contents: write` to push commits and tags. No npm tokens, no JFrog tokens.
+- **No secrets in Stage 1**: The prepare-release workflow only needs GitHub
+  permissions to push the release branch and open a PR. No npm tokens, no JFrog
+  tokens.
 
 - **Cascade logic**: Both stages compute the cascade independently from the
   same hardcoded map. If you add a new package, update the cascade `case`
-  block in both `prepare-release.yml` and `neon-js.yml`.
+  block in both `prepare-release.yml` and `neon-js.yml`. `post-release.yml`
+  also recognizes the `all` package set so it can emit a single Stage 2
+  `package=all` dispatch instead of one dispatch per package.

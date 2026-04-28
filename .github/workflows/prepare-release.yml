@@ -35,6 +35,7 @@ on:
           - auth-ui
           - postgrest-js
           - neon-js
+          - all
       bump:
         description: 'Semver bump kind (ignored if `version` is set)'
         required: false
@@ -94,10 +95,17 @@ jobs:
 
       - name: Validate ref input
         id: validate
+        env:
+          PACKAGE: ${{ inputs.package }}
+          VERSION_INPUT: ${{ inputs.version }}
         run: |
           REF="${{ inputs.ref || 'main' }}"
           if [[ "$REF" =~ ^[0-9a-f]{7,40}$ ]]; then
             echo "::error::Raw SHA refs are not supported. Please use a branch name (e.g., 'main')."
+            exit 1
+          fi
+          if [[ "$PACKAGE" == "all" && -n "$VERSION_INPUT" ]]; then
+            echo "::error::Custom \`version\` is not supported with \`package=all\`; use a bump kind so every public package is bumped once from its own current version."
             exit 1
           fi
 
@@ -117,6 +125,7 @@ jobs:
             auth-ui)      PACKAGES='["auth-ui","auth","neon-js"]' ;;
             auth)         PACKAGES='["auth","neon-js"]' ;;
             neon-js)      PACKAGES='["neon-js"]' ;;
+            all)          PACKAGES='["postgrest-js","auth-ui","auth","neon-js"]' ;;
             *)            echo "Unknown package: $PACKAGE"; exit 1 ;;
           esac
           echo "packages=$PACKAGES" >> "$GITHUB_OUTPUT"
