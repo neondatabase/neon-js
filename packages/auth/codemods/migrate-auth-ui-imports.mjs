@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { extname, join, resolve } from 'node:path';
+import { dirname, extname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const replacements = [
   ['@neondatabase/auth/react/ui/server', '@neondatabase/auth-ui/server'],
@@ -140,7 +141,7 @@ function parseArgs(argv) {
     check: false,
     write: false,
     verifyExports: false,
-    dependencyVersion: '^0.1.0',
+    dependencyVersion: undefined,
     targets: [],
   };
 
@@ -173,11 +174,13 @@ function parseArgs(argv) {
     options.targets.push('.');
   }
 
+  options.dependencyVersion ??= getDefaultAuthUiDependencyVersion();
+
   return options;
 }
 
 function printHelp() {
-  console.log(`Usage: node scripts/migrate-auth-ui-imports.mjs (--check|--write|--verify-exports) [paths...]
+  console.log(`Usage: neon-auth-codemod (--check|--write|--verify-exports) [paths...]
 
 Migrates deprecated Neon Auth UI compatibility imports to @neondatabase/auth-ui.
 
@@ -185,8 +188,25 @@ Options:
   --check                         Report files that need migration and exit non-zero.
   --write                         Rewrite files in place and update nearest package.json files.
   --verify-exports                Check codemod UI symbol list against packages/auth/src/react/ui/index.ts.
-  --dependency-version=<version>  Version added to package.json dependencies. Defaults to ^0.1.0.
+  --dependency-version=<version>  Version added to package.json dependencies. Defaults to this package's @neondatabase/auth-ui dependency.
 `);
+}
+
+function getDefaultAuthUiDependencyVersion() {
+  const currentFile = fileURLToPath(import.meta.url);
+  const packageJsonPath = resolve(dirname(currentFile), '..', 'package.json');
+
+  try {
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
+    const version = packageJson.dependencies?.['@neondatabase/auth-ui'];
+    if (typeof version === 'string' && !version.startsWith('workspace:')) {
+      return version;
+    }
+  } catch {
+    // Fall through to the stable default below.
+  }
+
+  return '^0.1.0';
 }
 
 function* walk(path) {

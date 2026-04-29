@@ -274,10 +274,10 @@ legacy `@neondatabase/auth/react/ui` and `@neondatabase/auth/ui/*` entrypoints
 still work for compatibility, but they are deprecated and will be removed in
 the next major version.
 
-To migrate existing imports in this repository, run:
+To migrate existing imports, run:
 
 ```bash
-pnpm migrate:auth-ui-imports --write <path>
+npx -p @neondatabase/auth neon-auth-codemod --write <path>
 ```
 
 ### 1. Import CSS
