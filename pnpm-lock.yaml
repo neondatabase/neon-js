@@ -136,6 +136,9 @@ importers:
       '@neondatabase/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@neondatabase/auth-ui':
+        specifier: workspace:*
+        version: link:../../packages/auth-ui
       '@neondatabase/serverless':
         specifier: ^1.0.2
         version: 1.0.2
@@ -270,6 +273,9 @@ importers:
       '@neondatabase/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@neondatabase/auth-ui':
+        specifier: workspace:*
+        version: link:../../packages/auth-ui
       '@neondatabase/serverless':
         specifier: 1.0.2
         version: 1.0.2
@@ -352,6 +358,9 @@ importers:
       '@hookform/resolvers':
         specifier: ^5.2.2
         version: 5.2.2(react-hook-form@7.72.0(react@19.2.3))
+      '@neondatabase/auth-ui':
+        specifier: workspace:*
+        version: link:../../packages/auth-ui
       '@neondatabase/neon-js':
         specifier: workspace:*
         version: link:../../packages/neon-js
@@ -473,6 +482,9 @@ importers:
 
   examples/react-neon-js:
     dependencies:
+      '@neondatabase/auth-ui':
+        specifier: workspace:*
+        version: link:../../packages/auth-ui
       '@neondatabase/neon-js':
         specifier: workspace:*
         version: link:../../packages/neon-js

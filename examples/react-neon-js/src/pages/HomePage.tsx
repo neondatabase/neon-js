@@ -3,10 +3,10 @@ import {
   SignedOut,
   AuthLoading,
   UserAvatar,
-} from '@neondatabase/neon-js/auth/react';
+} from '@neondatabase/auth-ui';
 import { Link } from 'react-router-dom';
 import { useContext } from 'react';
-import { AuthUIContext } from '@neondatabase/neon-js/auth/react';
+import { AuthUIContext } from '@neondatabase/auth-ui';
 
 export function HomePage() {
   return (

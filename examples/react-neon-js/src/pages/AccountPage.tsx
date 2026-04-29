@@ -7,7 +7,7 @@ import {
   SecuritySettingsCards,
   SessionsCard,
   ChangePasswordCard,
-} from '@neondatabase/neon-js/auth/react';
+} from '@neondatabase/auth-ui';
 
 type AccountView = 'settings' | 'security' | 'sessions';
 

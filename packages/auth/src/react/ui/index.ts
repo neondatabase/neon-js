@@ -1,4 +1,8 @@
 // Custom Neon Auth UI Provider with react-adapter logic
+/**
+ * @deprecated Import UI components from `@neondatabase/auth-ui` instead.
+ * This compatibility entrypoint will be removed in the next major version.
+ */
 export { NeonAuthUIProvider } from '@neondatabase/auth-ui';
 export type { NeonAuthUIProviderProps } from '@neondatabase/auth-ui';
 

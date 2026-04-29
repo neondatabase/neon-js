@@ -315,11 +315,11 @@ Choose based on your project setup:
 
 ```css
 /* Without Tailwind - pre-built bundle (~47KB) */
-@import '@neondatabase/auth/ui/css';
+@import '@neondatabase/auth-ui/css';
 
 /* With Tailwind CSS v4 - theme tokens only */
 @import 'tailwindcss';
-@import '@neondatabase/auth/ui/tailwind';
+@import '@neondatabase/auth-ui/tailwind';
 ```
 
 Never import both paths - causes duplicate styles.

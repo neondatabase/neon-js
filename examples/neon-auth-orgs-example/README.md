@@ -155,7 +155,7 @@ Unauthenticated users hitting `/dashboard/*` or `/account/*` are redirected to t
 In the root layout (`src/app/layout.tsx`), wrap the app with `NeonAuthUIProvider`:
 
 ```tsx
-import { NeonAuthUIProvider, UserButton } from "@neondatabase/auth/react";
+import { NeonAuthUIProvider, UserButton } from "@neondatabase/auth-ui";
 import { authClient } from "@/lib/auth/client";
 
 <NeonAuthUIProvider authClient={authClient} redirectTo="/dashboard" emailOTP>

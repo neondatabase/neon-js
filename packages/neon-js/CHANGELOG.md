@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Client Telemetry**: Automatically injects `X-Neon-Client-Info` header with SDK name, version, runtime environment (Node.js, Deno, Bun, Edge, Browser), and framework detection (Next.js, Remix, React, Vue, Angular).
 
+### Deprecated
+
+- UI exports from `@neondatabase/neon-js/auth/react/ui`, `@neondatabase/neon-js/auth/react/ui/server`, `@neondatabase/neon-js/ui/css`, and `@neondatabase/neon-js/ui/tailwind` are deprecated. Install `@neondatabase/auth-ui` and import UI components, server helpers, and styles directly from that package instead. These compatibility exports will be removed in the next major version.
+
 ### Removed
 
 #### Breaking: Server Utilities Removed from `@neondatabase/neon-js/auth/next`

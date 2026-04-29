@@ -18,11 +18,11 @@ A Next.js integration for **Neon Auth** (`@neondatabase/auth`). This guide demon
 ### 1. Install the Package
 
 ```bash
-npm install @neondatabase/auth
+npm install @neondatabase/auth @neondatabase/auth-ui
 # or
-pnpm add @neondatabase/auth
+pnpm add @neondatabase/auth @neondatabase/auth-ui
 # or
-yarn add @neondatabase/auth
+yarn add @neondatabase/auth @neondatabase/auth-ui
 ```
 
 ### 2. Set Environment Variables
@@ -148,7 +148,7 @@ Create a providers component and wrap your application with `NeonAuthUIProvider`
 // app/providers.tsx
 "use client"
 
-import { NeonAuthUIProvider } from "@neondatabase/auth/react/ui"
+import { NeonAuthUIProvider } from "@neondatabase/auth-ui"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import type { ReactNode } from "react"
@@ -213,7 +213,7 @@ If your project doesn't use Tailwind CSS, import the pre-built CSS bundle:
 
 ```typescript
 // In your root layout or app entry point
-import "@neondatabase/auth/ui/css"
+import "@neondatabase/auth-ui/css"
 ```
 
 This includes all necessary styles with no additional configuration required.
@@ -225,7 +225,7 @@ If your project already uses Tailwind CSS v4, import the Tailwind-ready CSS to a
 ```css
 /* In your main CSS file (e.g., globals.css) */
 @import "tailwindcss";
-@import "@neondatabase/auth/ui/tailwind";
+@import "@neondatabase/auth-ui/tailwind";
 ```
 
 This imports only the theme variables and component scanning directive. Your Tailwind build will generate the necessary utility classes, avoiding duplication with your existing Tailwind setup.
@@ -238,8 +238,8 @@ Create a dynamic route file at `app/auth/[path]/page.tsx` to handle all authenti
 
 ```typescript
 // app/auth/[path]/page.tsx
-import { AuthView } from "@neondatabase/auth/react/ui"
-import { authViewPaths } from "@neondatabase/auth/react/ui/server"
+import { AuthView } from "@neondatabase/auth-ui"
+import { authViewPaths } from "@neondatabase/auth-ui/server"
 
 export const dynamicParams = false
 
@@ -279,8 +279,8 @@ This automatically handles the following authentication routes:
 
 ```typescript
 // app/account/[path]/page.tsx
-import { AccountView } from "@neondatabase/auth/react/ui"
-import { accountViewPaths } from "@neondatabase/auth/react/ui/server"
+import { AccountView } from "@neondatabase/auth-ui"
+import { accountViewPaths } from "@neondatabase/auth-ui/server"
 
 export const dynamicParams = false
 
@@ -307,8 +307,8 @@ export default async function AccountPage({
 
 ```typescript
 // app/organization/[path]/page.tsx
-import { OrganizationView } from "@neondatabase/auth/react/ui"
-import { organizationViewPaths } from "@neondatabase/auth/react/ui/server"
+import { OrganizationView } from "@neondatabase/auth-ui"
+import { organizationViewPaths } from "@neondatabase/auth-ui/server"
 
 export const dynamicParams = false
 

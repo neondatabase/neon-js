@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Deprecated
+
+- UI exports from `@neondatabase/auth/react`, `@neondatabase/auth/react/ui`, `@neondatabase/auth/react/ui/server`, `@neondatabase/auth/ui/css`, and `@neondatabase/auth/ui/tailwind` are deprecated. Install `@neondatabase/auth-ui` and import UI components, server helpers, and styles directly from that package instead. These compatibility exports will be removed in the next major version.
+
 ### Fixed
 
 - **Reactive Session Minting**: `session_data` cookie is now automatically minted when missing, expired, or invalid
