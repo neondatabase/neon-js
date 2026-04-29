@@ -13,7 +13,6 @@
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
     "@neondatabase/auth": "workspace:*",
-    "@neondatabase/auth-ui": "workspace:*",
     "@neondatabase/serverless": "^1.0.2",
     "@tanstack/react-query": "^5.90.21",
     "class-variance-authority": "^0.7.1",

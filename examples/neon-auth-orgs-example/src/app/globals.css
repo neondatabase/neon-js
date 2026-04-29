@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@neondatabase/auth-ui/tailwind";
+@import "@neondatabase/auth/ui/tailwind";
 
 @custom-variant dark (&:is(.dark *));
 

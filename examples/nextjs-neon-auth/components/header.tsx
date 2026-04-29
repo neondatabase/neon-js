@@ -1,6 +1,6 @@
 "use client"
 
-import { SignedIn, SignedOut, UserButton } from "@neondatabase/auth-ui"
+import { SignedIn, SignedOut, UserButton } from "@neondatabase/auth/react/ui"
 import Link from "next/link"
 
 import { Button } from "@/components/ui/button"

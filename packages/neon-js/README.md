@@ -1,9 +1,9 @@
 # @neondatabase/neon-js
 
-[npm version](https://www.npmjs.com/package/@neondatabase/neon-js)
-[npm downloads](https://www.npmjs.com/package/@neondatabase/neon-js)
-[TypeScript](https://www.typescriptlang.org/)
-[License](https://github.com/neondatabase/neon-js/blob/main/LICENSE)
+[![npm version](https://img.shields.io/npm/v/@neondatabase/neon-js.svg)](https://www.npmjs.com/package/@neondatabase/neon-js)
+[![npm downloads](https://img.shields.io/npm/dm/@neondatabase/neon-js.svg)](https://www.npmjs.com/package/@neondatabase/neon-js)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0%2B-blue.svg)](https://www.typescriptlang.org/)
+[![License](https://img.shields.io/npm/l/@neondatabase/neon-js.svg)](https://github.com/neondatabase/neon-js/blob/main/LICENSE)
 
 The official TypeScript SDK for Neon, combining authentication and database querying in a familiar interface.
 
@@ -51,7 +51,6 @@ Before using neon-js, you'll need:
 - Copy your Data API URL
 
 **Data API URL format:**
-
 ```
 https://ep-xxx.apirest.c-2.us-east-2.aws.neon.build/dbname/rest/v1
 ```
@@ -63,7 +62,6 @@ https://ep-xxx.apirest.c-2.us-east-2.aws.neon.build/dbname/rest/v1
 - Copy your Auth URL
 
 **Auth URL format:**
-
 ```
 https://ep-xxx.neonauth.c-2.us-east-2.aws.neon.build/dbname/auth
 ```
@@ -415,6 +413,12 @@ legacy `@neondatabase/neon-js/auth/react/ui` and `@neondatabase/neon-js/ui/*`
 entrypoints still work for compatibility, but they are deprecated and will be
 removed in the next major version.
 
+To migrate existing imports in this repository, run:
+
+```bash
+pnpm migrate:auth-ui-imports --write <path>
+```
+
 ### 1. Import CSS
 
 Install the UI package alongside `@neondatabase/neon-js`:
@@ -424,13 +428,11 @@ npm install @neondatabase/auth-ui
 ```
 
 **Without Tailwind CSS:**
-
 ```typescript
 import '@neondatabase/auth-ui/css';
 ```
 
 **With Tailwind CSS v4:**
-
 ```css
 @import 'tailwindcss';
 @import '@neondatabase/auth-ui/tailwind';
@@ -477,7 +479,7 @@ import { SignInForm, UserButton } from "@neondatabase/auth-ui"
 
 Available components: `SignInForm`, `SignUpForm`, `UserButton`, `AuthView`, `AccountView`, `OrganizationView`
 
-For full documentation and theming, see `[@neondatabase/auth-ui](../auth-ui)`.
+For full documentation and theming, see [`@neondatabase/auth-ui`](../auth-ui).
 
 ## TypeScript
 
@@ -527,7 +529,6 @@ npx @neondatabase/neon-js gen-types \
 ```
 
 **Options:**
-
 - `--db-url`, `-c` - PostgreSQL connection string (required)
 - `--output`, `-o` - Output file path (default: `./types/database.ts`)
 - `--schemas`, `-s` - Comma-separated list of schemas (default: `public`)
@@ -537,7 +538,6 @@ npx @neondatabase/neon-js gen-types \
 ### Session Caching
 
 Sessions are cached in memory with intelligent TTL:
-
 - **Cold start:** ~200ms (single network request)
 - **Cached reads:** <1ms (in-memory, no I/O)
 - **Cache TTL:** 60 seconds or until JWT expires
@@ -546,7 +546,6 @@ Sessions are cached in memory with intelligent TTL:
 ### Request Deduplication
 
 Concurrent authentication calls are automatically deduplicated:
-
 - **Without deduplication:** 10 concurrent calls = 10 requests (~2000ms)
 - **With deduplication:** 10 concurrent calls = 1 request (~200ms)
 - **Result:** 10x faster, N-1 fewer server requests
@@ -703,8 +702,8 @@ See the [todo-guardian-pro migration PR](https://github.com/pffigueiredo/todo-gu
 
 This package combines two underlying packages:
 
-- `[@neondatabase/auth](../auth)` - Authentication adapters (can be used standalone)
-- `[@neondatabase/postgrest-js](../postgrest-js)` - PostgreSQL client (can be used standalone)
+- [`@neondatabase/auth`](../auth) - Authentication adapters (can be used standalone)
+- [`@neondatabase/postgrest-js`](../postgrest-js) - PostgreSQL client (can be used standalone)
 
 ## Resources
 

@@ -1,4 +1,4 @@
-import { useTheme } from '@neondatabase/auth-ui';
+import { useTheme } from '@neondatabase/neon-js/auth/react';
 
 // Sun icon component
 function SunIcon() {

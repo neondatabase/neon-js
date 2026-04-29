@@ -186,12 +186,12 @@ VITE_NEON_AUTH_URL=https://your-project.neonauth.c-3.us-east-1.aws.neon.tech/neo
 With `@neondatabase/auth-ui`, the entire setup is:
 
 ```bash
-npm install @neondatabase/neon-js @neondatabase/auth-ui
+npm install @neondatabase/neon-js
 ```
 
 ```tsx
-import { NeonAuthUIProvider, SignInForm } from '@neondatabase/auth-ui';
-import '@neondatabase/auth-ui/css';
+import { NeonAuthUIProvider, SignInForm } from '@neondatabase/neon-js/auth/react/ui';
+import '@neondatabase/neon-js/ui/css';
 
 function App() {
   return (

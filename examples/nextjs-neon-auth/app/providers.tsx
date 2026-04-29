@@ -1,6 +1,6 @@
 "use client"
 
-import { NeonAuthUIProvider } from "@neondatabase/auth-ui"
+import { NeonAuthUIProvider } from "@neondatabase/auth/react/ui"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import type { ReactNode } from "react"

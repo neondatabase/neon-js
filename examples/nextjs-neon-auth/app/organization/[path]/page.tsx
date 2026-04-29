@@ -1,5 +1,5 @@
-import { OrganizationView } from '@neondatabase/auth-ui';
-import { organizationViewPaths } from '@neondatabase/auth-ui/server';
+import { OrganizationView } from '@neondatabase/auth/react/ui';
+import { organizationViewPaths } from '@neondatabase/auth/react/ui/server';
 
 export const dynamicParams = false;
 

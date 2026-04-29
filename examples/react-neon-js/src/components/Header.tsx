@@ -6,7 +6,7 @@ import {
   UserAvatar,
   AuthLoading,
   AuthUIContext,
-} from '@neondatabase/auth-ui';
+} from '@neondatabase/neon-js/auth/react';
 import { Link, NavLink } from 'react-router-dom';
 import { ThemeToggle } from './ThemeToggle';
 
