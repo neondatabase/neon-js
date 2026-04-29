@@ -23,6 +23,8 @@ const authUiExports = new Set([
   'AcceptInvitationCard',
   'AccountSettingsCards',
   'AccountView',
+  'AccountsCard',
+  'AppleIcon',
   'AuthCallback',
   'AuthForm',
   'AuthLoading',
@@ -35,9 +37,22 @@ const authUiExports = new Set([
   'CreateTeamDialog',
   'DeleteAccountCard',
   'DeleteOrganizationCard',
+  'DiscordIcon',
+  'DropboxIcon',
+  'FacebookIcon',
   'ForgotPasswordForm',
+  'GitHubIcon',
+  'GitLabIcon',
+  'GoogleIcon',
+  'HuggingFaceIcon',
+  'InputFieldSkeleton',
+  'KickIcon',
+  'LinearIcon',
+  'LinkedInIcon',
   'MagicLinkForm',
+  'MicrosoftIcon',
   'NeonAuthUIProvider',
+  'NotionIcon',
   'OrganizationCellView',
   'OrganizationInvitationsCard',
   'OrganizationLogo',
@@ -53,21 +68,28 @@ const authUiExports = new Set([
   'PasswordInput',
   'ProvidersCard',
   'RecoverAccountForm',
+  'RedditIcon',
   'RedirectToSignIn',
   'RedirectToSignUp',
   'ResetPasswordForm',
+  'RobloxIcon',
   'SecuritySettingsCards',
   'SessionsCard',
   'SettingsCard',
+  'SettingsCellSkeleton',
   'SignInForm',
   'SignOut',
   'SignUpForm',
   'SignedIn',
   'SignedOut',
+  'SlackIcon',
   'TeamCell',
   'TeamsCard',
+  'SpotifyIcon',
+  'TikTokIcon',
   'TwoFactorCard',
   'TwoFactorForm',
+  'TwitchIcon',
   'UpdateAvatarCard',
   'UpdateFieldCard',
   'UpdateNameCard',
@@ -76,6 +98,9 @@ const authUiExports = new Set([
   'UserButton',
   'UserInvitationsCard',
   'UserView',
+  'VKIcon',
+  'XIcon',
+  'ZoomIcon',
   'accountViewPaths',
   'authLocalization',
   'authViewPaths',
@@ -114,6 +139,7 @@ function parseArgs(argv) {
   const options = {
     check: false,
     write: false,
+    verifyExports: false,
     dependencyVersion: '^0.1.0',
     targets: [],
   };
@@ -123,6 +149,8 @@ function parseArgs(argv) {
       options.check = true;
     } else if (arg === '--write') {
       options.write = true;
+    } else if (arg === '--verify-exports') {
+      options.verifyExports = true;
     } else if (arg.startsWith('--dependency-version=')) {
       options.dependencyVersion = arg.slice('--dependency-version='.length);
     } else if (arg === '--help' || arg === '-h') {
@@ -131,6 +159,10 @@ function parseArgs(argv) {
     } else {
       options.targets.push(arg);
     }
+  }
+
+  if (options.verifyExports) {
+    return options;
   }
 
   if (options.check === options.write) {
@@ -145,13 +177,14 @@ function parseArgs(argv) {
 }
 
 function printHelp() {
-  console.log(`Usage: node scripts/migrate-auth-ui-imports.mjs (--check|--write) [paths...]
+  console.log(`Usage: node scripts/migrate-auth-ui-imports.mjs (--check|--write|--verify-exports) [paths...]
 
 Migrates deprecated Neon Auth UI compatibility imports to @neondatabase/auth-ui.
 
 Options:
   --check                         Report files that need migration and exit non-zero.
   --write                         Rewrite files in place and update nearest package.json files.
+  --verify-exports                Check codemod UI symbol list against packages/auth/src/react/ui/index.ts.
   --dependency-version=<version>  Version added to package.json dependencies. Defaults to ^0.1.0.
 `);
 }
@@ -232,6 +265,41 @@ function rewriteCompatibilityReactImports(text) {
   );
 }
 
+function extractAuthUiValueExports(sourcePath) {
+  const source = readFileSync(sourcePath, 'utf8');
+  const exports = new Set();
+
+  for (const match of source.matchAll(/export\s+\{([^}]*)\}\s+from\s+['"]@neondatabase\/auth-ui['"]/g)) {
+    for (const specifier of match[1].split(',')) {
+      const name = specifier.trim().split(/\s+as\s+/i)[0]?.trim();
+      if (name) {
+        exports.add(name);
+      }
+    }
+  }
+
+  return exports;
+}
+
+function verifyAuthUiExports() {
+  const sourcePath = resolve('packages/auth/src/react/ui/index.ts');
+  const sourceExports = extractAuthUiValueExports(sourcePath);
+  const missing = [...sourceExports].filter((name) => !authUiExports.has(name)).sort();
+
+  if (missing.length > 0) {
+    console.error(
+      `authUiExports is missing ${missing.length} value export(s) from ${sourcePath}:`
+    );
+    for (const name of missing) {
+      console.error(`- ${name}`);
+    }
+    process.exitCode = 1;
+    return;
+  }
+
+  console.log(`authUiExports covers ${sourceExports.size} value export(s) from ${sourcePath}.`);
+}
+
 function findPackageJson(start) {
   let current = resolve(statSync(start).isDirectory() ? start : join(start, '..'));
   const root = resolve('/');
@@ -262,6 +330,11 @@ function updatePackageJson(packageJsonPath, dependencyVersion) {
 
 function main() {
   const options = parseArgs(process.argv.slice(2));
+  if (options.verifyExports) {
+    verifyAuthUiExports();
+    return;
+  }
+
   const changedFiles = [];
   const packageJsons = new Set();
 
