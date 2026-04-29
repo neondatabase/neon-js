@@ -40,12 +40,16 @@ on:
         description: 'Semver bump kind (ignored if `version` is set)'
         required: false
         type: choice
-        default: prerelease
+        default: minor
         options:
-          - prerelease
           - patch
           - minor
           - major
+      beta:
+        description: 'Append -beta to computed versions (ignored for custom `version`)'
+        required: false
+        type: boolean
+        default: true
       version:
         description: 'Full custom version string (overrides `bump` if set, e.g. 0.3.0-beta.1). Applies to the TRIGGER package only; cascade packages still use `bump`.'
         required: false
@@ -143,6 +147,7 @@ jobs:
         id: versions
         env:
           BUMP: ${{ inputs.bump }}
+          BETA: ${{ inputs.beta }}
           VERSION_INPUT: ${{ inputs.version }}
           TRIGGER: ${{ inputs.package }}
         run: |
@@ -156,11 +161,11 @@ jobs:
             MODE="CUSTOM_VERSION"
             echo "- Mode: **CUSTOM_VERSION**" >> "$GITHUB_STEP_SUMMARY"
             echo "- Trigger package ($TRIGGER) uses explicit version: \`$VERSION_INPUT\`" >> "$GITHUB_STEP_SUMMARY"
-            echo "- Cascade packages still follow bump kind: \`$BUMP\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Cascade packages still follow bump kind: \`$BUMP\` with beta suffix: \`$BETA\`" >> "$GITHUB_STEP_SUMMARY"
           else
             MODE="BUMP"
             echo "- Mode: **BUMP**" >> "$GITHUB_STEP_SUMMARY"
-            echo "- All packages use bump kind: \`$BUMP\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "- All packages use bump kind: \`$BUMP\` with beta suffix: \`$BETA\`" >> "$GITHUB_STEP_SUMMARY"
           fi
           echo "" >> "$GITHUB_STEP_SUMMARY"
 
@@ -175,13 +180,11 @@ jobs:
               # Trigger package gets the exact version the user typed.
               new="$VERSION_INPUT"
             else
-              # Parse semver: major.minor.patch(-preid.prenum)?
+              # Parse semver and discard any existing prerelease suffix.
               if [[ "$current" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-([a-zA-Z][a-zA-Z0-9]*)(\.([0-9]+))?)?$ ]]; then
                 cur_major="${BASH_REMATCH[1]}"
                 cur_minor="${BASH_REMATCH[2]}"
                 cur_patch="${BASH_REMATCH[3]}"
-                pre_id="${BASH_REMATCH[5]:-}"
-                pre_num="${BASH_REMATCH[7]:-}"
               else
                 echo "::error::Could not parse current version '$current' for package $pkg (expected semver)"
                 exit 1
@@ -191,21 +194,14 @@ jobs:
                 major) new="$((cur_major+1)).0.0" ;;
                 minor) new="${cur_major}.$((cur_minor+1)).0" ;;
                 patch) new="${cur_major}.${cur_minor}.$((cur_patch+1))" ;;
-                prerelease)
-                  if [[ -n "$pre_id" ]]; then
-                    # Already on a prerelease track — increment counter (default to 0 if missing).
-                    next_num=$(( ${pre_num:-0} + 1 ))
-                    new="${cur_major}.${cur_minor}.${cur_patch}-${pre_id}.${next_num}"
-                  else
-                    # Stable version — start a new -beta.1 chain.
-                    new="${cur_major}.${cur_minor}.${cur_patch}-beta.1"
-                  fi
-                  ;;
                 *)
                   echo "::error::Unknown bump kind '$BUMP'"
                   exit 1
                   ;;
               esac
+              if [[ "$BETA" == "true" ]]; then
+                new="${new}-beta"
+              fi
             fi
 
             echo "New version: $new"
@@ -221,6 +217,30 @@ jobs:
           echo "tags=$(echo "$TAGS" | jq -c .)" >> "$GITHUB_OUTPUT"
           echo "### Versions" >> "$GITHUB_STEP_SUMMARY"
           echo "$VERSIONS" | jq -r 'to_entries[] | "- **\(.key)** v\(.value)"' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Check planned tags do not already exist
+        id: tag-preflight
+        run: |
+          TAGS='${{ steps.versions.outputs.tags }}'
+          EXISTING='[]'
+
+          for tag in $(echo "$TAGS" | jq -r '.[]'); do
+            if git rev-parse -q --verify "refs/tags/$tag" >/dev/null || \
+               git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+              echo "::error::Tag $tag already exists."
+              EXISTING=$(echo "$EXISTING" | jq -c --arg t "$tag" '. + [$t]')
+            fi
+          done
+
+          echo "existing_tags=$EXISTING" >> "$GITHUB_OUTPUT"
+          if [[ "$(echo "$EXISTING" | jq 'length')" -gt 0 ]]; then
+            echo "### Existing release tags" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "$EXISTING" | jq -r '.[] | "- `\(.)`"' >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Choose a newer version and rerun the workflow. If this tag is from an aborted release and nothing was published to npm, delete the stale tag first." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
 
       - name: Compute release branch + PR metadata
         id: meta
@@ -366,6 +386,16 @@ jobs:
             echo "**Version bump** — failed to compute or apply version bumps." >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
             echo "**Impact:** Nothing was pushed. Local changes existed only on the runner (now discarded). Safe to re-run." >> "$GITHUB_STEP_SUMMARY"
+
+          elif [[ "${{ steps.tag-preflight.outcome }}" == "failure" ]]; then
+            echo "**Planned tag already exists** — refusing to create a release that would reuse an existing tag." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Impact:** Nothing was committed or pushed." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Recovery:** Choose a newer version and rerun the workflow. If this tag is from an aborted release and nothing was published to npm, delete the stale tag first:" >> "$GITHUB_STEP_SUMMARY"
+            echo '```bash' >> "$GITHUB_STEP_SUMMARY"
+            echo "git push origin :refs/tags/<pkg>@v<version>" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
 
           elif [[ "${{ steps.commit.outcome }}" == "failure" ]]; then
             echo "**Commit** — \`git commit\` failed (no changes staged, or git config issue)." >> "$GITHUB_STEP_SUMMARY"
