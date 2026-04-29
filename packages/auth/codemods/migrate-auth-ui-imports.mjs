@@ -285,7 +285,7 @@ function rewriteCompatibilityReactImports(text) {
   );
 }
 
-function extractAuthUiValueExports(sourcePath) {
+export function extractAuthUiValueExports(sourcePath) {
   const source = readFileSync(sourcePath, 'utf8');
   const exports = new Set();
 
@@ -301,10 +301,15 @@ function extractAuthUiValueExports(sourcePath) {
   return exports;
 }
 
-function verifyAuthUiExports() {
+export function findMissingAuthUiExports(sourcePath = resolve('packages/auth/src/react/ui/index.ts')) {
+  const sourceExports = extractAuthUiValueExports(sourcePath);
+  return [...sourceExports].filter((name) => !authUiExports.has(name)).sort();
+}
+
+export function verifyAuthUiExports() {
   const sourcePath = resolve('packages/auth/src/react/ui/index.ts');
   const sourceExports = extractAuthUiValueExports(sourcePath);
-  const missing = [...sourceExports].filter((name) => !authUiExports.has(name)).sort();
+  const missing = findMissingAuthUiExports(sourcePath);
 
   if (missing.length > 0) {
     console.error(
@@ -411,9 +416,11 @@ function main() {
   }
 }
 
-try {
-  main();
-} catch (error) {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
+if (import.meta.url === `file://${process.argv[1]}`) {
+  try {
+    main();
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
 }
