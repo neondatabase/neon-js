@@ -50,8 +50,24 @@ describe('defaultDeriveNeonUrls', () => {
     const result = defaultDeriveNeonUrls(
       'http://ep-xxx.c-2.us-east-2.aws.neon.build/dbname'
     );
-    expect(result.auth.startsWith('http://')).toBe(true);
-    expect(result.dataApi.startsWith('http://')).toBe(true);
+    expect(result).toEqual({
+      auth: 'http://ep-xxx.neonauth.c-2.us-east-2.aws.neon.build/dbname/auth',
+      dataApi:
+        'http://ep-xxx.apirest.c-2.us-east-2.aws.neon.build/dbname/rest/v1',
+    });
+  });
+
+  it('throws when the URL contains a query string or hash fragment', () => {
+    expect(() =>
+      defaultDeriveNeonUrls(
+        'https://ep-xxx.c-2.us-east-2.aws.neon.build/dbname?x=1'
+      )
+    ).toThrow(/must not include a query string or hash fragment/);
+    expect(() =>
+      defaultDeriveNeonUrls(
+        'https://ep-xxx.c-2.us-east-2.aws.neon.build/dbname#frag'
+      )
+    ).toThrow(/must not include a query string or hash fragment/);
   });
 
   it('throws when the hostname has fewer than 3 labels', () => {
