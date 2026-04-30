@@ -79,6 +79,7 @@ jobs:
     permissions:
       contents: write      # push release branch
       pull-requests: write # open PR
+      actions: write       # dispatch ci.yml + unit-tests.yml on the release branch
 
     steps:
       - name: Harden the runner
@@ -347,6 +348,22 @@ jobs:
 
           echo "### PR" >> "$GITHUB_STEP_SUMMARY"
           echo "$PR_URL ($PR_OP)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Trigger required checks on release branch
+        if: steps.cpr.outputs.pull-request-url != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.meta.outputs.branch }}
+        run: |
+          # Release PRs opened by peter-evans/create-pull-request via GITHUB_TOKEN
+          # don't trigger pull_request workflows (GitHub recursion guard).
+          # workflow_dispatch is exempt — dispatch ci.yml + unit-tests.yml manually
+          # so branch protection's required contexts (ci, unit-tests) report on the
+          # release branch HEAD SHA.
+          # See https://docs.github.com/en/actions/concepts/security/github_token
+          gh workflow run ci.yml --ref "$BRANCH"
+          gh workflow run unit-tests.yml --ref "$BRANCH"
+          echo "Dispatched ci.yml and unit-tests.yml on $BRANCH" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Release failure guidance
         if: failure()
