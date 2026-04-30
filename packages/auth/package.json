@@ -1,6 +1,6 @@
 {
   "name": "@neondatabase/auth",
-  "version": "0.3.0-beta",
+  "version": "0.4.0-beta",
   "description": "TypeScript SDK for Neon Auth - authentication for PostgreSQL with multiple adapter support",
   "type": "module",
   "license": "Apache-2.0",
