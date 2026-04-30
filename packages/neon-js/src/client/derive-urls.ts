@@ -24,6 +24,12 @@ export type DeriveNeonUrls = (baseUrl: string) => {
 export const defaultDeriveNeonUrls: DeriveNeonUrls = (baseUrl) => {
   const url = new URL(baseUrl);
 
+  if (url.search !== '' || url.hash !== '') {
+    throw new Error(
+      `Invalid Neon base URL: must not include a query string or hash fragment (got "${baseUrl}").`
+    );
+  }
+
   const labels = url.hostname.split('.');
   if (labels.length < 3) {
     throw new Error(
@@ -36,13 +42,10 @@ export const defaultDeriveNeonUrls: DeriveNeonUrls = (baseUrl) => {
   const dataApiHost = [first, 'apirest', ...rest].join('.');
 
   const basePath = url.pathname.replace(/\/+$/, '');
-  const authPath = `${basePath}/auth`;
-  const dataApiPath = `${basePath}/rest/v1`;
-
-  const portSuffix = url.port ? `:${url.port}` : '';
+  const port = url.port ? `:${url.port}` : '';
 
   return {
-    auth: `${url.protocol}//${authHost}${portSuffix}${authPath}`,
-    dataApi: `${url.protocol}//${dataApiHost}${portSuffix}${dataApiPath}`,
+    auth: `${url.protocol}//${authHost}${port}${basePath}/auth`,
+    dataApi: `${url.protocol}//${dataApiHost}${port}${basePath}/rest/v1`,
   };
 };
