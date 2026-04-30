@@ -21,7 +21,7 @@ import {
 import { defaultDeriveNeonUrls, type DeriveNeonUrls } from './derive-urls';
 
 /**
- * Auth configuration for createClient (object form)
+ * Auth configuration for createClient
  */
 export type CreateClientAuthConfig<T extends NeonAuthAdapter> = {
   /** The auth service URL */
@@ -29,7 +29,7 @@ export type CreateClientAuthConfig<T extends NeonAuthAdapter> = {
 } & NeonAuthConfig<T>;
 
 /**
- * Data API configuration for createClient (object form)
+ * Data API configuration for createClient
  */
 export type CreateClientDataApiConfig<
   SchemaName,
@@ -45,7 +45,7 @@ export type CreateClientDataApiConfig<
 };
 
 /**
- * Configuration for createClient (object form)
+ * Configuration for createClient
  */
 export type CreateClientConfig<SchemaName, T extends NeonAuthAdapter> = {
   /** Auth service configuration */
@@ -55,34 +55,67 @@ export type CreateClientConfig<SchemaName, T extends NeonAuthAdapter> = {
 };
 
 /**
- * Per-call overrides accepted alongside a single base URL.
+ * Factory function to create NeonClient with seamless auth integration.
  *
- * Every field is optional; defaults come from `deriveUrls(baseUrl)`.
+ * @param config - Configuration with auth and dataApi sections
+ * @returns NeonClient instance with auth-aware fetch wrapper
+ * @throws AuthRequiredError when making requests without authentication
+ *
+ * @example
+ * ```typescript
+ * // Simple usage with default BetterAuthVanillaAdapter
+ * import { createClient } from '@neondatabase/neon-js';
+ *
+ * const client = createClient({
+ *   auth: { url: 'https://auth.example.com' },
+ *   dataApi: { url: 'https://data-api.example.com/rest/v1' },
+ * });
+ *
+ * // Better Auth API
+ * await client.auth.signIn.email({ email, password });
+ *
+ * // Database queries (automatic token injection)
+ * const { data: items } = await client.from('items').select();
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // With SupabaseAuthAdapter for Supabase-compatible API
+ * import { createClient, SupabaseAuthAdapter } from '@neondatabase/neon-js';
+ *
+ * const client = createClient({
+ *   auth: {
+ *     adapter: SupabaseAuthAdapter,
+ *     url: 'https://auth.example.com',
+ *   },
+ *   dataApi: {
+ *     url: 'https://data-api.example.com/rest/v1',
+ *   },
+ * });
+ *
+ * // Supabase-compatible auth methods
+ * await client.auth.signInWithPassword({ email, password });
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Single base URL — auth and Data API URLs are derived automatically.
+ * const client = createClient(
+ *   'https://ep-xxx.c-2.us-east-2.aws.neon.build/dbname'
+ * );
+ * ```
  */
-export type CreateClientStringOptions<
-  SchemaName,
-  T extends NeonAuthAdapter,
-> = {
-  auth?: Partial<CreateClientAuthConfig<T>>;
-  dataApi?: Partial<CreateClientDataApiConfig<SchemaName, T>>;
-  /**
-   * Override the auth/Data API URL derivation. End users do not need this;
-   * it is intended for wrapper packages (e.g. `@databricks/lakebase-js`)
-   * that have their own endpoint pattern.
-   */
-  deriveUrls?: DeriveNeonUrls;
-};
 
+/**
+ * Helper type to create NeonClient with proper schema resolution.
+ * Uses 'public' as the default schema since it's the most common case.
+ */
 type CreateClientResult<
   Database,
   TAdapter extends NeonAuthAdapter,
 > = NeonClient<Database, DefaultSchemaName<Database>, TAdapter>;
 
-// =============================================================================
-// Object-form overloads (existing behaviour — unchanged)
-// =============================================================================
-
-// Object form, no adapter specified → defaults to BetterAuthVanillaAdapter
+// Overload: No adapter specified (defaults to BetterAuthVanillaAdapter)
 export function createClient<Database = any>(config: {
   auth: { url: string; allowAnonymous?: boolean };
   dataApi: CreateClientDataApiConfig<
@@ -91,7 +124,7 @@ export function createClient<Database = any>(config: {
   >;
 }): CreateClientResult<Database, BetterAuthVanillaAdapterInstance>;
 
-// Object form, SupabaseAuthAdapter
+// Overload: SupabaseAuthAdapter
 export function createClient<Database = any>(
   config: CreateClientConfig<
     DefaultSchemaName<Database>,
@@ -99,7 +132,7 @@ export function createClient<Database = any>(
   >
 ): CreateClientResult<Database, SupabaseAuthAdapterInstance>;
 
-// Object form, BetterAuthVanillaAdapter
+// Overload: BetterAuthVanillaAdapter
 export function createClient<Database = any>(
   config: CreateClientConfig<
     DefaultSchemaName<Database>,
@@ -107,7 +140,7 @@ export function createClient<Database = any>(
   >
 ): CreateClientResult<Database, BetterAuthVanillaAdapterInstance>;
 
-// Object form, BetterAuthReactAdapter
+// Overload: BetterAuthReactAdapter
 export function createClient<Database = any>(
   config: CreateClientConfig<
     DefaultSchemaName<Database>,
@@ -115,11 +148,7 @@ export function createClient<Database = any>(
   >
 ): CreateClientResult<Database, BetterAuthReactAdapterInstance>;
 
-// =============================================================================
-// String-form overloads (new)
-// =============================================================================
-
-// String form, no adapter specified → defaults to BetterAuthVanillaAdapter
+// Overload: String form, no adapter specified (defaults to BetterAuthVanillaAdapter)
 export function createClient<Database = any>(
   baseUrl: string,
   options?: CreateClientStringOptions<
@@ -128,7 +157,7 @@ export function createClient<Database = any>(
   >
 ): CreateClientResult<Database, BetterAuthVanillaAdapterInstance>;
 
-// String form, SupabaseAuthAdapter
+// Overload: String form, SupabaseAuthAdapter
 export function createClient<Database = any>(
   baseUrl: string,
   options: CreateClientStringOptions<
@@ -137,7 +166,7 @@ export function createClient<Database = any>(
   > & { auth: { adapter: SupabaseAuthAdapterInstance } }
 ): CreateClientResult<Database, SupabaseAuthAdapterInstance>;
 
-// String form, BetterAuthVanillaAdapter
+// Overload: String form, BetterAuthVanillaAdapter
 export function createClient<Database = any>(
   baseUrl: string,
   options: CreateClientStringOptions<
@@ -146,7 +175,7 @@ export function createClient<Database = any>(
   > & { auth: { adapter: BetterAuthVanillaAdapterInstance } }
 ): CreateClientResult<Database, BetterAuthVanillaAdapterInstance>;
 
-// String form, BetterAuthReactAdapter
+// Overload: String form, BetterAuthReactAdapter
 export function createClient<Database = any>(
   baseUrl: string,
   options: CreateClientStringOptions<
@@ -155,18 +184,13 @@ export function createClient<Database = any>(
   > & { auth: { adapter: BetterAuthReactAdapterInstance } }
 ): CreateClientResult<Database, BetterAuthReactAdapterInstance>;
 
-// =============================================================================
-// Implementation
-// =============================================================================
-
+// Implementation signature
 export function createClient<
   Database = any,
   SchemaName extends string & keyof Database = DefaultSchemaName<Database>,
   TAuthAdapter extends NeonAuthAdapter = BetterAuthVanillaAdapterInstance,
 >(
-  arg1:
-    | string
-    | CreateClientConfig<SchemaName, TAuthAdapter>,
+  arg1: string | CreateClientConfig<SchemaName, TAuthAdapter>,
   arg2?: CreateClientStringOptions<SchemaName, TAuthAdapter>
 ): NeonClient<Database, SchemaName, TAuthAdapter> {
   const config: CreateClientConfig<SchemaName, TAuthAdapter> =
@@ -191,6 +215,7 @@ export function createClient<
   });
 
   // Step 2: Create lazy token accessor - called on every request
+  // Returns null if no session (will throw AuthRequiredError in fetchWithToken)
   const getAccessToken = async (): Promise<string | null> => {
     return auth.getJWTToken();
   };
@@ -220,6 +245,25 @@ export function createClient<
 
   return client;
 }
+
+/**
+ * Per-call overrides accepted alongside a single base URL.
+ *
+ * Every field is optional; defaults come from `deriveUrls(baseUrl)`.
+ */
+export type CreateClientStringOptions<
+  SchemaName,
+  T extends NeonAuthAdapter,
+> = {
+  auth?: Partial<CreateClientAuthConfig<T>>;
+  dataApi?: Partial<CreateClientDataApiConfig<SchemaName, T>>;
+  /**
+   * Override the auth/Data API URL derivation. End users do not need this;
+   * it is intended for wrapper packages (e.g. `@databricks/lakebase-js`)
+   * that have their own endpoint pattern.
+   */
+  deriveUrls?: DeriveNeonUrls;
+};
 
 function buildConfigFromBaseUrl<
   SchemaName,
