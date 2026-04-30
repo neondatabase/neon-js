@@ -3,9 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) Supabase Inc. — see ../LICENSE
 // Modified by Neon for vendoring purposes, 2026-04-30:
-//   none
+//   - dropped `import * as Parser from './Parser.js'` and the
+//     `parse` / `deparse` / `format` field assignments. The Parser depends on
+//     `pgsql-parser` + `prettier-plugin-sql`, which we do not vendor; the
+//     CLI's `generateTypes` path never calls those methods.
 
-import * as Parser from './Parser.js'
 import PostgresMetaColumnPrivileges from './PostgresMetaColumnPrivileges.js'
 import PostgresMetaColumns from './PostgresMetaColumns.js'
 import PostgresMetaConfig from './PostgresMetaConfig.js'
@@ -53,10 +55,6 @@ export default class PostgresMeta {
   types: PostgresMetaTypes
   version: PostgresMetaVersion
   views: PostgresMetaViews
-
-  parse = Parser.Parse
-  deparse = Parser.Deparse
-  format = Parser.Format
 
   constructor(config: PoolConfig) {
     const { query, end } = init(config)

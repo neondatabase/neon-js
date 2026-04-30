@@ -3,10 +3,15 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) Supabase Inc. — see ../LICENSE
 // Modified by Neon for vendoring purposes, 2026-04-30:
-//   none
+//   - re-pointed `'../../lib/generators.js'` to `'../lib/generators.js'`
+//     and `'../../lib/index.js'` to `'../lib/index.js'` to fit our flatter
+//     vendor directory layout (no `src/server/` parent dir here).
+//   - re-pointed `'../constants.js'` to `'../constants.js'` (relative to
+//     `templates/`, this resolves to `vendor/postgres-meta/constants.ts`,
+//     a slim file holding just the three values this template imports).
 
 import prettier from 'prettier'
-import type { GeneratorMetadata } from '../../lib/generators.js'
+import type { GeneratorMetadata } from '../lib/generators.js'
 import type {
   PostgresColumn,
   PostgresFunction,
@@ -14,7 +19,7 @@ import type {
   PostgresTable,
   PostgresType,
   PostgresView,
-} from '../../lib/index.js'
+} from '../lib/index.js'
 import {
   GENERATE_TYPES_DEFAULT_SCHEMA,
   VALID_FUNCTION_ARGS_MODE,
