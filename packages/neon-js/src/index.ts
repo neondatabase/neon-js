@@ -1,5 +1,6 @@
 // Main client factory
 export { createClient } from './client/client-factory';
+export type { CreateClientStringOptions } from './client/client-factory';
 
 // URL derivation (mostly used by wrappers; end users don't need this)
 export {
