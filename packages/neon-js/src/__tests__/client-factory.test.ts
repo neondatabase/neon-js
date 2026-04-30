@@ -89,6 +89,27 @@ describe('createClient — string form', () => {
       /Invalid Neon base URL/
     );
   });
+
+  it('forwards options.auth.adapter to the auth factory', () => {
+    const sentinelAdapter = vi.fn();
+    createClient(BASE_URL, {
+      auth: { adapter: sentinelAdapter as any },
+    });
+
+    const authConfig = createInternalNeonAuthMock.mock.calls[0]?.[1] as {
+      adapter: unknown;
+    };
+    expect(authConfig.adapter).toBe(sentinelAdapter);
+  });
+
+  it('defaults allowAnonymous to false when not provided', () => {
+    createClient(BASE_URL);
+
+    const authConfig = createInternalNeonAuthMock.mock.calls[0]?.[1] as {
+      allowAnonymous: boolean;
+    };
+    expect(authConfig.allowAnonymous).toBe(false);
+  });
 });
 
 describe('createClient — object form (backward compat)', () => {
