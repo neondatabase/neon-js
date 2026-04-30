@@ -7,7 +7,7 @@
 
 import { ident } from 'pg-format'
 import { SCHEMAS_SQL } from './sql/schemas.sql.js'
-import {
+import type {
   PostgresMetaResult,
   PostgresSchema,
   PostgresSchemaCreate,

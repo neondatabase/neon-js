@@ -8,7 +8,7 @@
 import { ident, literal } from 'pg-format'
 import { DEFAULT_SYSTEM_SCHEMAS } from './constants.js'
 import { filterByList, filterByValue } from './helpers.js'
-import { PostgresMetaResult, PostgresFunction, PostgresFunctionCreate } from './types.js'
+import type { PostgresMetaResult, PostgresFunction, PostgresFunctionCreate } from './types.js'
 import { FUNCTIONS_SQL } from './sql/functions.sql.js'
 
 export default class PostgresMetaFunctions {

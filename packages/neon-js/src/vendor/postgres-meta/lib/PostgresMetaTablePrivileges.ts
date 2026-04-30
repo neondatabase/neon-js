@@ -8,7 +8,7 @@
 import { ident } from 'pg-format'
 import { DEFAULT_SYSTEM_SCHEMAS } from './constants.js'
 import { filterByList, filterByValue } from './helpers.js'
-import {
+import type {
   PostgresMetaResult,
   PostgresTablePrivileges,
   PostgresTablePrivilegesGrant,

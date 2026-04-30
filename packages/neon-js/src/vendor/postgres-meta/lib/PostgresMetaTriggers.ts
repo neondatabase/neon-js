@@ -8,7 +8,7 @@
 import { ident, literal } from 'pg-format'
 import { DEFAULT_SYSTEM_SCHEMAS } from './constants.js'
 import { filterByList, filterByValue } from './helpers.js'
-import { PostgresMetaResult, PostgresTrigger } from './types.js'
+import type { PostgresMetaResult, PostgresTrigger } from './types.js'
 import { TRIGGERS_SQL } from './sql/triggers.sql.js'
 
 export default class PostgresMetaTriggers {

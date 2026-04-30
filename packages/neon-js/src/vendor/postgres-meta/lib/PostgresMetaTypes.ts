@@ -7,7 +7,7 @@
 
 import { DEFAULT_SYSTEM_SCHEMAS } from './constants.js'
 import { filterByList } from './helpers.js'
-import { PostgresMetaResult, PostgresType } from './types.js'
+import type { PostgresMetaResult, PostgresType } from './types.js'
 import { TYPES_SQL } from './sql/types.sql.js'
 
 export default class PostgresMetaTypes {

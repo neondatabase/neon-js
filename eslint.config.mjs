@@ -9,7 +9,11 @@ export default defineConfig(
   eslint.configs.recommended,
   tseslint.configs.recommended,
   unicorn.configs.recommended, // Use Unicorn's recommended preset
-  globalIgnores(['**/dist/**', '**/examples/**']),
+  globalIgnores([
+    '**/dist/**',
+    '**/examples/**',
+    'packages/neon-js/src/vendor/**',
+  ]),
   {
     // Set tsconfigRootDir to resolve multiple tsconfig issue
     languageOptions: {

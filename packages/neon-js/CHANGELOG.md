@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **CLI internals**: Vendored `@supabase/postgres-meta` @ v0.93.1 (Apache-2.0)
+  into `src/vendor/postgres-meta/` and removed it from runtime `dependencies`.
+  Drops the upstream Fastify HTTP server, `@sentry/node`, `pgsql-parser`,
+  `prettier-plugin-sql`, `@sinclair/typebox`, and the `npm:@supabase/pg@0.0.3`
+  fork from the published tarball's transitive dependency tree. The
+  `neon-js gen-types` CLI behaviour is unchanged. Direct runtime deps gained:
+  `pg ^8.13`, `pg-format 1.0.4`, `postgres-array 3.0.4`, `prettier 3.8.1`.
+  See `src/vendor/postgres-meta/README.md` for license + update procedure.
+
 ### Added
 
 - **Client Telemetry**: Automatically injects `X-Neon-Client-Info` header with SDK name, version, runtime environment (Node.js, Deno, Bun, Edge, Browser), and framework detection (Next.js, Remix, React, Vue, Angular).

@@ -6,7 +6,7 @@
 //   none
 
 import { ident, literal } from 'pg-format'
-import { PostgresMetaResult, PostgresExtension } from './types.js'
+import type { PostgresMetaResult, PostgresExtension } from './types.js'
 import { EXTENSIONS_SQL } from './sql/extensions.sql.js'
 import { filterByValue } from './helpers.js'
 

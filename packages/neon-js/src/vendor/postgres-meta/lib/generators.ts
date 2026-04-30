@@ -6,7 +6,7 @@
 //   none
 
 import PostgresMeta from './PostgresMeta.js'
-import {
+import type {
   PostgresColumn,
   PostgresForeignTable,
   PostgresFunction,

@@ -7,7 +7,7 @@
 
 import { DEFAULT_SYSTEM_SCHEMAS } from './constants.js'
 import { coalesceRowsToArray, filterByList, filterByValue } from './helpers.js'
-import { PostgresMetaResult, PostgresView } from './types.js'
+import type { PostgresMetaResult, PostgresView } from './types.js'
 import { VIEWS_SQL } from './sql/views.sql.js'
 import { COLUMNS_SQL } from './sql/columns.sql.js'
 

@@ -6,7 +6,7 @@
 //   none
 
 import { CONFIG_SQL } from './sql/config.sql.js'
-import { PostgresMetaResult, PostgresConfig } from './types.js'
+import type { PostgresMetaResult, PostgresConfig } from './types.js'
 
 export default class PostgresMetaConfig {
   query: (sql: string) => Promise<PostgresMetaResult<any>>

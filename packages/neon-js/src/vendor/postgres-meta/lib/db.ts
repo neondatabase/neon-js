@@ -8,10 +8,14 @@
 //   - dropped the `RESULT_SIZE_EXCEEDED` branch (specific to the
 //     `npm:@supabase/pg@0.0.3` fork; we use upstream `pg@^8`)
 //   - swapped fork-specific `pg` usage for upstream `pg@^8`
+//   - added `as any` casts for the raw-OID `setTypeParser` calls so they
+//     compile under upstream `pg@^8`'s stricter `TypeId` overload typings
+//   - converted type-only imports to `import type` for the package's
+//     `verbatimModuleSyntax: true` tsconfig
 
 import pg from 'pg'
 import { parse as parseArray } from 'postgres-array'
-import { PostgresMetaResult, PoolConfig } from './types.js'
+import type { PostgresMetaResult, PoolConfig } from './types.js'
 
 pg.types.setTypeParser(pg.types.builtins.INT8, (x) => {
   const asNumber = Number(x)
@@ -25,11 +29,15 @@ pg.types.setTypeParser(pg.types.builtins.DATE, (x) => x)
 pg.types.setTypeParser(pg.types.builtins.INTERVAL, (x) => x)
 pg.types.setTypeParser(pg.types.builtins.TIMESTAMP, (x) => x)
 pg.types.setTypeParser(pg.types.builtins.TIMESTAMPTZ, (x) => x)
-pg.types.setTypeParser(1115, parseArray) // _timestamp
-pg.types.setTypeParser(1182, parseArray) // _date
-pg.types.setTypeParser(1185, parseArray) // _timestamptz
-pg.types.setTypeParser(600, (x) => x) // point
-pg.types.setTypeParser(1017, (x) => x) // _point
+// `pg`'s `setTypeParser` overload signature accepts only a `TypeId` enum value
+// for the strongly-typed form. We pass raw OIDs for the non-builtin array
+// types, so cast to `any` to bypass the overload check. Behaviour at runtime
+// is identical to the upstream call.
+pg.types.setTypeParser(1115 as any, parseArray) // _timestamp
+pg.types.setTypeParser(1182 as any, parseArray) // _date
+pg.types.setTypeParser(1185 as any, parseArray) // _timestamptz
+pg.types.setTypeParser(600 as any, (x) => x) // point
+pg.types.setTypeParser(1017 as any, (x) => x) // _point
 
 // Ensure any query will have an appropriate error handler on the pool to prevent connections errors
 // to bubble up all the stack eventually killing the server

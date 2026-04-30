@@ -6,7 +6,7 @@
 //   none
 
 import { coalesceRowsToArray, filterByList, filterByValue } from './helpers.js'
-import { PostgresMetaResult, PostgresForeignTable } from './types.js'
+import type { PostgresMetaResult, PostgresForeignTable } from './types.js'
 import { FOREIGN_TABLES_SQL } from './sql/foreign_tables.sql.js'
 import { COLUMNS_SQL } from './sql/columns.sql.js'
 

@@ -1,6 +1,6 @@
-import { PostgresMeta } from '@supabase/postgres-meta';
-import { getGeneratorMetadata } from '@supabase/postgres-meta/dist/lib/generators.js';
-import { apply as applyTypescriptTemplate } from '@supabase/postgres-meta/dist/server/templates/typescript.js';
+import PostgresMeta from '../../vendor/postgres-meta/lib/PostgresMeta.js';
+import { getGeneratorMetadata } from '../../vendor/postgres-meta/lib/generators.js';
+import { apply as applyTypescriptTemplate } from '../../vendor/postgres-meta/templates/typescript.js';
 
 export interface GenerateTypesOptions {
   connectionString: string;

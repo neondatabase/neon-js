@@ -6,7 +6,7 @@
 //   none
 
 import { filterByList, coalesceRowsToArray, filterByValue } from './helpers.js'
-import { PostgresMetaResult, PostgresMaterializedView } from './types.js'
+import type { PostgresMetaResult, PostgresMaterializedView } from './types.js'
 import { MATERIALIZED_VIEWS_SQL } from './sql/materialized_views.sql.js'
 import { COLUMNS_SQL } from './sql/columns.sql.js'
 

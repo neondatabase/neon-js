@@ -7,7 +7,7 @@
 
 import { DEFAULT_SYSTEM_SCHEMAS } from './constants.js'
 import { filterByList, filterByValue } from './helpers.js'
-import { PostgresMetaResult, PostgresIndex } from './types.js'
+import type { PostgresMetaResult, PostgresIndex } from './types.js'
 import { INDEXES_SQL } from './sql/indexes.sql.js'
 
 export default class PostgresMetaIndexes {

@@ -8,7 +8,7 @@
 import { ident, literal } from 'pg-format'
 import { DEFAULT_SYSTEM_SCHEMAS } from './constants.js'
 import { coalesceRowsToArray, filterByValue, filterByList } from './helpers.js'
-import {
+import type {
   PostgresMetaResult,
   PostgresTable,
   PostgresTableCreate,

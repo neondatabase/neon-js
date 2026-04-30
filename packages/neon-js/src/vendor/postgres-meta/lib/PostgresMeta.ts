@@ -28,7 +28,7 @@ import PostgresMetaTypes from './PostgresMetaTypes.js'
 import PostgresMetaVersion from './PostgresMetaVersion.js'
 import PostgresMetaViews from './PostgresMetaViews.js'
 import { init } from './db.js'
-import { PostgresMetaResult, PoolConfig } from './types.js'
+import type { PostgresMetaResult, PoolConfig } from './types.js'
 
 export default class PostgresMeta {
   query: (

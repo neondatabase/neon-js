@@ -9,7 +9,7 @@ import { ident, literal } from 'pg-format'
 import { DEFAULT_SYSTEM_SCHEMAS } from './constants.js'
 import { filterByValue, filterByList } from './helpers.js'
 import { COLUMN_PRIVILEGES_SQL } from './sql/column_privileges.sql.js'
-import {
+import type {
   PostgresMetaResult,
   PostgresColumnPrivileges,
   PostgresColumnPrivilegesGrant,

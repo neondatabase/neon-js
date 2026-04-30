@@ -7,7 +7,7 @@
 
 import { ident, literal } from 'pg-format'
 import { ROLES_SQL } from './sql/roles.sql.js'
-import {
+import type {
   PostgresMetaResult,
   PostgresRole,
   PostgresRoleCreate,
