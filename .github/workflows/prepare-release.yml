@@ -79,7 +79,6 @@ jobs:
     permissions:
       contents: write      # push release branch
       pull-requests: write # open PR
-      actions: write       # dispatch ci.yml + unit-tests.yml on the release branch
 
     steps:
       - name: Harden the runner
@@ -335,6 +334,14 @@ jobs:
           title: ${{ steps.meta.outputs.pr_title }}
           body: ${{ steps.meta.outputs.body }}
           labels: release
+          # Open as draft so a human can flip "Ready for review" once. That
+          # ready_for_review event fires under the human's identity (not
+          # GITHUB_TOKEN), bypassing the recursion guard and producing real
+          # pull_request-event runs whose check-runs attach to the PR's
+          # required-checks rollup. `always-true` keeps the PR in draft on
+          # subsequent reruns; plain `true` would only set draft on creation
+          # and would mark a previously-draft PR as ready, breaking the flow.
+          draft: always-true
           # Don't delete the release branch on rerun — we want predictable, run-id-suffixed branches.
           delete-branch: false
 
@@ -348,22 +355,6 @@ jobs:
 
           echo "### PR" >> "$GITHUB_STEP_SUMMARY"
           echo "$PR_URL ($PR_OP)" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Trigger required checks on release branch
-        if: steps.cpr.outputs.pull-request-url != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-          BRANCH: ${{ steps.meta.outputs.branch }}
-        run: |
-          # Release PRs opened by peter-evans/create-pull-request via GITHUB_TOKEN
-          # don't trigger pull_request workflows (GitHub recursion guard).
-          # workflow_dispatch is exempt — dispatch ci.yml + unit-tests.yml manually
-          # so branch protection's required contexts (ci, unit-tests) report on the
-          # release branch HEAD SHA.
-          # See https://docs.github.com/en/actions/concepts/security/github_token
-          gh workflow run ci.yml --ref "$BRANCH"
-          gh workflow run unit-tests.yml --ref "$BRANCH"
-          echo "Dispatched ci.yml and unit-tests.yml on $BRANCH" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Release failure guidance
         if: failure()
