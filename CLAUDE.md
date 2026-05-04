@@ -340,7 +340,7 @@ Auth-UI CSS is designed to **never override user's theme**. This is achieved thr
 **CLI Tool**: `src/cli/`
 - `index.ts` - CLI entry point (bin: `neon-js`)
 - `commands/gen-types.ts` - Type generation command
-- `commands/generate-types.ts` - Core logic using postgres-meta
+- `commands/generate-types.ts` - Core logic using vendored postgres-meta (see `packages/neon-js/src/vendor/postgres-meta/README.md`)
 - `utils/parse-duration.ts` - Duration parsing
 
 **Dependencies**: Imports from `@neondatabase/postgrest-js` and `@neondatabase/auth`
