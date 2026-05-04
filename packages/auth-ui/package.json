@@ -76,7 +76,7 @@
     "@types/react": "19.1.13",
     "@types/react-dom": "19.1.9",
     "autoprefixer": "10.4.20",
-    "postcss": "8.5.6",
+    "postcss": "8.5.10",
     "postcss-import": "16.1.1"
   },
   "dependencies": {
