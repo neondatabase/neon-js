@@ -1,6 +1,6 @@
 {
   "name": "@neondatabase/neon-js",
-  "version": "0.4.0-beta",
+  "version": "0.5.0-beta",
   "description": "TypeScript SDK for Neon Auth and Data API - authentication and PostgreSQL querying",
   "type": "module",
   "license": "Apache-2.0",
