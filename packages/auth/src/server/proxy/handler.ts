@@ -53,9 +53,14 @@ export async function handleAuthProxyRequest(config: AuthProxyConfig): Promise<R
 
 	// Fallback: Call upstream API
 	const response = await handleAuthRequest(baseUrl, request, path);
-	return await handleAuthResponse(response, baseUrl, {
-		secret: cookieSecret,
-		sessionDataTtl,
-		domain,
-	});
+	return await handleAuthResponse(
+		response,
+		baseUrl,
+		{
+			secret: cookieSecret,
+			sessionDataTtl,
+			domain,
+		},
+		{ cookieHeader: request.headers.get('cookie') },
+	);
 }

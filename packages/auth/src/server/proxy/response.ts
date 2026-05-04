@@ -1,4 +1,5 @@
 import { mintSessionDataFromResponse } from '../session/minting';
+import { maybeRefreshSessionDataAfterResponse } from '../session/post-response-refresh';
 import { parseSetCookies, serializeSetCookie } from '@/server/utils/cookies';
 import type { SessionCookieConfig } from '../config';
 
@@ -7,20 +8,28 @@ const RESPONSE_HEADERS_ALLOWLIST = ['content-type', 'content-length', 'content-e
     'connection', 'date',
    'set-cookie', 'set-auth-jwt', 'set-auth-token', 'x-neon-ret-request-id'];
 
+export interface AuthResponseRequestContext {
+  /** Raw Cookie header from the inbound request, used to locate session_token for post-response refresh. */
+  cookieHeader: string | null;
+}
+
 /**
  * Handles responses from upstream Neon Auth server
  * - Proxies allowed headers to client
  * - Mints session data cookie if session token is present
+ * - Optionally refreshes session data cookie if mutation response body carries fresh user/session
  *
  * @param response - Response from upstream Neon Auth server
  * @param baseUrl - Base URL of Neon Auth server
  * @param cookieConfig - Session cookie configuration
+ * @param requestContext - Optional inbound request context for post-response refresh
  * @returns New Response with proxied headers and session data cookie
  */
 export const handleAuthResponse = async (
   response: Response,
   baseUrl: string,
-  cookieConfig: SessionCookieConfig
+  cookieConfig: SessionCookieConfig,
+  requestContext?: AuthResponseRequestContext
 ) => {
   const responseHeaders = prepareResponseHeaders(response, cookieConfig.domain);
 
@@ -28,6 +37,21 @@ export const handleAuthResponse = async (
   const sessionDataCookie = await mintSessionDataFromResponse(response.headers, baseUrl, cookieConfig);
   if (sessionDataCookie) {
     responseHeaders.append('Set-Cookie', sessionDataCookie);
+  }
+
+  // Fallback refresh: covers mutation routes (update-user, phone-number/verify, etc.)
+  // where upstream returns fresh user/session in the body without rotating session_token.
+  if (requestContext) {
+    const fallback = await maybeRefreshSessionDataAfterResponse({
+      requestCookieHeader: requestContext.cookieHeader,
+      response,
+      baseUrl,
+      cookieConfig,
+      alreadyMintedFromHeader: sessionDataCookie !== null,
+    });
+    if (fallback) {
+      responseHeaders.append('Set-Cookie', fallback);
+    }
   }
 
   return new Response(response.body, {

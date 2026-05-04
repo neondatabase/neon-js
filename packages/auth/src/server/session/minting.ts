@@ -59,6 +59,26 @@ async function mintSessionDataCookie(
 }
 
 /**
+ * Serialize a Set-Cookie header that deletes the session_data cookie.
+ *
+ * Used both by the token-rotation path (sign-out) and the post-response
+ * refresh fallback path (when re-minting fails, we clear the cache so the
+ * next read fetches fresh state from upstream).
+ */
+export function serializeSessionDataDeletion(cookieConfig: SessionCookieConfig): string {
+  return serializeSetCookie({
+    name: NEON_AUTH_SESSION_DATA_COOKIE_NAME,
+    value: '',
+    path: '/',
+    domain: cookieConfig.domain,
+    httpOnly: true,
+    secure: true,
+    sameSite: 'lax',
+    maxAge: 0,
+  });
+}
+
+/**
  * Utility A: Mint session_data cookie when session_token is updated by upstream
  *
  * Checks response headers for session_token in Set-Cookie, then mints session_data.
@@ -89,17 +109,7 @@ export async function mintSessionDataFromResponse(
   // Check if session_token is being deleted (sign-out scenario)
   const sessionCookieLower = sessionTokenCookie.toLowerCase();
   if (sessionCookieLower.includes('max-age=0')) {
-    // Return deletion cookie for session_data
-    return serializeSetCookie({
-      name: NEON_AUTH_SESSION_DATA_COOKIE_NAME,
-      value: '',
-      path: '/',
-      domain: cookieConfig.domain,
-      httpOnly: true,
-      secure: true,
-      sameSite: 'lax',
-      maxAge: 0,
-    });
+    return serializeSessionDataDeletion(cookieConfig);
   }
 
   // Session token was set/updated - mint new session_data cookie
