@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-
+/* eslint-disable no-undef */
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+// eslint-disable-next-line unicorn/import-style
 import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -146,19 +147,31 @@ function parseArgs(argv) {
   };
 
   for (const arg of argv) {
-    if (arg === '--check') {
+    switch (arg) {
+    case '--check': {
       options.check = true;
-    } else if (arg === '--write') {
+    
+    break;
+    }
+    case '--write': {
       options.write = true;
-    } else if (arg === '--verify-exports') {
+    
+    break;
+    }
+    case '--verify-exports': {
       options.verifyExports = true;
-    } else if (arg.startsWith('--dependency-version=')) {
+    
+    break;
+    }
+    default: { if (arg.startsWith('--dependency-version=')) {
       options.dependencyVersion = arg.slice('--dependency-version='.length);
     } else if (arg === '--help' || arg === '-h') {
       printHelp();
       process.exit(0);
     } else {
       options.targets.push(arg);
+    }
+    }
     }
   }
 
@@ -243,7 +256,7 @@ function rewriteText(text) {
 }
 
 function rewriteCompatibilityReactImports(text) {
-  return text.replace(
+  return text.replaceAll(
     /import\s+(type\s+)?\{([^}]*)\}\s+from\s+(['"])(@neondatabase\/(?:auth\/react|neon-js\/auth\/react))\3;?/g,
     (match, typeKeyword = '', specifierBlock, quote, source) => {
       if (!compatibilityReactSources.has(source)) {
@@ -303,7 +316,7 @@ export function extractAuthUiValueExports(sourcePath) {
 
 export function findMissingAuthUiExports(sourcePath = resolve('packages/auth/src/react/ui/index.ts')) {
   const sourceExports = extractAuthUiValueExports(sourcePath);
-  return [...sourceExports].filter((name) => !authUiExports.has(name)).sort();
+  return [...sourceExports].filter((name) => !authUiExports.has(name)).toSorted();
 }
 
 export function verifyAuthUiExports() {
