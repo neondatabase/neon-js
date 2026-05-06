@@ -25,6 +25,7 @@
     "release:auth": "npx tsx scripts/release.ts auth",
     "release:auth-ui": "npx tsx scripts/release.ts auth-ui",
     "release:neon-js": "npx tsx scripts/release.ts neon-js",
+    "migrate:auth-ui-imports": "node packages/auth/codemods/migrate-auth-ui-imports.mjs",
     "test:e2e": "pnpm run build && pnpm --filter e2e run test",
     "test:e2e:ui": "pnpm run build && pnpm --filter e2e run test:ui",
     "test:e2e:debug": "pnpm run build && pnpm --filter e2e run test:debug",

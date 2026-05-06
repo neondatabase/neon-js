@@ -269,19 +269,34 @@ See the [Next.js Setup Guide](./NEXT-JS.md) for comprehensive documentation incl
 
 ## UI Components
 
-Pre-built login forms and auth pages are included. No extra installation needed.
+Pre-built login forms and auth pages live in `@neondatabase/auth-ui`. The
+legacy `@neondatabase/auth/react/ui` and `@neondatabase/auth/ui/*` entrypoints
+still work for compatibility, but they are deprecated and will be removed in
+the next major version.
+
+To migrate existing imports, run:
+
+```bash
+npx -p @neondatabase/auth neon-auth-codemod --write <path>
+```
 
 ### 1. Import CSS
 
+Install the UI package alongside `@neondatabase/auth`:
+
+```bash
+npm install @neondatabase/auth-ui
+```
+
 **Without Tailwind CSS:**
 ```typescript
-import '@neondatabase/auth/ui/css';
+import '@neondatabase/auth-ui/css';
 ```
 
 **With Tailwind CSS v4:**
 ```css
 @import 'tailwindcss';
-@import '@neondatabase/auth/ui/tailwind';
+@import '@neondatabase/auth-ui/tailwind';
 ```
 
 ### 2. Setup Provider
@@ -289,9 +304,9 @@ import '@neondatabase/auth/ui/css';
 ```typescript
 "use client"
 
-import { NeonAuthUIProvider } from "@neondatabase/auth/react/ui"
+import { NeonAuthUIProvider } from "@neondatabase/auth-ui"
 import { createAuthClient } from "@neondatabase/auth"
-import "@neondatabase/auth/ui/css"
+import "@neondatabase/auth-ui/css"
 
 const authClient = createAuthClient('https://your-auth-url.com')
 
@@ -311,7 +326,7 @@ export function AuthProvider({ children }) {
 Use `AuthView` to render complete auth flows based on the URL path:
 
 ```typescript
-import { AuthView } from "@neondatabase/auth/react/ui"
+import { AuthView } from "@neondatabase/auth-ui"
 
 // Renders sign-in, sign-up, forgot-password, etc. based on path
 <AuthView path="sign-in" />
@@ -320,7 +335,7 @@ import { AuthView } from "@neondatabase/auth/react/ui"
 **Option B: Individual Components**
 
 ```typescript
-import { SignInForm, UserButton } from "@neondatabase/auth/react/ui"
+import { SignInForm, UserButton } from "@neondatabase/auth-ui"
 
 <SignInForm />
 <UserButton />
