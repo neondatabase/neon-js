@@ -10,4 +10,9 @@ type _AuthClientBase = {
 export type SupabaseAuthClientInterface = _AuthClientBase;
 
 // Re-export error types for auth handling
-export { AuthError, AuthApiError, isAuthError } from '@supabase/auth-js';
+export {
+  AuthError,
+  AuthApiError,
+  isAuthError,
+  isAuthApiError,
+} from '@supabase/auth-js';

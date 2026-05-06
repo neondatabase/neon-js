@@ -12,6 +12,7 @@ import { parseSetCookies, parseCookieValue } from '@/server/utils/cookies';
 import { validateSessionData } from '@/server/session/validator';
 import { NEON_AUTH_SESSION_COOKIE_NAME, NEON_AUTH_SESSION_DATA_COOKIE_NAME } from './constants';
 import { mintSessionDataFromResponse } from './session/minting';
+import { normalizeBetterAuthError } from '@/core/better-auth-helpers';
 
 export interface NeonAuthServerConfig {
   baseUrl: string;
@@ -118,12 +119,27 @@ export function createAuthServerInternal(
 
     const responseData = await response.json().catch(() => null);
     if (!response.ok) {
+      // Normalize through `normalizeBetterAuthError` to get a mapped
+      // `.code` + canonical `.message`, but return the values as a plain
+      // serializable object. An `AuthApiError` instance has a non-enumerable
+      // `message`, no `statusText`, and is an `Error` subclass — shapes that
+      // break `{...error}` spread and `JSON.stringify(error)` on the server
+      // return surface. Keep the POJO contract `{ message, status,
+      // statusText, code }` intact for server consumers.
+      const normalized = normalizeBetterAuthError({
+        status: response.status,
+        statusText: response.statusText,
+        message: responseData?.message || response.statusText,
+        code: responseData?.code,
+        body: responseData,
+      });
       return {
         data: null,
         error: {
-          message: responseData?.message || response.statusText,
-          status: response.status,
+          message: normalized.message,
+          status: normalized.status ?? response.status,
           statusText: response.statusText,
+          code: normalized.code,
         },
       };
     }
