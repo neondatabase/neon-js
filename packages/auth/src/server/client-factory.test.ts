@@ -9,7 +9,7 @@ const TEST_BASE_URL = 'https://auth.example.com';
 // an `AuthApiError` instance — consumers on the server path depend on
 // `JSON.stringify(error)` and `{...error}` working, and neither works on an
 // `Error` subclass (whose `message` is non-enumerable).
-interface ServerErrorPojo {
+interface ServerError {
   message: string;
   status: number;
   statusText: string;
@@ -65,7 +65,7 @@ describe('createAuthServerInternal error branch', () => {
       signIn: { email: (args: unknown) => Promise<{ data: unknown; error: unknown }> };
     }).signIn.email({ email: 'a@b.com', password: 'wrong' })) as {
       data: unknown;
-      error: ServerErrorPojo;
+      error: ServerError;
     };
 
     expect(result.data).toBeNull();
@@ -105,7 +105,7 @@ describe('createAuthServerInternal error branch', () => {
       email: 'dup@example.com',
       password: 'password123',
       name: 'Dup',
-    })) as { data: unknown; error: ServerErrorPojo };
+    })) as { data: unknown; error: ServerError };
 
     const serialized = structuredClone(result.error);
     expect(serialized.message).toBeDefined();
@@ -136,7 +136,7 @@ describe('createAuthServerInternal error branch', () => {
       signIn: { email: (args: unknown) => Promise<{ data: unknown; error: unknown }> };
     }).signIn.email({ email: 'bad', password: 'x' })) as {
       data: unknown;
-      error: ServerErrorPojo;
+      error: ServerError;
     };
 
     const spread = { ...result.error };
@@ -168,7 +168,7 @@ describe('createAuthServerInternal error branch', () => {
       signUp: { email: (args: unknown) => Promise<{ data: unknown; error: unknown }> };
     }).signUp.email({ email: 'taken@example.com', password: 'x' })) as {
       data: unknown;
-      error: ServerErrorPojo;
+      error: ServerError;
     };
 
     // Upstream `EMAIL_ALREADY_EXISTS` is mapped via BETTER_AUTH_ERROR_MAP to
@@ -202,7 +202,7 @@ describe('createAuthServerInternal error branch', () => {
       signIn: { email: (args: unknown) => Promise<{ data: unknown; error: unknown }> };
     }).signIn.email({ email: 'a@b.com', password: 'x' })) as {
       data: unknown;
-      error: ServerErrorPojo;
+      error: ServerError;
     };
 
     expect(typeof result.error.status).toBe('number');
