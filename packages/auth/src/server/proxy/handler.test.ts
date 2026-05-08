@@ -45,6 +45,7 @@ describe('handleAuthProxyRequest', () => {
         secret: TEST_SECRET,
         sessionDataTtl: undefined,
         domain: undefined,
+        sameSite: undefined,
       });
       expect(result).toBe(cachedResponse);
       // Should NOT call upstream on cache hit
@@ -162,6 +163,7 @@ describe('handleAuthProxyRequest', () => {
         secret: TEST_SECRET,
         sessionDataTtl: 600,
         domain: '.example.com',
+        sameSite: undefined,
       });
     });
 
@@ -258,6 +260,7 @@ describe('handleAuthProxyRequest', () => {
         secret: TEST_SECRET,
         sessionDataTtl: undefined,
         domain: undefined,
+        sameSite: undefined,
       });
     });
   });

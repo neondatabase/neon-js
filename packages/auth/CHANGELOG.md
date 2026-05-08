@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Next.js cookie SameSite**: Proxied `Set-Cookie` headers and minted `session_data` cookies now use `SameSite=Strict` by default (previously forced to `Lax`). Set `cookies.sameSite` to `'lax'` or `'none'` when you need the previous behavior or third-party iframe embedding (`'none'` requires `Secure`, which these cookies already set).
+
 ### Deprecated
 
 - UI exports from `@neondatabase/auth/react`, `@neondatabase/auth/react/ui`, `@neondatabase/auth/react/ui/server`, `@neondatabase/auth/ui/css`, and `@neondatabase/auth/ui/tailwind` are deprecated. Install `@neondatabase/auth-ui` and import UI components, server helpers, and styles directly from that package instead. These compatibility exports will be removed in the next major version.

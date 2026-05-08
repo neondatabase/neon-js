@@ -6,6 +6,7 @@ import { NEON_AUTH_SESSION_COOKIE_NAME, NEON_AUTH_SESSION_DATA_COOKIE_NAME } fro
 import type { SessionData } from '../types';
 import { parseCookies } from 'better-auth/cookies';
 import { serializeSetCookie } from '../utils/cookies';
+import type { SessionCookieSameSite } from '../config';
 
 /**
  * Result of middleware processing (framework-agnostic decision)
@@ -32,6 +33,8 @@ export interface AuthMiddlewareConfig {
 	sessionDataTtl?: number;
 	/** Cookie domain for session data cookie */
 	domain?: string;
+	/** SameSite for cookies set by middleware (default: strict) */
+	sameSite?: SessionCookieSameSite;
 }
 
 /**
@@ -62,7 +65,10 @@ export async function processAuthMiddleware(
 		cookieSecret,
 		sessionDataTtl,
 		domain,
+		sameSite,
 	} = config;
+
+	const effectiveSameSite = sameSite ?? 'strict';
 
 	// Always skip session check for login URL to prevent infinite redirect loop
 	if (pathname.startsWith(loginUrl)) {
@@ -78,7 +84,8 @@ export async function processAuthMiddleware(
 			baseUrl,
 			cookieSecret,
 			sessionDataTtl,
-			domain
+			domain,
+			sameSite
 		);
 		if (exchangeResult !== null) {
 			// OAuth exchange successful - redirect with session cookies
@@ -112,6 +119,7 @@ export async function processAuthMiddleware(
 			cookieSecret,
 			sessionDataTtl,
 			domain,
+			sameSite,
 		});
 
 		// Parse session data from response
@@ -151,7 +159,7 @@ export async function processAuthMiddleware(
 			domain,
 			httpOnly: true,
 			secure: true,
-			sameSite: 'lax',
+			sameSite: effectiveSameSite,
 			maxAge: 0,
 		}));
 	}

@@ -1,4 +1,5 @@
 import type { NeonAuthServer } from './types';
+import type { SessionCookieSameSite } from './config';
 import {
   NEON_AUTH_SERVER_PROXY_HEADER,
   type RequestContextFactory,
@@ -20,12 +21,14 @@ export interface NeonAuthServerConfig {
   cookieSecret: string;
   sessionDataTtl?: number;
   domain?: string;
+  sameSite?: SessionCookieSameSite;
 }
 
 export function createAuthServerInternal(
   config: NeonAuthServerConfig
 ): NeonAuthServer {
-  const { baseUrl, context: getContext, cookieSecret, sessionDataTtl, domain } = config;
+  const { baseUrl, context: getContext, cookieSecret, sessionDataTtl, domain, sameSite } = config;
+  const effectiveSameSite = sameSite ?? 'strict';
 
   const fetchWithAuth = async (
     path: string,
@@ -82,7 +85,7 @@ export function createAuthServerInternal(
             ...cookie,
             domain: domain,
             partitioned: undefined,
-            sameSite: 'lax' as const,
+            sameSite: effectiveSameSite,
           };
           await ctx.setCookie(cookie.name, cookie.value, cookieOptions);
         }
@@ -97,6 +100,7 @@ export function createAuthServerInternal(
             secret: cookieSecret,
             sessionDataTtl,
             domain,
+            sameSite,
           }
         );
 

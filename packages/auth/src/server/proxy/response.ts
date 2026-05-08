@@ -22,7 +22,7 @@ export const handleAuthResponse = async (
   baseUrl: string,
   cookieConfig: SessionCookieConfig
 ) => {
-  const responseHeaders = prepareResponseHeaders(response, cookieConfig.domain);
+  const responseHeaders = prepareResponseHeaders(response, cookieConfig);
 
   // Mint session data cookie from upstream response
   const sessionDataCookie = await mintSessionDataFromResponse(response.headers, baseUrl, cookieConfig);
@@ -37,8 +37,10 @@ export const handleAuthResponse = async (
   })
 }
 
-const prepareResponseHeaders = (response: Response, domain?: string) => {
+const prepareResponseHeaders = (response: Response, cookieConfig: SessionCookieConfig) => {
   const headers = new Headers();
+  const effectiveSameSite = cookieConfig.sameSite ?? 'strict';
+  const { domain } = cookieConfig;
   for (const header of RESPONSE_HEADERS_ALLOWLIST) {
     // Special handling for set-cookie: HTTP allows multiple Set-Cookie headers
     if (header === 'set-cookie') {
@@ -48,14 +50,12 @@ const prepareResponseHeaders = (response: Response, domain?: string) => {
         // - Strip Partitioned: Safari does not send Partitioned cookies on top-level navigations,
         //   which breaks the OAuth challenge exchange when the callback hits a middleware route.
         //   The flag is also only meaningful for third-party contexts; proxied cookies are first-party.
-        // - Force SameSite=Lax: upstream sends SameSite=None (required alongside Partitioned).
-        //   Lax is correct for first-party cookies and safe for cross-subdomain use — subdomains
-        //   share the same registrable domain (eTLD+1) and are considered same-site by browsers.
-        // Domain assignment is the only conditional step.
+        // - Apply configured SameSite (default strict): upstream may send SameSite=None with Partitioned.
+        // Domain assignment is the only other conditional step.
         const parsedCookies = parseSetCookies(cookieHeader);
         for (const parsedCookie of parsedCookies) {
           parsedCookie.partitioned = undefined;
-          parsedCookie.sameSite = 'lax';
+          parsedCookie.sameSite = effectiveSameSite;
           if (domain) {
             parsedCookie.domain = domain;
           }

@@ -49,6 +49,7 @@ export function authApiHandler(config: NeonAuthConfig) {
       cookieSecret: cookies.secret,
       sessionDataTtl: cookies.sessionDataTtl,
       domain: cookies.domain,
+      sameSite: cookies.sameSite,
     });
   };
 
