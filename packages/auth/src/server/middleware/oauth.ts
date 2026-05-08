@@ -2,6 +2,7 @@ import { NEON_AUTH_SESSION_VERIFIER_PARAM_NAME } from '@/core/constants';
 import { NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME } from '../constants';
 import { handleAuthRequest, handleAuthResponse } from '../proxy';
 import { parseCookies } from 'better-auth/cookies';
+import type { SessionCookieSameSite } from '../config';
 
 /**
  * Result of OAuth token exchange
@@ -54,7 +55,8 @@ export async function exchangeOAuthToken(
   baseUrl: string,
   cookieSecret: string,
   sessionDataTtl?: number,
-  domain?: string
+  domain?: string,
+  sameSite?: SessionCookieSameSite
 ): Promise<OAuthExchangeResult | null> {
   const url = new URL(request.url);
   const verifier = url.searchParams.get(NEON_AUTH_SESSION_VERIFIER_PARAM_NAME);
@@ -87,6 +89,7 @@ export async function exchangeOAuthToken(
     secret: cookieSecret,
     sessionDataTtl,
     domain,
+    sameSite,
   });
 
   if (response.ok) {

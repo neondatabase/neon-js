@@ -138,6 +138,7 @@ describe('processAuthMiddleware', () => {
         cookieSecret: TEST_SECRET,
         sessionDataTtl: undefined,
         domain: undefined,
+        sameSite: undefined,
       });
     });
 

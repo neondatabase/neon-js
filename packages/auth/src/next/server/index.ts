@@ -121,6 +121,7 @@ export function createNeonAuth(config: NeonAuthConfig) {
 		cookieSecret: cookies.secret,
 		sessionDataTtl: cookies.sessionDataTtl,
 		domain: cookies.domain,
+		sameSite: cookies.sameSite,
 	});
 
 	// Attach handler and middleware directly to the server proxy object

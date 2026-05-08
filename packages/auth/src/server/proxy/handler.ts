@@ -2,6 +2,7 @@ import { trySessionCache } from '../session/cache-handler';
 import { handleAuthRequest } from './request';
 import { handleAuthResponse } from './response';
 import { API_ENDPOINTS } from '../endpoints';
+import type { SessionCookieSameSite } from '../config';
 
 export interface AuthProxyConfig {
 	/** Standard Web API Request object */
@@ -16,6 +17,8 @@ export interface AuthProxyConfig {
 	sessionDataTtl?: number;
 	/** Cookie domain for session data cookie */
 	domain?: string;
+	/** SameSite for proxied and minted cookies (default: strict) */
+	sameSite?: SessionCookieSameSite;
 }
 
 /**
@@ -33,7 +36,7 @@ export interface AuthProxyConfig {
  * @returns Standard Web API Response
  */
 export async function handleAuthProxyRequest(config: AuthProxyConfig): Promise<Response> {
-	const { request, path, baseUrl, cookieSecret, sessionDataTtl, domain } = config;
+	const { request, path, baseUrl, cookieSecret, sessionDataTtl, domain, sameSite } = config;
 
 	// Try cookie cache for /get-session GET requests (optimization)
 	if (
@@ -44,6 +47,7 @@ export async function handleAuthProxyRequest(config: AuthProxyConfig): Promise<R
 			secret: cookieSecret,
 			sessionDataTtl,
 			domain,
+			sameSite,
 		});
 		if (cachedResponse) {
 			// Cache hit - return immediately (no upstream call)
@@ -57,5 +61,6 @@ export async function handleAuthProxyRequest(config: AuthProxyConfig): Promise<R
 		secret: cookieSecret,
 		sessionDataTtl,
 		domain,
+		sameSite,
 	});
 }

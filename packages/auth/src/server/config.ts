@@ -4,6 +4,9 @@
 
 import { ERRORS } from "./errors";
 
+/** Allowed values for the `SameSite` attribute on Neon Auth cookies. */
+export type SessionCookieSameSite = 'strict' | 'lax' | 'none';
+
 /**
  * Session cookie configuration
  */
@@ -41,6 +44,17 @@ export interface SessionCookieConfig {
 	 * @example '.example.com' // Share across subdomains
 	 */
 	domain?: string;
+
+	/**
+	 * `SameSite` for cookies set or rewritten by the server proxy (API route, middleware, RSC).
+	 *
+	 * - **`strict` (default)** — cookies are not sent on cross-site requests (strongest default).
+	 * - **`lax`** — previous hard-coded behavior; cookies sent on top-level cross-site navigations.
+	 * - **`none`** — use for third-party contexts (for example your app embedded in another site’s iframe); requires `Secure` (always applied for these cookies).
+	 *
+	 * @default 'strict'
+	 */
+	sameSite?: SessionCookieSameSite;
 }
 
 /**

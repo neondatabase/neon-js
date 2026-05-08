@@ -91,6 +91,12 @@ describe('config validation', () => {
 
     expect(() => createNeonAuth(config)).not.toThrow();
   });
+
+  test.each(['strict', 'lax', 'none'] as const)('accepts cookies.sameSite=%s', (sameSite) => {
+    const config = createAuthConfig({ sameSite });
+
+    expect(() => createNeonAuth(config)).not.toThrow();
+  });
 });
 
 describe('return value structure', () => {
