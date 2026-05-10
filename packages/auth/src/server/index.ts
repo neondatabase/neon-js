@@ -8,3 +8,11 @@ export {
 	type NeonAuthMiddlewareConfig,
 	type SessionCookieSameSite,
 } from './config';
+export {
+	resolveNeonAuthLogging,
+	type NeonAuthLogger,
+	type NeonAuthLogLevel,
+	type NeonAuthLoggingInput,
+	type ResolvedNeonAuthLogging,
+} from './logger';
+export type { NeonAuthNetworkErrorCode, ClassifiedFetchFailure } from './network-error';

@@ -3,6 +3,9 @@
  */
 
 import { ERRORS } from "./errors";
+import type { NeonAuthLogLevel, NeonAuthLogger } from "./logger";
+
+export type { NeonAuthLogLevel, NeonAuthLogger } from "./logger";
 
 /** Allowed values for the `SameSite` attribute on Neon Auth cookies. */
 export type SessionCookieSameSite = 'strict' | 'lax' | 'none';
@@ -71,6 +74,21 @@ export interface NeonAuthConfig {
 	 * Cookie configuration
 	 */
 	cookies: SessionCookieConfig;
+
+	/**
+	 * **Opt-in** injectable logger for proxy, middleware, and server API `fetch` calls.
+	 * Omit both `logger` and `logLevel` to keep Neon Auth silent (no extra `console` output).
+	 * Unimplemented methods fall back to `console` when logging is enabled.
+	 */
+	logger?: NeonAuthLogger;
+
+	/**
+	 * **Opt-in** minimum log level when logging is enabled (set this and/or {@link logger}).
+	 * When only `logLevel` is set, missing `logger` methods use `console`.
+	 *
+	 * @default 'warn' when enabled — emits `error` and `warn` only
+	 */
+	logLevel?: NeonAuthLogLevel;
 }
 
 /**

@@ -7,4 +7,7 @@ export const auth = createNeonAuth({
     sessionDataTtl: 300,
     domain: process.env.COOKIE_DOMAIN || undefined,
   },
+  // Opt-in: log proxy/middleware/server-API issues (e.g. synthetic 502s) at warn+error via console.
+  // Omit `logLevel` / `logger` in production if you prefer no Neon Auth console output.
+  logLevel: 'warn',
 });

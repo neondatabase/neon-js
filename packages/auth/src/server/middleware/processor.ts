@@ -7,6 +7,8 @@ import type { SessionData } from '../types';
 import { parseCookies } from 'better-auth/cookies';
 import { serializeSetCookie } from '../utils/cookies';
 import type { SessionCookieSameSite } from '../config';
+import type { NeonAuthLoggingInput } from '../logger';
+import { resolveNeonAuthLogging } from '../logger';
 
 /**
  * Result of middleware processing (framework-agnostic decision)
@@ -16,7 +18,7 @@ export type MiddlewareResult =
 	| { action: 'redirect_oauth'; redirectUrl: URL; cookies: string[] }
 	| { action: 'redirect_login'; redirectUrl: URL; cookies?: string[] };
 
-export interface AuthMiddlewareConfig {
+export interface AuthMiddlewareConfig extends NeonAuthLoggingInput {
 	/** Standard Web API Request object */
 	request: Request;
 	/** URL pathname being accessed */
@@ -56,6 +58,11 @@ export interface AuthMiddlewareConfig {
 export async function processAuthMiddleware(
 	config: AuthMiddlewareConfig
 ): Promise<MiddlewareResult> {
+	const log = resolveNeonAuthLogging({
+		logger: config.logger,
+		logLevel: config.logLevel,
+	});
+
 	const {
 		request,
 		pathname,
@@ -85,7 +92,8 @@ export async function processAuthMiddleware(
 			cookieSecret,
 			sessionDataTtl,
 			domain,
-			sameSite
+			sameSite,
+			log
 		);
 		if (exchangeResult !== null) {
 			// OAuth exchange successful - redirect with session cookies
@@ -120,6 +128,7 @@ export async function processAuthMiddleware(
 			sessionDataTtl,
 			domain,
 			sameSite,
+			log,
 		});
 
 		// Parse session data from response

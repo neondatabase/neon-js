@@ -2,6 +2,7 @@ import { createAuthServerInternal } from '@/server';
 import { createNextRequestContext } from './adapter';
 import type { NeonAuthConfig, NeonAuthMiddlewareConfig } from '@/server/config';
 import { validateCookieConfig } from '@/server/config';
+import { resolveNeonAuthLogging } from '@/server/logger';
 import { authApiHandler } from './handler';
 import { neonAuthMiddleware } from './middleware';
 import type { NeonAuthServer } from '@/server/types';
@@ -16,6 +17,15 @@ export {
   isAuthError,
   isAuthApiError,
 } from '@/adapters/supabase/auth-interface';
+
+export {
+	resolveNeonAuthLogging,
+	type NeonAuthLogger,
+	type NeonAuthLogLevel,
+	type NeonAuthLoggingInput,
+	type ResolvedNeonAuthLogging,
+} from '@/server/logger';
+export type { NeonAuthNetworkErrorCode } from '@/server/network-error';
 
 /**
  * Unified entry point for Neon Auth in Next.js
@@ -114,6 +124,8 @@ export function createNeonAuth(config: NeonAuthConfig) {
 
 	validateCookieConfig(cookies);
 
+	const log = resolveNeonAuthLogging(config);
+
 	// Create base server with all Better Auth methods
 	const server = createAuthServerInternal({
 		baseUrl,
@@ -122,6 +134,7 @@ export function createNeonAuth(config: NeonAuthConfig) {
 		sessionDataTtl: cookies.sessionDataTtl,
 		domain: cookies.domain,
 		sameSite: cookies.sameSite,
+		log,
 	});
 
 	// Attach handler and middleware directly to the server proxy object

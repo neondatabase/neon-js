@@ -3,6 +3,7 @@ import { handleAuthRequest } from './request';
 import { handleAuthResponse } from './response';
 import { API_ENDPOINTS } from '../endpoints';
 import type { SessionCookieSameSite } from '../config';
+import type { ResolvedNeonAuthLogging } from '../logger';
 
 export interface AuthProxyConfig {
 	/** Standard Web API Request object */
@@ -19,6 +20,8 @@ export interface AuthProxyConfig {
 	domain?: string;
 	/** SameSite for proxied and minted cookies (default: strict) */
 	sameSite?: SessionCookieSameSite;
+	/** Resolved logging sink (from {@link resolveNeonAuthLogging}) */
+	log?: ResolvedNeonAuthLogging;
 }
 
 /**
@@ -36,7 +39,8 @@ export interface AuthProxyConfig {
  * @returns Standard Web API Response
  */
 export async function handleAuthProxyRequest(config: AuthProxyConfig): Promise<Response> {
-	const { request, path, baseUrl, cookieSecret, sessionDataTtl, domain, sameSite } = config;
+	const { request, path, baseUrl, cookieSecret, sessionDataTtl, domain, sameSite, log } =
+		config;
 
 	// Try cookie cache for /get-session GET requests (optimization)
 	if (
@@ -56,7 +60,7 @@ export async function handleAuthProxyRequest(config: AuthProxyConfig): Promise<R
 	}
 
 	// Fallback: Call upstream API
-	const response = await handleAuthRequest(baseUrl, request, path);
+	const response = await handleAuthRequest(baseUrl, request, path, log);
 	return await handleAuthResponse(response, baseUrl, {
 		secret: cookieSecret,
 		sessionDataTtl,

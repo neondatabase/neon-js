@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Next.js server observability (opt-in)**: `createNeonAuth` / `NeonAuthConfig` accept optional `logger` and `logLevel`. When either is set, the server proxy, middleware, and Better Auth server `fetch` layer emit structured `warn` / `error` (and optional `info` / `debug`) for upstream failures, HTTP errors, and cookie minting issues. Omit both to stay silent (no extra `console` output). Upstream `fetch` failures are classified into stable JSON `code` values (`NETWORK_DNS`, `NETWORK_TIMEOUT`, `NETWORK_TLS`, etc.) instead of only `NETWORK_ERROR`. Re-exports: `resolveNeonAuthLogging`, `NeonAuthLogger`, `NeonAuthLogLevel`, `NeonAuthNetworkErrorCode`, and related types from `@neondatabase/auth` and `@neondatabase/auth/next/server`.
+
 ### Changed
 
 - **Next.js cookie SameSite**: Proxied `Set-Cookie` headers and minted `session_data` cookies now use `SameSite=Strict` by default (previously forced to `Lax`). Set `cookies.sameSite` to `'lax'` or `'none'` when you need the previous behavior or third-party iframe embedding (`'none'` requires `Secure`, which these cookies already set).

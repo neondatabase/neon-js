@@ -1,6 +1,7 @@
 import { handleAuthProxyRequest } from '@/server/proxy';
 import type { NeonAuthConfig } from '@/server/config';
 import { validateCookieConfig } from '@/server/config';
+import { resolveNeonAuthLogging } from '@/server/logger';
 
 type Params = { path: string[] };
 
@@ -35,6 +36,7 @@ export function authApiHandler(config: NeonAuthConfig) {
   const { baseUrl, cookies } = config;
 
   validateCookieConfig(cookies);
+  const log = resolveNeonAuthLogging(config);
   const handler = async (
     request: Request,
     { params }: { params: Promise<Params> }
@@ -50,6 +52,7 @@ export function authApiHandler(config: NeonAuthConfig) {
       sessionDataTtl: cookies.sessionDataTtl,
       domain: cookies.domain,
       sameSite: cookies.sameSite,
+      log,
     });
   };
 

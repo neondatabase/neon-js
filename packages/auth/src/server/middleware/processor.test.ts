@@ -131,15 +131,17 @@ describe('processAuthMiddleware', () => {
 
       await processAuthMiddleware(config);
 
-      expect(handleAuthProxyRequestSpy).toHaveBeenCalledWith({
-        request: config.request,
-        path: 'get-session',
-        baseUrl: BASE_URL,
-        cookieSecret: TEST_SECRET,
-        sessionDataTtl: undefined,
-        domain: undefined,
-        sameSite: undefined,
-      });
+      expect(handleAuthProxyRequestSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          request: config.request,
+          path: 'get-session',
+          baseUrl: BASE_URL,
+          cookieSecret: TEST_SECRET,
+          sessionDataTtl: undefined,
+          domain: undefined,
+          sameSite: undefined,
+        }),
+      );
     });
 
     test('passes session data to checkSessionRequired', async () => {

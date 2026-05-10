@@ -14,6 +14,8 @@ import { validateSessionData } from '@/server/session/validator';
 import { NEON_AUTH_SESSION_COOKIE_NAME, NEON_AUTH_SESSION_DATA_COOKIE_NAME } from './constants';
 import { mintSessionDataFromResponse } from './session/minting';
 import { normalizeBetterAuthError } from '@/core/better-auth-helpers';
+import type { ResolvedNeonAuthLogging } from './logger';
+import { classifyFetchFailure } from './network-error';
 
 export interface NeonAuthServerConfig {
   baseUrl: string;
@@ -22,12 +24,14 @@ export interface NeonAuthServerConfig {
   sessionDataTtl?: number;
   domain?: string;
   sameSite?: SessionCookieSameSite;
+  /** Resolved logging sink */
+  log?: ResolvedNeonAuthLogging;
 }
 
 export function createAuthServerInternal(
   config: NeonAuthServerConfig
 ): NeonAuthServer {
-  const { baseUrl, context: getContext, cookieSecret, sessionDataTtl, domain, sameSite } = config;
+  const { baseUrl, context: getContext, cookieSecret, sessionDataTtl, domain, sameSite, log } = config;
   const effectiveSameSite = sameSite ?? 'strict';
 
   const fetchWithAuth = async (
@@ -65,11 +69,69 @@ export function createAuthServerInternal(
       requestBody = JSON.stringify(Object.keys(body).length > 0 ? body : {});
     }
 
-    const response = await fetch(url.toString(), {
-      method,
-      headers,
-      body: requestBody,
-    });
+    let response: Response;
+    try {
+      response = await fetch(url.toString(), {
+        method,
+        headers,
+        body: requestBody,
+      });
+    } catch (error) {
+      const classified = classifyFetchFailure(error);
+      if (classified.kind === 'transport') {
+        log?.warn('[neon-auth] Server API upstream fetch failed', {
+          component: 'server-api',
+          path: url.pathname,
+          code: classified.code,
+          detail: classified.detail,
+          host: url.host,
+        });
+        return {
+          data: null,
+          error: {
+            message: classified.clientMessage,
+            status: 502,
+            statusText: 'Bad Gateway',
+            code: classified.code,
+          },
+        };
+      }
+
+      log?.error('[neon-auth] Server API unexpected fetch error', {
+        component: 'server-api',
+        path: url.pathname,
+        detail: classified.detail,
+        message: classified.clientMessage,
+        host: url.host,
+      });
+
+      return {
+        data: null,
+        error: {
+          message: classified.clientMessage,
+          status: 500,
+          statusText: 'Internal Server Error',
+          code: 'INTERNAL_ERROR',
+        },
+      };
+    }
+
+    if (!response.ok) {
+      log?.warn('[neon-auth] Server API upstream HTTP error', {
+        component: 'server-api',
+        path: url.pathname,
+        status: response.status,
+        statusText: response.statusText,
+        host: url.host,
+      });
+    } else {
+      log?.debug('[neon-auth] Server API upstream fetch completed', {
+        component: 'server-api',
+        path: url.pathname,
+        status: response.status,
+        host: url.host,
+      });
+    }
 
     // Handle response cookies 
     const setCookieHeaders = response.headers.getSetCookie();
@@ -116,8 +178,10 @@ export function createAuthServerInternal(
           }
         }
       } catch (error) {
-        // Log error but don't fail the request - session cache is optional
-        console.error('[fetchWithAuth] Failed to mint session data cookie:', error);
+        log?.warn('[neon-auth] Failed to mint session data cookie', {
+          component: 'server-api',
+          detail: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 
@@ -186,8 +250,10 @@ export function createAuthServerInternal(
           }
         }
       } catch (error) {
-        // Log error but fall through to API call
-        console.error('[auth.getSession] Cookie validation error:', error);
+        log?.warn('[neon-auth] Cookie validation error before getSession upstream call', {
+          component: 'server-api',
+          detail: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 
