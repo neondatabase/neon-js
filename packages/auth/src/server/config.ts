@@ -3,9 +3,9 @@
  */
 
 import { ERRORS } from "./errors";
-import type { NeonAuthLogLevel, NeonAuthLogger } from "./logger";
+import type { NeonAuthLoggingInput, ResolvedNeonAuthLogging } from "./logger";
 
-export type { NeonAuthLogLevel, NeonAuthActiveLogLevel, NeonAuthLogger } from "./logger";
+export type { NeonAuthLogLevel, NeonAuthLogger, NeonAuthLoggingInput } from "./logger";
 
 /** Allowed values for the `SameSite` attribute on Neon Auth cookies. */
 export type SessionCookieSameSite = 'strict' | 'lax' | 'none';
@@ -31,7 +31,7 @@ export interface SessionCookieConfig {
 	 * Time-to-live for cached session data in seconds
 	 *
 	 * Controls how long session data is cached in a signed cookie before
-	 * requiring re-validation with the upstream auth server. 
+	 * requiring re-validation with the upstream auth server.
 	 * Note: this does not affect the session token cookie TTL.
 	 *
 	 * @default 300 (5 minutes)
@@ -60,10 +60,7 @@ export interface SessionCookieConfig {
 	sameSite?: SessionCookieSameSite;
 }
 
-/**
- * Base configuration for Neon Auth server utilities
- */
-export interface NeonAuthConfig {
+type NeonAuthBase = {
 	/**
 	 * Base URL for the Neon Auth server
 	 * @example 'https://ep-xxxx.neonauth.us-east-1.aws.neon.tech'
@@ -74,31 +71,29 @@ export interface NeonAuthConfig {
 	 * Cookie configuration
 	 */
 	cookies: SessionCookieConfig;
-
-	/**
-	 * Optional injectable logger for proxy, middleware, and server API `fetch` calls.
-	 * Unimplemented methods fall back to `console`.
-	 */
-	logger?: NeonAuthLogger;
-
-	/**
-	 * Minimum log level for Neon Auth. Use **`'silent'`** to disable all Neon Auth `console` output.
-	 * @default 'warn' — emits `error` and `warn` only
-	 */
-	logLevel?: NeonAuthLogLevel;
-}
+};
 
 /**
- * Configuration for Neon Auth middleware
- * Extends base config with middleware-specific options
+ * Base configuration for Neon Auth server utilities.
+ *
+ * Combines connection settings with {@link NeonAuthLoggingInput} (`logger`, `logLevel`, including `'silent'`).
  */
-export interface NeonAuthMiddlewareConfig extends NeonAuthConfig {
+export type NeonAuthConfig = NeonAuthBase & NeonAuthLoggingInput;
+
+/**
+ * Configuration for Neon Auth middleware.
+ */
+export type NeonAuthMiddlewareConfig = NeonAuthConfig & {
 	/**
 	 * URL to redirect to when user is not authenticated
 	 * @default '/auth/sign-in'
 	 */
 	loginUrl?: string;
-}
+	/**
+	 * Pre-resolved sink from {@link resolveNeonAuthLogging}. Set by {@link createNeonAuth} so middleware shares the same logging configuration as the API handler without resolving per request.
+	 */
+	log?: ResolvedNeonAuthLogging;
+};
 
 /**
  * Validates cookie configuration meets security requirements

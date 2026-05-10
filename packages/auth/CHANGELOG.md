@@ -10,12 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Next.js server observability (opt-out defaults)**: `createNeonAuth` / `NeonAuthConfig` support **`logger`** and **`logLevel`**. Defaults to **`warn`** on `console` (structured `error` / `warn` from the server proxy, middleware, and Better Auth server `fetch`). Set **`logLevel: 'silent'`** to disable Neon Auth `console` output; use **`info`** / **`debug`** or a custom **`logger`** for more detail.
-- **Logging types**: `NeonAuthLogLevel` includes **`'silent'`**; **`NeonAuthActiveLogLevel`** (levels that actually emit) is exported from `@neondatabase/auth` and `@neondatabase/auth/next/server` alongside `resolveNeonAuthLogging`, `NeonAuthLogger`, `ResolvedNeonAuthLogging`, and `NeonAuthLoggingInput`.
-- **Upstream fetch error taxonomy**: Failed upstream `fetch` calls are classified into stable JSON **`code`** values (`NETWORK_DNS`, `NETWORK_TIMEOUT`, `NETWORK_TLS`, etc.) instead of only `NETWORK_ERROR`, including on synthetic **502** responses from the SDK proxy.
+- **Next.js server observability (opt-out defaults)**: `createNeonAuth` / `NeonAuthConfig` support **`logger`** and **`logLevel`**. Defaults to **`warn`** on `console` (structured `error` / `warn` from the server proxy, middleware, and Better Auth server `fetch`). Set **`logLevel: 'silent'`** to disable Neon Auth `console` output (`'silent'` ignores any **`logger`**); use **`info`** / **`debug`** or a custom **`logger`** for more detail.
+- **Logging types**: `NeonAuthLogLevel` includes **`'silent'`**; **`ResolvedNeonAuthLogging`** aligns with **`Required<NeonAuthLogger>`**. Exports: `resolveNeonAuthLogging`, `NeonAuthLogger`, `ResolvedNeonAuthLogging`, `NeonAuthLoggingInput` from `@neondatabase/auth` and `@neondatabase/auth/next/server`.
+- **Upstream fetch error taxonomy**: Failed upstream `fetch` calls are classified into semver-stable JSON **`code`** values on synthetic **502** responses and in logs. Full set: **`NETWORK_ERROR`**, **`NETWORK_DNS`**, **`NETWORK_REFUSED`**, **`NETWORK_TIMEOUT`**, **`NETWORK_TLS`**, **`NETWORK_RESET`**, **`NETWORK_ABORT`** — see **`NEON_AUTH_NETWORK_ERROR_CODES`** and type **`NeonAuthNetworkErrorCode`** (`classifyFetchFailure` also exported). Internal/unclassified failures use a generic client-visible message; details stay in server logs only.
+- **`NeonAuthServerApiError`**: Typed `{ message, status, statusText, code }` envelope for narrowing `error.code` from Better Auth server methods.
 
 ### Changed
 
+- **Next.js middleware logging**: `auth.middleware()` forwards **`logger`**, **`logLevel`**, and a single pre-resolved **`log`** from **`createNeonAuth`** so mute/custom sinks apply to middleware (no per-request logger resolve when using **`createNeonAuth`**).
+- **Better Auth server `fetch` wrapper**: Transport failures (`NETWORK_*`) still return `{ data: null, error: { … } }`; **non-transport** failures **rethrow** the original error (preserves prior framework error-boundary behavior). HTTP **4xx** upstream responses are logged at **`info`**; **5xx** at **`warn`**.
 - **Next.js cookie SameSite**: Proxied `Set-Cookie` headers and minted `session_data` cookies now use `SameSite=Strict` by default (previously forced to `Lax`). Set `cookies.sameSite` to `'lax'` or `'none'` when you need the previous behavior or third-party iframe embedding (`'none'` requires `Secure`, which these cookies already set).
 
 ### Deprecated

@@ -20,13 +20,18 @@ export {
 
 export {
 	resolveNeonAuthLogging,
-	type NeonAuthActiveLogLevel,
 	type NeonAuthLogger,
 	type NeonAuthLogLevel,
 	type NeonAuthLoggingInput,
 	type ResolvedNeonAuthLogging,
 } from '@/server/logger';
-export type { NeonAuthNetworkErrorCode } from '@/server/network-error';
+export {
+	NEON_AUTH_NETWORK_ERROR_CODES,
+	classifyFetchFailure,
+	type NeonAuthNetworkErrorCode,
+	type ClassifiedFetchFailure,
+} from '@/server/network-error';
+export type { NeonAuthServerApiError } from '@/server/types';
 
 /**
  * Unified entry point for Neon Auth in Next.js
@@ -51,7 +56,8 @@ export type { NeonAuthNetworkErrorCode } from '@/server/network-error';
  * @param config.cookies.secret - Secret for signing session cookies (minimum 32 characters)
  * @param config.cookies.sessionDataTtl - Optional TTL for session cache in seconds (default: 300)
  * @param config.cookies.domain - Optional cookie domain (default: current domain)
- * @param config.logLevel - Set `'silent'` to disable Neon Auth server console logs (default: `warn`)
+ * @param config.logger - Optional structured logger; omitted methods fall back to `console` (see {@link NeonAuthLogger})
+ * @param config.logLevel - Minimum level; `'silent'` disables Neon Auth server console logs (default: `warn`)
  * @returns Unified auth instance with server methods, handler, and middleware
  * @throws Error if `cookies.secret` is less than 32 characters
  *
@@ -185,7 +191,7 @@ export function createNeonAuth(config: NeonAuthConfig) {
 	 */
 	(server as NeonAuth).middleware = (
 		middlewareConfig?: Pick<NeonAuthMiddlewareConfig, 'loginUrl'>
-	) => neonAuthMiddleware({ ...config, ...middlewareConfig });
+	) => neonAuthMiddleware({ ...config, ...middlewareConfig, log });
 
 	return server as NeonAuth;
 }

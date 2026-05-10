@@ -52,8 +52,16 @@ export const handleAuthRequest = async (
 				status: response.status,
 				host,
 			});
-		} else {
+		} else if (response.status >= 500) {
 			log?.warn('[neon-auth] Upstream HTTP error', {
+				component: 'proxy',
+				proxyPath: path,
+				status: response.status,
+				statusText: response.statusText,
+				host,
+			});
+		} else {
+			log?.info('[neon-auth] Upstream HTTP non-2xx', {
 				component: 'proxy',
 				proxyPath: path,
 				status: response.status,
@@ -88,7 +96,6 @@ export const handleAuthRequest = async (
 			component: 'proxy',
 			proxyPath: path,
 			detail: classified.detail,
-			message: classified.clientMessage,
 			host: safeAuthHost(baseUrl),
 		});
 

@@ -2,26 +2,43 @@
  * Classifies failed upstream `fetch` calls for clearer client responses and logs.
  */
 
-export type NeonAuthNetworkErrorCode =
-	| 'NETWORK_ERROR'
-	| 'NETWORK_DNS'
-	| 'NETWORK_REFUSED'
-	| 'NETWORK_TIMEOUT'
-	| 'NETWORK_TLS'
-	| 'NETWORK_RESET'
-	| 'NETWORK_ABORT';
+/**
+ * Semver-stable transport error codes surfaced as JSON `code` on synthetic HTTP responses
+ * (for example 502 from the proxy) and in logs. Treat adding values as non-breaking;
+ * renaming or removing values is a breaking change.
+ */
+export const NEON_AUTH_NETWORK_ERROR_CODES = [
+	'NETWORK_ERROR',
+	'NETWORK_DNS',
+	'NETWORK_REFUSED',
+	'NETWORK_TIMEOUT',
+	'NETWORK_TLS',
+	'NETWORK_RESET',
+	'NETWORK_ABORT',
+] as const;
 
+/** @see NEON_AUTH_NETWORK_ERROR_CODES */
+export type NeonAuthNetworkErrorCode =
+	(typeof NEON_AUTH_NETWORK_ERROR_CODES)[number];
+
+/**
+ * Result of {@link classifyFetchFailure}: a transport failure with a stable
+ * {@link NeonAuthNetworkErrorCode}, or an internal/unclassified error (detail for logs only).
+ */
 export type ClassifiedFetchFailure =
 	| {
 			kind: 'transport';
 			code: NeonAuthNetworkErrorCode;
 			/** Safe short detail for logs (no secrets) */
 			detail?: string;
+			/** Safe message for JSON bodies returned to clients */
 			clientMessage: string;
 	  }
 	| {
 			kind: 'internal';
+			/** Truncated detail for server-side logs only */
 			detail?: string;
+			/** Generic message for JSON bodies — never echo raw `Error.message` */
 			clientMessage: string;
 	  };
 
@@ -32,7 +49,16 @@ function readErrnoCode(node: unknown): string | undefined {
 }
 
 function isAbortError(node: unknown): boolean {
-	return node instanceof Error && node.name === 'AbortError';
+	if (node instanceof Error && node.name === 'AbortError') return true;
+	if (
+		typeof node === 'object' &&
+		node !== null &&
+		'name' in node &&
+		(node as { name?: unknown }).name === 'AbortError'
+	) {
+		return true;
+	}
+	return false;
 }
 
 function isTlsRelated(code: string | undefined, message: string): boolean {
@@ -113,6 +139,8 @@ function clientMessageFor(code: NeonAuthNetworkErrorCode): string {
 		}
 	}
 }
+
+const INTERNAL_PUBLIC_MESSAGE = 'Internal Server Error';
 
 /**
  * Inspects an error from `fetch` (including `cause` and aggregate errors) and
@@ -196,11 +224,11 @@ export function classifyFetchFailure(error: unknown): ClassifiedFetchFailure {
 
 	const head = nodes[0];
 	const message =
-		head instanceof Error ? head.message : 'Internal Server Error';
+		head instanceof Error ? head.message : INTERNAL_PUBLIC_MESSAGE;
 
 	return {
 		kind: 'internal',
 		detail: message.slice(0, 200),
-		clientMessage: message,
+		clientMessage: INTERNAL_PUBLIC_MESSAGE,
 	};
 }

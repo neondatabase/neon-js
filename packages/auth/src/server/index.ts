@@ -10,10 +10,15 @@ export {
 } from './config';
 export {
 	resolveNeonAuthLogging,
-	type NeonAuthActiveLogLevel,
 	type NeonAuthLogger,
 	type NeonAuthLogLevel,
 	type NeonAuthLoggingInput,
 	type ResolvedNeonAuthLogging,
 } from './logger';
-export type { NeonAuthNetworkErrorCode, ClassifiedFetchFailure } from './network-error';
+export {
+	NEON_AUTH_NETWORK_ERROR_CODES,
+	classifyFetchFailure,
+	type NeonAuthNetworkErrorCode,
+	type ClassifiedFetchFailure,
+} from './network-error';
+export type { NeonAuthServerApiError } from './types';

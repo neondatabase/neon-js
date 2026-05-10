@@ -11,6 +11,17 @@ describe('resolveNeonAuthLogging', () => {
 		warnSpy.mockRestore();
 	});
 
+	test('logLevel silent ignores custom logger', () => {
+		const customWarn = vi.fn();
+		const log = resolveNeonAuthLogging({
+			logLevel: 'silent',
+			logger: { warn: customWarn },
+		});
+
+		log.warn('ignored');
+		expect(customWarn).not.toHaveBeenCalled();
+	});
+
 	test('logLevel silent disables all output', () => {
 		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});

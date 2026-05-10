@@ -1,6 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { processAuthMiddleware } from './processor';
 import type { AuthMiddlewareConfig } from './processor';
+import type { ResolvedNeonAuthLogging } from '../logger';
 import * as oauth from './oauth';
 import * as routeProtection from './route-protection';
 import * as proxyHandler from '../proxy/handler';
@@ -140,7 +141,39 @@ describe('processAuthMiddleware', () => {
           sessionDataTtl: undefined,
           domain: undefined,
           sameSite: undefined,
+          log: expect.any(Object),
         }),
+      );
+    });
+
+    test('forwards pre-resolved log sink to handleAuthProxyRequest', async () => {
+      const mockLog: ResolvedNeonAuthLogging = {
+        error: vi.fn(),
+        warn: vi.fn(),
+        info: vi.fn(),
+        debug: vi.fn(),
+      };
+
+      const handleAuthProxyRequestSpy = vi
+        .spyOn(proxyHandler, 'handleAuthProxyRequest')
+        .mockResolvedValue(Response.json({ session: null, user: null }));
+
+      vi.spyOn(routeProtection, 'checkSessionRequired').mockReturnValue({
+        allowed: true,
+        requiresRedirect: false,
+      });
+
+      const config = createTestConfig({
+        request: new Request('https://app.com/dashboard', {
+          headers: { Cookie: '__Secure-neon-auth.session_token=token-value' },
+        }),
+        log: mockLog,
+      });
+
+      await processAuthMiddleware(config);
+
+      expect(handleAuthProxyRequestSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ log: mockLog }),
       );
     });
 

@@ -49,6 +49,8 @@ export function needsSessionVerification(request: Request): boolean {
  * @param cookieSecret - Secret for signing session cookies
  * @param sessionDataTtl - Optional TTL for session data cache
  * @param domain - Optional cookie domain
+ * @param sameSite - SameSite for cookies set during exchange
+ * @param log - Resolved Neon Auth logging sink (proxy / middleware)
  * @returns Exchange result with redirect URL and cookies, or null if exchange not needed/failed
  */
 export async function exchangeOAuthToken(

@@ -2,7 +2,7 @@
  * Framework-agnostic logging for Neon Auth server-side proxy and middleware.
  */
 
-/** Levels that emit output. Use `'silent'` to disable Neon Auth console logging entirely. */
+/** Supported Neon Auth log levels (`'silent'` disables all Neon Auth SDK `console` output). */
 export type NeonAuthLogLevel =
 	| 'error'
 	| 'warn'
@@ -10,8 +10,7 @@ export type NeonAuthLogLevel =
 	| 'debug'
 	| 'silent';
 
-/** Subset used for actual emission (excludes `silent`). */
-export type NeonAuthActiveLogLevel = Exclude<NeonAuthLogLevel, 'silent'>;
+type NeonAuthActiveLogLevel = Exclude<NeonAuthLogLevel, 'silent'>;
 
 const LEVEL_RANK: Record<NeonAuthActiveLogLevel, number> = {
 	error: 0,
@@ -22,6 +21,9 @@ const LEVEL_RANK: Record<NeonAuthActiveLogLevel, number> = {
 
 /**
  * Optional injectable logger. Omitted methods fall back to `console`.
+ *
+ * Custom implementations may receive structured fields such as `err` (the raw caught value)
+ * alongside `detail` for richer sinks (Sentry, OTel).
  */
 export type NeonAuthLogger = Partial<{
 	error(message: string, meta?: Record<string, unknown>): void;
@@ -30,17 +32,10 @@ export type NeonAuthLogger = Partial<{
 	debug(message: string, meta?: Record<string, unknown>): void;
 }>;
 
-/**
- * Resolved sink used internally after merging defaults and level filtering.
- */
-export type ResolvedNeonAuthLogging = {
-	error(message: string, meta?: Record<string, unknown>): void;
-	warn(message: string, meta?: Record<string, unknown>): void;
-	info(message: string, meta?: Record<string, unknown>): void;
-	debug(message: string, meta?: Record<string, unknown>): void;
-};
+/** Resolved sink after merging defaults and level filtering (same shape as {@link NeonAuthLogger} with all methods required). */
+export type ResolvedNeonAuthLogging = Required<NeonAuthLogger>;
 
-const consoleSink: Required<NeonAuthLogger> = {
+const consoleSink: ResolvedNeonAuthLogging = {
 	error: (message, meta) => {
 		if (meta && Object.keys(meta).length > 0) console.error(message, meta);
 		else console.error(message);
@@ -61,7 +56,7 @@ const consoleSink: Required<NeonAuthLogger> = {
 
 function wrapWithLevel(
 	level: NeonAuthActiveLogLevel,
-	logger: Required<NeonAuthLogger>
+	logger: ResolvedNeonAuthLogging
 ): ResolvedNeonAuthLogging {
 	const minRank = LEVEL_RANK[level];
 
@@ -84,10 +79,15 @@ function wrapWithLevel(
 	};
 }
 
+/**
+ * Logger / level options for Neon Auth server surfaces.
+ *
+ * When **`logLevel`** is **`'silent'`**, any **`logger`** is ignored at runtime (full mute).
+ */
 export type NeonAuthLoggingInput = {
 	logger?: NeonAuthLogger;
 	/**
-	 * Minimum level for Neon Auth logs. Use **`'silent'`** to disable all Neon Auth `console` output.
+	 * Minimum level for Neon Auth logs. **`'silent'`** disables all Neon Auth `console` output.
 	 * @default 'warn' — emits `error` and `warn` only
 	 */
 	logLevel?: NeonAuthLogLevel;
@@ -101,10 +101,10 @@ const noopResolved: ResolvedNeonAuthLogging = {
 };
 
 /**
- * Merges user logger with `console`, applies {@link NeonAuthLoggingInput.logLevel}.
+ * Merges user logger with `console`, applies {@link NeonAuthLoggingInput} level rules.
  *
  * **Opt-out:** Defaults to `warn` (structured `error` / `warn` to `console`). Set **`logLevel: 'silent'`**
- * to disable completely. Custom {@link logger} overrides `console` per level.
+ * to disable completely. Custom **`logger`** overrides `console` per level when not silent.
  */
 export function resolveNeonAuthLogging(
 	input?: NeonAuthLoggingInput
@@ -115,7 +115,7 @@ export function resolveNeonAuthLogging(
 
 	const level: NeonAuthActiveLogLevel = input?.logLevel ?? 'warn';
 	const raw = input?.logger ?? {};
-	const merged: Required<NeonAuthLogger> = {
+	const merged: ResolvedNeonAuthLogging = {
 		error: raw.error ?? consoleSink.error,
 		warn: raw.warn ?? consoleSink.warn,
 		info: raw.info ?? consoleSink.info,

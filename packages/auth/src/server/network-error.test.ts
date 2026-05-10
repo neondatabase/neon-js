@@ -41,18 +41,27 @@ describe('classifyFetchFailure', () => {
 		});
 	});
 
-	test('non-network Error maps to internal', () => {
+	test('non-network Error maps to internal with generic client message', () => {
 		const r = classifyFetchFailure(new Error('Something else'));
 		expect(r).toEqual({
 			kind: 'internal',
 			detail: 'Something else',
-			clientMessage: 'Something else',
+			clientMessage: 'Internal Server Error',
 		});
 	});
 
 	test('AbortError maps to NETWORK_ABORT', () => {
 		const err = new Error('Aborted');
 		err.name = 'AbortError';
+		const r = classifyFetchFailure(err);
+		expect(r.kind).toBe('transport');
+		if (r.kind === 'transport') {
+			expect(r.code).toBe('NETWORK_ABORT');
+		}
+	});
+
+	test('DOMException AbortError maps to NETWORK_ABORT', () => {
+		const err = new DOMException('Aborted', 'AbortError');
 		const r = classifyFetchFailure(err);
 		expect(r.kind).toBe('transport');
 		if (r.kind === 'transport') {

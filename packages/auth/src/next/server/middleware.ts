@@ -23,6 +23,9 @@ const SKIP_ROUTES = [
  * @param config.cookies - Cookie configuration
  * @param config.cookies.secret - Secret for signing session cookies (minimum 32 characters)
  * @param config.cookies.sessionDataTtl - Optional TTL for session cache in seconds (default: 300)
+ * @param config.logger - Optional structured logger; omitted methods fall back to `console`
+ * @param config.logLevel - Minimum log level; `'silent'` disables Neon Auth console output (default: `warn`)
+ * @param config.log - Pre-resolved logging sink (set by {@link createNeonAuth})
  * @param config.loginUrl - The URL to redirect to when the user is not authenticated (default: '/auth/sign-in')
  * @returns A middleware function that can be used in the Next.js app.
  * @throws Error if `cookies.secret` is less than 32 characters
@@ -41,7 +44,14 @@ const SKIP_ROUTES = [
  * ```
  */
 export function neonAuthMiddleware(config: NeonAuthMiddlewareConfig) {
-  const { baseUrl, cookies, loginUrl = '/auth/sign-in' } = config;
+  const {
+    baseUrl,
+    cookies,
+    loginUrl = '/auth/sign-in',
+    log,
+    logger,
+    logLevel,
+  } = config;
 
   validateCookieConfig(cookies);
   return async (request: NextRequest) => {
@@ -57,6 +67,9 @@ export function neonAuthMiddleware(config: NeonAuthMiddlewareConfig) {
       sessionDataTtl: cookies.sessionDataTtl,
       domain: cookies.domain,
       sameSite: cookies.sameSite,
+      log,
+      logger,
+      logLevel,
     });
 
     switch (result.action) {

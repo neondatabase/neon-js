@@ -101,19 +101,11 @@ export function createAuthServerInternal(
         component: 'server-api',
         path: url.pathname,
         detail: classified.detail,
-        message: classified.clientMessage,
         host: url.host,
+        err: error,
       });
 
-      return {
-        data: null,
-        error: {
-          message: classified.clientMessage,
-          status: 500,
-          statusText: 'Internal Server Error',
-          code: 'INTERNAL_ERROR',
-        },
-      };
+      throw error instanceof Error ? error : new Error(String(error));
     }
 
     if (response.ok) {
@@ -123,8 +115,16 @@ export function createAuthServerInternal(
         status: response.status,
         host: url.host,
       });
-    } else {
+    } else if (response.status >= 500) {
       log?.warn('[neon-auth] Server API upstream HTTP error', {
+        component: 'server-api',
+        path: url.pathname,
+        status: response.status,
+        statusText: response.statusText,
+        host: url.host,
+      });
+    } else {
+      log?.info('[neon-auth] Server API upstream HTTP non-2xx', {
         component: 'server-api',
         path: url.pathname,
         status: response.status,
@@ -140,7 +140,7 @@ export function createAuthServerInternal(
         const parsedCookies = parseSetCookies(setCookieHeader);
         for (const cookie of parsedCookies) {
           // Mirror sanitization from prepareResponseHeaders (response.ts):
-          // strip Partitioned and force SameSite=Lax for Safari compatibility.
+          // strip Partitioned and apply configured SameSite (default `strict`).
           // Always override domain: use local config if set, otherwise strip any
           // upstream Domain attribute to avoid leaking the auth server's domain.
           const cookieOptions = {
@@ -181,6 +181,7 @@ export function createAuthServerInternal(
         log?.warn('[neon-auth] Failed to mint session data cookie', {
           component: 'server-api',
           detail: error instanceof Error ? error.message : String(error),
+          err: error,
         });
       }
     }
@@ -253,6 +254,7 @@ export function createAuthServerInternal(
         log?.warn('[neon-auth] Cookie validation error before getSession upstream call', {
           component: 'server-api',
           detail: error instanceof Error ? error.message : String(error),
+          err: error,
         });
       }
     }
