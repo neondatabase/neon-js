@@ -2,25 +2,29 @@ import { describe, test, expect, vi } from 'vitest';
 import { resolveNeonAuthLogging } from './logger';
 
 describe('resolveNeonAuthLogging', () => {
-	test('when logger and logLevel are omitted, logging is silent', () => {
+	test('defaults to console-backed warn level when no options', () => {
 		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-		const log = resolveNeonAuthLogging({});
-
-		log.warn('should not reach console');
-		expect(warnSpy).not.toHaveBeenCalled();
-		warnSpy.mockRestore();
-	});
-
-	test('logLevel alone opts in to console-backed sink', () => {
-		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-		const log = resolveNeonAuthLogging({ logLevel: 'warn' });
+		const log = resolveNeonAuthLogging();
 
 		log.warn('hello');
 		expect(warnSpy).toHaveBeenCalledWith('hello');
 		warnSpy.mockRestore();
 	});
 
-	test('default level warn emits error and warn only when logger is set', () => {
+	test('logging false silences all levels', () => {
+		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const log = resolveNeonAuthLogging({ logging: false });
+
+		log.warn('silent');
+		log.error('silent');
+		expect(warnSpy).not.toHaveBeenCalled();
+		expect(errorSpy).not.toHaveBeenCalled();
+		warnSpy.mockRestore();
+		errorSpy.mockRestore();
+	});
+
+	test('custom logger uses default warn level when logLevel omitted', () => {
 		const calls = { error: 0, warn: 0, info: 0, debug: 0 };
 		const log = resolveNeonAuthLogging({
 			logger: {

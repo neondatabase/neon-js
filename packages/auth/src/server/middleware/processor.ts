@@ -59,6 +59,7 @@ export async function processAuthMiddleware(
 	config: AuthMiddlewareConfig
 ): Promise<MiddlewareResult> {
 	const log = resolveNeonAuthLogging({
+		logging: config.logging,
 		logger: config.logger,
 		logLevel: config.logLevel,
 	});

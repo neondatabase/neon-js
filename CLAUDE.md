@@ -783,6 +783,16 @@ The `skills/` directory contains AI-assistant skills for helping developers set 
 - `examples/react-neon-js/` - Reference React + Vite implementation
 - `examples/nextjs-neon-auth/` - Reference Next.js implementation
 
+## Learned User Preferences
+
+- Neon Auth Next.js/server observability: **opt-out** defaults (`warn` to `console`); apps can set `logging: false` on `createNeonAuth` config to silence or inject a custom `logger`.
+- When adding SDK-facing observability or debugging aids, update the package changelog and show usage in an example app when it helps adopters.
+
+## Learned Workspace Facts
+
+- `createNeonAuth` accepts optional **`logging`**, **`logger`**, and **`logLevel`** (`resolveNeonAuthLogging`); related types are re-exported from `@neondatabase/auth/next/server`.
+- The auth **proxy** (`packages/auth/src/server/proxy/request.ts`) logs structured warn/debug lines for upstream fetch outcomes and uses **`classifyFetchFailure`** / `packages/auth/src/server/network-error.ts` for transport vs HTTP error taxonomy returned to clients.
+
 ## References
 
 - [Better Auth Docs](https://www.better-auth.com/docs)

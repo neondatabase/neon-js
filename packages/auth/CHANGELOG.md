@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Next.js server observability (opt-in)**: `createNeonAuth` / `NeonAuthConfig` accept optional `logger` and `logLevel`. When either is set, the server proxy, middleware, and Better Auth server `fetch` layer emit structured `warn` / `error` (and optional `info` / `debug`) for upstream failures, HTTP errors, and cookie minting issues. Omit both to stay silent (no extra `console` output). Upstream `fetch` failures are classified into stable JSON `code` values (`NETWORK_DNS`, `NETWORK_TIMEOUT`, `NETWORK_TLS`, etc.) instead of only `NETWORK_ERROR`. Re-exports: `resolveNeonAuthLogging`, `NeonAuthLogger`, `NeonAuthLogLevel`, `NeonAuthNetworkErrorCode`, and related types from `@neondatabase/auth` and `@neondatabase/auth/next/server`.
+- **Next.js server observability (opt-out)**: By default, `createNeonAuth` logs structured `warn` / `error` (default level `warn`) to `console` for the server proxy, middleware, and Better Auth server `fetch` layer (upstream failures, HTTP errors, cookie minting issues). Set `logging: false` on `NeonAuthConfig` to silence completely, or pass `logger` / `logLevel` to customize. Upstream `fetch` failures are classified into stable JSON `code` values (`NETWORK_DNS`, `NETWORK_TIMEOUT`, `NETWORK_TLS`, etc.) instead of only `NETWORK_ERROR`. Re-exports: `resolveNeonAuthLogging`, `NeonAuthLogger`, `NeonAuthLogLevel`, `NeonAuthNetworkErrorCode`, and related types from `@neondatabase/auth` and `@neondatabase/auth/next/server`.
 
 ### Changed
 

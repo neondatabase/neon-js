@@ -76,6 +76,11 @@ function wrapWithLevel(
 }
 
 export type NeonAuthLoggingInput = {
+	/**
+	 * Set `false` to disable Neon Auth server/proxy/middleware logging entirely (no `console` calls).
+	 * @default true — logs at {@link logLevel} using `console`, unless {@link logger} overrides methods.
+	 */
+	logging?: boolean;
 	logger?: NeonAuthLogger;
 	/**
 	 * Minimum level when logging is enabled (see {@link resolveNeonAuthLogging}).
@@ -94,22 +99,19 @@ const noopResolved: ResolvedNeonAuthLogging = {
 /**
  * Merges user logger with `console`, applies {@link NeonAuthLoggingInput.logLevel}.
  *
- * **Opt-in:** If both `logger` and `logLevel` are omitted, returns a no-op sink (no
- * `console` output from Neon Auth). Set `logLevel` and/or `logger` to enable.
- * When only `logLevel` is set, missing logger methods use `console`.
+ * **Opt-out:** By default (`logging` not `false`), Neon Auth emits `warn` / `error` (and higher levels per
+ * `logLevel`) through `console`. Set `logging: false` to silence completely. Custom {@link logger}
+ * methods override `console` for those levels.
  */
 export function resolveNeonAuthLogging(
 	input?: NeonAuthLoggingInput
 ): ResolvedNeonAuthLogging {
-	const optedIn =
-		input !== undefined &&
-		(input.logger !== undefined || input.logLevel !== undefined);
-	if (!optedIn) {
+	if (input?.logging === false) {
 		return noopResolved;
 	}
 
-	const level = input.logLevel ?? 'warn';
-	const raw = input.logger ?? {};
+	const level = input?.logLevel ?? 'warn';
+	const raw = input?.logger ?? {};
 	const merged: Required<NeonAuthLogger> = {
 		error: raw.error ?? consoleSink.error,
 		warn: raw.warn ?? consoleSink.warn,

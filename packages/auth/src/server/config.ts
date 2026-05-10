@@ -76,17 +76,21 @@ export interface NeonAuthConfig {
 	cookies: SessionCookieConfig;
 
 	/**
-	 * **Opt-in** injectable logger for proxy, middleware, and server API `fetch` calls.
-	 * Omit both `logger` and `logLevel` to keep Neon Auth silent (no extra `console` output).
-	 * Unimplemented methods fall back to `console` when logging is enabled.
+	 * Set `false` to disable Neon Auth server/proxy/middleware `console` logging entirely.
+	 * @default true — structured `warn` / `error` (per {@link logLevel}) for upstream issues, etc.
+	 */
+	logging?: boolean;
+
+	/**
+	 * Optional injectable logger for proxy, middleware, and server API `fetch` calls.
+	 * Unimplemented methods fall back to `console`.
 	 */
 	logger?: NeonAuthLogger;
 
 	/**
-	 * **Opt-in** minimum log level when logging is enabled (set this and/or {@link logger}).
-	 * When only `logLevel` is set, missing `logger` methods use `console`.
+	 * Minimum log level when {@link logging} is enabled.
 	 *
-	 * @default 'warn' when enabled — emits `error` and `warn` only
+	 * @default 'warn' — emits `error` and `warn` only
 	 */
 	logLevel?: NeonAuthLogLevel;
 }
