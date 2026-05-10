@@ -99,10 +99,11 @@ describe('CSS Build Output', () => {
       expect(hasLayerWrappers(css)).toBe(false);
     });
 
-    it('matches snapshot', () => {
+    it('matches extracted class list snapshot (cross-platform stable)', () => {
       const stylePath = resolve(distDir, 'style.css');
       const css = readFileSync(stylePath, 'utf8');
-      expect(css).toMatchSnapshot();
+      // Full minified CSS differs across OS/toolchain; sorted class names are stable.
+      expect(extractClassesFromCSS(css)).toMatchSnapshot();
     });
 
     it('is valid parseable CSS', () => {
