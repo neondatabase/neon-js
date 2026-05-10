@@ -5,7 +5,7 @@
 import { ERRORS } from "./errors";
 import type { NeonAuthLogLevel, NeonAuthLogger } from "./logger";
 
-export type { NeonAuthLogLevel, NeonAuthLogger } from "./logger";
+export type { NeonAuthLogLevel, NeonAuthActiveLogLevel, NeonAuthLogger } from "./logger";
 
 /** Allowed values for the `SameSite` attribute on Neon Auth cookies. */
 export type SessionCookieSameSite = 'strict' | 'lax' | 'none';
@@ -76,20 +76,13 @@ export interface NeonAuthConfig {
 	cookies: SessionCookieConfig;
 
 	/**
-	 * Set `false` to disable Neon Auth server/proxy/middleware `console` logging entirely.
-	 * @default true — structured `warn` / `error` (per {@link logLevel}) for upstream issues, etc.
-	 */
-	logging?: boolean;
-
-	/**
 	 * Optional injectable logger for proxy, middleware, and server API `fetch` calls.
 	 * Unimplemented methods fall back to `console`.
 	 */
 	logger?: NeonAuthLogger;
 
 	/**
-	 * Minimum log level when {@link logging} is enabled.
-	 *
+	 * Minimum log level for Neon Auth. Use **`'silent'`** to disable all Neon Auth `console` output.
 	 * @default 'warn' — emits `error` and `warn` only
 	 */
 	logLevel?: NeonAuthLogLevel;

@@ -11,10 +11,10 @@ describe('resolveNeonAuthLogging', () => {
 		warnSpy.mockRestore();
 	});
 
-	test('logging false silences all levels', () => {
+	test('logLevel silent disables all output', () => {
 		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-		const log = resolveNeonAuthLogging({ logging: false });
+		const log = resolveNeonAuthLogging({ logLevel: 'silent' });
 
 		log.warn('silent');
 		log.error('silent');

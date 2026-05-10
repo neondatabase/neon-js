@@ -20,6 +20,7 @@ export {
 
 export {
 	resolveNeonAuthLogging,
+	type NeonAuthActiveLogLevel,
 	type NeonAuthLogger,
 	type NeonAuthLogLevel,
 	type NeonAuthLoggingInput,
@@ -50,7 +51,7 @@ export type { NeonAuthNetworkErrorCode } from '@/server/network-error';
  * @param config.cookies.secret - Secret for signing session cookies (minimum 32 characters)
  * @param config.cookies.sessionDataTtl - Optional TTL for session cache in seconds (default: 300)
  * @param config.cookies.domain - Optional cookie domain (default: current domain)
- * @param config.logging - Set `false` to disable Neon Auth server console logs (default: warn-level structured logs)
+ * @param config.logLevel - Set `'silent'` to disable Neon Auth server console logs (default: `warn`)
  * @returns Unified auth instance with server methods, handler, and middleware
  * @throws Error if `cookies.secret` is less than 32 characters
  *

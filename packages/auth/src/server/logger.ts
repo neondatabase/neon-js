@@ -2,9 +2,18 @@
  * Framework-agnostic logging for Neon Auth server-side proxy and middleware.
  */
 
-export type NeonAuthLogLevel = 'error' | 'warn' | 'info' | 'debug';
+/** Levels that emit output. Use `'silent'` to disable Neon Auth console logging entirely. */
+export type NeonAuthLogLevel =
+	| 'error'
+	| 'warn'
+	| 'info'
+	| 'debug'
+	| 'silent';
 
-const LEVEL_RANK: Record<NeonAuthLogLevel, number> = {
+/** Subset used for actual emission (excludes `silent`). */
+export type NeonAuthActiveLogLevel = Exclude<NeonAuthLogLevel, 'silent'>;
+
+const LEVEL_RANK: Record<NeonAuthActiveLogLevel, number> = {
 	error: 0,
 	warn: 1,
 	info: 2,
@@ -51,13 +60,13 @@ const consoleSink: Required<NeonAuthLogger> = {
 };
 
 function wrapWithLevel(
-	level: NeonAuthLogLevel,
+	level: NeonAuthActiveLogLevel,
 	logger: Required<NeonAuthLogger>
 ): ResolvedNeonAuthLogging {
 	const minRank = LEVEL_RANK[level];
 
 	const gate = (
-		messageLevel: NeonAuthLogLevel,
+		messageLevel: NeonAuthActiveLogLevel,
 		fn: (message: string, meta?: Record<string, unknown>) => void
 	) => {
 		return (message: string, meta?: Record<string, unknown>) => {
@@ -76,14 +85,9 @@ function wrapWithLevel(
 }
 
 export type NeonAuthLoggingInput = {
-	/**
-	 * Set `false` to disable Neon Auth server/proxy/middleware logging entirely (no `console` calls).
-	 * @default true — logs at {@link logLevel} using `console`, unless {@link logger} overrides methods.
-	 */
-	logging?: boolean;
 	logger?: NeonAuthLogger;
 	/**
-	 * Minimum level when logging is enabled (see {@link resolveNeonAuthLogging}).
+	 * Minimum level for Neon Auth logs. Use **`'silent'`** to disable all Neon Auth `console` output.
 	 * @default 'warn' — emits `error` and `warn` only
 	 */
 	logLevel?: NeonAuthLogLevel;
@@ -99,18 +103,17 @@ const noopResolved: ResolvedNeonAuthLogging = {
 /**
  * Merges user logger with `console`, applies {@link NeonAuthLoggingInput.logLevel}.
  *
- * **Opt-out:** By default (`logging` not `false`), Neon Auth emits `warn` / `error` (and higher levels per
- * `logLevel`) through `console`. Set `logging: false` to silence completely. Custom {@link logger}
- * methods override `console` for those levels.
+ * **Opt-out:** Defaults to `warn` (structured `error` / `warn` to `console`). Set **`logLevel: 'silent'`**
+ * to disable completely. Custom {@link logger} overrides `console` per level.
  */
 export function resolveNeonAuthLogging(
 	input?: NeonAuthLoggingInput
 ): ResolvedNeonAuthLogging {
-	if (input?.logging === false) {
+	if (input?.logLevel === 'silent') {
 		return noopResolved;
 	}
 
-	const level = input?.logLevel ?? 'warn';
+	const level: NeonAuthActiveLogLevel = input?.logLevel ?? 'warn';
 	const raw = input?.logger ?? {};
 	const merged: Required<NeonAuthLogger> = {
 		error: raw.error ?? consoleSink.error,

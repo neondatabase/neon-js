@@ -10,6 +10,7 @@ export {
 } from './config';
 export {
 	resolveNeonAuthLogging,
+	type NeonAuthActiveLogLevel,
 	type NeonAuthLogger,
 	type NeonAuthLogLevel,
 	type NeonAuthLoggingInput,
