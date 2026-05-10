@@ -34,6 +34,13 @@ export function Header() {
                     </svg>
                     <span className="hidden sm:inline font-semibold">Notely</span>
                 </Link>
+                <nav className="flex items-center gap-1">
+                    <Link href="/iframe-test">
+                        <Button variant="ghost" size="sm">
+                            Iframe Test
+                        </Button>
+                    </Link>
+                </nav>
                 <SignedIn>
                     <nav className="flex items-center gap-1">
                         <Link href="/dashboard">
