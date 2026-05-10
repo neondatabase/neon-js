@@ -47,7 +47,7 @@
     "build": "tsdown",
     "dev": "tsdown --watch",
     "test": "vitest",
-    "test:node": "node --run test",
+    "test:node": "vitest run --passWithNoTests",
     "test:ci": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit",
     "test:types": "tsc --noEmit",
