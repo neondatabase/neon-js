@@ -787,11 +787,13 @@ The `skills/` directory contains AI-assistant skills for helping developers set 
 
 - Neon Auth Next.js/server observability: **opt-out** defaults (`warn` to `console`); apps can set **`logLevel: 'silent'`** on `createNeonAuth` to mute or inject a custom **`logger`**.
 - When adding SDK-facing observability or debugging aids, update the package changelog and show usage in an example app when it helps adopters.
+- Prefer **`logger`** + **`logLevel`** as the only controls for server/proxy logging—avoid separate boolean or feature flags solely to toggle logs.
 
 ## Learned Workspace Facts
 
 - `createNeonAuth` accepts optional **`logger`** and **`logLevel`** (including **`'silent'`** via `resolveNeonAuthLogging`); related types are re-exported from `@neondatabase/auth/next/server`.
 - The auth **proxy** (`packages/auth/src/server/proxy/request.ts`) logs structured warn/debug lines for upstream fetch outcomes and uses **`classifyFetchFailure`** / `packages/auth/src/server/network-error.ts` for transport vs HTTP error taxonomy returned to clients.
+- **`examples/nextjs-neon-auth/app/iframe-test/page.tsx`** is the App Router counterpart to iframe-hosted OAuth/popup testing in **`examples/react-neon-js/`**.
 
 ## References
 

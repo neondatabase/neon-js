@@ -28,6 +28,28 @@ bun run dev
 
 5. Open [http://localhost:3000](http://localhost:3000) to see the app.
 
+## Demos
+
+- **`/`** – Marketing landing page
+- **`/auth/sign-in`**, **`/auth/sign-up`** – Auth UI views (powered by `@neondatabase/auth/react/ui`)
+- **`/dashboard`**, **`/notes`**, **`/account/*`** – Protected routes that require a session
+- **`/iframe-test`** – Embeds the auth views in a same-origin iframe to verify that
+  email/password and **OAuth (popup) flows work inside an iframe**
+
+### Iframe / embedded auth
+
+`@neondatabase/auth` automatically detects when your app is rendered inside an
+`<iframe>` (via `globalThis.self !== globalThis.top`). When a user clicks a
+social/SSO button from inside an iframe, the SDK opens the OAuth provider in a
+popup window instead of attempting a top-level redirect (which OAuth providers
+block via `X-Frame-Options` / CSP). After the OAuth callback completes, the
+popup posts the session verifier back to the parent iframe via `postMessage`,
+which finalises the session in the embedded context.
+
+Visit `/iframe-test` to try this flow end-to-end. The same code paths apply
+when this Next.js app is embedded as an iframe inside any third-party host
+(embedded apps, widgets, multi-tenant platforms).
+
 ## Learn More
 
 - [Neon Auth Documentation](https://neon.tech/docs/guides/neon-auth)
