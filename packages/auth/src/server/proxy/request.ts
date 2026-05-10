@@ -45,19 +45,19 @@ export const handleAuthRequest = async (
 		});
 
 		const host = safeAuthHost(baseUrl);
-		if (!response.ok) {
+		if (response.ok) {
+			log?.debug('[neon-auth] Upstream fetch completed', {
+				component: 'proxy',
+				proxyPath: path,
+				status: response.status,
+				host,
+			});
+		} else {
 			log?.warn('[neon-auth] Upstream HTTP error', {
 				component: 'proxy',
 				proxyPath: path,
 				status: response.status,
 				statusText: response.statusText,
-				host,
-			});
-		} else {
-			log?.debug('[neon-auth] Upstream fetch completed', {
-				component: 'proxy',
-				proxyPath: path,
-				status: response.status,
 				host,
 			});
 		}

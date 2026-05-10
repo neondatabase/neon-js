@@ -90,20 +90,27 @@ function collectRelatedErrors(error: unknown): unknown[] {
 
 function clientMessageFor(code: NeonAuthNetworkErrorCode): string {
 	switch (code) {
-		case 'NETWORK_DNS':
+		case 'NETWORK_DNS': {
 			return 'Could not resolve authentication server hostname';
-		case 'NETWORK_REFUSED':
+		}
+		case 'NETWORK_REFUSED': {
 			return 'Connection refused by authentication server';
-		case 'NETWORK_TIMEOUT':
+		}
+		case 'NETWORK_TIMEOUT': {
 			return 'Authentication server connection timed out';
-		case 'NETWORK_TLS':
+		}
+		case 'NETWORK_TLS': {
 			return 'TLS error connecting to authentication server';
-		case 'NETWORK_RESET':
+		}
+		case 'NETWORK_RESET': {
 			return 'Connection to authentication server was reset';
-		case 'NETWORK_ABORT':
+		}
+		case 'NETWORK_ABORT': {
 			return 'Authentication request was aborted';
-		default:
+		}
+		default: {
 			return 'Unable to connect to authentication server';
+		}
 	}
 }
 

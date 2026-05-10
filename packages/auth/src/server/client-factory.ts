@@ -116,19 +116,19 @@ export function createAuthServerInternal(
       };
     }
 
-    if (!response.ok) {
+    if (response.ok) {
+      log?.debug('[neon-auth] Server API upstream fetch completed', {
+        component: 'server-api',
+        path: url.pathname,
+        status: response.status,
+        host: url.host,
+      });
+    } else {
       log?.warn('[neon-auth] Server API upstream HTTP error', {
         component: 'server-api',
         path: url.pathname,
         status: response.status,
         statusText: response.statusText,
-        host: url.host,
-      });
-    } else {
-      log?.debug('[neon-auth] Server API upstream fetch completed', {
-        component: 'server-api',
-        path: url.pathname,
-        status: response.status,
         host: url.host,
       });
     }
