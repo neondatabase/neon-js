@@ -1,5 +1,8 @@
 import { NEON_AUTH_SESSION_VERIFIER_PARAM_NAME } from '@/core/constants';
-import { NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME } from '../constants';
+import {
+  NEON_AUTH_LEGACY_SESSION_CHALLANGE_COOKIE_NAME,
+  NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME,
+} from '../constants';
 import { handleAuthRequest, handleAuthResponse } from '../proxy';
 import { parseCookies } from 'better-auth/cookies';
 import type { SessionCookieSameSite } from '../config';
@@ -35,7 +38,12 @@ export function needsSessionVerification(request: Request): boolean {
   }
 
   const cookies = parseCookies(cookieHeader);
-  const hasChallenge = cookies.has(NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME);
+  // Dual-read: prefer the correctly-spelled name but fall back to the legacy
+  // (misspelled) name for backward compatibility with older Neon Auth servers
+  // still in the field. See databricks-eng/neon-cloud#6472.
+  const hasChallenge =
+    cookies.has(NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME) ||
+    cookies.has(NEON_AUTH_LEGACY_SESSION_CHALLANGE_COOKIE_NAME);
 
   return hasVerifier && hasChallenge;
 }
@@ -71,7 +79,12 @@ export async function exchangeOAuthToken(
   }
 
   const cookies = parseCookies(cookieHeader);
-  const challenge = cookies.get(NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME);
+  // Dual-read: prefer the correctly-spelled name but fall back to the legacy
+  // (misspelled) name for backward compatibility with older Neon Auth servers
+  // still in the field. See databricks-eng/neon-cloud#6472.
+  const challenge =
+    cookies.get(NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME) ??
+    cookies.get(NEON_AUTH_LEGACY_SESSION_CHALLANGE_COOKIE_NAME);
 
   if (!verifier || !challenge) {
     return null;
