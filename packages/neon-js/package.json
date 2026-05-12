@@ -1,6 +1,6 @@
 {
   "name": "@neondatabase/neon-js",
-  "version": "0.2.0-beta.1",
+  "version": "0.6.1-beta",
   "description": "TypeScript SDK for Neon Auth and Data API - authentication and PostgreSQL querying",
   "type": "module",
   "license": "Apache-2.0",
@@ -98,7 +98,9 @@
   "files": [
     "dist",
     "llms.txt",
-    "sbom.cdx.json"
+    "sbom.cdx.json",
+    "src/vendor/postgres-meta/LICENSE",
+    "src/vendor/postgres-meta/README.md"
   ],
   "publishConfig": {
     "access": "public"
@@ -116,13 +118,18 @@
     "clean": "rm -rf node_modules dist"
   },
   "devDependencies": {
+    "@types/pg": "8.20.0",
+    "@types/pg-format": "1.0.5",
     "msw": "2.6.8"
   },
   "dependencies": {
     "@neondatabase/auth": "workspace:*",
     "@neondatabase/postgrest-js": "workspace:*",
-    "@supabase/postgres-meta": "0.93.1",
     "meow": "14.0.0",
+    "pg": "^8.13.0",
+    "pg-format": "1.0.4",
+    "postgres-array": "3.0.4",
+    "prettier": "3.8.1",
     "zod": "4.1.12"
   }
 }

@@ -25,6 +25,7 @@
     "release:auth": "npx tsx scripts/release.ts auth",
     "release:auth-ui": "npx tsx scripts/release.ts auth-ui",
     "release:neon-js": "npx tsx scripts/release.ts neon-js",
+    "migrate:auth-ui-imports": "node packages/auth/codemods/migrate-auth-ui-imports.mjs",
     "test:e2e": "pnpm run build && pnpm --filter e2e run test",
     "test:e2e:ui": "pnpm run build && pnpm --filter e2e run test:ui",
     "test:e2e:debug": "pnpm run build && pnpm --filter e2e run test:debug",
@@ -51,16 +52,25 @@
   "dependencies": {},
   "pnpm": {
     "overrides": {
-      "better-auth": "1.4.6",
-      "@better-auth/core": "1.4.6",
+      "better-auth": "1.4.18",
+      "@better-auth/core": "1.4.18",
       "@better-auth/utils": "0.3.0",
-      "@better-auth/passkey": "1.4.12",
-      "@better-auth/telemetry": "1.4.6",
+      "@better-auth/passkey": "1.4.18",
+      "@better-auth/telemetry": "1.4.18",
       "@better-fetch/fetch": "1.1.21",
-      "better-call": "1.1.5",
+      "better-call": "1.1.8",
       "tailwindcss": "4.2.1",
       "@tailwindcss/cli": "4.2.1",
-      "@tailwindcss/oxide": "4.2.1"
+      "@tailwindcss/oxide": "4.2.1",
+      "next": "16.2.3",
+      "defu": "6.1.7",
+      "vite": "7.3.2",
+      "fastify": ">=5.8.5"
+    },
+    "supportedArchitectures": {
+      "os": ["linux", "darwin", "win32"],
+      "cpu": ["x64", "arm64"],
+      "libc": ["glibc", "musl"]
     }
   }
 }

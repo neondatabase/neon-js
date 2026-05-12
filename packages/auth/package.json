@@ -1,6 +1,6 @@
 {
   "name": "@neondatabase/auth",
-  "version": "0.2.0-beta.1",
+  "version": "0.4.1-beta",
   "description": "TypeScript SDK for Neon Auth - authentication for PostgreSQL with multiple adapter support",
   "type": "module",
   "license": "Apache-2.0",
@@ -34,6 +34,9 @@
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
+  "bin": {
+    "neon-auth-codemod": "./codemods/migrate-auth-ui-imports.mjs"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.mts",
@@ -84,6 +87,7 @@
     }
   },
   "files": [
+    "codemods/migrate-auth-ui-imports.mjs",
     "dist",
     "llms.txt",
     "sbom.cdx.json"
@@ -107,15 +111,15 @@
   "devDependencies": {
     "@neondatabase/internal": "workspace:*",
     "msw": "2.6.8",
-    "next": "16.0.6"
+    "next": "16.2.3"
   },
   "dependencies": {
     "@better-fetch/fetch": "1.1.21",
     "@neondatabase/auth-ui": "workspace:*",
     "@supabase/auth-js": "2.79.0",
-    "better-auth": "1.4.6",
+    "better-auth": "1.4.18",
     "jose": "6.1.2",
-    "zod": "4.1.12"
+    "zod": "4.3.6"
   },
   "peerDependencies": {
     "react": ">=18.0.0",

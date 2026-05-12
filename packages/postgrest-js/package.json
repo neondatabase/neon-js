@@ -1,6 +1,6 @@
 {
   "name": "@neondatabase/postgrest-js",
-  "version": "0.1.0-alpha.2",
+  "version": "0.2.0-beta",
   "description": "PostgreSQL client for Neon Data API - query your database without authentication",
   "type": "module",
   "license": "Apache-2.0",
@@ -47,7 +47,7 @@
     "build": "tsdown",
     "dev": "tsdown --watch",
     "test": "vitest",
-    "test:node": "node --run test",
+    "test:node": "vitest run --passWithNoTests",
     "test:ci": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit",
     "test:types": "tsc --noEmit",

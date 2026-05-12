@@ -45,6 +45,7 @@ describe('handleAuthProxyRequest', () => {
         secret: TEST_SECRET,
         sessionDataTtl: undefined,
         domain: undefined,
+        sameSite: undefined,
       });
       expect(result).toBe(cachedResponse);
       // Should NOT call upstream on cache hit
@@ -138,7 +139,12 @@ describe('handleAuthProxyRequest', () => {
 
       await handleAuthProxyRequest(config);
 
-      expect(handleAuthRequestSpy).toHaveBeenCalledWith(BASE_URL, testRequest, 'sign-in/email');
+      expect(handleAuthRequestSpy).toHaveBeenCalledWith(
+        BASE_URL,
+        testRequest,
+        'sign-in/email',
+        undefined,
+      );
     });
 
     test('calls handleAuthResponse with correct cookie config', async () => {
@@ -162,6 +168,7 @@ describe('handleAuthProxyRequest', () => {
         secret: TEST_SECRET,
         sessionDataTtl: 600,
         domain: '.example.com',
+        sameSite: undefined,
       });
     });
 
@@ -258,6 +265,7 @@ describe('handleAuthProxyRequest', () => {
         secret: TEST_SECRET,
         sessionDataTtl: undefined,
         domain: undefined,
+        sameSite: undefined,
       });
     });
   });
@@ -281,7 +289,12 @@ describe('handleAuthProxyRequest', () => {
 
       await handleAuthProxyRequest(config);
 
-      expect(handleAuthRequestSpy).toHaveBeenCalledWith(BASE_URL, config.request, 'sign-in/email');
+      expect(handleAuthRequestSpy).toHaveBeenCalledWith(
+        BASE_URL,
+        config.request,
+        'sign-in/email',
+        undefined,
+      );
     });
 
     test('handles sign-out endpoint', async () => {
@@ -300,7 +313,12 @@ describe('handleAuthProxyRequest', () => {
 
       await handleAuthProxyRequest(config);
 
-      expect(handleAuthRequestSpy).toHaveBeenCalledWith(BASE_URL, config.request, 'sign-out');
+      expect(handleAuthRequestSpy).toHaveBeenCalledWith(
+        BASE_URL,
+        config.request,
+        'sign-out',
+        undefined,
+      );
     });
 
     test('handles update-user endpoint', async () => {
@@ -319,7 +337,12 @@ describe('handleAuthProxyRequest', () => {
 
       await handleAuthProxyRequest(config);
 
-      expect(handleAuthRequestSpy).toHaveBeenCalledWith(BASE_URL, config.request, 'update-user');
+      expect(handleAuthRequestSpy).toHaveBeenCalledWith(
+        BASE_URL,
+        config.request,
+        'update-user',
+        undefined,
+      );
     });
   });
 });

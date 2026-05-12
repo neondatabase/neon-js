@@ -6,6 +6,9 @@ import { NEON_AUTH_SESSION_COOKIE_NAME, NEON_AUTH_SESSION_DATA_COOKIE_NAME } fro
 import type { SessionData } from '../types';
 import { parseCookies } from 'better-auth/cookies';
 import { serializeSetCookie } from '../utils/cookies';
+import type { SessionCookieSameSite } from '../config';
+import type { NeonAuthLoggingInput, ResolvedNeonAuthLogging } from '../logger';
+import { resolveNeonAuthLogging } from '../logger';
 
 /**
  * Result of middleware processing (framework-agnostic decision)
@@ -15,7 +18,7 @@ export type MiddlewareResult =
 	| { action: 'redirect_oauth'; redirectUrl: URL; cookies: string[] }
 	| { action: 'redirect_login'; redirectUrl: URL; cookies?: string[] };
 
-export interface AuthMiddlewareConfig {
+export type AuthMiddlewareConfig = {
 	/** Standard Web API Request object */
 	request: Request;
 	/** URL pathname being accessed */
@@ -32,7 +35,11 @@ export interface AuthMiddlewareConfig {
 	sessionDataTtl?: number;
 	/** Cookie domain for session data cookie */
 	domain?: string;
-}
+	/** SameSite for cookies set by middleware (default: strict) */
+	sameSite?: SessionCookieSameSite;
+	/** Pre-resolved sink; preferred over resolving from logger/logLevel */
+	log?: ResolvedNeonAuthLogging;
+} & NeonAuthLoggingInput;
 
 /**
  * Generic authentication middleware processor (framework-agnostic)
@@ -53,6 +60,13 @@ export interface AuthMiddlewareConfig {
 export async function processAuthMiddleware(
 	config: AuthMiddlewareConfig
 ): Promise<MiddlewareResult> {
+	const log =
+		config.log ??
+		resolveNeonAuthLogging({
+			logger: config.logger,
+			logLevel: config.logLevel,
+		});
+
 	const {
 		request,
 		pathname,
@@ -62,7 +76,10 @@ export async function processAuthMiddleware(
 		cookieSecret,
 		sessionDataTtl,
 		domain,
+		sameSite,
 	} = config;
+
+	const effectiveSameSite = sameSite ?? 'strict';
 
 	// Always skip session check for login URL to prevent infinite redirect loop
 	if (pathname.startsWith(loginUrl)) {
@@ -78,7 +95,9 @@ export async function processAuthMiddleware(
 			baseUrl,
 			cookieSecret,
 			sessionDataTtl,
-			domain
+			domain,
+			sameSite,
+			log
 		);
 		if (exchangeResult !== null) {
 			// OAuth exchange successful - redirect with session cookies
@@ -112,11 +131,19 @@ export async function processAuthMiddleware(
 			cookieSecret,
 			sessionDataTtl,
 			domain,
+			sameSite,
+			log,
 		});
 
 		// Parse session data from response
 		if (sessionResponse.ok) {
-			const data = await sessionResponse.json().catch(() => null);
+			const data = await sessionResponse.json().catch((error) => {
+				log.debug('[neon-auth] Failed to parse session response JSON', {
+					component: 'middleware',
+					detail: error instanceof Error ? error.message : String(error),
+				});
+				return null;
+			});
 			if (data) {
 				sessionData = data as SessionData;
 			}
@@ -151,7 +178,7 @@ export async function processAuthMiddleware(
 			domain,
 			httpOnly: true,
 			secure: true,
-			sameSite: 'lax',
+			sameSite: effectiveSameSite,
 			maxAge: 0,
 		}));
 	}

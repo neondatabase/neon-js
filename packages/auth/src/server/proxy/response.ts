@@ -22,7 +22,7 @@ export const handleAuthResponse = async (
   baseUrl: string,
   cookieConfig: SessionCookieConfig
 ) => {
-  const responseHeaders = prepareResponseHeaders(response, cookieConfig.domain);
+  const responseHeaders = prepareResponseHeaders(response, cookieConfig);
 
   // Mint session data cookie from upstream response
   const sessionDataCookie = await mintSessionDataFromResponse(response.headers, baseUrl, cookieConfig);
@@ -37,22 +37,29 @@ export const handleAuthResponse = async (
   })
 }
 
-const prepareResponseHeaders = (response: Response, domain?: string) => {
+const prepareResponseHeaders = (response: Response, cookieConfig: SessionCookieConfig) => {
   const headers = new Headers();
+  const effectiveSameSite = cookieConfig.sameSite ?? 'strict';
+  const { domain } = cookieConfig;
   for (const header of RESPONSE_HEADERS_ALLOWLIST) {
     // Special handling for set-cookie: HTTP allows multiple Set-Cookie headers
     if (header === 'set-cookie') {
       const cookies = response.headers.getSetCookie();
       for (const cookieHeader of cookies) {
-        // Parse and add domain if specified
-        if (domain) {
-          const parsedCookies = parseSetCookies(cookieHeader);
-          for (const parsedCookie of parsedCookies) {
+        // Always sanitize upstream cookie flags before forwarding to the browser:
+        // - Strip Partitioned: Safari does not send Partitioned cookies on top-level navigations,
+        //   which breaks the OAuth challenge exchange when the callback hits a middleware route.
+        //   The flag is also only meaningful for third-party contexts; proxied cookies are first-party.
+        // - Apply configured SameSite (default strict): upstream may send SameSite=None with Partitioned.
+        // Domain assignment is the only other conditional step.
+        const parsedCookies = parseSetCookies(cookieHeader);
+        for (const parsedCookie of parsedCookies) {
+          parsedCookie.partitioned = undefined;
+          parsedCookie.sameSite = effectiveSameSite;
+          if (domain) {
             parsedCookie.domain = domain;
-            headers.append('Set-Cookie', serializeSetCookie(parsedCookie));
           }
-        } else {
-          headers.append('Set-Cookie', cookieHeader);
+          headers.append('Set-Cookie', serializeSetCookie(parsedCookie));
         }
       }
     } else {

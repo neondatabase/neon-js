@@ -4,6 +4,7 @@ import type {
   BetterAuthSession as Session,
   BetterAuthUser as User,
 } from '@/core/better-auth-types';
+import type { NeonAuthNetworkErrorCode } from './network-error';
 
 export type RequireSessionData = {
   session: Session;
@@ -17,6 +18,16 @@ export type SessionData =
       user: null;
     };
 
+/**
+ * Error shape returned from Neon Auth server API helpers (`auth.signIn`, `getSession`, etc.)
+ * when the upstream call fails. `code` is a transport code, `'INTERNAL_ERROR'`, or a Better Auth HTTP error code string.
+ */
+export type NeonAuthServerApiError = {
+  message: string;
+  status: number;
+  statusText: string;
+  code: NeonAuthNetworkErrorCode | 'INTERNAL_ERROR' | (string & {});
+};
 
 export interface SessionDataCookie {
   value: string;
