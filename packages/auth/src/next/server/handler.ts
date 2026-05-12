@@ -17,11 +17,11 @@ type Params = { path: string[] };
  * @throws Error if `cookies.secret` is less than 32 characters
  *
  * @example
- * Mount the `authApiHandler` to an API route. Create a route file inside `/api/auth/[...all]/route.ts` directory.
+ * Mount the `authApiHandler` to an API route. Create a route file inside `/api/auth/[...path]/route.ts` directory.
  * And add the following code:
  *
  * ```ts
- * // app/api/auth/[...all]/route.ts
+ * // app/api/auth/[...path]/route.ts
  * import { authApiHandler } from '@neondatabase/auth/next';
  *
  * export const { GET, POST } = authApiHandler({
