@@ -38,16 +38,16 @@ Authentication adapters for Neon Auth supporting multiple auth providers:
 **Exports:**
 - `@neondatabase/auth` - Main exports (createAuthClient, types)
 - `@neondatabase/auth/react` - React adapter exports
-- `@neondatabase/auth/react/ui` - Re-exports from auth-ui
-- `@neondatabase/auth/react/ui/server` - Server-side utilities
+- `@neondatabase/auth-ui` - Preferred UI components package
+- `@neondatabase/auth-ui/server` - Preferred UI server utilities
 - `@neondatabase/auth/react/adapters` - BetterAuthReactAdapter
 - `@neondatabase/auth/vanilla` - Vanilla adapter exports
 - `@neondatabase/auth/vanilla/adapters` - SupabaseAuthAdapter, BetterAuthVanillaAdapter
 - `@neondatabase/auth/next` - Next.js integration (createAuthClient for client-side)
 - `@neondatabase/auth/next/server` - Next.js server integration (createNeonAuth for server-side)
 - `@neondatabase/auth/types` - Better Auth types (Session, User, Organization, etc.)
-- `@neondatabase/auth/ui/css` - Pre-built CSS
-- `@neondatabase/auth/ui/tailwind` - Tailwind CSS
+- `@neondatabase/auth-ui/css` - Pre-built CSS bundle
+- `@neondatabase/auth-ui/tailwind` - Tailwind-ready CSS
 
 ### `@neondatabase/neon-js` (packages/neon-js/)
 Main SDK package that combines authentication with PostgreSQL querying:
@@ -91,7 +91,7 @@ UI components for Neon Auth built on top of [better-auth-ui](https://better-auth
 - `@neondatabase/auth-ui/tailwind` - Tailwind-ready CSS
 - `@neondatabase/auth-ui/server` - Server-side utilities
 
-**Note:** CSS is also re-exported from `@neondatabase/auth/ui/css` and `@neondatabase/auth/ui/tailwind` for convenience.
+**Note:** New examples should import UI components and styles directly from `@neondatabase/auth-ui`. Compatibility re-exports from `@neondatabase/auth` are deprecated.
 
 **Dependencies:**
 - `@neondatabase/auth` (peer dependency)
@@ -245,9 +245,9 @@ CSS is intentionally duplicated across packages for convenience imports:
 auth-ui (generates via Tailwind) → auth (copies) → neon-js (copies)
 ```
 
-**Why triplication?** Enables users to import CSS from whichever package they use:
+**Why triplication?** Preserves compatibility for older import paths while new code imports directly from auth-ui:
 - `@neondatabase/auth-ui/css` - Direct from source
-- `@neondatabase/auth/ui/css` - Convenience for auth-only users
+- Auth package CSS compatibility entrypoint - deprecated
 - `@neondatabase/neon-js/ui/css` - Convenience for full SDK users
 
 **End-user impact:** Minimal. npm deduplicates identical files during download. End users get ~47KB of CSS, not 141KB.
@@ -590,11 +590,11 @@ export default function AuthPage() {
 **CSS Import Options:**
 ```css
 /* Without Tailwind - import pre-built CSS */
-@import '@neondatabase/auth/ui/css';
+@import '@neondatabase/auth-ui/css';
 
 /* With Tailwind CSS v4 */
 @import 'tailwindcss';
-@import '@neondatabase/auth/ui/tailwind';
+@import '@neondatabase/auth-ui/tailwind';
 ```
 
 ## Adapter Features
