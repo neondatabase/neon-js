@@ -1,29 +1,39 @@
--- Personal todos (organization_id IS NULL) and team todos (JWT `o` claim):
---   { "id": "<org-uuid>", "slug": "<org-slug>", "role": "<member-role>" }
--- Requires Neon Auth Organizations plugin enabled on the auth endpoint.
+-- Apply on existing databases that used the pre-organization migration.sql.
+-- Requires Neon Auth Organizations plugin enabled.
 
-CREATE TABLE public.todos (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-    user_id text NOT NULL,
-    organization_id text,
-    title text NOT NULL,
-    completed boolean NOT NULL DEFAULT false,
-    is_public boolean NOT NULL DEFAULT false,
-    created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now()
-);
+ALTER TABLE public.todos
+ADD COLUMN IF NOT EXISTS organization_id text;
 
-CREATE INDEX idx_todos_organization_id ON public.todos (organization_id)
+CREATE INDEX IF NOT EXISTS idx_todos_organization_id ON public.todos (organization_id)
 WHERE
     organization_id IS NOT NULL;
 
-CREATE INDEX idx_todos_is_public ON public.todos (is_public)
-WHERE
-    is_public = true;
+DROP POLICY IF EXISTS "Users can view their own todos" ON public.todos;
 
-ALTER TABLE public.todos ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can create their own todos" ON public.todos;
 
--- Active organization from JWT claim `o`: { "id", "slug", "role" } (Neon Auth organization plugin).
+DROP POLICY IF EXISTS "Users can update their own todos" ON public.todos;
+
+DROP POLICY IF EXISTS "Users can delete their own todos" ON public.todos;
+
+DROP POLICY IF EXISTS "Org members can view org todos" ON public.todos;
+
+DROP POLICY IF EXISTS "Org members can create org todos" ON public.todos;
+
+DROP POLICY IF EXISTS "Org members can update org todos" ON public.todos;
+
+DROP POLICY IF EXISTS "Org members can delete org todos" ON public.todos;
+
+DROP POLICY IF EXISTS "Authenticated users can view todos" ON public.todos;
+
+DROP POLICY IF EXISTS "Authenticated users can create todos" ON public.todos;
+
+DROP POLICY IF EXISTS "Authenticated users can update todos" ON public.todos;
+
+DROP POLICY IF EXISTS "Authenticated users can delete todos" ON public.todos;
+
+DROP FUNCTION IF EXISTS public.jwt_organization() ->> 'id';
+
 CREATE OR REPLACE FUNCTION public.jwt_organization()
 RETURNS jsonb
 LANGUAGE sql
@@ -33,7 +43,6 @@ AS $$
   SELECT auth.jwt() -> 'o';
 $$;
 
--- Signed-in users: org todos (JWT `o`), personal todos (organization_id IS NULL), or public.
 CREATE POLICY "Authenticated users can view todos" ON public.todos FOR
 SELECT TO authenticated USING (
     (
@@ -84,21 +93,3 @@ CREATE POLICY "Authenticated users can delete todos" ON public.todos FOR DELETE 
         AND user_id = auth.user_id ()
     )
 );
-
-GRANT SELECT ON public.todos TO anonymous;
-
-CREATE POLICY "Anonymous users can view public todos" ON public.todos FOR
-SELECT TO anonymous USING (is_public = true);
-
-CREATE OR REPLACE FUNCTION public.update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = now();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SET search_path = public;
-
-CREATE TRIGGER update_todos_updated_at
-  BEFORE UPDATE ON public.todos
-  FOR EACH ROW
-  EXECUTE FUNCTION public.update_updated_at_column();

@@ -6,6 +6,7 @@ import {
   UserAvatar,
   AuthLoading,
   AuthUIContext,
+  OrganizationSwitcher,
 } from '@neondatabase/neon-js/auth/react';
 import { Link, NavLink } from 'react-router-dom';
 import { ThemeToggle } from './ThemeToggle';
@@ -59,6 +60,15 @@ export function Header() {
             Iframe Test
           </NavLink>
           <SignedIn>
+            <NavLink
+              to="/organization/settings"
+              style={({ isActive }) => ({
+                ...styles.navLink,
+                ...(isActive ? styles.navLinkActive : {}),
+              })}
+            >
+              Organizations
+            </NavLink>
             <NavLink
               to="/account/settings"
               style={({ isActive }) => ({
@@ -121,6 +131,9 @@ export function Header() {
 
           {/* Signed In State - Desktop Only */}
           <SignedIn>
+            <div style={styles.orgSwitcher} className="header-desktop-only">
+              <OrganizationSwitcher />
+            </div>
             <div className="header-desktop-only">
               <UserButton />
             </div>
@@ -218,6 +231,16 @@ export function Header() {
           </NavLink>
           <SignedIn>
             <NavLink
+              to="/organization/settings"
+              onClick={closeMobileMenu}
+              style={({ isActive }) => ({
+                ...styles.mobileNavLink,
+                ...(isActive ? styles.mobileNavLinkActive : {}),
+              })}
+            >
+              Organizations
+            </NavLink>
+            <NavLink
               to="/account/settings"
               onClick={closeMobileMenu}
               style={({ isActive }) => ({
@@ -233,6 +256,9 @@ export function Header() {
         <div style={styles.mobileMenuFooter}>
           {/* User Info - Mobile */}
           <SignedIn>
+            <div style={styles.mobileOrgSwitcher}>
+              <OrganizationSwitcher />
+            </div>
             <Link
               to="/account/settings"
               onClick={closeMobileMenu}
@@ -370,6 +396,12 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: '0.75rem',
+  },
+  orgSwitcher: {
+    maxWidth: '220px',
+  },
+  mobileOrgSwitcher: {
+    marginBottom: '0.5rem',
   },
   iconButton: {
     display: 'flex',
