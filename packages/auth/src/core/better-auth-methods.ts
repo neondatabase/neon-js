@@ -410,6 +410,8 @@ export function deriveBetterAuthMethodFromUrl(
   return undefined;
 }
 
+let broadcastChannelSubscribed = false;
+
 export function initBroadcastChannel() {
   // Handle OAuth popup completion - send verifier to parent and close
   if (isBrowser() && globalThis.opener && globalThis.opener !== globalThis) {
@@ -425,6 +427,11 @@ export function initBroadcastChannel() {
       return;
     }
   }
+
+  if (broadcastChannelSubscribed) {
+    return;
+  }
+  broadcastChannelSubscribed = true;
 
   getGlobalBroadcastChannel().subscribe((message) => {
     if (message.clientId === CURRENT_TAB_CLIENT_ID) {
