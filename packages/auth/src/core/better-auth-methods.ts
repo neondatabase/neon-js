@@ -72,6 +72,7 @@ export const BETTER_AUTH_ENDPOINTS = {
   token: '/token',
   anonymousSignIn: '/sign-in/anonymous',
   anonymousToken: '/token/anonymous',
+  setActiveOrganization: '/organization/set-active',
 } as const;
 
 /**
@@ -180,6 +181,12 @@ export const BETTER_AUTH_METHODS_HOOKS: Record<string, MethodHook> = {
     onSuccess: () => {
       BETTER_AUTH_METHODS_CACHE.clearSessionCache();
       emitAuthEvent({ type: 'SIGN_OUT' });
+    },
+  },
+  setActiveOrganization: {
+    onRequest: () => {},
+    onSuccess: () => {
+      BETTER_AUTH_METHODS_CACHE.invalidateSessionCache();
     },
   },
   updateUser: {
@@ -397,6 +404,9 @@ export function deriveBetterAuthMethodFromUrl(
   }
   if (url.includes(BETTER_AUTH_ENDPOINTS.signOut)) {
     return 'signOut';
+  }
+  if (url.includes(BETTER_AUTH_ENDPOINTS.setActiveOrganization)) {
+    return 'setActiveOrganization';
   }
   if (url.includes(BETTER_AUTH_ENDPOINTS.updateUser)) {
     return 'updateUser';
