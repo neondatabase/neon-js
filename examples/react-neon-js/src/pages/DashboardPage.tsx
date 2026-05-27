@@ -26,7 +26,6 @@ function DashboardContent() {
   const { hooks } = useContext(AuthUIContext);
   const { data: session } = hooks.useSession();
   const { data: activeOrg } = hooks.useActiveOrganization();
-  const { data: activeMember } = hooks.useActiveMember();
 
   const [todos, setTodos] = useState<Todo[]>([]);
   const [newTodoTitle, setNewTodoTitle] = useState('');
@@ -46,6 +45,7 @@ function DashboardContent() {
   const isAuthenticated = Boolean(userId) && !isAnonymous;
   const isReadOnly = !isAuthenticated;
   const activeOrgId = activeOrg?.id ?? null;
+  const activeMemberRole = activeOrg?.members?.find((m) => m.userId === userId)?.role;
   const addToOrganization = Boolean(activeOrgId) && !addAsPersonal;
 
   // Fetch todos
@@ -283,7 +283,7 @@ function DashboardContent() {
                 </h1>
                 <p style={styles.email}>
                   {activeOrg
-                    ? `Team + personal tasks${activeMember?.role ? ` · ${activeMember.role}` : ''}`
+                    ? `Team + personal tasks${activeMemberRole ? ` · ${activeMemberRole}` : ''}`
                     : 'Personal tasks'}
                 </p>
               </div>

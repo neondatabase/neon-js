@@ -32,12 +32,13 @@ DROP POLICY IF EXISTS "Authenticated users can update todos" ON public.todos;
 
 DROP POLICY IF EXISTS "Authenticated users can delete todos" ON public.todos;
 
-DROP FUNCTION IF EXISTS public.jwt_organization() ->> 'id';
+DROP FUNCTION IF EXISTS public.jwt_organization();
 
 CREATE OR REPLACE FUNCTION public.jwt_organization()
 RETURNS jsonb
 LANGUAGE sql
 STABLE
+SECURITY DEFINER
 SET search_path = public
 AS $$
   SELECT auth.jwt() -> 'o';

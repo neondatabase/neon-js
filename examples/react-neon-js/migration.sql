@@ -28,6 +28,7 @@ CREATE OR REPLACE FUNCTION public.jwt_organization()
 RETURNS jsonb
 LANGUAGE sql
 STABLE
+SECURITY DEFINER
 SET search_path = public
 AS $$
   SELECT auth.jwt() -> 'o';

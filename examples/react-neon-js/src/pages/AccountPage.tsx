@@ -7,9 +7,10 @@ import {
   SecuritySettingsCards,
   SessionsCard,
   ChangePasswordCard,
+  OrganizationsCard,
 } from '@neondatabase/neon-js/auth/react';
 
-type AccountView = 'settings' | 'security' | 'sessions';
+type AccountView = 'settings' | 'security' | 'sessions' | 'organizations';
 
 export function AccountPage() {
   const { view } = useParams<{ view: string }>();
@@ -44,6 +45,9 @@ export function AccountPage() {
             <TabLink to="/account/sessions" active={currentView === 'sessions'}>
               📱 Sessions
             </TabLink>
+            <TabLink to="/account/organizations" active={currentView === 'organizations'}>
+              🏢 Organizations
+            </TabLink>
           </div>
 
           {/* Content */}
@@ -51,6 +55,7 @@ export function AccountPage() {
             {currentView === 'settings' && <SettingsView />}
             {currentView === 'security' && <SecurityView />}
             {currentView === 'sessions' && <SessionsView />}
+            {currentView === 'organizations' && <OrganizationsView />}
           </div>
         </div>
       </SignedIn>
@@ -113,6 +118,20 @@ function SecurityView() {
           Manage linked accounts and other security settings.
         </p>
         <SecuritySettingsCards />
+      </div>
+    </div>
+  );
+}
+
+function OrganizationsView() {
+  return (
+    <div style={styles.section}>
+      <div style={styles.sectionCard}>
+        <h2 style={styles.sectionTitle}>Organizations</h2>
+        <p style={styles.sectionDesc}>
+          Create organizations and collaborate with your team.
+        </p>
+        <OrganizationsCard />
       </div>
     </div>
   );
