@@ -68,6 +68,7 @@ export function MagicLinkForm() {
   }
 
   const showForm = status === "idle" || status === "error";
+  const isSending = status === "sending";
 
   return (
     <div className="w-full max-w-md rounded-xl border border-border bg-card p-8">
@@ -120,15 +121,15 @@ export function MagicLinkForm() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               className="h-11 rounded-lg border border-input bg-background px-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              disabled={status === "sending"}
+              disabled={isSending}
             />
           </div>
           <button
             type="submit"
-            disabled={status === "sending"}
+            disabled={isSending}
             className="h-11 rounded-lg bg-primary font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
           >
-            {status === "sending" ? "Sending..." : "Send Magic Link"}
+            {isSending ? "Sending..." : "Send Magic Link"}
           </button>
         </form>
       ) : (
@@ -153,7 +154,7 @@ export function MagicLinkForm() {
             <button
               type="button"
               onClick={handleResend}
-              disabled={status === "sending"}
+              disabled={isSending}
               className="text-sm text-primary transition-colors hover:text-primary/80 disabled:opacity-50"
             >
               Resend link

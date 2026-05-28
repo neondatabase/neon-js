@@ -75,6 +75,9 @@ importers:
 
   examples/neon-auth-magic-link-example:
     dependencies:
+      '@neondatabase/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@neondatabase/serverless':
         specifier: ^1.0.2
         version: 1.0.2
