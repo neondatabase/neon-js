@@ -147,7 +147,6 @@ export function Providers({ children }) {
   const navigate = useNavigate();
 
   return (
-    // @ts-expect-error - neonAuthClient is a valid auth client
     <AuthUIProvider authClient={neonAuthClient} navigate={navigate} Link={Link}>
       {children}
     </AuthUIProvider>
