@@ -14,6 +14,7 @@ export {
 export {
   shouldProtectRoute,
   checkSessionRequired,
+  DEFAULT_AUTH_SKIP_ROUTES,
   type SessionCheckResult,
 } from './route-protection';
 

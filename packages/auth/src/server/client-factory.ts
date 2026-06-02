@@ -28,7 +28,7 @@ export interface NeonAuthServerConfig {
   log?: ResolvedNeonAuthLogging;
 }
 
-export function createAuthServerInternal(
+export function createAuthServer(
   config: NeonAuthServerConfig
 ): NeonAuthServer {
   const { baseUrl, context: getContext, cookieSecret, sessionDataTtl, domain, sameSite, log } = config;
