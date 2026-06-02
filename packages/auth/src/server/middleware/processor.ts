@@ -24,7 +24,7 @@ export type AuthMiddlewareConfig = {
 	/** URL pathname being accessed */
 	pathname: string;
 	/** Routes that don't require authentication */
-	skipRoutes: string[];
+	skipRoutes: readonly string[];
 	/** URL to redirect to for login */
 	loginUrl: string;
 	/** Base URL of Neon Auth server */

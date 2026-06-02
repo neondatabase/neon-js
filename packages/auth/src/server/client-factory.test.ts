@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
-import { createAuthServerInternal } from './client-factory';
+import { createAuthServer } from './client-factory';
 import type { RequestContext } from './request-context';
 
 const TEST_SECRET = 'test-secret-at-least-32-characters-long!';
@@ -26,7 +26,7 @@ function makeContext(): RequestContext {
   };
 }
 
-describe('createAuthServerInternal error branch', () => {
+describe('createAuthServer error branch', () => {
   const originalFetch = globalThis.fetch;
   let fetchMock: ReturnType<typeof vi.fn>;
 
@@ -54,7 +54,7 @@ describe('createAuthServerInternal error branch', () => {
       )
     );
 
-    const server = createAuthServerInternal({
+    const server = createAuthServer({
       baseUrl: TEST_BASE_URL,
       context: makeContext,
       cookieSecret: TEST_SECRET,
@@ -93,7 +93,7 @@ describe('createAuthServerInternal error branch', () => {
       )
     );
 
-    const server = createAuthServerInternal({
+    const server = createAuthServer({
       baseUrl: TEST_BASE_URL,
       context: makeContext,
       cookieSecret: TEST_SECRET,
@@ -126,7 +126,7 @@ describe('createAuthServerInternal error branch', () => {
       )
     );
 
-    const server = createAuthServerInternal({
+    const server = createAuthServer({
       baseUrl: TEST_BASE_URL,
       context: makeContext,
       cookieSecret: TEST_SECRET,
@@ -158,7 +158,7 @@ describe('createAuthServerInternal error branch', () => {
       )
     );
 
-    const server = createAuthServerInternal({
+    const server = createAuthServer({
       baseUrl: TEST_BASE_URL,
       context: makeContext,
       cookieSecret: TEST_SECRET,
@@ -192,7 +192,7 @@ describe('createAuthServerInternal error branch', () => {
       )
     );
 
-    const server = createAuthServerInternal({
+    const server = createAuthServer({
       baseUrl: TEST_BASE_URL,
       context: makeContext,
       cookieSecret: TEST_SECRET,
@@ -221,7 +221,7 @@ describe('createAuthServerInternal error branch', () => {
       )
     );
 
-    const server = createAuthServerInternal({
+    const server = createAuthServer({
       baseUrl: TEST_BASE_URL,
       context: makeContext,
       cookieSecret: TEST_SECRET,

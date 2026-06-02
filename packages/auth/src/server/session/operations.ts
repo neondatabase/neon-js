@@ -61,12 +61,18 @@ function signPayload(
 }
 
 /**
- * Parse session data from JSON, converting date strings to Date objects
+ * Parse session data from JSON, converting date strings to Date objects.
  *
- * Note: Better Auth API returns ISO 8601 date strings. JSON.parse() does not
- * automatically convert these to Date objects, so manual conversion is required.
+ * Better Auth API returns ISO 8601 date strings; `JSON.parse()` does not
+ * automatically convert these to `Date` objects, so manual conversion is
+ * required.
  *
- * @internal Exported for internal use by auth handler
+ * Adapter authors typically invoke this on responses returned by
+ * {@link handleAuthProxyRequest} when populating framework context
+ * (e.g. `c.var.auth` in Hono). Returns `{ session: null, user: null }` on
+ * parse failure instead of throwing.
+ *
+ * @public
  */
 export function parseSessionData(json: unknown): SessionData {
   // Handle null/undefined/missing response

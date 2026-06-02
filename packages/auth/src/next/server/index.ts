@@ -1,4 +1,4 @@
-import { createAuthServerInternal } from '@/server';
+import { createAuthServer } from '@/server';
 import { createNextRequestContext } from './adapter';
 import type { NeonAuthConfig, NeonAuthMiddlewareConfig } from '@/server/config';
 import { validateCookieConfig } from '@/server/config';
@@ -135,7 +135,7 @@ export function createNeonAuth(config: NeonAuthConfig) {
 	const log = resolveNeonAuthLogging(config);
 
 	// Create base server with all Better Auth methods
-	const server = createAuthServerInternal({
+	const server = createAuthServer({
 		baseUrl,
 		context: createNextRequestContext,
 		cookieSecret: cookies.secret,

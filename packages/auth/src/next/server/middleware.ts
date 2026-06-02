@@ -1,19 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { processAuthMiddleware } from '@/server/middleware';
+import { DEFAULT_AUTH_SKIP_ROUTES, processAuthMiddleware } from '@/server/middleware';
 import type { NeonAuthMiddlewareConfig } from '@/server/config';
 import { validateCookieConfig } from '@/server/config';
 
-const AUTH_API_ROUTES = '/api/auth';
-const SKIP_ROUTES = [
-  AUTH_API_ROUTES,
-  // Routes added by `auth-ui`
-  '/auth/callback',
-  '/auth/sign-in',
-  '/auth/sign-up',
-  '/auth/magic-link',
-  '/auth/email-otp',
-  '/auth/forgot-password',
-];
+const SKIP_ROUTES = DEFAULT_AUTH_SKIP_ROUTES;
 
 /**
  * A Next.js middleware to protect routes from unauthenticated requests and refresh the session if required.
