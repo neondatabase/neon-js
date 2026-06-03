@@ -18,39 +18,39 @@ import * as ServerToolkit from '@/server';
 
 describe('@neondatabase/auth/server public surface', () => {
 	test('exports the expected named symbols', () => {
-		const names = Object.keys(ServerToolkit).sort();
+		const names = Object.keys(ServerToolkit).toSorted();
 		expect(names).toMatchInlineSnapshot(`
-      [
-        "AuthApiError",
-        "AuthError",
-        "DEFAULT_AUTH_SKIP_ROUTES",
-        "NEON_AUTH_COOKIE_PREFIX",
-        "NEON_AUTH_HEADER_MIDDLEWARE_NAME",
-        "NEON_AUTH_NETWORK_ERROR_CODES",
-        "NEON_AUTH_SERVER_PROXY_HEADER",
-        "NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME",
-        "NEON_AUTH_SESSION_COOKIE_NAME",
-        "NEON_AUTH_SESSION_DATA_COOKIE_NAME",
-        "checkSessionRequired",
-        "classifyFetchFailure",
-        "createAuthServer",
-        "extractNeonAuthCookies",
-        "handleAuthProxyRequest",
-        "handleAuthRequest",
-        "handleAuthResponse",
-        "isAuthApiError",
-        "isAuthError",
-        "parseCookieValue",
-        "parseSessionData",
-        "parseSetCookies",
-        "processAuthMiddleware",
-        "resolveNeonAuthLogging",
-        "serializeSetCookie",
-        "shouldProtectRoute",
-        "validateCookieConfig",
-        "validateSessionData",
-      ]
-    `);
+			[
+			  "AuthApiError",
+			  "AuthError",
+			  "DEFAULT_AUTH_SKIP_ROUTES",
+			  "NEON_AUTH_COOKIE_PREFIX",
+			  "NEON_AUTH_HEADER_MIDDLEWARE_NAME",
+			  "NEON_AUTH_NETWORK_ERROR_CODES",
+			  "NEON_AUTH_SERVER_PROXY_HEADER",
+			  "NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME",
+			  "NEON_AUTH_SESSION_COOKIE_NAME",
+			  "NEON_AUTH_SESSION_DATA_COOKIE_NAME",
+			  "checkSessionRequired",
+			  "classifyFetchFailure",
+			  "createAuthServer",
+			  "extractNeonAuthCookies",
+			  "handleAuthProxyRequest",
+			  "handleAuthRequest",
+			  "handleAuthResponse",
+			  "isAuthApiError",
+			  "isAuthError",
+			  "parseCookieValue",
+			  "parseSessionData",
+			  "parseSetCookies",
+			  "processAuthMiddleware",
+			  "resolveNeonAuthLogging",
+			  "serializeSetCookie",
+			  "shouldProtectRoute",
+			  "validateCookieConfig",
+			  "validateSessionData",
+			]
+		`);
 	});
 
 	test('every exported value has the expected JS kind', () => {
