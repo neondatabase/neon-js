@@ -23,6 +23,11 @@ export default defineConfig(
       'src/auth/vanilla/adapters/index.ts',
       'src/auth/next/index.ts',
       'src/auth/next/server/index.ts',
+      // Framework-agnostic server toolkit re-export.
+      // Mirrors `@neondatabase/auth/server` so adopters of the full SDK can
+      // build framework adapters without adding `@neondatabase/auth` as a
+      // separate dep. See packages/auth/BUILDING-AN-ADAPTER.md.
+      'src/auth/server/index.ts',
     ],
     external: ['@neondatabase/auth', '@neondatabase/postgrest-js'],
     plugins: [

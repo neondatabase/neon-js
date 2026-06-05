@@ -47,7 +47,7 @@ shaped the same way:
 ```typescript
 // adapter.ts
 import type { RequestContext } from '@neondatabase/auth/server';
-import { extractNeonAuthCookies } from '@neondatabase/auth/server';
+import { extractNeonAuthCookies, serializeSetCookie } from '@neondatabase/auth/server';
 import { getContext } from 'hono/context-storage'; // example: Hono
 
 function createHonoRequestContext(): RequestContext {
@@ -55,8 +55,10 @@ function createHonoRequestContext(): RequestContext {
   return {
     getCookies: () => extractNeonAuthCookies(c.req.header('cookie') ?? ''),
     setCookie: (name, value, options) => {
-      // Map toolkit options into your framework's cookie API
-      c.header('Set-Cookie', serializeCookie(name, value, options), {
+      // `serializeSetCookie` takes a single `ParsedCookie` object — the toolkit's
+      // canonical Set-Cookie serializer. Pass the toolkit's `options` through
+      // verbatim; it already sanitizes flags before reaching your adapter.
+      c.header('Set-Cookie', serializeSetCookie({ name, value, ...options }), {
         append: true,
       });
     },
@@ -117,9 +119,10 @@ export function createHonoAuth(config: NeonAuthConfig) {
 
 ## Step 3 — Mount the proxy handler
 
-The toolkit's `handleAuthProxyRequest` is a pure function from
-`(Request, paths, config) -> Promise<Response>`. Mount it under the conventional
-`/api/auth/*` path, extracting `paths` from your framework's router:
+The toolkit's `handleAuthProxyRequest` takes a single `AuthProxyConfig` object
+and returns a `Promise<Response>`. `path` is the slash-joined remainder after
+your `/api/auth/` mount point (e.g. `'sign-in/email'`), not an array. Mount it
+under the conventional `/api/auth/*` path:
 
 ```typescript
 // handler.ts
@@ -127,8 +130,17 @@ import { handleAuthProxyRequest } from '@neondatabase/auth/server';
 
 export function authHandler(config: ProxyConfig) {
   return async (c: Context) => {
-    const path = c.req.path.split('/api/auth/')[1]?.split('/') ?? [];
-    return handleAuthProxyRequest(c.req.raw, path, config);
+    const path = c.req.path.replace(/^\/api\/auth\//, '');
+    return handleAuthProxyRequest({
+      request: c.req.raw,
+      path,
+      baseUrl: config.baseUrl,
+      cookieSecret: config.cookieSecret,
+      sessionDataTtl: config.sessionDataTtl,
+      domain: config.domain,
+      sameSite: config.sameSite,
+      log: config.log,
+    });
   };
 }
 ```
@@ -140,8 +152,17 @@ internally. Your handler is intentionally a one-liner.
 ## Step 4 — Add middleware
 
 `processAuthMiddleware` returns a discriminated `MiddlewareResult` describing
-what should happen to the response. Translate each variant into your
-framework's native response/redirect API:
+what should happen to the response. The discriminant is `action` (not `type`)
+and has **three** variants — handle all three or the OAuth callback path will
+silently break:
+
+| `action` | `redirectUrl` | `cookies` | `headers` | When |
+|---|---|---|---|---|
+| `'allow'` | — | optional | optional | Public route, or session valid (session-data cookie may need refresh) |
+| `'redirect_oauth'` | `URL` (required) | required | — | `?code=` callback after OAuth — verifier exchanged, cookies cleared, redirect onward |
+| `'redirect_login'` | `URL` (required) | optional | — | Protected route, no/expired session |
+
+Translate each variant into your framework's native response/redirect API:
 
 ```typescript
 // middleware.ts
@@ -154,16 +175,38 @@ export function authMiddleware(config: MiddlewareConfig) {
       request: c.req.raw,
       pathname: url.pathname,
       skipRoutes: DEFAULT_AUTH_SKIP_ROUTES,
-      ...config,
+      loginUrl: config.loginUrl,
+      baseUrl: config.baseUrl,
+      cookieSecret: config.cookieSecret,
+      sessionDataTtl: config.sessionDataTtl,
+      domain: config.domain,
+      sameSite: config.sameSite,
+      log: config.log,
     });
 
-    switch (result.type) {
+    switch (result.action) {
       case 'allow':
+        // Forward any signal headers (e.g. `x-neon-auth-middleware: true`) so
+        // downstream handlers know auth middleware already ran.
+        if (result.headers) {
+          for (const [k, v] of Object.entries(result.headers)) c.req.raw.headers.set(k, v);
+        }
         await next();
-        for (const cookie of result.cookiesToSet) c.header('Set-Cookie', cookie, { append: true });
+        if (result.cookies) {
+          for (const cookie of result.cookies) c.header('Set-Cookie', cookie, { append: true });
+        }
         return;
-      case 'redirect':
-        return c.redirect(result.url, 302);
+
+      case 'redirect_oauth':
+        // Verifier-cleanup cookies MUST be set on the redirect response.
+        for (const cookie of result.cookies) c.header('Set-Cookie', cookie, { append: true });
+        return c.redirect(result.redirectUrl.toString(), 302);
+
+      case 'redirect_login':
+        if (result.cookies) {
+          for (const cookie of result.cookies) c.header('Set-Cookie', cookie, { append: true });
+        }
+        return c.redirect(result.redirectUrl.toString(), 302);
     }
   };
 }
