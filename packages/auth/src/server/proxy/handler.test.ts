@@ -41,12 +41,17 @@ describe('handleAuthProxyRequest', () => {
 
       const result = await handleAuthProxyRequest(config);
 
-      expect(trySessionCacheSpy).toHaveBeenCalledWith(config.request, TEST_BASE_URL, {
-        secret: TEST_SECRET,
-        sessionDataTtl: undefined,
-        domain: undefined,
-        sameSite: undefined,
-      });
+      expect(trySessionCacheSpy).toHaveBeenCalledWith(
+        config.request,
+        TEST_BASE_URL,
+        {
+          secret: TEST_SECRET,
+          sessionDataTtl: undefined,
+          domain: undefined,
+          sameSite: undefined,
+        },
+        undefined
+      );
       expect(result).toBe(cachedResponse);
       // Should NOT call upstream on cache hit
       expect(handleAuthRequestSpy).not.toHaveBeenCalled();
@@ -164,12 +169,17 @@ describe('handleAuthProxyRequest', () => {
 
       await handleAuthProxyRequest(config);
 
-      expect(handleAuthResponseSpy).toHaveBeenCalledWith(upstreamResponse, BASE_URL, {
-        secret: TEST_SECRET,
-        sessionDataTtl: 600,
-        domain: '.example.com',
-        sameSite: undefined,
-      });
+      expect(handleAuthResponseSpy).toHaveBeenCalledWith(
+        upstreamResponse,
+        BASE_URL,
+        {
+          secret: TEST_SECRET,
+          sessionDataTtl: 600,
+          domain: '.example.com',
+          sameSite: undefined,
+        },
+        undefined
+      );
     });
 
     test('returns processed response from handleAuthResponse', async () => {
@@ -212,7 +222,8 @@ describe('handleAuthProxyRequest', () => {
         BASE_URL,
         expect.objectContaining({
           sessionDataTtl: 900,
-        })
+        }),
+        undefined
       );
     });
 
@@ -239,7 +250,8 @@ describe('handleAuthProxyRequest', () => {
         BASE_URL,
         expect.objectContaining({
           domain: '.custom-domain.com',
-        })
+        }),
+        undefined
       );
     });
 
@@ -261,12 +273,17 @@ describe('handleAuthProxyRequest', () => {
 
       await handleAuthProxyRequest(config);
 
-      expect(handleAuthResponseSpy).toHaveBeenCalledWith(upstreamResponse, BASE_URL, {
-        secret: TEST_SECRET,
-        sessionDataTtl: undefined,
-        domain: undefined,
-        sameSite: undefined,
-      });
+      expect(handleAuthResponseSpy).toHaveBeenCalledWith(
+        upstreamResponse,
+        BASE_URL,
+        {
+          secret: TEST_SECRET,
+          sessionDataTtl: undefined,
+          domain: undefined,
+          sameSite: undefined,
+        },
+        undefined
+      );
     });
   });
 

@@ -3,6 +3,7 @@ import { fetchSessionWithCookie } from './operations';
 import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../constants';
 import { serializeSetCookie } from '../utils/cookies';
 import type { SessionCookieConfig } from '../config';
+import type { ResolvedNeonAuthLogging } from '../logger';
 
 /**
  * Core minting logic - creates session_data cookie from session token
@@ -10,16 +11,19 @@ import type { SessionCookieConfig } from '../config';
  * @param sessionTokenCookie - Session token cookie string (format: "name=value")
  * @param baseUrl - Auth server base URL
  * @param cookieConfig - Cookie configuration
+ * @param log - Optional pre-resolved logger (honors `logLevel: 'silent'`).
+ *              Falls back to `console.error` when omitted.
  * @returns Set-Cookie string or null on error
  */
 async function mintSessionDataCookie(
   sessionTokenCookie: string,
   baseUrl: string,
-  cookieConfig: SessionCookieConfig
+  cookieConfig: SessionCookieConfig,
+  log?: ResolvedNeonAuthLogging
 ): Promise<string | null> {
   try {
     // Fetch session data from upstream using the session token
-    const sessionData = await fetchSessionWithCookie(sessionTokenCookie, baseUrl);
+    const sessionData = await fetchSessionWithCookie(sessionTokenCookie, baseUrl, log);
 
     if (!sessionData.session) {
       return null; // No valid session
@@ -48,12 +52,18 @@ async function mintSessionDataCookie(
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error('[mintSessionDataCookie] Failed to mint session_data cookie:', {
+    const meta = {
       error: errorMessage,
       ...(process.env.NODE_ENV !== 'production' && {
         stack: error instanceof Error ? error.stack : undefined,
       }),
-    });
+    };
+    if (log) {
+      log.error('[mintSessionDataCookie] Failed to mint session_data cookie:', meta);
+    } else {
+      // Console fallback when no logger is plumbed through — matches legacy behavior.
+      console.error('[mintSessionDataCookie] Failed to mint session_data cookie:', meta);
+    }
     return null;
   }
 }
@@ -74,7 +84,8 @@ async function mintSessionDataCookie(
 export async function mintSessionDataFromResponse(
   responseHeaders: Headers,
   baseUrl: string,
-  cookieConfig: SessionCookieConfig
+  cookieConfig: SessionCookieConfig,
+  log?: ResolvedNeonAuthLogging
 ): Promise<string | null> {
   // Check if upstream set a session_token cookie
   const setCookieHeaders = responseHeaders.getSetCookie();
@@ -103,7 +114,7 @@ export async function mintSessionDataFromResponse(
   }
 
   // Session token was set/updated - mint new session_data cookie
-  return await mintSessionDataCookie(sessionTokenCookie, baseUrl, cookieConfig);
+  return await mintSessionDataCookie(sessionTokenCookie, baseUrl, cookieConfig, log);
 }
 
 /**
@@ -120,7 +131,8 @@ export async function mintSessionDataFromResponse(
 export async function mintSessionDataFromToken(
   sessionTokenCookie: string,
   baseUrl: string,
-  cookieConfig: SessionCookieConfig
+  cookieConfig: SessionCookieConfig,
+  log?: ResolvedNeonAuthLogging
 ): Promise<string | null> {
-  return await mintSessionDataCookie(sessionTokenCookie, baseUrl, cookieConfig);
+  return await mintSessionDataCookie(sessionTokenCookie, baseUrl, cookieConfig, log);
 }
