@@ -94,7 +94,8 @@
     "codemods/migrate-auth-ui-imports.mjs",
     "dist",
     "llms.txt",
-    "sbom.cdx.json"
+    "sbom.cdx.json",
+    "BUILDING-AN-ADAPTER.md"
   ],
   "publishConfig": {
     "access": "public"

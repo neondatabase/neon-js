@@ -47,12 +47,17 @@ export async function handleAuthProxyRequest(config: AuthProxyConfig): Promise<R
 		path === API_ENDPOINTS.getSession.path &&
 		request.method === API_ENDPOINTS.getSession.method
 	) {
-		const cachedResponse = await trySessionCache(request, baseUrl, {
-			secret: cookieSecret,
-			sessionDataTtl,
-			domain,
-			sameSite,
-		});
+		const cachedResponse = await trySessionCache(
+			request,
+			baseUrl,
+			{
+				secret: cookieSecret,
+				sessionDataTtl,
+				domain,
+				sameSite,
+			},
+			log
+		);
 		if (cachedResponse) {
 			// Cache hit - return immediately (no upstream call)
 			return cachedResponse;
@@ -61,10 +66,15 @@ export async function handleAuthProxyRequest(config: AuthProxyConfig): Promise<R
 
 	// Fallback: Call upstream API
 	const response = await handleAuthRequest(baseUrl, request, path, log);
-	return await handleAuthResponse(response, baseUrl, {
-		secret: cookieSecret,
-		sessionDataTtl,
-		domain,
-		sameSite,
-	});
+	return await handleAuthResponse(
+		response,
+		baseUrl,
+		{
+			secret: cookieSecret,
+			sessionDataTtl,
+			domain,
+			sameSite,
+		},
+		log
+	);
 }

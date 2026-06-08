@@ -116,11 +116,20 @@ export {
 	NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME,
 } from './constants';
 
-// --- Auth error classes (currently re-exported from next/server too) -----
-
-export {
-	AuthError,
-	AuthApiError,
-	isAuthError,
-	isAuthApiError,
-} from '@/adapters/supabase/auth-interface';
+// --- NOT exported: Supabase-flavored AuthError / AuthApiError -------------
+//
+// `AuthError` / `AuthApiError` / `isAuthError` / `isAuthApiError` are
+// `@supabase/auth-js` re-exports used by `SupabaseAuthAdapter`. Surfacing them
+// from this vendor-neutral toolkit would couple every adapter author's public
+// contract to a pinned Supabase version and risk `instanceof`-across-realms
+// failures.
+//
+// Toolkit-side error handling lives on the `NeonAuthServerApiError` envelope
+// returned by `createAuthServer` server methods (typed `{ message, status,
+// statusText, code }` with `code: NeonAuthNetworkErrorCode | 'INTERNAL_ERROR'
+// | (string & {})`). Adapter authors should narrow on `error.code` rather
+// than `instanceof AuthError`.
+//
+// Supabase consumers can still import them directly from
+// `@neondatabase/auth/vanilla/adapters` (where `SupabaseAuthAdapter` lives).
+// See #161 review feedback (Andras item 7).

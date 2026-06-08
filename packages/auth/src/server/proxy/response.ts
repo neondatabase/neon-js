@@ -1,6 +1,7 @@
 import { mintSessionDataFromResponse } from '../session/minting';
 import { parseSetCookies, serializeSetCookie } from '@/server/utils/cookies';
 import type { SessionCookieConfig } from '../config';
+import type { ResolvedNeonAuthLogging } from '../logger';
 
 // Allowlist of response headers that we want to proxy to the client from Neon Auth.
 const RESPONSE_HEADERS_ALLOWLIST = ['content-type', 'content-length', 'content-encoding', 'transfer-encoding',
@@ -20,12 +21,13 @@ const RESPONSE_HEADERS_ALLOWLIST = ['content-type', 'content-length', 'content-e
 export const handleAuthResponse = async (
   response: Response,
   baseUrl: string,
-  cookieConfig: SessionCookieConfig
+  cookieConfig: SessionCookieConfig,
+  log?: ResolvedNeonAuthLogging
 ) => {
   const responseHeaders = prepareResponseHeaders(response, cookieConfig);
 
   // Mint session data cookie from upstream response
-  const sessionDataCookie = await mintSessionDataFromResponse(response.headers, baseUrl, cookieConfig);
+  const sessionDataCookie = await mintSessionDataFromResponse(response.headers, baseUrl, cookieConfig, log);
   if (sessionDataCookie) {
     responseHeaders.append('Set-Cookie', sessionDataCookie);
   }

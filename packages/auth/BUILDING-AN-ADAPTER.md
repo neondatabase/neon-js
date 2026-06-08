@@ -242,11 +242,64 @@ the framework-specific bridge:
    request/response objects.
 2. **Handler routing**: assert `/api/auth/sign-in/email` is correctly forwarded
    to `handleAuthProxyRequest` with `['sign-in', 'email']`.
-3. **Middleware mapping**: assert each `MiddlewareResult.type` produces the
+3. **Middleware mapping**: assert each `MiddlewareResult.action` produces the
    right framework response (200 / 302 / Set-Cookie pass-through).
 
 The Next.js adapter's tests in
 [`src/next/server/`](./src/next/server/) are a useful template.
+
+## Known limitations
+
+A few things are intentionally not surfaced through the toolkit yet. If any of
+these blocks your adapter, please open an issue.
+
+### `fetchOptions` on server methods is not forwarded upstream
+
+Better Auth's client API accepts a second `fetchOptions` argument
+(`auth.signIn.email(data, fetchOptions)`) carrying browser-oriented hooks like
+`onSuccess`, `onError`, `throw`, `query`, etc. The toolkit's server proxy
+intentionally **discards** `fetchOptions` and only forwards the data payload
+and the method name to the upstream Neon Auth server.
+
+Rationale:
+
+- Most client-side hooks (`onSuccess`, `onError`, `throw`) are framework
+  callbacks that don't translate to a server-to-server proxy.
+- Forwarding arbitrary `headers` would bypass the toolkit's own cookie
+  sanitization (`Partitioned` stripping, `SameSite` policy, domain assignment).
+- `signal` (AbortSignal) and `query` may be worth wiring through in a future
+  iteration — please open an issue with a concrete use case.
+
+If your adapter needs to inject custom headers on every upstream call (e.g.
+client telemetry), wrap your `RequestContext.getHeader` to expose them and
+the toolkit will pick them up.
+
+### Error narrowing: use `NeonAuthServerApiError`, not `instanceof AuthError`
+
+Server methods returned by `createAuthServer` return
+`{ data, error: NeonAuthServerApiError | null }` envelopes. Narrow on
+`error.code`:
+
+```ts
+import { NEON_AUTH_NETWORK_ERROR_CODES } from '@neondatabase/auth/server';
+
+const { data, error } = await auth.signIn.email({ email, password });
+if (error) {
+  if (NEON_AUTH_NETWORK_ERROR_CODES.includes(error.code)) {
+    // Upstream unreachable — retryable
+  } else if (error.code === 'INTERNAL_ERROR') {
+    // Toolkit-level bug — log and surface
+  } else {
+    // Upstream business error (`bad_credentials`, `rate_limited`, …)
+    // — show error.message to the user
+  }
+}
+```
+
+The Supabase-flavored `AuthError` / `AuthApiError` classes are **not** exposed
+on `@neondatabase/auth/server` (they're vendor-coupled and risk
+`instanceof`-across-realms failures). They remain available for
+`SupabaseAuthAdapter` consumers via `@neondatabase/auth/vanilla/adapters`.
 
 ## Versioning
 

@@ -26,6 +26,62 @@ function makeContext(): RequestContext {
   };
 }
 
+// Items 3 from #161 review (Andras): the public toolkit factory MUST enforce
+// the same cookie-secret invariants the Next.js adapter does, otherwise direct
+// consumers can ship weak / empty secrets and yield forgeable session cookies.
+describe('createAuthServer config validation', () => {
+  test('throws when cookieSecret is empty', () => {
+    expect(() =>
+      createAuthServer({
+        baseUrl: TEST_BASE_URL,
+        context: makeContext,
+        cookieSecret: '',
+      })
+    ).toThrow(/secret/i);
+  });
+
+  test('throws when cookieSecret is shorter than 32 characters', () => {
+    expect(() =>
+      createAuthServer({
+        baseUrl: TEST_BASE_URL,
+        context: makeContext,
+        cookieSecret: 'too-short',
+      })
+    ).toThrow(/32/);
+  });
+
+  test('throws when sessionDataTtl is zero or negative', () => {
+    expect(() =>
+      createAuthServer({
+        baseUrl: TEST_BASE_URL,
+        context: makeContext,
+        cookieSecret: TEST_SECRET,
+        sessionDataTtl: 0,
+      })
+    ).toThrow(/sessionDataTtl|ttl/i);
+
+    expect(() =>
+      createAuthServer({
+        baseUrl: TEST_BASE_URL,
+        context: makeContext,
+        cookieSecret: TEST_SECRET,
+        sessionDataTtl: -5,
+      })
+    ).toThrow();
+  });
+
+  test('accepts a valid 32+ char secret and positive sessionDataTtl', () => {
+    expect(() =>
+      createAuthServer({
+        baseUrl: TEST_BASE_URL,
+        context: makeContext,
+        cookieSecret: TEST_SECRET,
+        sessionDataTtl: 60,
+      })
+    ).not.toThrow();
+  });
+});
+
 describe('createAuthServer error branch', () => {
   const originalFetch = globalThis.fetch;
   let fetchMock: ReturnType<typeof vi.fn>;

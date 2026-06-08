@@ -35,8 +35,23 @@ export const DEFAULT_AUTH_SKIP_ROUTES = [
  * @returns true if route should be protected, false if it should be skipped
  */
 export function shouldProtectRoute(pathname: string, skipRoutes: readonly string[]): boolean {
-  // Check if pathname starts with any of the skip routes
-  return !skipRoutes.some((route) => pathname.startsWith(route));
+  // Segment-aware match: a skip route matches the pathname when the
+  // pathname is exactly equal to it OR is a descendant (route + '/...').
+  //
+  // Bare `pathname.startsWith(route)` causes prefix bleed — e.g. with
+  // `route = '/auth/sign-in'` it would also skip `/auth/sign-internal`,
+  // and `/api/auth` would skip `/api/authz`. Since `DEFAULT_AUTH_SKIP_ROUTES`
+  // is now an exported public toolkit contract, the bug would silently
+  // expose adapter authors. See #161 review feedback (Andras).
+  //
+  // Trailing slashes on route definitions are normalized so that
+  // `['/api/auth/']` behaves the same as `['/api/auth']`.
+  return !skipRoutes.some((rawRoute) => {
+    const route = rawRoute.endsWith('/') && rawRoute.length > 1
+      ? rawRoute.slice(0, -1)
+      : rawRoute;
+    return pathname === route || pathname.startsWith(`${route}/`);
+  });
 }
 
 /**

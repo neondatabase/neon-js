@@ -21,8 +21,6 @@ describe('@neondatabase/auth/server public surface', () => {
 		const names = Object.keys(ServerToolkit).toSorted();
 		expect(names).toMatchInlineSnapshot(`
 			[
-			  "AuthApiError",
-			  "AuthError",
 			  "DEFAULT_AUTH_SKIP_ROUTES",
 			  "NEON_AUTH_COOKIE_PREFIX",
 			  "NEON_AUTH_HEADER_MIDDLEWARE_NAME",
@@ -38,8 +36,6 @@ describe('@neondatabase/auth/server public surface', () => {
 			  "handleAuthProxyRequest",
 			  "handleAuthRequest",
 			  "handleAuthResponse",
-			  "isAuthApiError",
-			  "isAuthError",
 			  "parseCookieValue",
 			  "parseSessionData",
 			  "parseSetCookies",
@@ -71,13 +67,6 @@ describe('@neondatabase/auth/server public surface', () => {
 		expect(typeof ServerToolkit.serializeSetCookie).toBe('function');
 		expect(typeof ServerToolkit.parseCookieValue).toBe('function');
 		expect(typeof ServerToolkit.extractNeonAuthCookies).toBe('function');
-		expect(typeof ServerToolkit.isAuthError).toBe('function');
-		expect(typeof ServerToolkit.isAuthApiError).toBe('function');
-
-		// Classes (error constructors)
-		expect(typeof ServerToolkit.AuthError).toBe('function');
-		expect(typeof ServerToolkit.AuthApiError).toBe('function');
-		expect(new ServerToolkit.AuthError('test')).toBeInstanceOf(Error);
 
 		// Constants
 		expect(typeof ServerToolkit.NEON_AUTH_SERVER_PROXY_HEADER).toBe('string');
