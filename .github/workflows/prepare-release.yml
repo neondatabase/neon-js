@@ -37,7 +37,7 @@ on:
           - neon-js
           - all
       bump:
-        description: 'Semver bump kind (ignored if `version` is set)'
+        description: 'Semver bump kind (ignored if `version` is set). Use `reuse` to re-tag the current versions on `ref` without bumping (recover an aborted release).'
         required: false
         type: choice
         default: minor
@@ -45,6 +45,7 @@ on:
           - patch
           - minor
           - major
+          - reuse
       beta:
         description: 'Append -beta to computed versions (ignored for custom `version`)'
         required: false
@@ -101,6 +102,7 @@ jobs:
         id: validate
         env:
           PACKAGE: ${{ inputs.package }}
+          BUMP: ${{ inputs.bump }}
           VERSION_INPUT: ${{ inputs.version }}
         run: |
           REF="${{ inputs.ref || 'main' }}"
@@ -110,6 +112,12 @@ jobs:
           fi
           if [[ "$PACKAGE" == "all" && -n "$VERSION_INPUT" ]]; then
             echo "::error::Custom \`version\` is not supported with \`package=all\`; use a bump kind so every public package is bumped once from its own current version."
+            exit 1
+          fi
+          # In reuse mode there is no version bump to apply, so a custom `version`
+          # makes no sense. Reject the combo up front (mirrors the `all` + `version` guard).
+          if [[ "$BUMP" == "reuse" && -n "$VERSION_INPUT" ]]; then
+            echo "::error::Custom \`version\` is not supported with \`bump=reuse\`; reuse mode re-tags the version already present in each package.json at \`ref\` and never changes it. Leave \`version\` empty."
             exit 1
           fi
 
@@ -157,28 +165,43 @@ jobs:
 
           # Version resolution preamble.
           echo "### Version resolution" >> "$GITHUB_STEP_SUMMARY"
-          if [[ -n "$VERSION_INPUT" ]]; then
+          if [[ "$BUMP" == "reuse" ]]; then
+            MODE="REUSE"
+            echo "reuse=true" >> "$GITHUB_OUTPUT"
+            echo "- Mode: **REUSE**" >> "$GITHUB_STEP_SUMMARY"
+            echo "- No version bump is computed or applied. Each cascade package keeps the version already present in its \`package.json\` at \`ref\`." >> "$GITHUB_STEP_SUMMARY"
+            echo "- The \`beta\` and \`version\` inputs are ignored in reuse mode." >> "$GITHUB_STEP_SUMMARY"
+          elif [[ -n "$VERSION_INPUT" ]]; then
             MODE="CUSTOM_VERSION"
+            echo "reuse=false" >> "$GITHUB_OUTPUT"
             echo "- Mode: **CUSTOM_VERSION**" >> "$GITHUB_STEP_SUMMARY"
             echo "- Trigger package ($TRIGGER) uses explicit version: \`$VERSION_INPUT\`" >> "$GITHUB_STEP_SUMMARY"
             echo "- Cascade packages still follow bump kind: \`$BUMP\` with beta suffix: \`$BETA\`" >> "$GITHUB_STEP_SUMMARY"
           else
             MODE="BUMP"
+            echo "reuse=false" >> "$GITHUB_OUTPUT"
             echo "- Mode: **BUMP**" >> "$GITHUB_STEP_SUMMARY"
             echo "- All packages use bump kind: \`$BUMP\` with beta suffix: \`$BETA\`" >> "$GITHUB_STEP_SUMMARY"
           fi
           echo "" >> "$GITHUB_STEP_SUMMARY"
 
           for pkg in $(echo "$PACKAGES" | jq -r '.[]'); do
-            echo "::group::Bump $pkg ($BUMP)"
+            echo "::group::Resolve $pkg ($BUMP)"
             cd "packages/$pkg"
 
             current=$(jq -r '.version' package.json)
             echo "Current version: $current"
 
-            if [[ "$MODE" == "CUSTOM_VERSION" && "$pkg" == "$TRIGGER" ]]; then
+            if [[ "$MODE" == "REUSE" ]]; then
+              # Reuse mode: take the version already in package.json at `ref`.
+              # No bump, no beta suffix, no package.json edit.
+              new="$current"
+              echo "Reuse version: $new (package.json left unchanged)"
+            elif [[ "$MODE" == "CUSTOM_VERSION" && "$pkg" == "$TRIGGER" ]]; then
               # Trigger package gets the exact version the user typed.
               new="$VERSION_INPUT"
+              echo "New version: $new"
+              jq --arg v "$new" '.version = $v' package.json > tmp.json && mv tmp.json package.json
             else
               # Parse semver and discard any existing prerelease suffix.
               if [[ "$current" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-([a-zA-Z][a-zA-Z0-9]*)(\.([0-9]+))?)?$ ]]; then
@@ -202,10 +225,9 @@ jobs:
               if [[ "$BETA" == "true" ]]; then
                 new="${new}-beta"
               fi
+              echo "New version: $new"
+              jq --arg v "$new" '.version = $v' package.json > tmp.json && mv tmp.json package.json
             fi
-
-            echo "New version: $new"
-            jq --arg v "$new" '.version = $v' package.json > tmp.json && mv tmp.json package.json
 
             VERSIONS=$(echo "$VERSIONS" | jq --arg k "$pkg" --arg v "$new" '. + {($k): $v}')
             TAGS=$(echo "$TAGS" | jq --arg t "${pkg}@v${new}" '. + [$t]')
@@ -218,8 +240,125 @@ jobs:
           echo "### Versions" >> "$GITHUB_STEP_SUMMARY"
           echo "$VERSIONS" | jq -r 'to_entries[] | "- **\(.key)** v\(.value)"' >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Reuse mode published-state guard
+        id: reuse-guard
+        if: steps.versions.outputs.reuse == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # REUSE MODE SAFETY GATE.
+          #
+          # Reuse re-tags an EXISTING version on a corrected commit. That is only
+          # legitimate if the version was never published to npm. npm versions
+          # are immutable, so re-tagging a published version would point a tag at
+          # source that can never reach the registry under that version (and would
+          # mislead operators into thinking they could republish it).
+          #
+          # We must fail-closed: abort the whole run if ANY cascade version is
+          # confirmed published, or if publish-state cannot be determined.
+          #
+          # The npm registry and the Databricks private mirror
+          # (npm-proxy.dev.databricks.com) can both be blocked for days, so this
+          # check is offline-capable:
+          #   1. Try `npm view @neondatabase/<pkg>@<ver> version`.
+          #      - command succeeds + prints the version  -> PUBLISHED (abort)
+          #      - command fails with a "version not found" style 404         -> UNPUBLISHED
+          #      - command fails because the registry is unreachable          -> fall back to (2)
+          #   2. Offline fallback via git tags: a tag `<pkg>@v<ver>` that exists
+          #      AND is reachable on the remote is treated as evidence the version
+          #      MAY be published. Because we cannot positively confirm npm state
+          #      offline, we fail-closed: the operator must delete the tag by hand
+          #      after confirming npm has no such version, then re-run. If no tag
+          #      exists at all and npm is unreachable, we ALSO fail-closed because
+          #      publish-state genuinely cannot be determined.
+          PACKAGES='${{ steps.cascade.outputs.packages }}'
+          VERSIONS='${{ steps.versions.outputs.versions }}'
+
+          PUBLISHED='[]'        # confirmed-published versions -> always abort
+          UNDETERMINED='[]'     # publish-state could not be established -> abort
+
+          echo "### Reuse mode: published-state guard" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          for pkg in $(echo "$PACKAGES" | jq -r '.[]'); do
+            ver=$(echo "$VERSIONS" | jq -r --arg k "$pkg" '.[$k]')
+            spec="@neondatabase/${pkg}@${ver}"
+            tag="${pkg}@v${ver}"
+            echo "::group::Guard $spec"
+
+            # (1) Online check. Capture stdout + stderr + exit code separately.
+            npm_out=""
+            npm_rc=0
+            npm_out=$(npm view "$spec" version 2>npm_err.txt) || npm_rc=$?
+            npm_err=$(cat npm_err.txt 2>/dev/null || true)
+            rm -f npm_err.txt
+
+            if [[ "$npm_rc" -eq 0 && -n "$npm_out" ]]; then
+              echo "CONFIRMED PUBLISHED on npm: $spec (npm view returned '$npm_out')"
+              PUBLISHED=$(echo "$PUBLISHED" | jq -c --arg s "$spec" '. + [$s]')
+              echo "::endgroup::"
+              continue
+            fi
+
+            # Distinguish "registry says no such version" (safe) from "registry
+            # unreachable" (must fall back). npm emits E404 for an unknown
+            # package/version; network/registry problems surface as ENOTFOUND,
+            # ETIMEDOUT, ECONNREFUSED, EAI_AGAIN, ERR_SOCKET, 5xx, etc.
+            if echo "$npm_err" | grep -qiE 'E404|404 Not Found|is not in this registry|no such package'; then
+              echo "Not published (npm 404): $spec"
+              echo "::endgroup::"
+              continue
+            fi
+
+            echo "npm registry unreachable or inconclusive for $spec (rc=$npm_rc)."
+            echo "npm stderr: $npm_err"
+
+            # (2) Offline fallback via git tags.
+            tag_exists=false
+            if git rev-parse -q --verify "refs/tags/$tag" >/dev/null \
+               || git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+              tag_exists=true
+            fi
+
+            if [[ "$tag_exists" == "true" ]]; then
+              # A tag exists but npm could not be reached. We cannot prove the
+              # version is unpublished, so fail-closed and let a human confirm.
+              echo "Tag $tag exists and npm is unreachable -> cannot prove unpublished."
+              UNDETERMINED=$(echo "$UNDETERMINED" | jq -c --arg s "$spec" '. + [$s]')
+            else
+              # No tag and npm unreachable: publish-state genuinely unknown.
+              echo "No tag $tag and npm is unreachable -> publish-state unknown."
+              UNDETERMINED=$(echo "$UNDETERMINED" | jq -c --arg s "$spec" '. + [$s]')
+            fi
+            echo "::endgroup::"
+          done
+
+          PUB_COUNT=$(echo "$PUBLISHED" | jq 'length')
+          UND_COUNT=$(echo "$UNDETERMINED" | jq 'length')
+
+          if [[ "$PUB_COUNT" -gt 0 ]]; then
+            echo "**Confirmed already published (reuse forbidden):**" >> "$GITHUB_STEP_SUMMARY"
+            echo "$PUBLISHED" | jq -r '.[] | "- `\(.)`"' >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::Reuse aborted - one or more versions are already published to npm. npm versions are immutable; reusing a published version is not allowed. Cut a new patch release with the fix instead."
+            exit 1
+          fi
+
+          if [[ "$UND_COUNT" -gt 0 ]]; then
+            echo "**Publish-state could not be determined:**" >> "$GITHUB_STEP_SUMMARY"
+            echo "$UNDETERMINED" | jq -r '.[] | "- `\(.)`"' >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Resolve this before re-running: confirm on npm that the version is NOT published, then delete the stale tag (\`git push origin :refs/tags/<pkg>@v<ver>\`) and re-run reuse, OR wait until the npm registry/mirror is reachable again." >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::Reuse aborted - publish-state for one or more versions could not be determined (npm unreachable). Failing closed rather than risk reusing a published version."
+            exit 1
+          fi
+
+          echo "All cascade versions confirmed unpublished - safe to re-tag." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Check planned tags do not already exist
         id: tag-preflight
+        if: steps.versions.outputs.reuse != 'true'
         run: |
           TAGS='${{ steps.versions.outputs.tags }}'
           EXISTING='[]'
@@ -242,8 +381,138 @@ jobs:
             exit 1
           fi
 
+      - name: Reuse mode re-tag on ref
+        id: reuse-retag
+        if: steps.versions.outputs.reuse == 'true'
+        run: |
+          # REUSE MODE TAGGING.
+          #
+          # No version changed, so there is no package.json diff and therefore no
+          # release PR. The dispatch-time admin/maintain gate is the human
+          # approval. We tag `ref` (the corrected commit) directly.
+          #
+          # The guard step already confirmed every version is unpublished, so any
+          # pre-existing tag for the target version is stale (from the aborted
+          # release) and safe to delete + recreate. Net effect: the tag now points
+          # at `ref`.
+          TAGS='${{ steps.versions.outputs.tags }}'
+          SHA=$(git rev-parse HEAD)
+
+          echo "### Reuse mode: re-tag on \`ref\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Tagging commit \`${SHA}\` (\`${{ inputs.ref || 'main' }}\`)." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          for tag in $(echo "$TAGS" | jq -r '.[]'); do
+            echo "::group::Re-tag $tag"
+
+            # Delete any pre-existing local + remote tag (confirmed unpublished).
+            if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+              echo "Deleting stale local tag $tag"
+              git tag -d "$tag"
+            fi
+            if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+              echo "Deleting stale remote tag $tag"
+              git push origin ":refs/tags/$tag"
+            fi
+
+            git tag -a "$tag" "$SHA" -m "Release $tag (reuse re-tag on commit $SHA)"
+            git push origin "refs/tags/$tag"
+            echo "Re-created tag $tag -> $SHA"
+            echo "- \`$tag\` -> \`${SHA:0:7}\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "::endgroup::"
+          done
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Reuse mode Stage 2 handoff
+        id: reuse-handoff
+        if: steps.versions.outputs.reuse == 'true'
+        run: |
+          # Emit the SAME Stage 2 handoff that post-release.yml produces on the
+          # normal path, but pointing at the re-created tags on `ref`. There is no
+          # PR to comment on in reuse mode, so this goes to the run summary only.
+          PACKAGES='${{ steps.cascade.outputs.packages }}'
+          TAGS='${{ steps.versions.outputs.tags }}'
+          SHA=$(git rev-parse HEAD)
+          SECPUB_OWNER="databricks"
+          SECPUB_REPO="secure-public-registry-releases-eng"
+          UI_LINK="${GITHUB_SERVER_URL}/${SECPUB_OWNER}/${SECPUB_REPO}/actions/workflows/neon-js.yml"
+          ALL_RELEASE_PACKAGES='["postgrest-js","auth-ui","auth","neon-js"]'
+          IS_ALL_RELEASE=false
+          if jq -e --argjson packages "$PACKAGES" --argjson all "$ALL_RELEASE_PACKAGES" -n '$packages == $all' >/dev/null; then
+            IS_ALL_RELEASE=true
+          fi
+          ALL_REF=$(jq -rn --argjson packages "$PACKAGES" --argjson tags "$TAGS" '($packages | index("neon-js")) as $idx | if $idx == null then empty else $tags[$idx] end')
+
+          {
+            echo "## Reused - ready for Stage 2 (npm publish)"
+            echo ""
+            echo "Existing (unpublished) versions re-tagged on commit \`${SHA:0:7}\` (\`${{ inputs.ref || 'main' }}\`). No version bump and no release PR - reuse re-points the version tags at the corrected commit."
+            echo ""
+            if [[ "$IS_ALL_RELEASE" == "true" ]]; then
+              echo "### Full release set"
+              echo ""
+              echo "Dispatch Stage 2 once for the full release set. Use the \`neon-js\` tag as the ref; all tags point at the same commit."
+              echo ""
+              paste <(echo "$PACKAGES" | jq -r '.[]') <(echo "$TAGS" | jq -r '.[]') \
+              | while IFS=$'\t' read -r pkg tag; do
+                  echo "- \`@neondatabase/${pkg}\` -> \`${tag}\`"
+                done
+              echo ""
+              echo "**CLI** (one-liner):"
+              echo '```bash'
+              echo "gh workflow run -R ${SECPUB_OWNER}/${SECPUB_REPO} neon-js.yml \\"
+              echo "  -f package=all \\"
+              echo "  -f ref=${ALL_REF} \\"
+              echo "  -f dry-run=false"
+              echo '```'
+              echo ""
+              echo "**UI:** [Dispatch \`neon-js.yml\`](${UI_LINK}) - fill in the form with \`package=all\`, \`ref=${ALL_REF}\`, untick \`dry-run\`."
+              echo ""
+            else
+              echo "### Publish order (leaf first)"
+              echo ""
+              echo "Dispatch Stage 2 one package at a time, **in the order listed below**. Each downstream package's published tarball references its dependency's version - that dependency must already be on npm when the dependent publishes, or consumers will hit \`npm install\` failures."
+              echo ""
+              i=1
+              paste <(echo "$PACKAGES" | jq -r '.[]') <(echo "$TAGS" | jq -r '.[]') \
+              | while IFS=$'\t' read -r pkg tag; do
+                  echo "${i}. \`@neondatabase/${pkg}\` -> \`${tag}\`"
+                  i=$((i+1))
+                done
+              echo ""
+              echo "---"
+              echo ""
+              i=1
+              paste <(echo "$PACKAGES" | jq -r '.[]') <(echo "$TAGS" | jq -r '.[]') \
+              | while IFS=$'\t' read -r pkg tag; do
+                  echo "### ${i}. \`@neondatabase/${pkg}\` -> \`${tag}\`"
+                  echo ""
+                  echo "**CLI** (one-liner):"
+                  echo '```bash'
+                  echo "gh workflow run -R ${SECPUB_OWNER}/${SECPUB_REPO} neon-js.yml \\"
+                  echo "  -f package=${pkg} \\"
+                  echo "  -f ref=${tag} \\"
+                  echo "  -f dry-run=false"
+                  echo '```'
+                  echo ""
+                  echo "**UI:** [Dispatch \`neon-js.yml\`](${UI_LINK}) - fill in the form with \`package=${pkg}\`, \`ref=${tag}\`, untick \`dry-run\`."
+                  echo ""
+                  echo "**Wait until this run finishes successfully before dispatching the next package.**"
+                  echo ""
+                  i=$((i+1))
+                done
+              echo "---"
+              echo ""
+            fi
+            echo "**If anything's wrong before Stage 2 runs:** delete the bad tag(s) manually (\`git push origin :refs/tags/<pkg>@v<ver>\`) and re-run reuse from a corrected commit."
+            echo ""
+            echo "**If anything's wrong after Stage 2 publishes:** npm versions are immutable, so cut a new patch release with the fix - do NOT try to reuse the same version again (npm will reject republishing it)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Compute release branch + PR metadata
         id: meta
+        if: steps.versions.outputs.reuse != 'true'
         run: |
           PACKAGES='${{ steps.cascade.outputs.packages }}'
           VERSIONS='${{ steps.versions.outputs.versions }}'
@@ -293,6 +562,7 @@ jobs:
 
       - name: Compute commit message
         id: commit-msg
+        if: steps.versions.outputs.reuse != 'true'
         run: |
           PACKAGES='${{ steps.cascade.outputs.packages }}'
           VERSIONS='${{ steps.versions.outputs.versions }}'
@@ -306,6 +576,7 @@ jobs:
           echo "message=$COMMIT_MSG" >> "$GITHUB_OUTPUT"
 
       - name: Ensure `release` label exists
+        if: steps.versions.outputs.reuse != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -313,6 +584,7 @@ jobs:
 
       - name: Create signed commit + open PR
         id: cpr
+        if: steps.versions.outputs.reuse != 'true'
         # Pinned to the full SHA of v8.1.1 (released 2025-04-22).
         # This action commits via the GitHub Contents API, which produces commits
         # signed by the github-actions[bot] verified signature. That replaces the
@@ -404,6 +676,20 @@ jobs:
             echo '```bash' >> "$GITHUB_STEP_SUMMARY"
             echo "git push origin :refs/tags/<pkg>@v<version>" >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+          elif [[ "${{ steps.reuse-guard.outcome }}" == "failure" ]]; then
+            echo "**Reuse mode published-state guard** - one or more reused versions are already published to npm, or their publish-state could not be determined." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Impact:** Nothing was tagged or pushed. Failing closed protects npm immutability." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Recovery:** If a version is genuinely published, reuse is not allowed - cut a new patch release with the fix instead. If publish-state was undetermined (npm registry/mirror unreachable), confirm on npm that the version is unpublished, delete any stale tag (\`git push origin :refs/tags/<pkg>@v<ver>\`), then re-run reuse once the registry is reachable." >> "$GITHUB_STEP_SUMMARY"
+
+          elif [[ "${{ steps.reuse-retag.outcome }}" == "failure" ]]; then
+            echo "**Reuse mode re-tag** - failed while deleting/recreating tags on \`ref\`." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Impact:** Some tags may have been re-created and others not. Check the tag list on the remote before re-running." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Recovery:** Re-run reuse - the step deletes any pre-existing (confirmed-unpublished) tag and recreates it on \`ref\`, so a rerun converges." >> "$GITHUB_STEP_SUMMARY"
 
           elif [[ "${{ steps.cpr.outcome }}" == "failure" ]]; then
             echo "**Create signed commit + open PR** — \`peter-evans/create-pull-request\` failed." >> "$GITHUB_STEP_SUMMARY"
