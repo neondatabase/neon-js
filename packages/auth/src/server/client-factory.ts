@@ -14,7 +14,8 @@ import { validateSessionData } from '@/server/session/validator';
 import { NEON_AUTH_SESSION_COOKIE_NAME, NEON_AUTH_SESSION_DATA_COOKIE_NAME } from './constants';
 import { mintSessionDataFromResponse } from './session/minting';
 import { normalizeBetterAuthError } from '@/core/better-auth-helpers';
-import type { ResolvedNeonAuthLogging } from './logger';
+import type { NeonAuthLogger, ResolvedNeonAuthLogging } from './logger';
+import { resolveLog } from './logger';
 import { classifyFetchFailure } from './network-error';
 import { validateCookieConfig } from './config';
 
@@ -102,20 +103,31 @@ export interface NeonAuthServerConfig {
   sameSite?: SessionCookieSameSite;
 
   /**
-   * Pre-resolved logging sink from {@link resolveNeonAuthLogging}. When
-   * omitted, the toolkit falls back to `console` at the `warn` level.
+   * Logging sink. Accepts either a pre-resolved sink from
+   * {@link resolveNeonAuthLogging} **or** a partial {@link NeonAuthLogger}
+   * (the same shape adapters typically expose to their own users). Partial
+   * loggers are normalized internally at the default `'warn'` level. When
+   * omitted, the toolkit falls back to `console` at `'warn'`.
    *
-   * Adapter authors should resolve once at `createAuthServer` time and
-   * reuse the same sink across middleware and handler to avoid per-request
-   * resolution cost.
+   * Adapter authors who already resolve a sink once (e.g. via
+   * `resolveNeonAuthLogging({ logger, logLevel })` in their public factory)
+   * should forward that sink here to avoid per-request resolution cost and
+   * to preserve their user's `logLevel` gating.
    */
-  log?: ResolvedNeonAuthLogging;
+  log?: ResolvedNeonAuthLogging | NeonAuthLogger;
 }
 
 export function createAuthServer(
   config: NeonAuthServerConfig
 ): NeonAuthServer {
-  const { baseUrl, context: getContext, cookieSecret, sessionDataTtl, domain, sameSite, log } = config;
+  const { baseUrl, context: getContext, cookieSecret, sessionDataTtl, domain, sameSite } = config;
+  // Normalize the optional logger once at factory time so per-request paths
+  // (`log?.warn(...)`) see a consistent `ResolvedNeonAuthLogging | undefined`
+  // regardless of whether the adapter forwarded a partial `NeonAuthLogger`
+  // or a pre-resolved sink. Pre-resolved sinks pass through unchanged so
+  // caller-side level gating (from `resolveNeonAuthLogging`) is preserved.
+  // See #161 review feedback (Andras FIX 3, DX).
+  const log = resolveLog(config.log);
 
   // Enforce the same cookie-secret and TTL invariants the bundled Next.js
   // adapter does via `validateCookieConfig`. Without this guard, toolkit
@@ -234,11 +246,17 @@ export function createAuthServer(
           // strip Partitioned and apply configured SameSite (default `strict`).
           // Always override domain: use local config if set, otherwise strip any
           // upstream Domain attribute to avoid leaking the auth server's domain.
+          // Always force Secure to match the minting path
+          // (`session/minting.ts` hardcodes `secure: true`) and the documented
+          // "Secure is always applied" contract. With `SameSite=None`, a
+          // missing `Secure` makes the browser drop the cookie entirely.
+          // See #161 review feedback (Andras FIX 1, security).
           const cookieOptions = {
             ...cookie,
             domain: domain,
             partitioned: undefined,
             sameSite: effectiveSameSite,
+            secure: true,
           };
           await ctx.setCookie(cookie.name, cookie.value, cookieOptions);
         }

@@ -297,3 +297,98 @@ describe('createAuthServer error branch', () => {
     });
   });
 });
+
+// Andras FIX 1 (security): the API-endpoint upstream-cookie loop in
+// `client-factory.ts` must mirror the proxy and minting paths and always
+// stamp `secure: true` on forwarded cookies. With `SameSite=None`, a missing
+// `Secure` makes the browser drop the cookie entirely.
+describe('createAuthServer cookie forwarding (Secure forcing)', () => {
+  const originalFetch = globalThis.fetch;
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  function makeContextWithSpy(): {
+    context: RequestContext;
+    setCookieSpy: ReturnType<typeof vi.fn>;
+  } {
+    const setCookieSpy = vi.fn();
+    return {
+      context: {
+        getCookies: () => '',
+        setCookie: setCookieSpy,
+        getHeader: () => null,
+        getOrigin: () => 'https://app.example.com',
+        getFramework: () => 'test',
+      },
+      setCookieSpy,
+    };
+  }
+
+  // Helper: build an upstream 200 response with a single Set-Cookie header.
+  // Using `Response.json` keeps lint (unicorn/prefer-response-static-json)
+  // happy and matches sibling tests' style.
+  function upstreamWithSetCookie(setCookie: string): Response {
+    const headers = new Headers({
+      'Content-Type': 'application/json',
+      'Set-Cookie': setCookie,
+    });
+    return Response.json({ ok: true }, { status: 200, headers });
+  }
+
+  test('forces Secure on forwarded cookies even when upstream omits it', async () => {
+    const { context, setCookieSpy } = makeContextWithSpy();
+
+    fetchMock.mockResolvedValueOnce(
+      upstreamWithSetCookie(
+        '__Secure-neon-auth.example_cookie=abc; Path=/; HttpOnly; SameSite=Lax'
+      )
+    );
+
+    const server = createAuthServer({
+      baseUrl: TEST_BASE_URL,
+      context: () => context,
+      cookieSecret: TEST_SECRET,
+    });
+
+    await (server as unknown as {
+      signIn: { email: (args: unknown) => Promise<unknown> };
+    }).signIn.email({ email: 'a@b.com', password: 'p' });
+
+    expect(setCookieSpy).toHaveBeenCalled();
+    const options = setCookieSpy.mock.calls[0][2];
+    expect(options).toMatchObject({ secure: true });
+  });
+
+  test('keeps Secure when upstream sends SameSite=None (would otherwise be dropped)', async () => {
+    const { context, setCookieSpy } = makeContextWithSpy();
+
+    fetchMock.mockResolvedValueOnce(
+      upstreamWithSetCookie(
+        '__Secure-neon-auth.example_cookie=abc; Path=/; HttpOnly; SameSite=None'
+      )
+    );
+
+    const server = createAuthServer({
+      baseUrl: TEST_BASE_URL,
+      context: () => context,
+      cookieSecret: TEST_SECRET,
+      sameSite: 'none',
+    });
+
+    await (server as unknown as {
+      signIn: { email: (args: unknown) => Promise<unknown> };
+    }).signIn.email({ email: 'a@b.com', password: 'p' });
+
+    expect(setCookieSpy).toHaveBeenCalled();
+    const options = setCookieSpy.mock.calls[0][2];
+    expect(options).toMatchObject({ secure: true, sameSite: 'none' });
+  });
+});
