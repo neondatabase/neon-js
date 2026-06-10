@@ -117,7 +117,12 @@ describe('NeonAuthServerConfig shape', () => {
     expectTypeOf<NeonAuthServerConfig['sessionDataTtl']>().toEqualTypeOf<number | undefined>();
     expectTypeOf<NeonAuthServerConfig['domain']>().toEqualTypeOf<string | undefined>();
     expectTypeOf<NeonAuthServerConfig['sameSite']>().toEqualTypeOf<SessionCookieSameSite | undefined>();
-    expectTypeOf<NeonAuthServerConfig['log']>().toEqualTypeOf<ResolvedNeonAuthLogging | undefined>();
+    // `log` accepts either a pre-resolved sink or a partial NeonAuthLogger
+    // (Andras FIX 3, DX) so adapters can forward `log?: NeonAuthLogger` from
+    // their own config without TS2322.
+    expectTypeOf<NeonAuthServerConfig['log']>().toEqualTypeOf<
+      ResolvedNeonAuthLogging | NeonAuthLogger | undefined
+    >();
   });
 });
 
@@ -169,6 +174,17 @@ describe('AuthProxyConfig shape', () => {
     expectTypeOf<AuthProxyConfig['request']>().toEqualTypeOf<Request>();
     expectTypeOf<AuthProxyConfig['path']>().toEqualTypeOf<string>();
     expectTypeOf<AuthProxyConfig['baseUrl']>().toEqualTypeOf<string>();
+  });
+
+  // Andras FIX 3 (DX): `log` must accept either a pre-resolved sink or a
+  // partial `NeonAuthLogger` (the same shape adapters expose to their own
+  // users). Without this widening, adapters forwarding their public
+  // `log?: NeonAuthLogger` straight into `handleAuthProxyRequest` failed
+  // TS2322 against the old `Required<NeonAuthLogger>` type.
+  it('log accepts a pre-resolved sink, a partial NeonAuthLogger, or undefined', () => {
+    expectTypeOf<AuthProxyConfig['log']>().toEqualTypeOf<
+      ResolvedNeonAuthLogging | NeonAuthLogger | undefined
+    >();
   });
 });
 

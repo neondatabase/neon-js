@@ -93,6 +93,11 @@ export function createHonoAuth(config: NeonAuthConfig) {
   validateCookieConfig(config.cookies);
   const log = resolveNeonAuthLogging(config);
 
+  // `createAuthServer` takes a FLAT config: the nested `cookies` block from
+  // your adapter's public `NeonAuthConfig` is mapped to top-level fields.
+  // Do NOT spread `...config.cookies` — that yields `{ secret, ... }` while
+  // the toolkit reads `cookieSecret`, so the spread silently produces an
+  // invalid shape and `cookieSecret` is `undefined` at runtime.
   const server = createAuthServer({
     baseUrl: config.baseUrl,
     context: createHonoRequestContext,
@@ -103,11 +108,24 @@ export function createHonoAuth(config: NeonAuthConfig) {
     log,
   });
 
+  // Single flat config used by both the route handler (Step 3) and the
+  // middleware (Step 4). They each read FLAT fields (`cookieSecret`,
+  // `sessionDataTtl`, `domain`, `sameSite`, `log`) and would also break on
+  // `...config.cookies`.
+  const proxyConfig = {
+    baseUrl: config.baseUrl,
+    cookieSecret: config.cookies.secret,
+    sessionDataTtl: config.cookies.sessionDataTtl,
+    domain: config.cookies.domain,
+    sameSite: config.cookies.sameSite,
+    log,
+  };
+
   // Attach the route handler + middleware so apps get one cohesive surface.
   Object.assign(server, {
-    handler: () => authHandler({ baseUrl: config.baseUrl, log, ...config.cookies }),
+    handler: () => authHandler(proxyConfig),
     middleware: (opts: { loginUrl: string }) =>
-      authMiddleware({ baseUrl: config.baseUrl, log, ...config.cookies, ...opts }),
+      authMiddleware({ ...proxyConfig, ...opts }),
   });
 
   return server as typeof server & {
@@ -214,6 +232,132 @@ export function authMiddleware(config: MiddlewareConfig) {
 
 `DEFAULT_AUTH_SKIP_ROUTES` matches what the Next.js adapter uses; you can
 compose it with your own public routes (`[...DEFAULT_AUTH_SKIP_ROUTES, '/healthz']`).
+
+## Node-style (non-Fetch) frameworks (Express, Fastify)
+
+Express and Fastify do not natively expose Fetch `Request` / `Response`
+objects. The toolkit only speaks Fetch, so an adapter has to bridge in two
+places: the request entering `handleAuthProxyRequest` and the response coming
+back out. Six gotchas show up in practice — handle them all and the rest of
+the adapter looks just like the Fetch-native walkthrough above.
+
+### 1. Build a Fetch `Request` from a Node `IncomingMessage`
+
+You need an **absolute** URL (Node `req.url` is path-only) and you must mark
+the body as half-duplex when there is one, otherwise the `Request`
+constructor throws on Node ≥ 18.
+
+```typescript
+function toFetchRequest(req: import('node:http').IncomingMessage, body?: Buffer): Request {
+  const proto = (req.headers['x-forwarded-proto'] as string) ?? 'http';
+  const host = req.headers.host ?? 'localhost';
+  const url = new URL(req.url ?? '/', `${proto}://${host}`);
+
+  const init: RequestInit & { duplex?: 'half' } = {
+    method: req.method,
+    headers: req.headers as Record<string, string>,
+  };
+  if (body && body.length > 0) {
+    init.body = body;
+    init.duplex = 'half'; // required by undici when body is set
+  }
+  return new Request(url, init);
+}
+```
+
+### 2. Write `Response` back — preserve **multiple** `Set-Cookie` headers
+
+**Critical.** `response.headers.get('set-cookie')` comma-merges multiple
+cookies and corrupts any cookie with `Expires=Wed, 01 Jan 1970…` (the comma
+inside the date is interpreted as a separator). Always use the array form:
+
+```typescript
+// Express
+async function writeFetchResponse(res: import('express').Response, fetchRes: Response) {
+  res.status(fetchRes.status);
+  for (const [k, v] of fetchRes.headers) {
+    if (k.toLowerCase() === 'set-cookie') continue;
+    res.setHeader(k, v);
+  }
+  res.setHeader('set-cookie', fetchRes.headers.getSetCookie()); // <-- array
+  res.send(Buffer.from(await fetchRes.arrayBuffer()));
+}
+
+// Fastify (use reply.raw to set multiple Set-Cookie cleanly)
+async function writeFetchReply(reply: import('fastify').FastifyReply, fetchRes: Response) {
+  reply.raw.statusCode = fetchRes.status;
+  for (const [k, v] of fetchRes.headers) {
+    if (k.toLowerCase() === 'set-cookie') continue;
+    reply.raw.setHeader(k, v);
+  }
+  reply.raw.setHeader('set-cookie', fetchRes.headers.getSetCookie());
+  reply.raw.end(Buffer.from(await fetchRes.arrayBuffer()));
+}
+```
+
+### 3. Raw body parsing on the auth route
+
+The toolkit forwards the body verbatim to upstream; pre-parsed JSON ruins
+upstream signature verification. Disable framework body parsers on the auth
+mount only:
+
+```typescript
+// Express 5
+import express from 'express';
+app.use('/api/auth', express.raw({ type: '*/*' }));
+
+// Fastify
+fastify.removeAllContentTypeParsers();
+fastify.addContentTypeParser('*', { parseAs: 'buffer' }, (_req, body, done) =>
+  done(null, body)
+);
+```
+
+### 4. Express 5 wildcard syntax
+
+Express 5 ships path-to-regexp v8, which requires a **named** wildcard. The
+bare `/api/auth/*` form throws at registration time:
+
+```typescript
+app.all('/api/auth/*splat', authHandler); // Express 5
+```
+
+(Express 4 keeps the legacy `'/api/auth/*'` syntax.)
+
+### 5. Bind the per-request `Request` via `AsyncLocalStorage`
+
+`RequestContext`'s factory runs lazily inside server methods (e.g.
+`auth.getSession()`), long after Express/Fastify has handed off the request.
+Stash the Fetch `Request` you built in step 1 into an `AsyncLocalStorage` so
+the context factory can read it back:
+
+```typescript
+import { AsyncLocalStorage } from 'node:async_hooks';
+
+export const requestStorage = new AsyncLocalStorage<{ request: Request }>();
+
+export const createNodeRequestContext: RequestContextFactory = () => {
+  const store = requestStorage.getStore();
+  if (!store) throw new Error('Neon Auth: no request bound — call inside requestStorage.run()');
+  // …return a RequestContext that reads cookies/headers from store.request
+};
+
+// In your route handler / middleware, wrap the work in `.run(...)`:
+app.use((req, res, next) => {
+  const fetchReq = toFetchRequest(req, req.body as Buffer);
+  requestStorage.run({ request: fetchReq }, () => next());
+});
+```
+
+### 6. ESM-only — `require()` works on Node ≥ 22.12
+
+`@neondatabase/auth` ships ESM only. On modern Node, the CJS-to-ESM
+interop in 22.12+ lets you `require('@neondatabase/auth/server')` directly.
+On older runtimes, use a dynamic import:
+
+```typescript
+const { createAuthServer } = await import('@neondatabase/auth/server');
+```
 
 ## What the toolkit gives you for free
 

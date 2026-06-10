@@ -1,7 +1,10 @@
 import { signSessionDataCookie } from './operations';
 import { fetchSessionWithCookie } from './operations';
-import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../constants';
-import { serializeSetCookie } from '../utils/cookies';
+import {
+  NEON_AUTH_SESSION_COOKIE_NAME,
+  NEON_AUTH_SESSION_DATA_COOKIE_NAME,
+} from '../constants';
+import { parseSetCookies, serializeSetCookie } from '../utils/cookies';
 import type { SessionCookieConfig } from '../config';
 import type { ResolvedNeonAuthLogging } from '../logger';
 
@@ -87,20 +90,35 @@ export async function mintSessionDataFromResponse(
   cookieConfig: SessionCookieConfig,
   log?: ResolvedNeonAuthLogging
 ): Promise<string | null> {
-  // Check if upstream set a session_token cookie
+  // Parse upstream Set-Cookie headers and locate the session token by EXACT
+  // name. The previous substring scans (`.includes('session_token')` and
+  // `.includes('max-age=0')`) false-matched:
+  //   - an unrelated cookie named `analytics_session_token_ref` triggered minting
+  //   - a session cookie whose VALUE contained the literal `max-age=0`
+  //     (alongside a real `Max-Age=3600`) was treated as a sign-out
+  // See #161 review feedback (Andras FIX 2, correctness).
   const setCookieHeaders = responseHeaders.getSetCookie();
-  const sessionTokenCookie = setCookieHeaders.find(cookie =>
-    cookie.includes('session_token')
-  );
+  let sessionTokenCookie: string | undefined;
+  let sessionTokenIsDeletion = false;
+  for (const cookieHeader of setCookieHeaders) {
+    const parsed = parseSetCookies(cookieHeader).find(
+      cookie => cookie.name === NEON_AUTH_SESSION_COOKIE_NAME
+    );
+    if (parsed) {
+      sessionTokenCookie = cookieHeader;
+      sessionTokenIsDeletion =
+        parsed.maxAge === 0 ||
+        (parsed.expires !== undefined && parsed.expires.getTime() <= Date.now());
+      break;
+    }
+  }
 
   if (!sessionTokenCookie) {
     return null; // No session token in response, nothing to mint
   }
 
-  // Check if session_token is being deleted (sign-out scenario)
-  const sessionCookieLower = sessionTokenCookie.toLowerCase();
-  if (sessionCookieLower.includes('max-age=0')) {
-    // Return deletion cookie for session_data
+  if (sessionTokenIsDeletion) {
+    // Return deletion cookie for session_data (matches sign-out)
     return serializeSetCookie({
       name: NEON_AUTH_SESSION_DATA_COOKIE_NAME,
       value: '',

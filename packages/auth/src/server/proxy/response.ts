@@ -3,9 +3,12 @@ import { parseSetCookies, serializeSetCookie } from '@/server/utils/cookies';
 import type { SessionCookieConfig } from '../config';
 import type { ResolvedNeonAuthLogging } from '../logger';
 
-// Allowlist of response headers that we want to proxy to the client from Neon Auth.
-const RESPONSE_HEADERS_ALLOWLIST = ['content-type', 'content-length', 'content-encoding', 'transfer-encoding',
-    'connection', 'date',
+// Allowlist of response headers proxied from upstream Neon Auth to the client.
+// Hop-by-hop / framing headers (`connection`, `transfer-encoding`,
+// `content-length`) are intentionally excluded: the runtime sets framing
+// itself, and a forwarded stale `content-length` corrupts a re-encoded body.
+// See #161 review feedback (Andras FIX 4, correctness nit).
+const RESPONSE_HEADERS_ALLOWLIST = ['content-type', 'content-encoding', 'date',
    'set-cookie', 'set-auth-jwt', 'set-auth-token', 'x-neon-ret-request-id'];
 
 /**
@@ -58,6 +61,12 @@ const prepareResponseHeaders = (response: Response, cookieConfig: SessionCookieC
         for (const parsedCookie of parsedCookies) {
           parsedCookie.partitioned = undefined;
           parsedCookie.sameSite = effectiveSameSite;
+          // Always force Secure on forwarded cookies, matching the minting
+          // path (`session/minting.ts` hardcodes `secure: true`) and the
+          // documented "Secure is always applied" contract. With
+          // `SameSite=None`, a missing `Secure` makes the browser drop the
+          // cookie entirely. See #161 review feedback (Andras FIX 1, security).
+          parsedCookie.secure = true;
           if (domain) {
             parsedCookie.domain = domain;
           }
