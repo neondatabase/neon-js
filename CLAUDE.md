@@ -788,12 +788,16 @@ The `skills/` directory contains AI-assistant skills for helping developers set 
 - Neon Auth Next.js/server observability: **opt-out** defaults (`warn` to `console`); apps can set **`logLevel: 'silent'`** on `createNeonAuth` to mute or inject a custom **`logger`**.
 - When adding SDK-facing observability or debugging aids, update the package changelog and show usage in an example app when it helps adopters.
 - Prefer **`logger`** + **`logLevel`** as the only controls for server/proxy logging—avoid separate boolean or feature flags solely to toggle logs.
+- When diagnosing a suspected SDK bug, **verify the hypothesis against the actual example apps** before concluding (and explain why a passing demo is still consistent with the bug) rather than asserting from code reading alone.
+- **Guard regressions with a demo reproduction**: add a minimal example exercising the failure mode in the relevant example app (e.g. a Server Action form in `nextjs-neon-auth`) so it stays testable and is a candidate for E2E coverage.
 
 ## Learned Workspace Facts
 
 - `createNeonAuth` accepts optional **`logger`** and **`logLevel`** (including **`'silent'`** via `resolveNeonAuthLogging`); related types are re-exported from `@neondatabase/auth/next/server`.
 - The auth **proxy** (`packages/auth/src/server/proxy/request.ts`) logs structured warn/debug lines for upstream fetch outcomes and uses **`classifyFetchFailure`** / `packages/auth/src/server/network-error.ts` for transport vs HTTP error taxonomy returned to clients.
 - **`examples/nextjs-neon-auth/app/iframe-test/page.tsx`** is the App Router counterpart to iframe-hosted OAuth/popup testing in **`examples/react-neon-js/`**.
+- Server-side **`createNeonAuth()`** is a proxy over Better Auth's server endpoints: call **`auth.token()`** (JWT plugin `GET /token`) to obtain the signed JWT for RLS / Drizzle / Data API; **`getSession().data.session.token`** is the opaque session-cookie identifier, **not** a JWT. The `getJWTToken()` helper exists only on the client `createAuthClient()`—on the server use `auth.token()` (plus `auth.getAnonymousToken()` for anonymous fallback).
+- The Next.js example wires the adapter via **`proxy.ts`** (Next.js 16's rename of `middleware.ts`). The middleware's internal session lookup is always issued as a **`GET`** regardless of the triggering request's method—Server Actions are `POST`s to the page URL, so forwarding that method would skip the get-session cache and hit the GET-only upstream, spuriously redirecting authenticated users to login (guarded by a Server Action form on the protected `/notes` route in `nextjs-neon-auth`).
 
 ## References
 

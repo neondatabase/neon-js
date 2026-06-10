@@ -124,8 +124,23 @@ export async function processAuthMiddleware(
 	if (hasSessionToken) {
 		// Session token present - get session by calling handleAuthProxyRequest
 		// (handles cookie cache + upstream fallback)
+		//
+		// The middleware session lookup is always a read and must use GET. The
+		// triggering request can be any method (e.g. a Next.js Server Action is a
+		// POST to the current page URL). Forwarding that method would skip the
+		// get-session cookie-cache fast path AND issue a POST to the upstream
+		// `/get-session` endpoint, which only accepts GET — making an
+		// authenticated user look unauthenticated and triggering a spurious
+		// redirect to the login page. Normalize to a GET request (preserving
+		// cookies/headers) so the lookup behaves identically regardless of how
+		// the route was reached.
+		const sessionRequest =
+			request.method === 'GET'
+				? request
+				: new Request(request.url, { method: 'GET', headers: request.headers });
+
 		const sessionResponse = await handleAuthProxyRequest({
-			request,
+			request: sessionRequest,
 			path: 'get-session',
 			baseUrl,
 			cookieSecret,

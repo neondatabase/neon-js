@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Server Actions no longer trigger spurious login redirects** (`processAuthMiddleware`): the middleware's internal session lookup is now always performed as a `GET`, regardless of the triggering request's method. A Next.js Server Action is a `POST` to the current page URL; when that page matched a protected route, the middleware previously forwarded the `POST` to the upstream `/get-session` endpoint (which only accepts `GET`) and skipped the cookie-cache fast path, so the upstream returned a non-OK response and the authenticated user was redirected to the login page. API routes and normal navigations were unaffected because they issue `GET` requests. The lookup request is cloned with `method: 'GET'` (cookies/headers preserved) only when the incoming method is not already `GET`.
 - **Reactive Session Minting**: `session_data` cookie is now automatically minted when missing, expired, or invalid
   - Middleware and session handlers now propagate newly minted cookies in response headers
   - Test coverage added for reactive minting scenarios

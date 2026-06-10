@@ -146,6 +146,55 @@ describe('processAuthMiddleware', () => {
       );
     });
 
+    test('normalizes non-GET requests (e.g. Server Action POST) to a GET session lookup', async () => {
+      const sessionResponse = Response.json({
+        session: { id: 'session-123' },
+        user: { id: 'user-123' },
+      });
+
+      const handleAuthProxyRequestSpy = vi
+        .spyOn(proxyHandler, 'handleAuthProxyRequest')
+        .mockResolvedValue(sessionResponse);
+
+      // Simulate a Next.js Server Action: a POST to the current (protected) page.
+      const config = createTestConfig({
+        request: new Request('https://app.com/account/settings', {
+          method: 'POST',
+          headers: { Cookie: '__Secure-neon-auth.session_token=token-value' },
+        }),
+        pathname: '/account/settings',
+      });
+
+      const result = await processAuthMiddleware(config);
+
+      // The session lookup must use GET so the upstream get-session call (and
+      // cookie-cache fast path) work; otherwise an authenticated user would be
+      // redirected to login.
+      const passedRequest = handleAuthProxyRequestSpy.mock.calls[0][0].request;
+      expect(passedRequest.method).toBe('GET');
+      expect(passedRequest.headers.get('Cookie')).toBe(
+        '__Secure-neon-auth.session_token=token-value'
+      );
+      expect(result.action).toBe('allow');
+    });
+
+    test('forwards the original request unchanged for GET lookups', async () => {
+      const handleAuthProxyRequestSpy = vi
+        .spyOn(proxyHandler, 'handleAuthProxyRequest')
+        .mockResolvedValue(Response.json({ session: { id: 's' }, user: { id: 'u' } }));
+
+      const config = createTestConfig({
+        request: new Request('https://app.com/dashboard', {
+          headers: { Cookie: '__Secure-neon-auth.session_token=token-value' },
+        }),
+      });
+
+      await processAuthMiddleware(config);
+
+      // No clone needed for GET - the original request instance is reused.
+      expect(handleAuthProxyRequestSpy.mock.calls[0][0].request).toBe(config.request);
+    });
+
     test('forwards pre-resolved log sink to handleAuthProxyRequest', async () => {
       const mockLog: ResolvedNeonAuthLogging = {
         error: vi.fn(),
