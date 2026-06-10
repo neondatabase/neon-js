@@ -1,7 +1,6 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { and, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { notes } from "@/lib/schema"
 import { auth } from "@/lib/auth/server"
@@ -32,28 +31,6 @@ export async function addNoteAction(formData: FormData) {
     title,
     userId: session.user.id,
   })
-
-  revalidatePath("/notes")
-}
-
-/**
- * Server Action that deletes one of the current user's notes.
- * Same protected-route / non-GET considerations as {@link addNoteAction}.
- */
-export async function deleteNoteAction(formData: FormData) {
-  const { data: session } = await auth.getSession()
-  if (!session?.user) {
-    throw new Error("Unauthorized")
-  }
-
-  const id = formData.get("id") as string | null
-  if (!id) {
-    return
-  }
-
-  await db
-    .delete(notes)
-    .where(and(eq(notes.id, id), eq(notes.userId, session.user.id)))
 
   revalidatePath("/notes")
 }

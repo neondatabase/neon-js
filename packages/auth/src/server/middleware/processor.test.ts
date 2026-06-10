@@ -156,11 +156,17 @@ describe('processAuthMiddleware', () => {
         .spyOn(proxyHandler, 'handleAuthProxyRequest')
         .mockResolvedValue(sessionResponse);
 
-      // Simulate a Next.js Server Action: a POST to the current (protected) page.
+      // Simulate a Next.js Server Action: a POST to the current (protected)
+      // page, carrying body-framing headers like a real form submission.
       const config = createTestConfig({
         request: new Request('https://app.com/account/settings', {
           method: 'POST',
-          headers: { Cookie: '__Secure-neon-auth.session_token=token-value' },
+          headers: {
+            Cookie: '__Secure-neon-auth.session_token=token-value',
+            'Content-Type': 'multipart/form-data; boundary=----x',
+            'Content-Length': '128',
+          },
+          body: 'noop',
         }),
         pathname: '/account/settings',
       });
@@ -172,9 +178,15 @@ describe('processAuthMiddleware', () => {
       // redirected to login.
       const passedRequest = handleAuthProxyRequestSpy.mock.calls[0][0].request;
       expect(passedRequest.method).toBe('GET');
+      // A fresh clone, not the original POST request.
+      expect(passedRequest).not.toBe(config.request);
+      // Cookies/headers preserved...
       expect(passedRequest.headers.get('Cookie')).toBe(
         '__Secure-neon-auth.session_token=token-value'
       );
+      // ...but body-framing headers stripped from the body-less GET.
+      expect(passedRequest.headers.get('Content-Type')).toBeNull();
+      expect(passedRequest.headers.get('Content-Length')).toBeNull();
       expect(result.action).toBe('allow');
     });
 

@@ -1,6 +1,5 @@
 "use client"
 
-import { useRef } from "react"
 import { useFormStatus } from "react-dom"
 import { Plus, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -26,27 +25,22 @@ function SubmitButton() {
 /**
  * Add-note form backed by a Next.js Server Action (not an API route).
  *
- * Submitting this form POSTs to the current `/notes` URL, which is covered by
- * the auth middleware matcher. It exists so adopters (and us) can verify that
- * Server Actions on protected routes are NOT redirected to sign-in for an
- * authenticated user.
+ * The Server Action is passed directly to `<form action={...}>`. Next.js
+ * dispatches it as a POST to the current `/notes` URL — which is covered by
+ * the auth middleware matcher — so this verifies Server Actions on protected
+ * routes are NOT redirected to sign-in for an authenticated user. Passing the
+ * action directly (rather than wrapping it in a client handler) keeps the form
+ * working without client JS and lets React reset the uncontrolled input after
+ * a successful submission.
  */
 export function ServerActionNoteForm() {
-    const formRef = useRef<HTMLFormElement>(null)
-
     return (
-        <form
-            ref={formRef}
-            action={async (formData) => {
-                await addNoteAction(formData)
-                formRef.current?.reset()
-            }}
-            className="mb-8"
-        >
+        <form action={addNoteAction} className="mb-8">
             <div className="flex gap-2">
                 <input
                     type="text"
                     name="title"
+                    required
                     placeholder="Add a note via Server Action..."
                     className="flex-1 rounded-lg border border-input bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
                 />

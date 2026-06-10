@@ -42,6 +42,22 @@ export type AuthMiddlewareConfig = {
 } & NeonAuthLoggingInput;
 
 /**
+ * Returns a copy of `headers` with body-framing headers removed.
+ *
+ * Used when re-issuing a non-GET request as a body-less GET (the middleware
+ * session lookup): a leftover `Content-Length` / `Content-Type` /
+ * `Transfer-Encoding` from the original request would misdescribe the empty
+ * GET body and could trip stricter upstreams.
+ */
+function stripBodyHeaders(headers: Headers): Headers {
+	const next = new Headers(headers);
+	next.delete('content-type');
+	next.delete('content-length');
+	next.delete('transfer-encoding');
+	return next;
+}
+
+/**
  * Generic authentication middleware processor (framework-agnostic)
  *
  * Handles the complete middleware flow:
@@ -134,10 +150,20 @@ export async function processAuthMiddleware(
 		// redirect to the login page. Normalize to a GET request (preserving
 		// cookies/headers) so the lookup behaves identically regardless of how
 		// the route was reached.
+		//
+		// Downstream (`handleAuthProxyRequest` and the proxy) only reads standard
+		// Web `Request` members (`headers`, `url`, `method`, `body`), never
+		// `NextRequest`-only accessors, so a plain `Request` clone is sufficient.
+		// We drop body-framing headers carried over from the original request:
+		// the GET lookup has no body, so a stale `Content-Length`/`Content-Type`
+		// (e.g. `multipart/form-data` from a Server Action) would misdescribe it.
 		const sessionRequest =
 			request.method === 'GET'
 				? request
-				: new Request(request.url, { method: 'GET', headers: request.headers });
+				: new Request(request.url, {
+						method: 'GET',
+						headers: stripBodyHeaders(request.headers),
+					});
 
 		const sessionResponse = await handleAuthProxyRequest({
 			request: sessionRequest,
