@@ -179,3 +179,84 @@ describe('Database type parameter with adapter inference', () => {
     expectTypeOf(typedClient.auth.signIn.email).toBeFunction();
   });
 });
+
+// =============================================================================
+// Test 6: String form — default adapter
+// =============================================================================
+describe('String form — default adapter type inference', () => {
+  const client = createClient('https://ep-xxx.c-2.us-east-2.aws.neon.build/db');
+
+  it('should default to BetterAuthVanillaAdapter API', () => {
+    expectTypeOf(client.auth.signIn.email).toBeFunction();
+    expectTypeOf(client.auth.getSession).toBeFunction();
+  });
+});
+
+// =============================================================================
+// Test 7: String form — explicit SupabaseAuthAdapter
+// =============================================================================
+describe('String form — SupabaseAuthAdapter type inference', () => {
+  const client = createClient(
+    'https://ep-xxx.c-2.us-east-2.aws.neon.build/db',
+    {
+      auth: { adapter: SupabaseAuthAdapter() },
+    }
+  );
+
+  it('should expose Supabase API', () => {
+    expectTypeOf(client.auth.signInWithPassword).toBeFunction();
+    expectTypeOf(client.auth.signUp).toBeFunction();
+    expectTypeOf(client.auth.signOut).toBeFunction();
+  });
+});
+
+// =============================================================================
+// Test 8: String form — explicit BetterAuthReactAdapter
+// =============================================================================
+describe('String form — BetterAuthReactAdapter type inference', () => {
+  const client = createClient(
+    'https://ep-xxx.c-2.us-east-2.aws.neon.build/db',
+    {
+      auth: { adapter: BetterAuthReactAdapter() },
+    }
+  );
+
+  it('should expose React adapter API', () => {
+    expectTypeOf(client.auth.useSession).toBeFunction();
+    expectTypeOf(client.auth.signIn.email).toBeFunction();
+  });
+});
+
+// =============================================================================
+// Test 9: String form — Database type parameter
+// =============================================================================
+describe('String form with Database type parameter', () => {
+  interface TestDatabaseStringForm {
+    public: {
+      Tables: {
+        items: {
+          Row: { id: number };
+          Insert: { id?: number };
+          Update: { id?: number };
+        };
+      };
+      Views: Record<string, never>;
+      Functions: Record<string, never>;
+    };
+  }
+
+  it('should preserve Database type with default adapter', () => {
+    const typed = createClient<TestDatabaseStringForm>(
+      'https://ep-xxx.c-2.us-east-2.aws.neon.build/db'
+    );
+    expectTypeOf(typed.auth.signIn.email).toBeFunction();
+  });
+
+  it('should preserve Database type with explicit Supabase adapter', () => {
+    const typed = createClient<TestDatabaseStringForm>(
+      'https://ep-xxx.c-2.us-east-2.aws.neon.build/db',
+      { auth: { adapter: SupabaseAuthAdapter() } }
+    );
+    expectTypeOf(typed.auth.signInWithPassword).toBeFunction();
+  });
+});

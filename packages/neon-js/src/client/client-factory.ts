@@ -18,6 +18,7 @@ import {
   buildNeonJsClientInfo,
   X_NEON_CLIENT_INFO_HEADER,
 } from '../utils/client-info';
+import { defaultDeriveNeonUrls, type DeriveNeonUrls } from './derive-urls';
 
 /**
  * Auth configuration for createClient
@@ -95,6 +96,14 @@ export type CreateClientConfig<SchemaName, T extends NeonAuthAdapter> = {
  * // Supabase-compatible auth methods
  * await client.auth.signInWithPassword({ email, password });
  * ```
+ *
+ * @example
+ * ```typescript
+ * // Single base URL — auth and Data API URLs are derived automatically.
+ * const client = createClient(
+ *   'https://ep-xxx.c-2.us-east-2.aws.neon.build/dbname'
+ * );
+ * ```
  */
 
 /**
@@ -139,14 +148,56 @@ export function createClient<Database = any>(
   >
 ): CreateClientResult<Database, BetterAuthReactAdapterInstance>;
 
+// Overload: String form, no adapter specified (defaults to BetterAuthVanillaAdapter)
+export function createClient<Database = any>(
+  baseUrl: string,
+  options?: CreateClientStringOptions<
+    DefaultSchemaName<Database>,
+    BetterAuthVanillaAdapterInstance
+  >
+): CreateClientResult<Database, BetterAuthVanillaAdapterInstance>;
+
+// Overload: String form, SupabaseAuthAdapter
+export function createClient<Database = any>(
+  baseUrl: string,
+  options: CreateClientStringOptions<
+    DefaultSchemaName<Database>,
+    SupabaseAuthAdapterInstance
+  > & { auth: { adapter: SupabaseAuthAdapterInstance } }
+): CreateClientResult<Database, SupabaseAuthAdapterInstance>;
+
+// Overload: String form, BetterAuthVanillaAdapter
+export function createClient<Database = any>(
+  baseUrl: string,
+  options: CreateClientStringOptions<
+    DefaultSchemaName<Database>,
+    BetterAuthVanillaAdapterInstance
+  > & { auth: { adapter: BetterAuthVanillaAdapterInstance } }
+): CreateClientResult<Database, BetterAuthVanillaAdapterInstance>;
+
+// Overload: String form, BetterAuthReactAdapter
+export function createClient<Database = any>(
+  baseUrl: string,
+  options: CreateClientStringOptions<
+    DefaultSchemaName<Database>,
+    BetterAuthReactAdapterInstance
+  > & { auth: { adapter: BetterAuthReactAdapterInstance } }
+): CreateClientResult<Database, BetterAuthReactAdapterInstance>;
+
 // Implementation signature
 export function createClient<
   Database = any,
   SchemaName extends string & keyof Database = DefaultSchemaName<Database>,
   TAuthAdapter extends NeonAuthAdapter = BetterAuthVanillaAdapterInstance,
 >(
-  config: CreateClientConfig<SchemaName, TAuthAdapter>
+  arg1: string | CreateClientConfig<SchemaName, TAuthAdapter>,
+  arg2?: CreateClientStringOptions<SchemaName, TAuthAdapter>
 ): NeonClient<Database, SchemaName, TAuthAdapter> {
+  const config: CreateClientConfig<SchemaName, TAuthAdapter> =
+    typeof arg1 === 'string'
+      ? buildConfigFromBaseUrl<SchemaName, TAuthAdapter>(arg1, arg2)
+      : arg1;
+
   const { auth: authConfig, dataApi: dataApiConfig } = config;
 
   // Build client info once - sub-packages will see it and skip their own injection
@@ -193,4 +244,48 @@ export function createClient<
   });
 
   return client;
+}
+
+/**
+ * Per-call overrides accepted alongside a single base URL.
+ *
+ * Every field is optional; defaults come from `deriveUrls(baseUrl)`.
+ */
+export type CreateClientStringOptions<
+  SchemaName,
+  T extends NeonAuthAdapter,
+> = {
+  auth?: Partial<CreateClientAuthConfig<T>>;
+  dataApi?: Partial<CreateClientDataApiConfig<SchemaName, T>>;
+  /**
+   * Override the auth/Data API URL derivation. End users do not need this;
+   * it is intended for wrapper packages (e.g. `@databricks/lakebase-js`)
+   * that have their own endpoint pattern.
+   */
+  deriveUrls?: DeriveNeonUrls;
+};
+
+function buildConfigFromBaseUrl<
+  SchemaName,
+  TAuthAdapter extends NeonAuthAdapter,
+>(
+  baseUrl: string,
+  options: CreateClientStringOptions<SchemaName, TAuthAdapter> | undefined
+): CreateClientConfig<SchemaName, TAuthAdapter> {
+  const derive = options?.deriveUrls ?? defaultDeriveNeonUrls;
+  const derived = derive(baseUrl);
+
+  const authOverrides = options?.auth ?? {};
+  const dataApiOverrides = options?.dataApi ?? {};
+
+  return {
+    auth: {
+      ...authOverrides,
+      url: authOverrides.url ?? derived.auth,
+    } as CreateClientAuthConfig<TAuthAdapter>,
+    dataApi: {
+      ...dataApiOverrides,
+      url: dataApiOverrides.url ?? derived.dataApi,
+    } as CreateClientDataApiConfig<SchemaName, TAuthAdapter>,
+  };
 }
