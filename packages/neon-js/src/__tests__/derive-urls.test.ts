@@ -70,6 +70,19 @@ describe('defaultDeriveNeonUrls', () => {
     ).toThrow(/must not include a query string or hash fragment/);
   });
 
+  it('throws when the URL contains embedded credentials', () => {
+    expect(() =>
+      defaultDeriveNeonUrls(
+        'https://user:pass@ep-xxx.c-2.us-east-2.aws.neon.build/dbname'
+      )
+    ).toThrow(/must not include credentials/);
+    expect(() =>
+      defaultDeriveNeonUrls(
+        'https://user@ep-xxx.c-2.us-east-2.aws.neon.build/dbname'
+      )
+    ).toThrow(/must not include credentials/);
+  });
+
   it('throws when the hostname has fewer than 3 labels', () => {
     expect(() => defaultDeriveNeonUrls('https://example.com/db')).toThrow(
       /Invalid Neon base URL/

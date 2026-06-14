@@ -16,6 +16,16 @@ export type DeriveNeonUrls = (baseUrl: string) => {
  * Insert `neonauth` / `apirest` after the first hostname label and append
  * `/auth` / `/rest/v1` to the path.
  *
+ * Only the protocol, host, port, and path are used. A query string, hash
+ * fragment, or embedded credentials (`user:pass@host`) are rejected.
+ *
+ * Constraints (use the object form or a custom `deriveUrls` to bypass them):
+ *   - The hostname must have at least 3 dot-separated labels, so `localhost`
+ *     and single-host proxies are intentionally rejected.
+ *   - A single port is applied to both derived hosts, so split-port local
+ *     setups (e.g. `neonauth:30443` vs `apirest:9443`) cannot be expressed
+ *     via the string form. In production both services share port 443.
+ *
  * Example:
  *   https://ep-xxx.c-2.us-east-2.aws.neon.build/dbname
  *     → auth:    https://ep-xxx.neonauth.c-2.us-east-2.aws.neon.build/dbname/auth
@@ -27,6 +37,12 @@ export const defaultDeriveNeonUrls: DeriveNeonUrls = (baseUrl) => {
   if (url.search !== '' || url.hash !== '') {
     throw new Error(
       `Invalid Neon base URL: must not include a query string or hash fragment (got "${baseUrl}").`
+    );
+  }
+
+  if (url.username !== '' || url.password !== '') {
+    throw new Error(
+      `Invalid Neon base URL: must not include credentials (got "${baseUrl}").`
     );
   }
 
