@@ -78,6 +78,10 @@
       "types": "./dist/next/server/index.d.mts",
       "default": "./dist/next/server/index.mjs"
     },
+    "./client-plugin": {
+      "types": "./dist/client-plugin/index.d.mts",
+      "default": "./dist/client-plugin/index.mjs"
+    },
     "./ui/css": {
       "types": "./dist/ui/css.d.ts",
       "default": "./dist/ui/css.css"

@@ -20,6 +20,8 @@ export default defineConfig(
 
       'src/next/index.ts',
       'src/next/server/index.ts',
+
+      'src/client-plugin/index.ts',
     ],
     skipNodeModulesBundle: true,
     // Explicitly externalize workspace deps that skipNodeModulesBundle misses
