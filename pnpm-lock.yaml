@@ -274,6 +274,9 @@ importers:
       '@neondatabase/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@neondatabase/auth-ui':
+        specifier: workspace:*
+        version: link:../../packages/auth-ui
       '@neondatabase/serverless':
         specifier: 1.0.2
         version: 1.0.2
