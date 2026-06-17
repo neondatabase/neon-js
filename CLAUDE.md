@@ -788,12 +788,23 @@ The `skills/` directory contains AI-assistant skills for helping developers set 
 - Neon Auth Next.js/server observability: **opt-out** defaults (`warn` to `console`); apps can set **`logLevel: 'silent'`** on `createNeonAuth` to mute or inject a custom **`logger`**.
 - When adding SDK-facing observability or debugging aids, update the package changelog and show usage in an example app when it helps adopters.
 - Prefer **`logger`** + **`logLevel`** as the only controls for server/proxy logging—avoid separate boolean or feature flags solely to toggle logs.
+- User-facing Neon Auth docs (website repo): describe **current** SDK behavior—avoid "after upgrading" and migration framing outside dedicated migration guides.
+- In user-facing Neon Auth docs (`neondatabase/website`): prefer **"Neon Auth logging"** over "console output"; omit **(opt-out)** from titles/headings; **`logLevel`** tables list explicit emitted levels per row (not ranges like “through `info`”); use **`<NextjsProxyNote/>`** for **`proxy.ts`** (Next.js 16+) vs **`middleware.ts`** samples.
+- For copy-paste prompts, use a **single plain `text` fenced block** so the full prompt copies in one action—not `markdown` the UI may render as separate sections.
+- Multi-tenancy demos should let signed-in users create **personal** rows (`organization_id IS NULL`) alongside org-scoped team data—don't require an active organization for all authenticated writes.
+- Prefer RLS helpers that return the **full JWT `o` claim** (jsonb) over id-only accessors; extract `id` / `slug` / `role` with `->>` in policies.
 
 ## Learned Workspace Facts
 
 - `createNeonAuth` accepts optional **`logger`** and **`logLevel`** (including **`'silent'`** via `resolveNeonAuthLogging`); related types are re-exported from `@neondatabase/auth/next/server`.
-- The auth **proxy** (`packages/auth/src/server/proxy/request.ts`) logs structured warn/debug lines for upstream fetch outcomes and uses **`classifyFetchFailure`** / `packages/auth/src/server/network-error.ts` for transport vs HTTP error taxonomy returned to clients.
+- The auth **proxy** (`packages/auth/src/server/proxy/request.ts`) logs structured warn/debug lines for upstream fetch outcomes; failed upstream `fetch` returns synthetic **502** JSON with stable **`NETWORK_*`** codes via **`classifyFetchFailure`** (`packages/auth/src/server/network-error.ts`).
 - **`examples/nextjs-neon-auth/app/iframe-test/page.tsx`** is the App Router counterpart to iframe-hosted OAuth/popup testing in **`examples/react-neon-js/`**.
+- Neon Auth product docs live in **`neondatabase/website`** (`content/docs/auth/`); reference/troubleshooting covers server logging, **`NETWORK_*`** codes, and iframe **`sameSite`** (`nextjs-server.md`, `troubleshooting.md`).
+- Website **`<NextjsProxyNote/>`** component: **`content/docs/shared-content/nextjs-proxy-note.md`** — documents **`proxy.ts`** vs **`middleware.ts`** for Next.js version differences.
+- SDK releases use a **two-stage** pipeline: `prepare-release.yml` bumps versions and creates per-package tags in neon-js; npm publish runs in **`secure-public-registry-releases-eng`** on those tags.
+- Neon Auth session JWT includes organization claim **`o`**: `{ "id", "slug", "role" }` for the active org—used for RLS multi-tenancy via Data API.
+- **`pg_session_jwt`** is Neon's first-party extension ([`neondatabase/pg_session_jwt`](https://github.com/neondatabase/pg_session_jwt)); `auth.user_id()` / `auth.jwt()` live in the extension-owned **`auth`** schema (avoid custom functions there until Neon documents support).
+- Upstream plan: **`auth.organization()`** (jsonb) and **`auth.organization_id()`** (text) in `pg_session_jwt`; until shipped, **`examples/react-neon-js`** uses **`public.jwt_organization()`** as app-level RLS sugar with Organizations plugin + **`OrganizationSwitcher`**.
 
 ## References
 

@@ -22,6 +22,11 @@ const IframeTestPage = lazy(() =>
     default: module.IframeTestPage,
   }))
 );
+const OrganizationPage = lazy(() =>
+  import('./pages/OrganizationPage').then((module) => ({
+    default: module.OrganizationPage,
+  }))
+);
 
 // Loading fallback component
 function PageLoadingFallback() {
@@ -75,6 +80,9 @@ export default function App() {
           {/* Account settings */}
           <Route path="/account" element={<AccountPage />} />
           <Route path="/account/:view" element={<AccountPage />} />
+
+          {/* Organization management (members, settings, teams) */}
+          <Route path="/organization/:pathname" element={<OrganizationPage />} />
         </Routes>
       </Suspense>
     </>

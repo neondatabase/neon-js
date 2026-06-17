@@ -13,7 +13,7 @@ test.describe('Data API', () => {
     });
 
     await test.step('Create new todo', async () => {
-      const addInput = page.getByPlaceholder('What needs to be done?');
+      const addInput = page.getByPlaceholder(/add a personal task/i);
       await expect(addInput).toBeVisible({ timeout: 10_000 });
 
       await addInput.fill(uniqueTodoTitle);

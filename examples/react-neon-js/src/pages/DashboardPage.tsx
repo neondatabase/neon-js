@@ -25,12 +25,14 @@ export function DashboardPage() {
 function DashboardContent() {
   const { hooks } = useContext(AuthUIContext);
   const { data: session } = hooks.useSession();
+  const { data: activeOrg } = hooks.useActiveOrganization();
 
   const [todos, setTodos] = useState<Todo[]>([]);
   const [newTodoTitle, setNewTodoTitle] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
+  const [addAsPersonal, setAddAsPersonal] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const userId = session?.user?.id;
@@ -42,6 +44,9 @@ function DashboardContent() {
       : false;
   const isAuthenticated = Boolean(userId) && !isAnonymous;
   const isReadOnly = !isAuthenticated;
+  const activeOrgId = activeOrg?.id ?? null;
+  const activeMemberRole = activeOrg?.members?.find((m) => m.userId === userId)?.role;
+  const addToOrganization = Boolean(activeOrgId) && !addAsPersonal;
 
   // Fetch todos
   const fetchTodos = useCallback(async () => {
@@ -54,7 +59,7 @@ function DashboardContent() {
         .select('*')
         .order('created_at', { ascending: false });
 
-      // If user is not authenticated, only show public todos
+      // Anonymous users only see public todos; org scope is enforced by RLS for signed-in users.
       if (!isAuthenticated) {
         query = query.eq('is_public', true);
       }
@@ -69,11 +74,15 @@ function DashboardContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [userId, isAuthenticated]);
+  }, [isAuthenticated, activeOrgId]);
 
   useEffect(() => {
     fetchTodos();
   }, [fetchTodos]);
+
+  useEffect(() => {
+    setAddAsPersonal(false);
+  }, [activeOrgId]);
 
   // Add todo
   const addTodo = async (e: React.FormEvent) => {
@@ -89,6 +98,7 @@ function DashboardContent() {
         .insert({
           title: newTodoTitle.trim(),
           user_id: userId,
+          organization_id: addToOrganization ? activeOrgId : null,
           completed: false,
         })
         .select()
@@ -224,6 +234,22 @@ function DashboardContent() {
 
   return (
     <div style={styles.container}>
+      {isAuthenticated && !activeOrgId && (
+        <div style={styles.orgBanner}>
+          <span style={{ fontSize: '1.25rem' }}>🏢</span>
+          <div style={{ flex: 1 }}>
+            <p style={styles.guestBannerTitle}>Personal tasks only</p>
+            <p style={styles.guestBannerText}>
+              New tasks are private to you. Create or select an organization in
+              the header to share tasks with your team.
+            </p>
+          </div>
+          <Link to="/organization/settings" style={styles.guestSignInButton}>
+            Manage orgs
+          </Link>
+        </div>
+      )}
+
       {/* Guest Banner */}
       {isReadOnly && (
         <div style={styles.guestBanner}>
@@ -251,9 +277,15 @@ function DashboardContent() {
               />
               <div>
                 <h1 style={styles.welcomeTitle}>
-                  {session?.user?.name || 'User'}'s Tasks
+                  {activeOrg?.name
+                    ? `${activeOrg.name} Tasks`
+                    : `${session?.user?.name || 'User'}'s Tasks`}
                 </h1>
-                <p style={styles.email}>{session?.user?.email}</p>
+                <p style={styles.email}>
+                  {activeOrg
+                    ? `Team + personal tasks${activeMemberRole ? ` · ${activeMemberRole}` : ''}`
+                    : 'Personal tasks'}
+                </p>
               </div>
             </>
           ) : (
@@ -306,7 +338,11 @@ function DashboardContent() {
       <div style={styles.todoCard}>
         <div style={styles.todoHeader}>
           <h2 style={styles.todoTitle}>
-            {isReadOnly ? '🌐 Public Tasks' : '📝 My Tasks'}
+            {isReadOnly
+              ? '🌐 Public Tasks'
+              : activeOrg
+                ? '📝 Tasks'
+                : '📝 Personal Tasks'}
           </h2>
           {!isReadOnly && completedTodosCount > 0 && (
             <button onClick={clearCompleted} style={styles.clearButton}>
@@ -317,27 +353,46 @@ function DashboardContent() {
 
         {/* Add Todo Form - Only for authenticated users */}
         {!isReadOnly && (
-          <form onSubmit={addTodo} style={styles.addForm}>
-            <input
-              type="text"
-              value={newTodoTitle}
-              onChange={(e) => setNewTodoTitle(e.target.value)}
-              placeholder="What needs to be done?"
-              style={styles.addInput}
-              disabled={isAdding}
-            />
-            <button
-              type="submit"
-              disabled={!newTodoTitle.trim() || isAdding}
-              style={{
-                ...styles.addButton,
-                opacity: !newTodoTitle.trim() || isAdding ? 0.5 : 1,
-                cursor:
-                  !newTodoTitle.trim() || isAdding ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {isAdding ? '...' : '+ Add'}
-            </button>
+          <form onSubmit={addTodo} style={styles.addFormColumn}>
+            <div style={styles.addForm}>
+              <input
+                type="text"
+                value={newTodoTitle}
+                onChange={(e) => setNewTodoTitle(e.target.value)}
+                placeholder={
+                  addToOrganization
+                    ? `Add a task for ${activeOrg?.name ?? 'your team'}…`
+                    : 'Add a personal task…'
+                }
+                style={styles.addInput}
+                disabled={isAdding}
+              />
+              <button
+                type="submit"
+                disabled={!newTodoTitle.trim() || isAdding}
+                style={{
+                  ...styles.addButton,
+                  opacity: !newTodoTitle.trim() || isAdding ? 0.5 : 1,
+                  cursor:
+                    !newTodoTitle.trim() || isAdding
+                      ? 'not-allowed'
+                      : 'pointer',
+                }}
+              >
+                {isAdding ? '...' : '+ Add'}
+              </button>
+            </div>
+            {activeOrgId && (
+              <label style={styles.personalToggle}>
+                <input
+                  type="checkbox"
+                  checked={addAsPersonal}
+                  onChange={(e) => setAddAsPersonal(e.target.checked)}
+                  disabled={isAdding}
+                />
+                Personal task (only visible to you)
+              </label>
+            )}
           </form>
         )}
 
@@ -441,10 +496,14 @@ function DashboardContent() {
       <div style={styles.tipsCard}>
         <h3 style={styles.tipsTitle}>💡 Quick Tips</h3>
         <ul style={styles.tipsList}>
+          <li>
+            Personal tasks are private; team tasks use the JWT{' '}
+            <code style={styles.inlineCode}>o</code> claim in RLS
+          </li>
+          <li>Use the organization switcher to share tasks with your team</li>
           <li>Click the checkbox to mark a task as complete</li>
-          <li>Use filters to focus on active or completed tasks</li>
-          <li>Click 🔒/🌐 to toggle public visibility for anonymous users</li>
-          <li>Clear completed tasks to keep your list tidy</li>
+          <li>Click 🔒/🌐 to share a task with anonymous visitors</li>
+          <li>Invite teammates from organization settings</li>
         </ul>
       </div>
     </div>
@@ -515,6 +574,12 @@ function TodoItem({
           {todo.title}
         </span>
         <span style={styles.todoDate}>
+          {!isReadOnly && (
+            <span style={styles.scopeBadge}>
+              {todo.organization_id ? '🏢 Team' : '👤 Personal'}
+              {' · '}
+            </span>
+          )}
           {new Date(todo.created_at).toLocaleDateString('en-US', {
             month: 'short',
             day: 'numeric',
@@ -611,6 +676,23 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid color-mix(in oklch, var(--primary) 30%, transparent)',
     borderRadius: 'var(--radius)',
     marginBottom: '1.5rem',
+  },
+  orgBanner: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '1rem',
+    padding: '1rem 1.25rem',
+    backgroundColor: 'color-mix(in oklch, var(--secondary) 80%, transparent)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius)',
+    marginBottom: '1.5rem',
+  },
+  inlineCode: {
+    fontFamily: 'ui-monospace, monospace',
+    fontSize: '0.8em',
+    padding: '0.1em 0.35em',
+    borderRadius: '0.25rem',
+    backgroundColor: 'var(--muted)',
   },
   guestBannerTitle: {
     color: 'var(--foreground)',
@@ -724,10 +806,23 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '0.25rem 0.5rem',
     borderRadius: '0.25rem',
   },
+  addFormColumn: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.75rem',
+    marginBottom: '1.5rem',
+  },
   addForm: {
     display: 'flex',
     gap: '0.75rem',
-    marginBottom: '1.5rem',
+  },
+  personalToggle: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    fontSize: '0.875rem',
+    color: 'var(--muted-foreground)',
+    cursor: 'pointer',
   },
   addInput: {
     flex: 1,
@@ -831,6 +926,9 @@ const styles: Record<string, React.CSSProperties> = {
   todoDate: {
     fontSize: '0.75rem',
     color: 'var(--muted-foreground)',
+  },
+  scopeBadge: {
+    fontWeight: 500,
   },
   deleteButton: {
     background: 'none',
