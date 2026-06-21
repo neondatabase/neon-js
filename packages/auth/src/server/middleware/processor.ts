@@ -139,31 +139,18 @@ export async function processAuthMiddleware(
 
 	if (hasSessionToken) {
 		// Session token present - get session by calling handleAuthProxyRequest
-		// (handles cookie cache + upstream fallback)
+		// (handles cookie cache + upstream fallback).
 		//
-		// The middleware session lookup is always a read and must use GET. The
-		// triggering request can be any method (e.g. a Next.js Server Action is a
-		// POST to the current page URL). Forwarding that method would skip the
-		// get-session cookie-cache fast path AND issue a POST to the upstream
-		// `/get-session` endpoint, which only accepts GET — making an
-		// authenticated user look unauthenticated and triggering a spurious
-		// redirect to the login page. Normalize to a GET request (preserving
-		// cookies/headers) so the lookup behaves identically regardless of how
-		// the route was reached.
-		//
-		// Downstream (`handleAuthProxyRequest` and the proxy) only reads standard
-		// Web `Request` members (`headers`, `url`, `method`, `body`), never
-		// `NextRequest`-only accessors, so a plain `Request` clone is sufficient.
-		// We drop body-framing headers carried over from the original request:
-		// the GET lookup has no body, so a stale `Content-Length`/`Content-Type`
-		// (e.g. `multipart/form-data` from a Server Action) would misdescribe it.
-		const sessionRequest =
-			request.method === 'GET'
-				? request
-				: new Request(request.url, {
-						method: 'GET',
-						headers: stripBodyHeaders(request.headers),
-					});
+		// The lookup is always a read, so issue it as a GET regardless of how the
+		// route was reached. The triggering request may use any method (a Next.js
+		// Server Action is a POST to the page URL); forwarding that would skip the
+		// get-session cookie-cache fast path and POST to the GET-only upstream,
+		// spuriously logging the user out. Body-framing headers are dropped since
+		// the GET has no body; downstream reads only standard `Request` members.
+		const sessionRequest = new Request(request.url, {
+			method: 'GET',
+			headers: stripBodyHeaders(request.headers),
+		});
 
 		const sessionResponse = await handleAuthProxyRequest({
 			request: sessionRequest,

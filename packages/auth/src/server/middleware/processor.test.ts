@@ -134,7 +134,8 @@ describe('processAuthMiddleware', () => {
 
       expect(handleAuthProxyRequestSpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          request: config.request,
+          // The lookup uses a normalized GET clone, not the original instance.
+          request: expect.any(Request),
           path: 'get-session',
           baseUrl: BASE_URL,
           cookieSecret: TEST_SECRET,
@@ -190,7 +191,7 @@ describe('processAuthMiddleware', () => {
       expect(result.action).toBe('allow');
     });
 
-    test('forwards the original request unchanged for GET lookups', async () => {
+    test('issues a fresh GET lookup request even when the incoming request is GET', async () => {
       const handleAuthProxyRequestSpy = vi
         .spyOn(proxyHandler, 'handleAuthProxyRequest')
         .mockResolvedValue(Response.json({ session: { id: 's' }, user: { id: 'u' } }));
@@ -203,8 +204,14 @@ describe('processAuthMiddleware', () => {
 
       await processAuthMiddleware(config);
 
-      // No clone needed for GET - the original request instance is reused.
-      expect(handleAuthProxyRequestSpy.mock.calls[0][0].request).toBe(config.request);
+      // The lookup is always a fresh GET request (uniform regardless of method),
+      // never the original instance, with cookies preserved.
+      const passedRequest = handleAuthProxyRequestSpy.mock.calls[0][0].request;
+      expect(passedRequest).not.toBe(config.request);
+      expect(passedRequest.method).toBe('GET');
+      expect(passedRequest.headers.get('Cookie')).toBe(
+        '__Secure-neon-auth.session_token=token-value'
+      );
     });
 
     test('forwards pre-resolved log sink to handleAuthProxyRequest', async () => {
