@@ -134,7 +134,8 @@ describe('processAuthMiddleware', () => {
 
       expect(handleAuthProxyRequestSpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          request: config.request,
+          // The lookup uses a normalized GET clone, not the original instance.
+          request: expect.any(Request),
           path: 'get-session',
           baseUrl: BASE_URL,
           cookieSecret: TEST_SECRET,
@@ -143,6 +144,73 @@ describe('processAuthMiddleware', () => {
           sameSite: undefined,
           log: expect.any(Object),
         }),
+      );
+    });
+
+    test('normalizes non-GET requests (e.g. Server Action POST) to a GET session lookup', async () => {
+      const sessionResponse = Response.json({
+        session: { id: 'session-123' },
+        user: { id: 'user-123' },
+      });
+
+      const handleAuthProxyRequestSpy = vi
+        .spyOn(proxyHandler, 'handleAuthProxyRequest')
+        .mockResolvedValue(sessionResponse);
+
+      // Simulate a Next.js Server Action: a POST to the current (protected)
+      // page, carrying body-framing headers like a real form submission.
+      const config = createTestConfig({
+        request: new Request('https://app.com/account/settings', {
+          method: 'POST',
+          headers: {
+            Cookie: '__Secure-neon-auth.session_token=token-value',
+            'Content-Type': 'multipart/form-data; boundary=----x',
+            'Content-Length': '128',
+          },
+          body: 'noop',
+        }),
+        pathname: '/account/settings',
+      });
+
+      const result = await processAuthMiddleware(config);
+
+      // The session lookup must use GET so the upstream get-session call (and
+      // cookie-cache fast path) work; otherwise an authenticated user would be
+      // redirected to login.
+      const passedRequest = handleAuthProxyRequestSpy.mock.calls[0][0].request;
+      expect(passedRequest.method).toBe('GET');
+      // A fresh clone, not the original POST request.
+      expect(passedRequest).not.toBe(config.request);
+      // Cookies/headers preserved...
+      expect(passedRequest.headers.get('Cookie')).toBe(
+        '__Secure-neon-auth.session_token=token-value'
+      );
+      // ...but body-framing headers stripped from the body-less GET.
+      expect(passedRequest.headers.get('Content-Type')).toBeNull();
+      expect(passedRequest.headers.get('Content-Length')).toBeNull();
+      expect(result.action).toBe('allow');
+    });
+
+    test('issues a fresh GET lookup request even when the incoming request is GET', async () => {
+      const handleAuthProxyRequestSpy = vi
+        .spyOn(proxyHandler, 'handleAuthProxyRequest')
+        .mockResolvedValue(Response.json({ session: { id: 's' }, user: { id: 'u' } }));
+
+      const config = createTestConfig({
+        request: new Request('https://app.com/dashboard', {
+          headers: { Cookie: '__Secure-neon-auth.session_token=token-value' },
+        }),
+      });
+
+      await processAuthMiddleware(config);
+
+      // The lookup is always a fresh GET request (uniform regardless of method),
+      // never the original instance, with cookies preserved.
+      const passedRequest = handleAuthProxyRequestSpy.mock.calls[0][0].request;
+      expect(passedRequest).not.toBe(config.request);
+      expect(passedRequest.method).toBe('GET');
+      expect(passedRequest.headers.get('Cookie')).toBe(
+        '__Secure-neon-auth.session_token=token-value'
       );
     });
 

@@ -3,6 +3,7 @@ import {
   createTestUser,
   registerUser,
   createNote,
+  createNoteViaServerAction,
   deleteNote,
   expectNoteExists,
   expectNoteNotExists,
@@ -44,6 +45,22 @@ test.describe('Notes', () => {
 
     // Verify empty state is no longer visible
     await expect(page.getByText(/no notes yet/i)).not.toBeVisible();
+  });
+
+  test('should create a note via Server Action without redirecting to sign-in', async ({
+    page,
+  }) => {
+    // Navigate to notes page (a protected route in the middleware matcher)
+    await page.goto('/notes');
+
+    // Create a note through the Server Action form. This POSTs to /notes and
+    // runs through the auth middleware; an authenticated user must stay on the
+    // page rather than being bounced to the sign-in screen.
+    const noteTitle = `Server Action Note - ${Date.now()}`;
+    await createNoteViaServerAction(page, noteTitle);
+
+    await expect(page).toHaveURL('/notes');
+    await expectNoteExists(page, noteTitle);
   });
 
   test('should delete notes', async ({ page }) => {

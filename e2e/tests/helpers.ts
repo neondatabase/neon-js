@@ -103,13 +103,40 @@ export async function navigateToOrganizationSettings(page: Page): Promise<void> 
 }
 
 /**
- * Create a new note
+ * Create a new note via the API-route form (client `fetch` to `/api/notes`).
+ *
+ * The notes page renders two add-note forms (API route + Server Action), so the
+ * submit button is scoped to the form that owns this input to avoid a strict-mode
+ * locator collision.
  */
 export async function createNote(page: Page, noteTitle: string): Promise<void> {
-  await page.getByPlaceholder(/add a quick note/i).fill(noteTitle);
+  const form = page
+    .locator('form')
+    .filter({ has: page.getByPlaceholder(/add a quick note/i) });
+
+  await form.getByPlaceholder(/add a quick note/i).fill(noteTitle);
 
   // Click the add button (Plus icon)
-  await page.locator('button[type="submit"]').click();
+  await form.locator('button[type="submit"]').click();
+
+  // Wait for note to be added
+  await expect(page.getByText(noteTitle)).toBeVisible({ timeout: 5_000 });
+}
+
+/**
+ * Create a new note via the Server Action form.
+ *
+ * Submitting this form POSTs to the protected `/notes` route, exercising the
+ * auth middleware against a non-GET request. An authenticated user must NOT be
+ * redirected to sign-in (the bug this guards against).
+ */
+export async function createNoteViaServerAction(page: Page, noteTitle: string): Promise<void> {
+  const form = page
+    .locator('form')
+    .filter({ has: page.getByPlaceholder(/server action/i) });
+
+  await form.getByPlaceholder(/server action/i).fill(noteTitle);
+  await form.locator('button[type="submit"]').click();
 
   // Wait for note to be added
   await expect(page.getByText(noteTitle)).toBeVisible({ timeout: 5_000 });

@@ -5,6 +5,7 @@ import { db } from "@/lib/db"
 import { notes } from "@/lib/schema"
 import { eq, desc } from "drizzle-orm"
 import { AddNoteForm } from "./add-note-form"
+import { ServerActionNoteForm } from "./server-action-note-form"
 import { DeleteNoteButton } from "./delete-note-button"
 
 // Server components using `auth` methods must be rendered dynamically
@@ -52,8 +53,22 @@ export default async function NotesPage() {
                     </p>
                 </div>
 
-                {/* Quick Add Form */}
+                {/* Quick Add Form (API route via client fetch) */}
+                <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Add via API route
+                </div>
                 <AddNoteForm />
+
+                {/*
+                  Quick Add Form (Next.js Server Action).
+                  `/notes` is a protected route in the middleware matcher, so this
+                  Server Action POSTs through the auth middleware. It must succeed
+                  for an authenticated user and NOT redirect to sign-in.
+                */}
+                <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Add via Server Action
+                </div>
+                <ServerActionNoteForm />
 
                 {/* Notes List */}
                 {userNotes.length === 0 ? (

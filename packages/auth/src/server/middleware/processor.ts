@@ -42,6 +42,21 @@ export type AuthMiddlewareConfig = {
 } & NeonAuthLoggingInput;
 
 /**
+ * Returns a copy of `headers` without body-framing headers
+ * (`Content-Type` / `Content-Length` / `Transfer-Encoding`).
+ *
+ * The session lookup re-issues the request as a body-less GET, so these
+ * leftover headers would misdescribe it and could trip stricter upstreams.
+ */
+function stripBodyHeaders(headers: Headers): Headers {
+	const next = new Headers(headers);
+	next.delete('content-type');
+	next.delete('content-length');
+	next.delete('transfer-encoding');
+	return next;
+}
+
+/**
  * Generic authentication middleware processor (framework-agnostic)
  *
  * Handles the complete middleware flow:
@@ -122,10 +137,17 @@ export async function processAuthMiddleware(
 	let sessionCookies: string[] = [];
 
 	if (hasSessionToken) {
-		// Session token present - get session by calling handleAuthProxyRequest
-		// (handles cookie cache + upstream fallback)
+		// Always issue the session lookup as a GET (it's a read). The triggering
+		// request may use any method — a Next.js Server Action POSTs to the page
+		// URL — and a non-GET would skip the get-session cache and hit the
+		// GET-only upstream, spuriously logging the user out.
+		const sessionRequest = new Request(request.url, {
+			method: 'GET',
+			headers: stripBodyHeaders(request.headers),
+		});
+
 		const sessionResponse = await handleAuthProxyRequest({
-			request,
+			request: sessionRequest,
 			path: 'get-session',
 			baseUrl,
 			cookieSecret,
