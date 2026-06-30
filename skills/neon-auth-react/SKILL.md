@@ -21,13 +21,13 @@ Use this skill when:
 1. **Adapter Factory Pattern**: Always call adapters with `()` - they are factory functions
 2. **React Adapter Import**: Use subpath `@neondatabase/auth/react/adapters`
 3. **createAuthClient takes URL as first arg**: `createAuthClient(url, config)`
-4. **CSS Import**: Choose ONE - either `/ui/css` OR `/ui/tailwind`, never both
+4. **CSS Import**: Choose ONE - either `@neondatabase/auth-ui/css` OR `@neondatabase/auth-ui/tailwind`, never both
 
 ## Setup
 
 ### 1. Install
 ```bash
-npm install @neondatabase/auth
+npm install @neondatabase/auth @neondatabase/auth-ui
 ```
 
 ### 2. Create Client (`src/auth-client.ts`)
@@ -46,13 +46,13 @@ export const authClient = createAuthClient(
 
 ### 3. Create Provider (`src/providers.tsx`)
 ```typescript
-import { NeonAuthUIProvider } from '@neondatabase/auth/react/ui';
+import { NeonAuthUIProvider } from '@neondatabase/auth-ui';
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { authClient } from './auth-client';
 
 // Import CSS (choose one)
-import '@neondatabase/auth/ui/css';
+import '@neondatabase/auth-ui/css';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
@@ -94,13 +94,13 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 **Without Tailwind** (pre-built CSS bundle ~47KB):
 ```css
 /* In your main CSS file or import in provider */
-@import '@neondatabase/auth/ui/css';
+@import '@neondatabase/auth-ui/css';
 ```
 
 **With Tailwind CSS v4**:
 ```css
 @import 'tailwindcss';
-@import '@neondatabase/auth/ui/tailwind';
+@import '@neondatabase/auth-ui/tailwind';
 ```
 
 **IMPORTANT**: Never import both - causes duplicate styles.
@@ -220,7 +220,7 @@ Full configuration options:
 Handles sign-in, sign-up, forgot password, and callback routes:
 
 ```typescript
-import { AuthView } from '@neondatabase/auth/react/ui';
+import { AuthView } from '@neondatabase/auth-ui';
 
 // Route: /auth/:pathname
 function AuthPage() {
@@ -240,7 +240,7 @@ import {
   SignedOut,
   AuthLoading,
   RedirectToSignIn
-} from '@neondatabase/auth/react/ui';
+} from '@neondatabase/auth-ui';
 
 function MyPage() {
   return (
@@ -272,7 +272,7 @@ function MyPage() {
 Dropdown menu with user avatar, name, and sign-out:
 
 ```typescript
-import { UserButton } from '@neondatabase/auth/react/ui';
+import { UserButton } from '@neondatabase/auth-ui';
 
 function Header() {
   return (
@@ -295,7 +295,7 @@ import {
   ChangeEmailCard,        // Email change form
   DeleteAccountCard,      // Account deletion
   ProvidersCard,          // Linked OAuth providers
-} from '@neondatabase/auth/react/ui';
+} from '@neondatabase/auth-ui';
 
 function AccountPage() {
   const { view } = useParams(); // 'settings', 'security', 'sessions'
@@ -326,7 +326,7 @@ import {
   OrganizationSettingsCards,  // Org settings
   OrganizationMembersCard,    // Member management
   AcceptInvitationCard,       // Accept org invite
-} from '@neondatabase/auth/react/ui';
+} from '@neondatabase/auth-ui';
 ```
 
 ---
@@ -646,7 +646,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 ```typescript
 // pages/AuthPage.tsx
 import { useParams } from 'react-router-dom';
-import { AuthView } from '@neondatabase/auth/react/ui';
+import { AuthView } from '@neondatabase/auth-ui';
 
 export function AuthPage() {
   const { pathname } = useParams();
@@ -666,7 +666,7 @@ import {
   SecuritySettingsCards,
   SessionsCard,
   ChangePasswordCard,
-} from '@neondatabase/auth/react/ui';
+} from '@neondatabase/auth-ui';
 
 export function AccountPage() {
   const { view = 'settings' } = useParams();
