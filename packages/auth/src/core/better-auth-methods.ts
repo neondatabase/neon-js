@@ -18,6 +18,7 @@ import {
 } from './constants';
 import { openOAuthPopup } from './oauth-popup';
 import { isBrowser, isIframe } from '../utils/browser';
+import { generateUUID } from '../utils/uuid';
 import { anonymousTokenResponseSchema } from '../plugins/anonymous-token';
 
 interface SocialSignInResponse {
@@ -27,7 +28,7 @@ interface SocialSignInResponse {
   user?: BetterAuthUser;
 }
 
-export const CURRENT_TAB_CLIENT_ID = crypto.randomUUID();
+export const CURRENT_TAB_CLIENT_ID = generateUUID();
 
 export const BETTER_AUTH_METHODS_IN_FLIGHT_REQUESTS =
   new InFlightRequestManager();
@@ -337,7 +338,7 @@ function mapToEventType(event: InternalAuthEvent): NeonAuthChangeEvent {
       return 'TOKEN_REFRESHED';
     }
     case 'USER_UPDATE': {
-      return 'USER_UPDATED';
+      return 'UPDATED';
     }
   }
 }
