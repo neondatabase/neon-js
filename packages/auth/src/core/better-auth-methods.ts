@@ -18,7 +18,6 @@ import {
 } from './constants';
 import { openOAuthPopup } from './oauth-popup';
 import { isBrowser, isIframe } from '../utils/browser';
-import { generateUUID } from '../utils/uuid';
 import { anonymousTokenResponseSchema } from '../plugins/anonymous-token';
 
 interface SocialSignInResponse {
@@ -28,7 +27,14 @@ interface SocialSignInResponse {
   user?: BetterAuthUser;
 }
 
-export const CURRENT_TAB_CLIENT_ID = generateUUID();
+let _currentTabClientId: string | undefined;
+
+export function getCurrentTabClientId(): string {
+  if (!_currentTabClientId) {
+    _currentTabClientId = crypto.randomUUID();
+  }
+  return _currentTabClientId;
+}
 
 export const BETTER_AUTH_METHODS_IN_FLIGHT_REQUESTS =
   new InFlightRequestManager();
@@ -313,7 +319,7 @@ export async function emitAuthEvent(event: InternalAuthEvent): Promise<void> {
     getGlobalBroadcastChannel().post({
       event: 'session',
       data: { trigger },
-      clientId: CURRENT_TAB_CLIENT_ID,
+      clientId: getCurrentTabClientId(),
     });
   }
 
@@ -321,7 +327,7 @@ export async function emitAuthEvent(event: InternalAuthEvent): Promise<void> {
   getGlobalBroadcastChannel().post({
     event: 'session',
     data: { trigger: eventType, sessionData },
-    clientId: CURRENT_TAB_CLIENT_ID,
+    clientId: getCurrentTabClientId(),
   });
 }
 
@@ -338,7 +344,7 @@ function mapToEventType(event: InternalAuthEvent): NeonAuthChangeEvent {
       return 'TOKEN_REFRESHED';
     }
     case 'USER_UPDATE': {
-      return 'UPDATED';
+      return 'USER_UPDATED';
     }
   }
 }
@@ -428,7 +434,7 @@ export function initBroadcastChannel() {
   }
 
   getGlobalBroadcastChannel().subscribe((message) => {
-    if (message.clientId === CURRENT_TAB_CLIENT_ID) {
+    if (message.clientId === getCurrentTabClientId()) {
       return;
     }
 
