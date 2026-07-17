@@ -1,6 +1,11 @@
 // Main client factory
 export { createClient } from './client/client-factory';
-export type { CreateClientStringOptions } from './client/client-factory';
+export type {
+  CreateClientStringOptions,
+  CreateClientExternalConfig,
+  CreateClientExternalDataApiConfig,
+  NeonDataApiTokenProvider,
+} from './client/client-factory';
 
 // URL derivation (mostly used by wrappers; end users don't need this)
 export {
@@ -10,6 +15,9 @@ export {
 
 // Re-export utilities from postgrest-js for convenience
 export { fetchWithToken, AuthRequiredError } from '@neondatabase/postgrest-js';
+
+// The external-auth-provider form of createClient returns this type
+export { NeonPostgrestClient } from '@neondatabase/postgrest-js';
 
 // Re-export auth utilities (no React dependency)
 export {
