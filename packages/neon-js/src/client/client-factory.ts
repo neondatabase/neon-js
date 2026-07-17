@@ -8,7 +8,11 @@ import {
   type SupabaseAuthAdapterInstance,
 } from '@neondatabase/auth/vanilla/adapters';
 import { type BetterAuthReactAdapterInstance } from '@neondatabase/auth/react/adapters';
-import { fetchWithToken } from '@neondatabase/postgrest-js';
+import {
+  fetchWithToken,
+  NeonPostgrestClient,
+  type NeonPostgrestClientConstructorOptions,
+} from '@neondatabase/postgrest-js';
 import {
   NeonClient,
   type DefaultSchemaName,
@@ -52,6 +56,43 @@ export type CreateClientConfig<SchemaName, T extends NeonAuthAdapter> = {
   auth: CreateClientAuthConfig<T>;
   /** Data API configuration */
   dataApi: CreateClientDataApiConfig<SchemaName, T>;
+};
+
+/**
+ * Returns a valid JWT for the current user, or `null` if there is no session.
+ *
+ * Called lazily on every Data API request. Wire this to your own identity
+ * provider — e.g. Clerk's `getToken()` or Auth0's `getAccessTokenSilently()`.
+ * Neon validates the returned token against the JWKS URL configured for the
+ * provider.
+ */
+export type NeonDataApiTokenProvider = () => Promise<string | null>;
+
+/**
+ * Data API configuration for the external-auth-provider form of createClient.
+ *
+ * Same as {@link CreateClientDataApiConfig} but carries a `getToken` function
+ * instead of relying on a Neon Auth service.
+ */
+export type CreateClientExternalDataApiConfig<SchemaName> =
+  CreateClientDataApiConfig<SchemaName, NeonAuthAdapter> & {
+    /** Token provider consulted on every Data API request. */
+    getToken: NeonDataApiTokenProvider;
+  };
+
+/**
+ * Configuration for the external-auth-provider form of createClient.
+ *
+ * Use this when authentication is handled by your own identity provider
+ * (Clerk, Auth0, …) rather than Neon Auth: omit the `auth` block entirely and
+ * supply `dataApi.getToken`. No Neon Auth client is created, and the returned
+ * client is a plain {@link NeonPostgrestClient} (no `.auth` property).
+ */
+export type CreateClientExternalConfig<SchemaName> = {
+  /** External providers do not use a Neon Auth service. */
+  auth?: never;
+  /** Data API configuration, including your token provider. */
+  dataApi: CreateClientExternalDataApiConfig<SchemaName>;
 };
 
 /**
@@ -104,6 +145,20 @@ export type CreateClientConfig<SchemaName, T extends NeonAuthAdapter> = {
  *   'https://ep-xxx.c-2.us-east-2.aws.neon.build/dbname'
  * );
  * ```
+ *
+ * @example
+ * ```typescript
+ * // External auth provider (Clerk, Auth0, …): omit `auth` and supply a
+ * // `getToken` function. The returned client has no `.auth` property.
+ * const client = createClient({
+ *   dataApi: {
+ *     url: 'https://data-api.example.com/rest/v1',
+ *     getToken: async () => await yourAuthProvider.getToken(),
+ *   },
+ * });
+ *
+ * const { data: items } = await client.from('items').select();
+ * ```
  */
 
 /**
@@ -114,6 +169,13 @@ type CreateClientResult<
   Database,
   TAdapter extends NeonAuthAdapter,
 > = NeonClient<Database, DefaultSchemaName<Database>, TAdapter>;
+
+// Overload: External auth provider (no Neon Auth) — returns a plain
+// NeonPostgrestClient with no `.auth` property. Listed first so its `auth?:
+// never` shape is matched before the auth-required object overloads.
+export function createClient<Database = any>(
+  config: CreateClientExternalConfig<DefaultSchemaName<Database>>
+): NeonPostgrestClient<Database, DefaultSchemaName<Database>>;
 
 // Overload: No adapter specified (defaults to BetterAuthVanillaAdapter)
 export function createClient<Database = any>(config: {
@@ -190,13 +252,27 @@ export function createClient<
   SchemaName extends string & keyof Database = DefaultSchemaName<Database>,
   TAuthAdapter extends NeonAuthAdapter = BetterAuthVanillaAdapterInstance,
 >(
-  arg1: string | CreateClientConfig<SchemaName, TAuthAdapter>,
+  arg1:
+    | string
+    | CreateClientConfig<SchemaName, TAuthAdapter>
+    | CreateClientExternalConfig<SchemaName>,
   arg2?: CreateClientStringOptions<SchemaName, TAuthAdapter>
-): NeonClient<Database, SchemaName, TAuthAdapter> {
+):
+  | NeonClient<Database, SchemaName, TAuthAdapter>
+  | NeonPostgrestClient<Database, SchemaName> {
+  // External-auth-provider form: no `auth` block, a `getToken` on `dataApi`.
+  // Build a plain NeonPostgrestClient and let the caller's token flow through
+  // unchanged — no Neon Auth client is created.
+  if (typeof arg1 !== 'string' && !arg1.auth) {
+    return buildExternalClient<Database, SchemaName>(
+      (arg1 as CreateClientExternalConfig<SchemaName>).dataApi
+    );
+  }
+
   const config: CreateClientConfig<SchemaName, TAuthAdapter> =
     typeof arg1 === 'string'
       ? buildConfigFromBaseUrl<SchemaName, TAuthAdapter>(arg1, arg2)
-      : arg1;
+      : (arg1 as CreateClientConfig<SchemaName, TAuthAdapter>);
 
   const { auth: authConfig, dataApi: dataApiConfig } = config;
 
@@ -244,6 +320,44 @@ export function createClient<
   });
 
   return client;
+}
+
+/**
+ * Builds the external-auth-provider client: a plain NeonPostgrestClient whose
+ * every request carries the caller's token via `fetchWithToken(getToken)`.
+ *
+ * Mirrors the fetch/header wiring of the auth path, but the token comes from
+ * the caller's `getToken` rather than a Neon Auth session.
+ */
+function buildExternalClient<
+  Database,
+  SchemaName extends string & keyof Database,
+>(
+  dataApiConfig: CreateClientExternalDataApiConfig<SchemaName>
+): NeonPostgrestClient<Database, SchemaName> {
+  const clientInfoHeader = buildNeonJsClientInfo();
+
+  const tokenFetch = fetchWithToken(
+    dataApiConfig.getToken,
+    dataApiConfig.options?.global?.fetch
+  );
+
+  const options: NeonPostgrestClientConstructorOptions<SchemaName>['options'] = {
+    ...dataApiConfig.options,
+    global: {
+      ...dataApiConfig.options?.global,
+      fetch: tokenFetch,
+      headers: {
+        ...dataApiConfig.options?.global?.headers,
+        [X_NEON_CLIENT_INFO_HEADER]: clientInfoHeader,
+      },
+    },
+  };
+
+  return new NeonPostgrestClient<Database, SchemaName>({
+    dataApiUrl: dataApiConfig.url,
+    options,
+  });
 }
 
 /**

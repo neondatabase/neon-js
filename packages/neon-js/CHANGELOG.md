@@ -21,6 +21,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`createClient` external auth provider support**: `createClient` now accepts a
+  Data-API-only form for apps that authenticate with their own identity provider
+  (Clerk, Auth0, …). Omit the `auth` block and pass `dataApi.getToken`; the token
+  is attached to every Data API request and no Neon Auth client is created. This
+  form returns a `NeonPostgrestClient` (no `.auth` property). New exported types:
+  `CreateClientExternalConfig`, `CreateClientExternalDataApiConfig`, and
+  `NeonDataApiTokenProvider`; `NeonPostgrestClient` is now re-exported from the
+  package entry.
+
+  ```typescript
+  const neon = createClient({
+    dataApi: {
+      url: import.meta.env.VITE_NEON_DATA_API_URL,
+      getToken: async () => await yourAuthProvider.getToken(),
+    },
+  });
+  ```
+
 - **Client Telemetry**: Automatically injects `X-Neon-Client-Info` header with SDK name, version, runtime environment (Node.js, Deno, Bun, Edge, Browser), and framework detection (Next.js, Remix, React, Vue, Angular).
 
 ### Deprecated

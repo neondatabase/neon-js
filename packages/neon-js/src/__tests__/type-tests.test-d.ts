@@ -260,3 +260,23 @@ describe('String form with Database type parameter', () => {
     expectTypeOf(typed.auth.signInWithPassword).toBeFunction();
   });
 });
+
+// =============================================================================
+// Test 10: External auth provider form — queries work, no `.auth` property
+// =============================================================================
+describe('External auth provider form type inference', () => {
+  const client = createClient({
+    dataApi: {
+      url: 'https://data-api.example.com/rest/v1',
+      getToken: async () => 'token',
+    },
+  });
+
+  it('should expose Data API query methods', () => {
+    expectTypeOf(client.from).toBeFunction();
+  });
+
+  it('should not expose an `auth` property', () => {
+    expectTypeOf(client).not.toHaveProperty('auth');
+  });
+});

@@ -131,3 +131,73 @@ describe('createClient — object form (backward compat)', () => {
     );
   });
 });
+
+describe('createClient — external auth provider form', () => {
+  beforeEach(() => {
+    createInternalNeonAuthMock.mockClear();
+  });
+
+  it('does not create a Neon Auth client when auth is omitted', () => {
+    createClient({
+      dataApi: {
+        url: 'https://data-api.example.com/rest/v1',
+        getToken: async () => 'external-token',
+      },
+    });
+
+    expect(createInternalNeonAuthMock).not.toHaveBeenCalled();
+  });
+
+  it('returns a plain client with no `auth` property', () => {
+    const client = createClient({
+      dataApi: {
+        url: 'https://data-api.example.com/rest/v1',
+        getToken: async () => 'external-token',
+      },
+    });
+
+    expect((client as unknown as { url: string }).url).toBe(
+      'https://data-api.example.com/rest/v1'
+    );
+    expect((client as unknown as { auth?: unknown }).auth).toBeUndefined();
+  });
+
+  it("attaches the caller's token to Data API requests", async () => {
+    const baseFetch = vi.fn(async () => new Response('[]'));
+    const getToken = vi.fn(async () => 'external-token');
+
+    const client = createClient({
+      dataApi: {
+        url: 'https://data-api.example.com/rest/v1',
+        getToken,
+        options: { global: { fetch: baseFetch as unknown as typeof fetch } },
+      },
+    });
+
+    await client.from('todos').select('*');
+
+    expect(getToken).toHaveBeenCalled();
+    const init = baseFetch.mock.calls[0]?.[1] as RequestInit;
+    const headers = new Headers(init.headers);
+    expect(headers.get('Authorization')).toBe('Bearer external-token');
+  });
+
+  it('surfaces AuthRequiredError when getToken yields null', async () => {
+    const baseFetch = vi.fn(async () => new Response('[]'));
+
+    const client = createClient({
+      dataApi: {
+        url: 'https://data-api.example.com/rest/v1',
+        getToken: async () => null,
+        options: { global: { fetch: baseFetch as unknown as typeof fetch } },
+      },
+    });
+
+    // The upstream PostgrestClient catches the fetch-layer throw and returns it
+    // as `{ error }` rather than rejecting.
+    const { error } = await client.from('todos').select('*');
+
+    expect(error?.message).toMatch(/Authentication required/);
+    expect(baseFetch).not.toHaveBeenCalled();
+  });
+});
