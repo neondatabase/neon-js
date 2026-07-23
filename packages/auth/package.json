@@ -111,7 +111,7 @@
   "devDependencies": {
     "@neondatabase/internal": "workspace:*",
     "msw": "2.6.8",
-    "next": "16.2.6"
+    "next": "16.2.11"
   },
   "dependencies": {
     "@better-fetch/fetch": "1.1.21",
