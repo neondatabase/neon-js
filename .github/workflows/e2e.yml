@@ -184,7 +184,7 @@ jobs:
       # Clean up: Delete Neon branch (runs even if tests fail)
       - name: Delete Neon branch
         if: always()
-        uses: neondatabase/delete-branch-action@4468d825d5a88ef4012f1705a82f02ec3072f776 # v3.2.1
+        uses: neondatabase/delete-branch-action@aed9ab1ec86e380312c7b0a9e29942e41349adf6 # main (neonctl pinned to 2.22.0)
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch: test-${{ matrix.app }}-${{ github.run_id }}-${{ github.run_attempt }}
