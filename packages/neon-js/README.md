@@ -196,6 +196,28 @@ const client = createClient<Database>({
 const { data: publicItems } = await client.from('public_items').select();
 ```
 
+### External Auth Provider
+
+If your app authenticates with its own identity provider (Clerk, Auth0, and others) instead of Neon Auth, omit the `auth` block and pass a `getToken` function on `dataApi`. It is called lazily on every request and its JWT is attached to each Data API call — Neon validates it against the JWKS URL you configured for the provider.
+
+```typescript
+import { createClient } from '@neondatabase/neon-js';
+
+const neon = createClient<Database>({
+  dataApi: {
+    url: import.meta.env.VITE_NEON_DATA_API_URL,
+    // Return a valid JWT from your provider, e.g. Clerk's getToken()
+    // or Auth0's getAccessTokenSilently().
+    getToken: async () => await yourAuthProvider.getToken(),
+  },
+});
+
+// Every request carries your provider's token, so RLS policies apply
+const { data: items } = await neon.from('items').select();
+```
+
+This form returns a `NeonPostgrestClient` — the same query API as above, without the `.auth` namespace (auth is handled by your provider). No `@neondatabase/postgrest-js` import is needed.
+
 ## Authentication
 
 ### Sign Up

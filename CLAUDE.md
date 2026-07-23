@@ -404,6 +404,23 @@ const client = new NeonPostgrestClient({
 const { data: items } = await client.from('items').select();
 ```
 
+### Using createClient (External Auth Provider)
+
+When authentication is handled by your own identity provider (Clerk, Auth0, …) rather than Neon Auth, omit the `auth` block and pass `dataApi.getToken`. No Neon Auth client is created; the returned client is a plain `NeonPostgrestClient` (no `.auth` property), and your token is attached to every Data API request.
+
+```typescript
+import { createClient } from '@neondatabase/neon-js';
+
+const neon = createClient<Database>({
+  dataApi: {
+    url: 'https://data-api.example.com/rest/v1',
+    getToken: async () => await yourAuthProvider.getToken(), // returns a JWT or null
+  },
+});
+
+const { data: items } = await neon.from('items').select();
+```
+
 ### Using NeonClient (With Auth) - Adapter Pattern
 
 The `createClient()` factory accepts any auth adapter, allowing you to choose the API style:
