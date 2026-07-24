@@ -41,12 +41,17 @@ describe('handleAuthProxyRequest', () => {
 
       const result = await handleAuthProxyRequest(config);
 
-      expect(trySessionCacheSpy).toHaveBeenCalledWith(config.request, TEST_BASE_URL, {
-        secret: TEST_SECRET,
-        sessionDataTtl: undefined,
-        domain: undefined,
-        sameSite: undefined,
-      });
+      expect(trySessionCacheSpy).toHaveBeenCalledWith(
+        config.request,
+        TEST_BASE_URL,
+        {
+          secret: TEST_SECRET,
+          sessionDataTtl: undefined,
+          domain: undefined,
+          sameSite: undefined,
+        },
+        undefined
+      );
       expect(result).toBe(cachedResponse);
       // Should NOT call upstream on cache hit
       expect(handleAuthRequestSpy).not.toHaveBeenCalled();
@@ -164,12 +169,17 @@ describe('handleAuthProxyRequest', () => {
 
       await handleAuthProxyRequest(config);
 
-      expect(handleAuthResponseSpy).toHaveBeenCalledWith(upstreamResponse, BASE_URL, {
-        secret: TEST_SECRET,
-        sessionDataTtl: 600,
-        domain: '.example.com',
-        sameSite: undefined,
-      });
+      expect(handleAuthResponseSpy).toHaveBeenCalledWith(
+        upstreamResponse,
+        BASE_URL,
+        {
+          secret: TEST_SECRET,
+          sessionDataTtl: 600,
+          domain: '.example.com',
+          sameSite: undefined,
+        },
+        undefined
+      );
     });
 
     test('returns processed response from handleAuthResponse', async () => {
@@ -212,7 +222,8 @@ describe('handleAuthProxyRequest', () => {
         BASE_URL,
         expect.objectContaining({
           sessionDataTtl: 900,
-        })
+        }),
+        undefined
       );
     });
 
@@ -239,7 +250,8 @@ describe('handleAuthProxyRequest', () => {
         BASE_URL,
         expect.objectContaining({
           domain: '.custom-domain.com',
-        })
+        }),
+        undefined
       );
     });
 
@@ -261,12 +273,17 @@ describe('handleAuthProxyRequest', () => {
 
       await handleAuthProxyRequest(config);
 
-      expect(handleAuthResponseSpy).toHaveBeenCalledWith(upstreamResponse, BASE_URL, {
-        secret: TEST_SECRET,
-        sessionDataTtl: undefined,
-        domain: undefined,
-        sameSite: undefined,
-      });
+      expect(handleAuthResponseSpy).toHaveBeenCalledWith(
+        upstreamResponse,
+        BASE_URL,
+        {
+          secret: TEST_SECRET,
+          sessionDataTtl: undefined,
+          domain: undefined,
+          sameSite: undefined,
+        },
+        undefined
+      );
     });
   });
 
@@ -343,6 +360,80 @@ describe('handleAuthProxyRequest', () => {
         'update-user',
         undefined,
       );
+    });
+  });
+
+  // Andras FIX 3 (DX): `AuthProxyConfig.log` must accept either a pre-resolved
+  // sink or a partial `NeonAuthLogger` (the same shape adapters expose to
+  // their own users), so adapters can forward `config.log` straight through
+  // without a TS2322 error.
+  describe('logger normalization', () => {
+    test('forwards undefined when no log provided (silent downstream)', async () => {
+      const upstreamResponse = Response.json({}, { status: 200 });
+      vi.spyOn(request, 'handleAuthRequest').mockResolvedValue(upstreamResponse);
+      const handleAuthResponseSpy = vi
+        .spyOn(response, 'handleAuthResponse')
+        .mockResolvedValue(new Response('OK', { status: 200 }));
+
+      await handleAuthProxyRequest(createTestConfig({ path: 'sign-in/email' }));
+
+      expect(handleAuthResponseSpy).toHaveBeenCalledWith(
+        upstreamResponse,
+        BASE_URL,
+        expect.any(Object),
+        undefined
+      );
+    });
+
+    test('passes a pre-resolved sink through unchanged', async () => {
+      const upstreamResponse = Response.json({}, { status: 200 });
+      vi.spyOn(request, 'handleAuthRequest').mockResolvedValue(upstreamResponse);
+      const handleAuthResponseSpy = vi
+        .spyOn(response, 'handleAuthResponse')
+        .mockResolvedValue(new Response('OK', { status: 200 }));
+
+      const preResolved = {
+        error: vi.fn(),
+        warn: vi.fn(),
+        info: vi.fn(),
+        debug: vi.fn(),
+      };
+
+      await handleAuthProxyRequest(
+        createTestConfig({ path: 'sign-in/email', log: preResolved })
+      );
+
+      const forwardedLog = handleAuthResponseSpy.mock.calls[0][3];
+      expect(forwardedLog).toBe(preResolved);
+    });
+
+    test('normalizes a partial NeonAuthLogger into a resolved sink (all 4 methods callable)', async () => {
+      const upstreamResponse = Response.json({}, { status: 200 });
+      vi.spyOn(request, 'handleAuthRequest').mockResolvedValue(upstreamResponse);
+      const handleAuthResponseSpy = vi
+        .spyOn(response, 'handleAuthResponse')
+        .mockResolvedValue(new Response('OK', { status: 200 }));
+
+      // Partial logger (only `warn`) — mimics an adapter forwarding the
+      // public `log?: NeonAuthLogger` from its own config.
+      const partial = { warn: vi.fn() };
+
+      await handleAuthProxyRequest(
+        createTestConfig({ path: 'sign-in/email', log: partial })
+      );
+
+      const forwardedLog = handleAuthResponseSpy.mock.calls[0][3] as {
+        error: (m: string) => void;
+        warn: (m: string) => void;
+        info: (m: string) => void;
+        debug: (m: string) => void;
+      };
+      expect(forwardedLog).toBeDefined();
+      expect(forwardedLog).not.toBe(partial);
+      expect(typeof forwardedLog.error).toBe('function');
+      expect(typeof forwardedLog.warn).toBe('function');
+      expect(typeof forwardedLog.info).toBe('function');
+      expect(typeof forwardedLog.debug).toBe('function');
     });
   });
 });

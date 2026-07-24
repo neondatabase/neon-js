@@ -69,6 +69,7 @@ Main SDK package that combines authentication with PostgreSQL querying:
 - `@neondatabase/neon-js/auth/vanilla/adapters` - Re-exports @neondatabase/auth/vanilla/adapters
 - `@neondatabase/neon-js/auth/next` - Re-exports @neondatabase/auth/next (createAuthClient)
 - `@neondatabase/neon-js/auth/next/server` - Re-exports @neondatabase/auth/next/server (createNeonAuth)
+- `@neondatabase/neon-js/auth/server` - Re-exports @neondatabase/auth/server (framework-agnostic adapter toolkit, beta)
 - `@neondatabase/neon-js/ui/css` - Pre-built CSS
 - `@neondatabase/neon-js/ui/tailwind` - Tailwind CSS
 
@@ -254,11 +255,18 @@ auth-ui (generates via Tailwind) → auth (copies) → neon-js (copies)
 
 ### Re-export File Structure
 
-The 8 re-export files in `packages/neon-js/src/auth/` are **mandatory**, not optional complexity.
+The re-export files in `packages/neon-js/src/auth/` are **mandatory**, not optional complexity. There must be one wrapper per `@neondatabase/auth/*` subpath that the umbrella SDK exposes.
 
 **Why they exist:** npm's `exports` field cannot reference external packages. Only relative
 paths within the package are valid (per Node.js ESM specification). Wrapper files are the only way to provide the unified
 `@neondatabase/neon-js/auth/*` import paths.
+
+**Whenever you add a new subpath to `@neondatabase/auth`'s `exports`**, you MUST also:
+1. Create a wrapper at `packages/neon-js/src/auth/<path>/index.ts` containing `export * from '@neondatabase/auth/<path>';`
+2. Add the corresponding entry to `packages/neon-js/package.json` `exports`
+3. Add the new entry path to `packages/neon-js/tsdown.config.ts`
+4. Document the new export in this file's "neon-js" exports list above
+5. Bump `@neondatabase/neon-js` minor version + CHANGELOG entry
 
 **Reference:** [Node.js Packages Documentation](https://nodejs.org/api/packages.html)
 
@@ -804,13 +812,28 @@ The `skills/` directory contains AI-assistant skills for helping developers set 
 
 - Neon Auth Next.js/server observability: **opt-out** defaults (`warn` to `console`); apps can set **`logLevel: 'silent'`** on `createNeonAuth` to mute or inject a custom **`logger`**.
 - When adding SDK-facing observability or debugging aids, update the package changelog and show usage in an example app when it helps adopters.
-- Prefer **`logger`** + **`logLevel`** as the only controls for server/proxy logging—avoid separate boolean or feature flags solely to toggle logs.
+- Avoid adding new boolean/feature flags when an existing knob (e.g. **`logLevel`**) can express the same intent—reuse the smallest control rather than introducing a parallel toggle.
+- New framework adapters should **match the existing Next.js adapter's test coverage** before review, and reuse the shared core (proxy `Proxy` trap, `createAuthServerInternal`) rather than re-implementing it per framework.
+- Roll out cross-package refactors in **phases**: verify the full test suite passes for Phase 1 (backward-compatible foundation) before starting Phase 2 (adapter adoption / breaking moves).
+- Docs and changelogs should describe **current** usage; avoid upgrade-context phrasing like "after upgrading".
+- **Humanize** agent-authored PR review comments before posting so they don't read as LLM output; and prefer letting the human post review feedback themselves when feasible.
+- **Split PRs by concern** (e.g. per-feature website-docs PRs) rather than landing one large mixed change.
+- Auth-related PR reviewers default to **Andre** and **Andras** (grant Andre repo access if missing).
 
 ## Learned Workspace Facts
 
 - `createNeonAuth` accepts optional **`logger`** and **`logLevel`** (including **`'silent'`** via `resolveNeonAuthLogging`); related types are re-exported from `@neondatabase/auth/next/server`.
 - The auth **proxy** (`packages/auth/src/server/proxy/request.ts`) logs structured warn/debug lines for upstream fetch outcomes and uses **`classifyFetchFailure`** / `packages/auth/src/server/network-error.ts` for transport vs HTTP error taxonomy returned to clients.
 - **`examples/nextjs-neon-auth/app/iframe-test/page.tsx`** is the App Router counterpart to iframe-hosted OAuth/popup testing in **`examples/react-neon-js/`**.
+- The SDK is pinned to **`better-auth` 1.4.x** (currently `1.4.18`) across `packages/auth`, `packages/auth-ui`, root `package.json` overrides, and examples; **do not** upgrade to 1.5+/1.6+.
+- Framework-specific server adapters live under **`packages/auth/src/<framework>/`** (currently `next/`); **TanStack Start** support is in active development and **Hono** is the next planned framework, all sharing **`createAuthServerInternal`** (renamed from internal-only during the auth-core refactor and now consumed by framework adapters).
+- Neon Auth JWTs include an **`o` claim** carrying the active organization's `id`, `slug`, and member `role`—designed for RLS multi-tenancy policies.
+- Neon Postgres extension **`pg_session_jwt`** surfaces JWT claims to RLS; helper SQL functions live in the **`auth` schema** (e.g. `auth.organization_id()`, `auth.organization()`).
+- The Next.js auth proxy cookie **`SameSite`** attribute is configurable; cross-domain iframes (V0 / Vercel preview) drop `SameSite=strict` cross-site cookies, so iframe-hosted OAuth requires a less strict value on `session_challenge` and related cookies.
+- Popup-based OAuth uses **`NEON_AUTH_POPUP_CALLBACK_PARAM_NAME`**; the React example's `/auth/callback` route `postMessage`s the session to the opener and closes the popup (Next.js mirrors this via its server-rendered callback).
+- Neon Auth user-facing docs live in the separate **`neondatabase/website`** repo (e.g. `/docs/auth/quick-start/nextjs-api-only`); doc updates land there, not in this monorepo.
+- The `/review-pr` Cursor command orchestrates **`code-reviewer`**, **`pr-test-analyzer`**, **`comment-analyzer`**, **`silent-failure-hunter`**, **`type-design-analyzer`**, and **`code-simplifier`** subagents.
+- `examples/` has grown beyond the three documented above—also includes **`neon-auth-orgs-example`**, **`neon-auth-magic-link-example`**, **`nextjs-phone-login`**, and **`nextjs-admin-portal`** (org/RLS, webhook, phone OTP, and admin-portal demos respectively).
 
 ## References
 

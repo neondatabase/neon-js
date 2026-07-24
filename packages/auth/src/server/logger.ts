@@ -123,3 +123,31 @@ export function resolveNeonAuthLogging(
 	};
 	return wrapWithLevel(level, merged);
 }
+
+/**
+ * Internal normalizer: accept either a pre-resolved sink or a partial
+ * {@link NeonAuthLogger} (e.g. forwarded from an adapter's public config) and
+ * return a `ResolvedNeonAuthLogging` (or `undefined` for downstream silence).
+ *
+ * - `undefined`     → unchanged (downstream code uses its `?.` fallback)
+ * - all-4 methods   → treated as pre-resolved; preserves caller's level gating
+ * - partial methods → merged with `console` defaults at the default `'warn'`
+ *                     level (consistent with `createNeonAuth` defaults)
+ *
+ * Added for #161 review feedback (Andras FIX 3, DX): adapters that forward
+ * `log?: NeonAuthLogger` directly into `handleAuthProxyRequest` would
+ * otherwise fail TS2322 because `AuthProxyConfig.log` was typed as
+ * `Required<NeonAuthLogger>`.
+ *
+ * @internal
+ */
+export function resolveLog(
+	log: ResolvedNeonAuthLogging | NeonAuthLogger | undefined
+): ResolvedNeonAuthLogging | undefined {
+	if (!log) return undefined;
+	if (log.error && log.warn && log.info && log.debug) {
+		// Pre-resolved sink: keep as-is so existing level gating is preserved.
+		return log as ResolvedNeonAuthLogging;
+	}
+	return resolveNeonAuthLogging({ logger: log });
+}

@@ -56,6 +56,10 @@ export const parseSetCookies = (setCookieHeader: string): ParsedCookie[] => {
       path: parsedCookie.path,
       domain: parsedCookie.domain,
       maxAge: parsedCookie['max-age'] ?? parsedCookie.maxAge,
+      // Surface `expires` so callers (e.g. session minting) can detect deletion
+      // cookies by their past `Expires` attribute, not just `Max-Age=0`.
+      // See #161 review feedback (Andras FIX 2, correctness).
+      expires: parsedCookie.expires,
       httpOnly: parsedCookie.httponly ?? true,
       secure: parsedCookie.secure ?? true,
       sameSite: parsedCookie.samesite ?? 'lax',

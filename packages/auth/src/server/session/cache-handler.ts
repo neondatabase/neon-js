@@ -3,6 +3,27 @@ import { NEON_AUTH_SESSION_DATA_COOKIE_NAME, NEON_AUTH_SESSION_COOKIE_NAME } fro
 import { mintSessionDataFromToken } from './minting';
 import { parseCookies } from 'better-auth/cookies';
 import type { SessionCookieConfig } from '../config';
+import type { ResolvedNeonAuthLogging } from '../logger';
+
+function emit(
+  log: ResolvedNeonAuthLogging | undefined,
+  level: 'error' | 'warn' | 'debug',
+  message: string,
+  meta?: Record<string, unknown>
+): void {
+  if (log) {
+    log[level](message, meta);
+    return;
+  }
+  // Console fallback is intentional: preserves legacy behavior when adapter
+  // authors haven't plumbed a logger through. With a logger, the early
+  // return above ensures we never reach these lines.
+  if (meta && Object.keys(meta).length > 0) {
+    console[level](message, meta);
+  } else {
+    console[level](message);
+  }
+}
 
 /**
  * Attempts to retrieve session data from cookie cache
@@ -21,7 +42,8 @@ import type { SessionCookieConfig } from '../config';
 export async function trySessionCache(
   request: Request,
   baseUrl: string,
-  cookieConfig: SessionCookieConfig
+  cookieConfig: SessionCookieConfig,
+  log?: ResolvedNeonAuthLogging
 ): Promise<Response | null> {
   const url = new URL(request.url);
   const disableCookieCache = url.searchParams.get('disableCookieCache');
@@ -53,7 +75,8 @@ export async function trySessionCache(
     const sessionDataCookieString = await mintSessionDataFromToken(
       sessionTokenCookie,
       baseUrl,
-      cookieConfig
+      cookieConfig,
+      log
     );
 
     if (!sessionDataCookieString) {
@@ -62,7 +85,7 @@ export async function trySessionCache(
 
     // Fetch session data to return in response body
     try {
-      const sessionData = await fetchSessionWithCookie(sessionTokenCookie, baseUrl);
+      const sessionData = await fetchSessionWithCookie(sessionTokenCookie, baseUrl, log);
       if (!sessionData.session) {
         return null;
       }
@@ -72,7 +95,9 @@ export async function trySessionCache(
       response.headers.set('Set-Cookie', sessionDataCookieString);
       return response;
     } catch (error) {
-      console.error('[trySessionCache] Failed to fetch session after minting cookie:', error);
+      emit(log, 'error', '[trySessionCache] Failed to fetch session after minting cookie:', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return null;
     }
   };
@@ -87,7 +112,8 @@ export async function trySessionCache(
     const sessionData = await getSessionDataFromCookie(
       request,
       NEON_AUTH_SESSION_DATA_COOKIE_NAME,
-      cookieConfig.secret
+      cookieConfig.secret,
+      log
     );
 
     if (sessionData && sessionData.session) {
@@ -104,17 +130,17 @@ export async function trySessionCache(
     const errorName = error instanceof Error ? error.name : 'Unknown';
 
     if (errorName === 'JWTExpired') {
-      console.debug('[trySessionCache] Session cookie expired, minting new one:', {
+      emit(log, 'debug', '[trySessionCache] Session cookie expired, minting new one:', {
         error: errorMessage,
         url: request.url,
       });
     } else if (errorName === 'JWTInvalid' || errorName === 'JWTClaimValidationFailed') {
-      console.warn('[trySessionCache] Invalid session cookie, minting new one:', {
+      emit(log, 'warn', '[trySessionCache] Invalid session cookie, minting new one:', {
         error: errorMessage,
         url: request.url,
       });
     } else {
-      console.error('[trySessionCache] Unexpected validation error:', {
+      emit(log, 'error', '[trySessionCache] Unexpected validation error:', {
         error: errorMessage,
         url: request.url,
       });

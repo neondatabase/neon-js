@@ -1,4 +1,4 @@
-import { describe, test, expect } from 'vitest';
+import { describe, test, expect, vi } from 'vitest';
 import { validateSessionData, assertCookieSecret } from './validator';
 import { signSessionDataCookie, parseSessionData, getSessionDataFromCookie } from './operations';
 import { ERRORS } from '@/server/errors';
@@ -262,6 +262,76 @@ describe('parseSessionData', () => {
   test('handles null/undefined input', () => {
     expect(parseSessionData(null)).toEqual({ session: null, user: null });
     expect(parseSessionData({})).toEqual({ session: null, user: null });
+  });
+
+  // Item 6 from #161 review (Andras): `parseSessionData` was writing to
+  // `console.error` unconditionally on parse failure, bypassing the
+  // package's own `logLevel: 'silent'` contract. These tests pin that
+  // the injected logger is honored — and that no fallback `console.error`
+  // call leaks when one is provided.
+  describe('logger plumbing (Andras #161 item 6)', () => {
+    test('uses the injected logger instead of console.error on parse failure', () => {
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      const loggerErrorSpy = vi.fn();
+      const log = {
+        error: loggerErrorSpy,
+        warn: vi.fn(),
+        info: vi.fn(),
+        debug: vi.fn(),
+      };
+
+      const badJson = {
+        session: {
+          id: 'sess-123',
+          userId: 'user-123',
+          expiresAt: 'not-a-date',
+          createdAt: '2026-01-18T00:00:00.000Z',
+          updatedAt: '2026-01-18T00:00:00.000Z',
+        },
+        user: { id: 'user-123', email: 'a@b.com' },
+      };
+
+      const result = parseSessionData(badJson, log);
+
+      expect(result).toEqual({ session: null, user: null });
+      expect(loggerErrorSpy).toHaveBeenCalledTimes(1);
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        '[parseSessionData] Failed to parse session dates:',
+        expect.objectContaining({
+          error: expect.stringContaining('Invalid date'),
+          hasSession: true,
+          hasUser: true,
+        })
+      );
+      // Critical: NO console.error fallback when a logger was provided.
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    test('falls back to console.error when no logger is provided (back-compat)', () => {
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      const badJson = {
+        session: { id: 'sess-1', expiresAt: 'bad' },
+        user: { id: 'u-1' },
+      };
+
+      const result = parseSessionData(badJson);
+
+      expect(result).toEqual({ session: null, user: null });
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[parseSessionData] Failed to parse session dates:',
+        expect.any(Object)
+      );
+
+      consoleErrorSpy.mockRestore();
+    });
   });
 });
 

@@ -78,6 +78,10 @@
       "types": "./dist/next/server/index.d.mts",
       "default": "./dist/next/server/index.mjs"
     },
+    "./server": {
+      "types": "./dist/server/index.d.mts",
+      "default": "./dist/server/index.mjs"
+    },
     "./ui/css": {
       "types": "./dist/ui/css.d.ts",
       "default": "./dist/ui/css.css"
@@ -90,7 +94,8 @@
     "codemods/migrate-auth-ui-imports.mjs",
     "dist",
     "llms.txt",
-    "sbom.cdx.json"
+    "sbom.cdx.json",
+    "BUILDING-AN-ADAPTER.md"
   ],
   "publishConfig": {
     "access": "public"

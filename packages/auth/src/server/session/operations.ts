@@ -2,10 +2,41 @@ import type { RequireSessionData, SessionData, SessionDataCookie } from '@/serve
 import { validateSessionData } from './validator';
 import { parseCookies } from 'better-auth/cookies';
 import { SignJWT } from 'jose';
+import type { ResolvedNeonAuthLogging } from '@/server/logger';
 
 // Default 5-minute TTL for session data cookie (in seconds)
 export const DEFAULT_SESSION_CACHE_TTL_SECONDS = 300;
 const JWS_ALGO = 'HS256';
+
+/**
+ * Routes a log call through the injected `ResolvedNeonAuthLogging` sink when
+ * provided, otherwise falls back to `console.*`. Keeps backward compatibility
+ * for callers (including third-party adapter authors using `parseSessionData`
+ * publicly) that have not yet plumbed a logger through.
+ *
+ * Without this indirection, `logLevel: 'silent'` on `createAuthServer` is
+ * bypassed for session caching call sites — see #161 review feedback (Andras
+ * item 6).
+ */
+function emit(
+  log: ResolvedNeonAuthLogging | undefined,
+  level: 'error' | 'warn' | 'debug',
+  message: string,
+  meta?: Record<string, unknown>
+): void {
+  if (log) {
+    log[level](message, meta);
+    return;
+  }
+  // Console fallback is intentional: preserves legacy behavior when adapter
+  // authors haven't plumbed a logger through. With a logger, the early
+  // return above ensures we never reach these lines.
+  if (meta && Object.keys(meta).length > 0) {
+    console[level](message, meta);
+  } else {
+    console[level](message);
+  }
+}
 
 /**
  * Parse and validate date value, throwing descriptive error on failure
@@ -61,20 +92,55 @@ function signPayload(
 }
 
 /**
- * Parse session data from JSON, converting date strings to Date objects
- *
- * Note: Better Auth API returns ISO 8601 date strings. JSON.parse() does not
- * automatically convert these to Date objects, so manual conversion is required.
- *
- * @internal Exported for internal use by auth handler
+ * Subset of the upstream JSON shape this parser actually inspects.
+ * Kept open-ended for forward compatibility — adapter authors may receive
+ * additional fields from newer Neon Auth server versions; the parser only
+ * normalizes the documented dates and passes the rest through via spread.
  */
-export function parseSessionData(json: unknown): SessionData {
+type RawSessionEnvelope = {
+  session?: {
+    expiresAt?: unknown;
+    createdAt?: unknown;
+    updatedAt?: unknown;
+    [key: string]: unknown;
+  } | null;
+  user?: {
+    createdAt?: unknown;
+    updatedAt?: unknown;
+    [key: string]: unknown;
+  } | null;
+};
+
+/**
+ * Parse session data from JSON, converting date strings to Date objects.
+ *
+ * Better Auth API returns ISO 8601 date strings; `JSON.parse()` does not
+ * automatically convert these to `Date` objects, so manual conversion is
+ * required.
+ *
+ * Adapter authors typically invoke this on responses returned by
+ * {@link handleAuthProxyRequest} when populating framework context
+ * (e.g. `c.var.auth` in Hono). Returns `{ session: null, user: null }` on
+ * parse failure instead of throwing.
+ *
+ * @param json - Raw response body to parse (typically the JSON payload from
+ *               `/api/auth/get-session`).
+ * @param log  - Optional pre-resolved logger. When omitted, parse failures
+ *               are reported via `console.error`. Pass the same `log` from
+ *               your {@link NeonAuthServerConfig} to honor `logLevel: 'silent'`.
+ *
+ * @public
+ */
+export function parseSessionData(
+  json: unknown,
+  log?: ResolvedNeonAuthLogging
+): SessionData {
   // Handle null/undefined/missing response
   if (!json || typeof json !== 'object') {
     return { session: null, user: null };
   }
 
-  const data = json as any;
+  const data = json as RawSessionEnvelope;
 
   // Handle explicit null session
   if (!data.session || !data.user) {
@@ -95,9 +161,9 @@ export function parseSessionData(json: unknown): SessionData {
         createdAt: parseDate(data.user.createdAt, 'user.createdAt'),
         updatedAt: parseDate(data.user.updatedAt, 'user.updatedAt'),
       },
-    };
+    } as SessionData;
   } catch (error) {
-    console.error('[parseSessionData] Failed to parse session dates:', {
+    emit(log, 'error', '[parseSessionData] Failed to parse session dates:', {
       error: error instanceof Error ? error.message : String(error),
       hasSession: !!data.session,
       hasUser: !!data.user,
@@ -115,12 +181,15 @@ export function parseSessionData(json: unknown): SessionData {
  * @param request - Request object with cookie header
  * @param cookieName - Name of session data cookie
  * @param cookieSecret - cookie secret for validation
+ * @param log - Optional pre-resolved logger (honors `logLevel: 'silent'`).
+ *              Falls back to `console.warn` / `console.error` when omitted.
  * @returns SessionData or null on validation failure
  */
 export async function getSessionDataFromCookie(
   request: Request,
   cookieName: string,
-  cookieSecret: string
+  cookieSecret: string,
+  log?: ResolvedNeonAuthLogging
 ): Promise<SessionData | null> {
   try {
     const cookieHeader = request.headers.get('cookie');
@@ -141,7 +210,7 @@ export async function getSessionDataFromCookie(
     }
 
     // Cookie present but invalid - log for visibility
-    console.warn('[getSessionDataFromCookie] Invalid session cookie:', {
+    emit(log, 'warn', '[getSessionDataFromCookie] Invalid session cookie:', {
       error: result.error,
       cookieName,
     });
@@ -149,13 +218,18 @@ export async function getSessionDataFromCookie(
     return null;
   } catch (error) {
     // Unexpected error during extraction/validation
-    console.error('[getSessionDataFromCookie] Unexpected validation error:', {
-      error: error instanceof Error ? error.message : String(error),
-      cookieName,
-      ...(process.env.NODE_ENV !== 'production' && {
-        stack: error instanceof Error ? error.stack : undefined,
-      }),
-    });
+    emit(
+      log,
+      'error',
+      '[getSessionDataFromCookie] Unexpected validation error:',
+      {
+        error: error instanceof Error ? error.message : String(error),
+        cookieName,
+        ...(process.env.NODE_ENV !== 'production' && {
+          stack: error instanceof Error ? error.stack : undefined,
+        }),
+      }
+    );
 
     return null; // Fallback to API call
   }
@@ -170,7 +244,8 @@ export async function getSessionDataFromCookie(
  */
 export async function fetchSessionWithCookie(
   sessionTokenCookie: string,
-  baseUrl: string
+  baseUrl: string,
+  log?: ResolvedNeonAuthLogging
 ): Promise<SessionData> {
   // Parse cookie value - handle both Set-Cookie header format and simple "name=value" format
   let cookieName: string;
@@ -208,5 +283,5 @@ export async function fetchSessionWithCookie(
     throw new Error(`Failed to parse /get-session response as JSON: ${error instanceof Error ? error.message : String(error)}`);
   }
 
-  return parseSessionData(body);
+  return parseSessionData(body, log);
 }

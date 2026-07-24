@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
-import { createAuthServerInternal } from './client-factory';
+import { createAuthServer } from './client-factory';
 import type { RequestContext } from './request-context';
 
 const TEST_SECRET = 'test-secret-at-least-32-characters-long!';
@@ -26,7 +26,63 @@ function makeContext(): RequestContext {
   };
 }
 
-describe('createAuthServerInternal error branch', () => {
+// Items 3 from #161 review (Andras): the public toolkit factory MUST enforce
+// the same cookie-secret invariants the Next.js adapter does, otherwise direct
+// consumers can ship weak / empty secrets and yield forgeable session cookies.
+describe('createAuthServer config validation', () => {
+  test('throws when cookieSecret is empty', () => {
+    expect(() =>
+      createAuthServer({
+        baseUrl: TEST_BASE_URL,
+        context: makeContext,
+        cookieSecret: '',
+      })
+    ).toThrow(/secret/i);
+  });
+
+  test('throws when cookieSecret is shorter than 32 characters', () => {
+    expect(() =>
+      createAuthServer({
+        baseUrl: TEST_BASE_URL,
+        context: makeContext,
+        cookieSecret: 'too-short',
+      })
+    ).toThrow(/32/);
+  });
+
+  test('throws when sessionDataTtl is zero or negative', () => {
+    expect(() =>
+      createAuthServer({
+        baseUrl: TEST_BASE_URL,
+        context: makeContext,
+        cookieSecret: TEST_SECRET,
+        sessionDataTtl: 0,
+      })
+    ).toThrow(/sessionDataTtl|ttl/i);
+
+    expect(() =>
+      createAuthServer({
+        baseUrl: TEST_BASE_URL,
+        context: makeContext,
+        cookieSecret: TEST_SECRET,
+        sessionDataTtl: -5,
+      })
+    ).toThrow();
+  });
+
+  test('accepts a valid 32+ char secret and positive sessionDataTtl', () => {
+    expect(() =>
+      createAuthServer({
+        baseUrl: TEST_BASE_URL,
+        context: makeContext,
+        cookieSecret: TEST_SECRET,
+        sessionDataTtl: 60,
+      })
+    ).not.toThrow();
+  });
+});
+
+describe('createAuthServer error branch', () => {
   const originalFetch = globalThis.fetch;
   let fetchMock: ReturnType<typeof vi.fn>;
 
@@ -54,7 +110,7 @@ describe('createAuthServerInternal error branch', () => {
       )
     );
 
-    const server = createAuthServerInternal({
+    const server = createAuthServer({
       baseUrl: TEST_BASE_URL,
       context: makeContext,
       cookieSecret: TEST_SECRET,
@@ -93,7 +149,7 @@ describe('createAuthServerInternal error branch', () => {
       )
     );
 
-    const server = createAuthServerInternal({
+    const server = createAuthServer({
       baseUrl: TEST_BASE_URL,
       context: makeContext,
       cookieSecret: TEST_SECRET,
@@ -126,7 +182,7 @@ describe('createAuthServerInternal error branch', () => {
       )
     );
 
-    const server = createAuthServerInternal({
+    const server = createAuthServer({
       baseUrl: TEST_BASE_URL,
       context: makeContext,
       cookieSecret: TEST_SECRET,
@@ -158,7 +214,7 @@ describe('createAuthServerInternal error branch', () => {
       )
     );
 
-    const server = createAuthServerInternal({
+    const server = createAuthServer({
       baseUrl: TEST_BASE_URL,
       context: makeContext,
       cookieSecret: TEST_SECRET,
@@ -192,7 +248,7 @@ describe('createAuthServerInternal error branch', () => {
       )
     );
 
-    const server = createAuthServerInternal({
+    const server = createAuthServer({
       baseUrl: TEST_BASE_URL,
       context: makeContext,
       cookieSecret: TEST_SECRET,
@@ -221,7 +277,7 @@ describe('createAuthServerInternal error branch', () => {
       )
     );
 
-    const server = createAuthServerInternal({
+    const server = createAuthServer({
       baseUrl: TEST_BASE_URL,
       context: makeContext,
       cookieSecret: TEST_SECRET,
@@ -239,5 +295,100 @@ describe('createAuthServerInternal error branch', () => {
       user: { id: 'u1' },
       session: { id: 's1' },
     });
+  });
+});
+
+// Andras FIX 1 (security): the API-endpoint upstream-cookie loop in
+// `client-factory.ts` must mirror the proxy and minting paths and always
+// stamp `secure: true` on forwarded cookies. With `SameSite=None`, a missing
+// `Secure` makes the browser drop the cookie entirely.
+describe('createAuthServer cookie forwarding (Secure forcing)', () => {
+  const originalFetch = globalThis.fetch;
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  function makeContextWithSpy(): {
+    context: RequestContext;
+    setCookieSpy: ReturnType<typeof vi.fn>;
+  } {
+    const setCookieSpy = vi.fn();
+    return {
+      context: {
+        getCookies: () => '',
+        setCookie: setCookieSpy,
+        getHeader: () => null,
+        getOrigin: () => 'https://app.example.com',
+        getFramework: () => 'test',
+      },
+      setCookieSpy,
+    };
+  }
+
+  // Helper: build an upstream 200 response with a single Set-Cookie header.
+  // Using `Response.json` keeps lint (unicorn/prefer-response-static-json)
+  // happy and matches sibling tests' style.
+  function upstreamWithSetCookie(setCookie: string): Response {
+    const headers = new Headers({
+      'Content-Type': 'application/json',
+      'Set-Cookie': setCookie,
+    });
+    return Response.json({ ok: true }, { status: 200, headers });
+  }
+
+  test('forces Secure on forwarded cookies even when upstream omits it', async () => {
+    const { context, setCookieSpy } = makeContextWithSpy();
+
+    fetchMock.mockResolvedValueOnce(
+      upstreamWithSetCookie(
+        '__Secure-neon-auth.example_cookie=abc; Path=/; HttpOnly; SameSite=Lax'
+      )
+    );
+
+    const server = createAuthServer({
+      baseUrl: TEST_BASE_URL,
+      context: () => context,
+      cookieSecret: TEST_SECRET,
+    });
+
+    await (server as unknown as {
+      signIn: { email: (args: unknown) => Promise<unknown> };
+    }).signIn.email({ email: 'a@b.com', password: 'p' });
+
+    expect(setCookieSpy).toHaveBeenCalled();
+    const options = setCookieSpy.mock.calls[0][2];
+    expect(options).toMatchObject({ secure: true });
+  });
+
+  test('keeps Secure when upstream sends SameSite=None (would otherwise be dropped)', async () => {
+    const { context, setCookieSpy } = makeContextWithSpy();
+
+    fetchMock.mockResolvedValueOnce(
+      upstreamWithSetCookie(
+        '__Secure-neon-auth.example_cookie=abc; Path=/; HttpOnly; SameSite=None'
+      )
+    );
+
+    const server = createAuthServer({
+      baseUrl: TEST_BASE_URL,
+      context: () => context,
+      cookieSecret: TEST_SECRET,
+      sameSite: 'none',
+    });
+
+    await (server as unknown as {
+      signIn: { email: (args: unknown) => Promise<unknown> };
+    }).signIn.email({ email: 'a@b.com', password: 'p' });
+
+    expect(setCookieSpy).toHaveBeenCalled();
+    const options = setCookieSpy.mock.calls[0][2];
+    expect(options).toMatchObject({ secure: true, sameSite: 'none' });
   });
 });

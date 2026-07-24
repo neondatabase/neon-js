@@ -267,6 +267,36 @@ See the [Next.js Setup Guide](./NEXT-JS.md) for comprehensive documentation incl
 - Importing styles (with or without Tailwind CSS)
 - Using `authClient.useSession()` hook in client components
 
+## Server toolkit (for framework adapter authors)
+
+> **Stability: beta.** Minor versions may include breaking changes with migration
+> notes in the package CHANGELOG. Pin your peer dependency accordingly.
+
+`@neondatabase/auth/server` exposes the framework-agnostic primitives that the
+bundled `@neondatabase/auth/next/server` adapter is built on. Use it to build
+adapters for additional server frameworks (Hono, Remix, SolidStart, Express,
+Fastify, ...) without forking the package.
+
+```typescript
+import {
+  createAuthServer,
+  handleAuthProxyRequest,
+  processAuthMiddleware,
+  validateCookieConfig,
+  resolveNeonAuthLogging,
+  DEFAULT_AUTH_SKIP_ROUTES,
+  type RequestContext,
+  type NeonAuthConfig,
+  type MiddlewareResult,
+} from '@neondatabase/auth/server';
+```
+
+The toolkit is **Web Standards only** — it consumes `Request`/`Response` and
+exposes a small `RequestContext` interface that adapter authors implement for
+their framework's cookie/header APIs. The bundled Next.js adapter is the
+reference implementation; see [`BUILDING-AN-ADAPTER.md`](./BUILDING-AN-ADAPTER.md)
+for a walkthrough.
+
 ## UI Components
 
 Pre-built login forms and auth pages live in `@neondatabase/auth-ui`. The

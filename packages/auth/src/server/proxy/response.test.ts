@@ -104,6 +104,35 @@ describe('handleAuthResponse – cookie sanitization', () => {
     expect(cookie).toContain('Path=/auth');
     expect(cookie).toContain('Max-Age=300');
   });
+
+  // Andras FIX 1 (security): forwarded cookies must always carry `Secure`, to
+  // match `session/minting.ts` and the documented "Secure is always applied"
+  // contract. Without Secure, `SameSite=None` cookies are silently dropped.
+  test('forces Secure when upstream cookie omits it', async () => {
+    const upstream = upstreamResponse([
+      '__Secure-neon-auth.session_token=abc; Path=/; HttpOnly; SameSite=Lax',
+    ]);
+
+    const result = await handleAuthResponse(upstream, BASE_URL, COOKIE_CONFIG);
+
+    const cookie = result.headers.getSetCookie()[0];
+    expect(cookie).toContain('Secure');
+  });
+
+  test('keeps Secure on SameSite=None cookies (browser would drop them otherwise)', async () => {
+    const upstream = upstreamResponse([
+      '__Secure-neon-auth.session_token=abc; Path=/; HttpOnly; SameSite=None',
+    ]);
+
+    const result = await handleAuthResponse(upstream, BASE_URL, {
+      ...COOKIE_CONFIG,
+      sameSite: 'none',
+    });
+
+    const cookie = result.headers.getSetCookie()[0];
+    expect(cookie).toContain('SameSite=None');
+    expect(cookie).toContain('Secure');
+  });
 });
 
 describe('handleAuthResponse – domain handling', () => {
@@ -171,6 +200,23 @@ describe('handleAuthResponse – header allowlist', () => {
 
     expect(result.headers.get('x-custom-internal-header')).toBeNull();
     expect(result.headers.get('authorization')).toBeNull();
+  });
+
+  // Andras FIX 4: hop-by-hop / framing headers must not be forwarded; the
+  // runtime owns framing, and a forwarded stale `content-length` corrupts a
+  // re-encoded body.
+  test('does not forward hop-by-hop and framing headers (content-length, transfer-encoding, connection)', async () => {
+    const upstream = upstreamResponse([], {
+      'content-length': '9999',
+      'transfer-encoding': 'chunked',
+      'connection': 'keep-alive',
+    });
+
+    const result = await handleAuthResponse(upstream, BASE_URL, COOKIE_CONFIG);
+
+    expect(result.headers.get('content-length')).toBeNull();
+    expect(result.headers.get('transfer-encoding')).toBeNull();
+    expect(result.headers.get('connection')).toBeNull();
   });
 });
 

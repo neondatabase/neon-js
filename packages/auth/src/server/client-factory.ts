@@ -14,24 +14,127 @@ import { validateSessionData } from '@/server/session/validator';
 import { NEON_AUTH_SESSION_COOKIE_NAME, NEON_AUTH_SESSION_DATA_COOKIE_NAME } from './constants';
 import { mintSessionDataFromResponse } from './session/minting';
 import { normalizeBetterAuthError } from '@/core/better-auth-helpers';
-import type { ResolvedNeonAuthLogging } from './logger';
+import type { NeonAuthLogger, ResolvedNeonAuthLogging } from './logger';
+import { resolveLog } from './logger';
 import { classifyFetchFailure } from './network-error';
+import { validateCookieConfig } from './config';
 
+/**
+ * Configuration for {@link createAuthServer}.
+ *
+ * Use this when building a framework adapter on top of the
+ * `@neondatabase/auth/server` toolkit. The bundled Next.js adapter
+ * (`createNeonAuth` in `@neondatabase/auth/next/server`) is the reference
+ * implementation and constructs this internally — application authors using
+ * the Next.js adapter do not interact with this interface directly.
+ *
+ * See `BUILDING-AN-ADAPTER.md` for an end-to-end walkthrough.
+ *
+ * @public
+ */
 export interface NeonAuthServerConfig {
+  /**
+   * Base URL of the upstream Neon Auth server.
+   *
+   * @example 'https://ep-xxxx.neonauth.us-east-1.aws.neon.tech'
+   */
   baseUrl: string;
+
+  /**
+   * Factory that yields a fresh {@link RequestContext} for the in-flight
+   * request. Called on every server method invocation (e.g.
+   * `auth.getSession()`, `auth.signIn.email(...)`), so implementations
+   * should be lightweight.
+   *
+   * Adapters typically capture per-request state via the framework's
+   * request-scoped APIs (Next.js `next/headers`, Hono `contextStorage`,
+   * TanStack Start `getRequest`) and surface them through this factory.
+   * MAY return a `Promise` if the framework's APIs are async.
+   *
+   * @see RequestContext
+   */
   context: RequestContextFactory;
+
+  /**
+   * Secret for signing the `session_data` cookie minted by the server proxy.
+   * Must be **at least 32 characters** to provide adequate HMAC-SHA256
+   * collision resistance. Validated at `createAuthServer()` call time;
+   * throws if missing or too short.
+   *
+   * Generate a secure secret:
+   * ```bash
+   * openssl rand -base64 32
+   * ```
+   *
+   * @example process.env.NEON_AUTH_COOKIE_SECRET
+   */
   cookieSecret: string;
+
+  /**
+   * Time-to-live for the cached `session_data` cookie payload, in seconds.
+   * Controls how long the server reuses the cached cookie payload before
+   * re-validating against the upstream Neon Auth server.
+   *
+   * Does **not** affect the session token cookie's own expiration.
+   *
+   * @default 300 (5 minutes)
+   */
   sessionDataTtl?: number;
+
+  /**
+   * Cookie domain applied to cookies set by the server proxy.
+   *
+   * @default undefined (browser default — current domain only)
+   * @example '.example.com' // Share across subdomains
+   */
   domain?: string;
+
+  /**
+   * `SameSite` attribute applied to cookies set or rewritten by the server
+   * proxy (API route handlers, middleware, RSC).
+   *
+   * - **`strict`** (default) — cookies are not sent on cross-site requests.
+   * - **`lax`** — cookies sent on top-level cross-site navigations.
+   * - **`none`** — required for third-party contexts (e.g. iframe-embedded apps).
+   *   `Secure` is always applied for these cookies.
+   *
+   * @default 'strict'
+   */
   sameSite?: SessionCookieSameSite;
-  /** Resolved logging sink */
-  log?: ResolvedNeonAuthLogging;
+
+  /**
+   * Logging sink. Accepts either a pre-resolved sink from
+   * {@link resolveNeonAuthLogging} **or** a partial {@link NeonAuthLogger}
+   * (the same shape adapters typically expose to their own users). Partial
+   * loggers are normalized internally at the default `'warn'` level. When
+   * omitted, the toolkit falls back to `console` at `'warn'`.
+   *
+   * Adapter authors who already resolve a sink once (e.g. via
+   * `resolveNeonAuthLogging({ logger, logLevel })` in their public factory)
+   * should forward that sink here to avoid per-request resolution cost and
+   * to preserve their user's `logLevel` gating.
+   */
+  log?: ResolvedNeonAuthLogging | NeonAuthLogger;
 }
 
-export function createAuthServerInternal(
+export function createAuthServer(
   config: NeonAuthServerConfig
 ): NeonAuthServer {
-  const { baseUrl, context: getContext, cookieSecret, sessionDataTtl, domain, sameSite, log } = config;
+  const { baseUrl, context: getContext, cookieSecret, sessionDataTtl, domain, sameSite } = config;
+  // Normalize the optional logger once at factory time so per-request paths
+  // (`log?.warn(...)`) see a consistent `ResolvedNeonAuthLogging | undefined`
+  // regardless of whether the adapter forwarded a partial `NeonAuthLogger`
+  // or a pre-resolved sink. Pre-resolved sinks pass through unchanged so
+  // caller-side level gating (from `resolveNeonAuthLogging`) is preserved.
+  // See #161 review feedback (Andras FIX 3, DX).
+  const log = resolveLog(config.log);
+
+  // Enforce the same cookie-secret and TTL invariants the bundled Next.js
+  // adapter does via `validateCookieConfig`. Without this guard, toolkit
+  // consumers can ship empty / short secrets and produce forgeable
+  // `session_data` cookies — see #161 review feedback.
+  validateCookieConfig({ secret: cookieSecret, sessionDataTtl });
+
   const effectiveSameSite = sameSite ?? 'strict';
 
   const fetchWithAuth = async (
@@ -143,11 +246,17 @@ export function createAuthServerInternal(
           // strip Partitioned and apply configured SameSite (default `strict`).
           // Always override domain: use local config if set, otherwise strip any
           // upstream Domain attribute to avoid leaking the auth server's domain.
+          // Always force Secure to match the minting path
+          // (`session/minting.ts` hardcodes `secure: true`) and the documented
+          // "Secure is always applied" contract. With `SameSite=None`, a
+          // missing `Secure` makes the browser drop the cookie entirely.
+          // See #161 review feedback (Andras FIX 1, security).
           const cookieOptions = {
             ...cookie,
             domain: domain,
             partitioned: undefined,
             sameSite: effectiveSameSite,
+            secure: true,
           };
           await ctx.setCookie(cookie.name, cookie.value, cookieOptions);
         }
@@ -163,7 +272,8 @@ export function createAuthServerInternal(
             sessionDataTtl,
             domain,
             sameSite,
-          }
+          },
+          log
         );
 
         if (sessionDataCookie) {
