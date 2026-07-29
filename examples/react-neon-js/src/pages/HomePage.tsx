@@ -83,6 +83,12 @@ export function HomePage() {
             link="/account/settings"
           />
           <FeatureCard
+            icon="🏢"
+            title="Organizations"
+            description="Create teams, switch active organizations, and share todos with members."
+            link="/organization/settings"
+          />
+          <FeatureCard
             icon="👻"
             title="Anonymous Access"
             description="Browse the dashboard without an account. Anonymous tokens are generated automatically!"

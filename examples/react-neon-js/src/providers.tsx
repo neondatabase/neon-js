@@ -63,6 +63,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       credentials={{
         forgotPassword: true,
       }}
+      organization={{}}
     >
       {children}
     </NeonAuthUIProvider>

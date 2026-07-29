@@ -15,6 +15,7 @@ export type Database = {
           created_at: string;
           id: string;
           is_public: boolean;
+          organization_id: string | null;
           title: string;
           updated_at: string;
           user_id: string;
@@ -24,6 +25,7 @@ export type Database = {
           created_at?: string;
           id?: string;
           is_public?: boolean;
+          organization_id?: string | null;
           title: string;
           updated_at?: string;
           user_id: string;
@@ -33,6 +35,7 @@ export type Database = {
           created_at?: string;
           id?: string;
           is_public?: boolean;
+          organization_id?: string | null;
           title?: string;
           updated_at?: string;
           user_id?: string;

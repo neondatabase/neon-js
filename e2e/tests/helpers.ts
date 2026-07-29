@@ -103,6 +103,25 @@ export async function navigateToOrganizationSettings(page: Page): Promise<void> 
 }
 
 /**
+ * Ensure the signed-in user has an active organization (react-neon-js dashboard).
+ * Creates one via the OrganizationSwitcher when none exists.
+ */
+export async function ensureActiveOrganization(page: Page): Promise<void> {
+  const orgBanner = page.getByText('Select or create an organization');
+  const hasOrgBanner = await orgBanner.isVisible().catch(() => false);
+
+  if (!hasOrgBanner) {
+    return;
+  }
+
+  await page.getByLabel('Create organization').click();
+  await page.getByPlaceholder('My Organization').fill(`E2E Org ${Date.now()}`);
+  await page.getByRole('button', { name: /^create$/i }).click();
+
+  await expect(orgBanner).toBeHidden({ timeout: 15_000 });
+}
+
+/**
  * Create a new note
  */
 export async function createNote(page: Page, noteTitle: string): Promise<void> {
