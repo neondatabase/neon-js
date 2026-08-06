@@ -4,6 +4,10 @@ All notable changes to `@neondatabase/auth-ui` will be documented in this file.
 
 ## Unreleased
 
+### Changed
+
+- **Better Auth `1.4.18` → `1.6.23`** and **`@daveyplate/better-auth-ui` `3.3.9` → `3.4.0`** (required for `apiKeyClient` extraction onto `@better-auth/api-key`). Also bumps `@better-auth/passkey` to `1.6.23`.
+
 ## [0.1.0-alpha.11] - 2026-01-14
 
 ### Fixed

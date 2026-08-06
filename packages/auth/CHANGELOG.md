@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Better Auth `1.4.18` → `1.6.23`**: Aligns the SDK with neon-auth server (backend) on the same Better Auth line. Related pins updated together via root `pnpm.overrides`: `@better-auth/core` / `passkey` / `telemetry` / `api-key` `1.6.23`, `@better-auth/utils` `0.4.2`, `@better-fetch/fetch` `1.3.1`, `better-call` `1.3.7`, `jose` `6.2.5`.
 - **Next.js middleware logging**: `auth.middleware()` forwards **`logger`**, **`logLevel`**, and a single pre-resolved **`log`** from **`createNeonAuth`** so mute/custom sinks apply to middleware (no per-request logger resolve when using **`createNeonAuth`**).
 - **Better Auth server `fetch` wrapper**: Transport failures (`NETWORK_*`) still return `{ data: null, error: { … } }`; **non-transport** failures **rethrow** the original error (preserves prior framework error-boundary behavior). HTTP **4xx** upstream responses are logged at **`info`**; **5xx** at **`warn`**.
 - **Next.js cookie SameSite**: Proxied `Set-Cookie` headers and minted `session_data` cookies now use `SameSite=Strict` by default (previously forced to `Lax`). Set `cookies.sameSite` to `'lax'` or `'none'` when you need the previous behavior or third-party iframe embedding (`'none'` requires `Secure`, which these cookies already set).
