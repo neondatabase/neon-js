@@ -135,7 +135,7 @@ export function createAuthServer(
   // `session_data` cookies — see #161 review feedback.
   validateCookieConfig({ secret: cookieSecret, sessionDataTtl });
 
-  const effectiveSameSite = sameSite ?? 'strict';
+  const effectiveSameSite = sameSite ?? 'lax';
 
   const fetchWithAuth = async (
     path: string,
@@ -243,7 +243,7 @@ export function createAuthServer(
         const parsedCookies = parseSetCookies(setCookieHeader);
         for (const cookie of parsedCookies) {
           // Mirror sanitization from prepareResponseHeaders (response.ts):
-          // strip Partitioned and apply configured SameSite (default `strict`).
+          // strip Partitioned and apply configured SameSite (default `lax`).
           // Always override domain: use local config if set, otherwise strip any
           // upstream Domain attribute to avoid leaking the auth server's domain.
           // Always force Secure to match the minting path

@@ -54,6 +54,19 @@ export function shouldProtectRoute(pathname: string, skipRoutes: readonly string
   });
 }
 
+export function isSamePathOrSubpath(pathname: string, routePathname: string): boolean {
+  const normalizedRoutePathname =
+    routePathname === '/' ? routePathname : routePathname.replace(/\/+$/, '');
+
+  if (pathname === normalizedRoutePathname) {
+    return true;
+  }
+
+  return (
+    normalizedRoutePathname !== '/' && pathname.startsWith(`${normalizedRoutePathname}/`)
+  );
+}
+
 /**
  * Result of session requirement check
  */
@@ -72,18 +85,18 @@ export interface SessionCheckResult {
  *
  * @param pathname - URL pathname being accessed
  * @param skipRoutes - Routes that don't require authentication
- * @param loginUrl - URL to redirect to for login (if applicable)
+ * @param loginPathname - Same-origin login pathname, or null for an external login URL
  * @param session - Current session data (null if not authenticated)
  * @returns Session check result
  */
 export function checkSessionRequired(
   pathname: string,
   skipRoutes: readonly string[],
-  loginUrl: string,
+  loginPathname: string | null,
   session: SessionData | null
 ): SessionCheckResult {
   // Always allow access to login URL to prevent infinite redirect
-  if (pathname.startsWith(loginUrl)) {
+  if (loginPathname !== null && isSamePathOrSubpath(pathname, loginPathname)) {
     return { allowed: true, requiresRedirect: false };
   }
 

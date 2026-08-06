@@ -47,6 +47,41 @@ describe('processAuthMiddleware', () => {
 
       expect(result.action).toBe('allow');
     });
+
+    test('allows login subpaths when loginUrl has a trailing slash', async () => {
+      const config = createTestConfig({
+        loginUrl: '/auth/sign-in/',
+        request: new Request('https://app.com/auth/sign-in/email'),
+        pathname: '/auth/sign-in/email',
+      });
+
+      const result = await processAuthMiddleware(config);
+
+      expect(result.action).toBe('allow');
+    });
+
+    test('does not allow a local same-path route for an external login URL', async () => {
+      const config = createTestConfig({
+        loginUrl: 'https://identity.example.com/auth/sign-in',
+        request: new Request('https://app.com/auth/sign-in'),
+        pathname: '/auth/sign-in',
+      });
+
+      const result = await processAuthMiddleware(config);
+
+      expect(result.action).toBe('redirect_login');
+    });
+
+    test('does not allow sibling paths sharing the login path prefix', async () => {
+      const config = createTestConfig({
+        request: new Request('https://app.com/auth/sign-in-admin'),
+        pathname: '/auth/sign-in-admin',
+      });
+
+      const result = await processAuthMiddleware(config);
+
+      expect(result.action).toBe('redirect_login');
+    });
   });
 
   describe('OAuth flow', () => {
@@ -378,6 +413,70 @@ describe('processAuthMiddleware', () => {
         expect(result.redirectUrl.pathname).toBe(LOGIN_URL);
         expect(result.redirectUrl.origin).toBe('https://app.com');
       }
+    });
+
+    test('preserves request query parameters when redirecting to login', async () => {
+      const config = createTestConfig({
+        request: new Request(
+          'https://app.com/dashboard?neon_auth_session_verifier=verifier&source=oauth&tag=a&tag=b'
+        ),
+      });
+
+      const result = await processAuthMiddleware(config);
+
+      expect(result.action).toBe('redirect_login');
+      if (result.action === 'redirect_login') {
+        expect(result.redirectUrl.pathname).toBe(LOGIN_URL);
+        expect(result.redirectUrl.searchParams.get('neon_auth_session_verifier')).toBe('verifier');
+        expect(result.redirectUrl.searchParams.get('source')).toBe('oauth');
+        expect(result.redirectUrl.searchParams.getAll('tag')).toEqual(['a', 'b']);
+      }
+    });
+
+    test('appends colliding request query parameters after login URL parameters', async () => {
+      const config = createTestConfig({
+        loginUrl: '/auth/sign-in?source=configured&tag=configured',
+        request: new Request('https://app.com/dashboard?source=request&tag=a&tag=b'),
+      });
+
+      const result = await processAuthMiddleware(config);
+
+      expect(result.action).toBe('redirect_login');
+      if (result.action === 'redirect_login') {
+        expect([...result.redirectUrl.searchParams.entries()]).toEqual([
+          ['source', 'configured'],
+          ['tag', 'configured'],
+          ['source', 'request'],
+          ['tag', 'a'],
+          ['tag', 'b'],
+        ]);
+      }
+    });
+
+    test('allows the generated login URL when loginUrl contains query parameters', async () => {
+      const loginUrl = '/auth/sign-in?source=configured';
+      const redirectResult = await processAuthMiddleware(
+        createTestConfig({
+          loginUrl,
+          request: new Request('https://app.com/dashboard?source=request'),
+        })
+      );
+
+      expect(redirectResult.action).toBe('redirect_login');
+      if (redirectResult.action !== 'redirect_login') {
+        return;
+      }
+
+      const loginRequest = new Request(redirectResult.redirectUrl);
+      const result = await processAuthMiddleware(
+        createTestConfig({
+          loginUrl,
+          request: loginRequest,
+          pathname: new URL(loginRequest.url).pathname,
+        })
+      );
+
+      expect(result.action).toBe('allow');
     });
 
     test('allows access to skip routes without session', async () => {

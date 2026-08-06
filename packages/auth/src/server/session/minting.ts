@@ -50,7 +50,7 @@ async function mintSessionDataCookie(
       domain: cookieConfig.domain,
       httpOnly: true,
       secure: true,
-      sameSite: cookieConfig.sameSite ?? 'strict',
+      sameSite: cookieConfig.sameSite ?? 'lax',
       maxAge,
     });
   } catch (error) {
@@ -126,7 +126,7 @@ export async function mintSessionDataFromResponse(
       domain: cookieConfig.domain,
       httpOnly: true,
       secure: true,
-      sameSite: cookieConfig.sameSite ?? 'strict',
+      sameSite: cookieConfig.sameSite ?? 'lax',
       maxAge: 0,
     });
   }

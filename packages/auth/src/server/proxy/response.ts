@@ -44,7 +44,7 @@ export const handleAuthResponse = async (
 
 const prepareResponseHeaders = (response: Response, cookieConfig: SessionCookieConfig) => {
   const headers = new Headers();
-  const effectiveSameSite = cookieConfig.sameSite ?? 'strict';
+  const effectiveSameSite = cookieConfig.sameSite ?? 'lax';
   const { domain } = cookieConfig;
   for (const header of RESPONSE_HEADERS_ALLOWLIST) {
     // Special handling for set-cookie: HTTP allows multiple Set-Cookie headers
@@ -55,7 +55,7 @@ const prepareResponseHeaders = (response: Response, cookieConfig: SessionCookieC
         // - Strip Partitioned: Safari does not send Partitioned cookies on top-level navigations,
         //   which breaks the OAuth challenge exchange when the callback hits a middleware route.
         //   The flag is also only meaningful for third-party contexts; proxied cookies are first-party.
-        // - Apply configured SameSite (default strict): upstream may send SameSite=None with Partitioned.
+        // - Apply configured SameSite (default lax): upstream may send SameSite=None with Partitioned.
         // Domain assignment is the only other conditional step.
         const parsedCookies = parseSetCookies(cookieHeader);
         for (const parsedCookie of parsedCookies) {

@@ -41,7 +41,7 @@ describe('handleAuthResponse – cookie sanitization', () => {
     expect(cookies[0]).not.toContain('Partitioned');
   });
 
-  test('replaces SameSite=None with SameSite=Strict by default', async () => {
+  test('replaces SameSite=None with SameSite=Lax by default', async () => {
     const upstream = upstreamResponse([
       '__Secure-neon-auth.session_challange=abc; Path=/; Secure; SameSite=None; Partitioned',
     ]);
@@ -49,7 +49,7 @@ describe('handleAuthResponse – cookie sanitization', () => {
     const result = await handleAuthResponse(upstream, BASE_URL, COOKIE_CONFIG);
 
     const cookies = result.headers.getSetCookie();
-    expect(cookies[0]).toContain('SameSite=Strict');
+    expect(cookies[0]).toContain('SameSite=Lax');
     expect(cookies[0]).not.toContain('SameSite=None');
   });
 
@@ -68,19 +68,22 @@ describe('handleAuthResponse – cookie sanitization', () => {
     expect(cookies[0]).not.toContain('SameSite=None');
   });
 
-  test('applies configured SameSite overriding upstream', async () => {
+  test('uses cookies.sameSite=strict when configured', async () => {
     const upstream = upstreamResponse([
       '__Secure-neon-auth.session_challange=abc; Path=/; Secure; SameSite=Lax',
     ]);
 
-    const result = await handleAuthResponse(upstream, BASE_URL, COOKIE_CONFIG);
+    const result = await handleAuthResponse(upstream, BASE_URL, {
+      ...COOKIE_CONFIG,
+      sameSite: 'strict',
+    });
 
     const cookies = result.headers.getSetCookie();
     expect(cookies[0]).toContain('SameSite=Strict');
     expect(cookies[0]).not.toContain('SameSite=Lax');
   });
 
-  test('sets SameSite=Strict when upstream omits SameSite (integration default)', async () => {
+  test('sets SameSite=Lax when upstream omits SameSite', async () => {
     const upstream = upstreamResponse([
       '__Secure-neon-auth.session_challange=xyz; Path=/; HttpOnly; Secure',
     ]);
@@ -88,7 +91,7 @@ describe('handleAuthResponse – cookie sanitization', () => {
     const result = await handleAuthResponse(upstream, BASE_URL, COOKIE_CONFIG);
 
     const cookies = result.headers.getSetCookie();
-    expect(cookies[0]).toContain('SameSite=Strict');
+    expect(cookies[0]).toContain('SameSite=Lax');
   });
 
   test('preserves other cookie attributes (HttpOnly, Secure, Path, Max-Age)', async () => {
@@ -172,7 +175,7 @@ describe('handleAuthResponse – multiple cookies', () => {
     expect(cookies).toHaveLength(2);
     for (const cookie of cookies) {
       expect(cookie).not.toContain('Partitioned');
-      expect(cookie).toContain('SameSite=Strict');
+      expect(cookie).toContain('SameSite=Lax');
     }
   });
 });
