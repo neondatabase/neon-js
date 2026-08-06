@@ -31,7 +31,7 @@ bun run dev
 ## Demos
 
 - **`/`** – Marketing landing page
-- **`/auth/sign-in`**, **`/auth/sign-up`** – Auth UI views (powered by `@neondatabase/auth/react/ui`)
+- **`/auth/sign-in`**, **`/auth/sign-up`** – Auth UI views (powered by `@neondatabase/auth-ui`)
 - **`/dashboard`**, **`/notes`**, **`/account/*`** – Protected routes that require a session
 - **`/iframe-test`** – Embeds the auth views in a same-origin iframe to verify that
   email/password and **OAuth (popup) flows work inside an iframe**
