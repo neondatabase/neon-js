@@ -1,56 +1,77 @@
+/**
+ * Repurposed from `src/core/adapter-core.test.ts`.
+ *
+ * Plugin-path SUT: `neonClient()` + `createNeonCustomFetchImpl()` from
+ * `@neondatabase/auth/client-plugin`, exercised through a real
+ * `@better-fetch/fetch` instance so the fetch-plugin hooks (where
+ * error-normalization + client-info injection live after the Tier-1
+ * refactor) actually fire. Assertions remain identical to the wrapper-side
+ * test — only the construction differs.
+ *
+ * This proves that a tenant who wires up bare `better-auth/client` +
+ * `neonClient()` + `createNeonCustomFetchImpl()` gets the same transport-level
+ * behavior the wrapper provides (force-fetch escape hatch, in-flight dedup,
+ * error normalization to `AuthApiError`, client-info header injection).
+ */
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createFetch } from '@better-fetch/fetch';
-import { NeonAuthAdapterCore, FORCE_FETCH_HEADER } from './adapter-core';
-import { neonFetchPlugin } from '../client-plugin/fetch-hooks';
-import { AuthApiError, AuthError } from '../adapters/supabase/auth-interface';
-import type { BetterAuthInstance } from '../types';
-
-/**
- * Test harness that exposes the customFetchImpl from the abstract
- * NeonAuthAdapterCore so we can exercise its fetch-replacement branches
- * (dedup + force-fetch). After the Tier-1 refactor the
- * customFetchImpl no longer normalizes errors itself — that lives in
- * `neonFetchPlugin.hooks.onError`. To assert end-to-end error normalization
- * we therefore exercise the wrapper-equivalent wire-up (plugin + customFetch)
- * through a real `@better-fetch/fetch` instance.
- */
-class TestAdapter extends NeonAuthAdapterCore {
-  getBetterAuthInstance(): BetterAuthInstance {
-    return {} as BetterAuthInstance;
-  }
-
-  getCustomFetchImpl() {
-    const fetchOptions = this.betterAuthOptions.fetchOptions as {
-      customFetchImpl: (
-        url: string | URL | Request,
-        init?: RequestInit
-      ) => Promise<Response>;
-    };
-    return fetchOptions.customFetchImpl;
-  }
-}
+import { createAuthClient as baCreateAuthClient } from 'better-auth/client';
+import {
+  jwtClient,
+  adminClient,
+  emailOTPClient,
+  magicLinkClient,
+  organizationClient,
+  phoneNumberClient,
+} from 'better-auth/client/plugins';
+import {
+  neonClient,
+  createNeonCustomFetchImpl,
+  FORCE_FETCH_HEADER,
+} from '@/client-plugin';
+import { neonFetchPlugin } from '@/client-plugin/fetch-hooks';
+import { AuthApiError, AuthError } from '@/adapters/supabase/auth-interface';
 
 const TEST_URL = 'https://auth.example.com/api/auth/sign-in/email';
 const BASE_URL = 'https://auth.example.com';
 
 /**
- * Construct a better-fetch instance configured the way the wrapper configures
- * Better Auth's client: `neonFetchPlugin` in `plugins`, the wrapper's
- * customFetchImpl as `customFetchImpl`. This is the path consumers actually
- * hit at runtime — exercising it lets us assert that errors normalize and
- * dedup/force-fetch wrap fetch correctly.
+ * Plugin-path equivalent of the wrapper-side `makeWrapperFetch`: builds a
+ * real `@better-fetch/fetch` instance configured with `neonFetchPlugin` and
+ * the shared `createNeonCustomFetchImpl()`. Also constructs a parallel
+ * `createAuthClient` so we catch accidental wire-up regressions (plugin
+ * shape, pathMethods collisions).
  */
-function makeWrapperFetch() {
-  const adapter = new TestAdapter({ baseURL: BASE_URL });
+function makePluginWrapperFetch() {
+  const customFetchImpl = createNeonCustomFetchImpl();
+
+  const _client = baCreateAuthClient({
+    baseURL: BASE_URL,
+    plugins: [
+      jwtClient(),
+      adminClient(),
+      organizationClient(),
+      emailOTPClient(),
+      magicLinkClient(),
+      phoneNumberClient(),
+      neonClient(),
+    ],
+    fetchOptions: {
+      throw: false,
+      customFetchImpl,
+    },
+  });
+  void _client;
+
   return createFetch({
     baseURL: BASE_URL,
     throw: true,
     plugins: [neonFetchPlugin],
-    customFetchImpl: adapter.getCustomFetchImpl(),
+    customFetchImpl,
   });
 }
 
-describe('NeonAuthAdapterCore wrapper end-to-end fetch behavior', () => {
+describe('[plugin parity] end-to-end error normalization (plugin + customFetch)', () => {
   const originalFetch = globalThis.fetch;
   let fetchMock: ReturnType<typeof vi.fn>;
 
@@ -63,9 +84,9 @@ describe('NeonAuthAdapterCore wrapper end-to-end fetch behavior', () => {
     globalThis.fetch = originalFetch;
   });
 
-  describe('error normalization (via fetch plugin + custom fetch impl)', () => {
+  describe('main branch (via better-fetch + plugin)', () => {
     test('throws AuthApiError with .status and .code when upstream returns JSON with code', async () => {
-      const $fetch = makeWrapperFetch();
+      const $fetch = makePluginWrapperFetch();
 
       fetchMock.mockResolvedValueOnce(
         Response.json(
@@ -81,19 +102,19 @@ describe('NeonAuthAdapterCore wrapper end-to-end fetch behavior', () => {
         )
       );
 
-      await expect($fetch('/sign-in/email', { method: 'POST' })).rejects.toSatisfy(
-        (err: unknown) => {
-          expect(err).toBeInstanceOf(AuthApiError);
-          const apiErr = err as AuthApiError;
-          expect(apiErr.status).toBe(401);
-          expect(apiErr.code).toBe('invalid_credentials');
-          return true;
-        }
-      );
+      await expect(
+        $fetch('/sign-in/email', { method: 'POST' })
+      ).rejects.toSatisfy((err: unknown) => {
+        expect(err).toBeInstanceOf(AuthApiError);
+        const apiErr = err as AuthApiError;
+        expect(apiErr.status).toBe(401);
+        expect(apiErr.code).toBe('invalid_credentials');
+        return true;
+      });
     });
 
     test('throws AuthError with a typed .code (not forged from .status) when upstream lacks code', async () => {
-      const $fetch = makeWrapperFetch();
+      const $fetch = makePluginWrapperFetch();
 
       fetchMock.mockResolvedValueOnce(
         Response.json(
@@ -121,14 +142,17 @@ describe('NeonAuthAdapterCore wrapper end-to-end fetch behavior', () => {
     });
 
     test('thrown error is an AuthApiError instance (consumer narrowing works)', async () => {
-      const $fetch = makeWrapperFetch();
+      const $fetch = makePluginWrapperFetch();
 
       fetchMock.mockResolvedValueOnce(
-        Response.json({ message: 'Nope' }, {
-          status: 401,
-          statusText: 'Unauthorized',
-          headers: { 'Content-Type': 'application/json' },
-        })
+        Response.json(
+          { message: 'Nope' },
+          {
+            status: 401,
+            statusText: 'Unauthorized',
+            headers: { 'Content-Type': 'application/json' },
+          }
+        )
       );
 
       try {
@@ -149,47 +173,29 @@ describe('NeonAuthAdapterCore wrapper end-to-end fetch behavior', () => {
         }
       }
     });
-  });
 
-  describe('customFetchImpl direct-call behavior (fetch wrapping only)', () => {
-    test('returns response untouched when upstream is 2xx', async () => {
-      const adapter = new TestAdapter({ baseURL: BASE_URL });
-      const customFetchImpl = adapter.getCustomFetchImpl();
+    test('returns response untouched when upstream is 2xx (customFetchImpl direct)', async () => {
+      const customFetchImpl = createNeonCustomFetchImpl();
 
       fetchMock.mockResolvedValueOnce(
-        Response.json({ user: { id: 'u1' } }, {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        })
+        Response.json(
+          { user: { id: 'u1' } },
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }
+        )
       );
 
       const result = await customFetchImpl(TEST_URL, { method: 'POST' });
       expect(result.ok).toBe(true);
       expect(result.status).toBe(200);
     });
-
-    test('non-OK responses are NOT normalized in customFetchImpl alone (hook responsibility)', async () => {
-      // After the Tier-1 refactor `customFetchImpl` returns the raw non-OK
-      // response — the `onError` hook in the fetch plugin is what throws.
-      const adapter = new TestAdapter({ baseURL: BASE_URL });
-      const customFetchImpl = adapter.getCustomFetchImpl();
-
-      fetchMock.mockResolvedValueOnce(
-        Response.json(
-          { message: 'Nope', code: 'INVALID_EMAIL_OR_PASSWORD' },
-          { status: 401, statusText: 'Unauthorized' }
-        )
-      );
-
-      const result = await customFetchImpl(TEST_URL, { method: 'POST' });
-      expect(result.ok).toBe(false);
-      expect(result.status).toBe(401);
-    });
   });
 
   describe('force-fetch branch (X-Force-Fetch header)', () => {
     test('throws AuthApiError on non-2xx when paired with the fetch plugin', async () => {
-      const $fetch = makeWrapperFetch();
+      const $fetch = makePluginWrapperFetch();
 
       fetchMock.mockResolvedValueOnce(
         Response.json(
@@ -221,12 +227,9 @@ describe('NeonAuthAdapterCore wrapper end-to-end fetch behavior', () => {
     });
 
     test('strips X-Force-Fetch header before sending (customFetchImpl direct)', async () => {
-      const adapter = new TestAdapter({ baseURL: BASE_URL });
-      const customFetchImpl = adapter.getCustomFetchImpl();
+      const customFetchImpl = createNeonCustomFetchImpl();
 
-      fetchMock.mockResolvedValueOnce(
-        Response.json({}, { status: 200 })
-      );
+      fetchMock.mockResolvedValueOnce(Response.json({}, { status: 200 }));
 
       await customFetchImpl(TEST_URL, {
         method: 'GET',

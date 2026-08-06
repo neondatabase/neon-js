@@ -8,23 +8,19 @@ import {
   organizationClient,
   phoneNumberClient,
 } from 'better-auth/client/plugins';
+import { neonClient } from '../client-plugin';
 import {
-  BETTER_AUTH_METHODS_HOOKS,
-  BETTER_AUTH_METHODS_IN_FLIGHT_REQUESTS,
-  deriveBetterAuthMethodFromUrl,
-  initBroadcastChannel,
-} from './better-auth-methods';
-import { anonymousTokenClient } from '../plugins/anonymous-token';
-import { injectClientInfo } from '../utils/client-info';
+  createNeonCustomFetchImpl,
+  
+} from '../client-plugin/custom-fetch';
 import type { BetterAuthInstance } from '../types';
-import { normalizeBetterAuthError } from './better-auth-helpers';
 
 export interface NeonAuthAdapterCoreAuthOptions extends Omit<
   BetterAuthClientOptions,
   'plugins'
 > {}
 
-export const FORCE_FETCH_HEADER = 'X-Force-Fetch';
+
 
 const supportedBetterAuthClientPlugins = [
   jwtClient(),
@@ -33,7 +29,12 @@ const supportedBetterAuthClientPlugins = [
   emailOTPClient(),
   magicLinkClient(),
   phoneNumberClient(),
-  anonymousTokenClient(),
+  // `neonClient()` is the single source of truth for every Neon-specific
+  // client-side behavior: it installs the per-method onRequest/onSuccess
+  // fetch hooks (session-cache + cross-tab sync + JWT capture), exposes the
+  // `getAnonymousToken` / `getJWTToken` / `handleOAuthCallback` actions, and
+  // calls `initBroadcastChannel()` at construction.
+  neonClient(),
 ] satisfies BetterAuthClientOptions['plugins'];
 
 export type SupportedBetterAuthClientPlugins =
@@ -50,133 +51,32 @@ export abstract class NeonAuthAdapterCore {
   /**
    * Better Auth adapter implementing the NeonAuthClient interface.
    * See CLAUDE.md for architecture details and API mappings.
+   *
+   * All Neon-specific behaviors (per-method hooks, cross-tab sync, JWT
+   * capture, anonymous token, verifier forwarding, force-fetch escape
+   * hatch, in-flight dedup, error normalization, client-info injection)
+   * are installed via the shared `neonClient()` plugin and
+   * `createNeonCustomFetchImpl()`, so a tenant who wires up stock
+   * `better-auth/client` + `neonClient()` gets the same behavior as this
+   * wrapper.
    */
 
   //#region Constructor
   constructor(betterAuthClientOptions: NeonAuthAdapterCoreAuthOptions) {
-    // Preserve user's onSuccess callback if they provided one
-    const userOnSuccess = betterAuthClientOptions.fetchOptions?.onSuccess;
-    const userOnRequest = betterAuthClientOptions.fetchOptions?.onRequest;
-
+    const userFetchOptions = betterAuthClientOptions.fetchOptions ?? {};
     this.betterAuthOptions = {
       ...betterAuthClientOptions,
       plugins: supportedBetterAuthClientPlugins,
       fetchOptions: {
-        ...betterAuthClientOptions.fetchOptions,
+        ...userFetchOptions,
         throw: false,
-        onRequest: (request) => {
-          const url = request.url;
-          const method = deriveBetterAuthMethodFromUrl(url.toString());
-          if (method) {
-            BETTER_AUTH_METHODS_HOOKS[method].onRequest(request);
-          }
-          userOnRequest?.(request);
-        },
-        customFetchImpl: async (url, init) => {
-          const headers = injectClientInfo(init?.headers);
-          // Skip deduplication if X-Force-Fetch header is present
-          if (headers.has(FORCE_FETCH_HEADER)) {
-            headers.delete(FORCE_FETCH_HEADER);
-            const response = await fetch(url, { ...init, headers });
-
-            // Check for HTTP errors. Route through normalizeBetterAuthError
-            // so consumers always get a typed AuthApiError with `.status` + `.code`.
-            if (!response.ok) {
-              const body = await response
-                .clone()
-                .json()
-                .catch(() => ({}));
-              throw normalizeBetterAuthError({
-                status: response.status,
-                statusText: response.statusText,
-                message:
-                  body.message ||
-                  `HTTP ${response.status} ${response.statusText}`,
-                code: body.code,
-                body,
-              });
-            }
-
-            return response;
-          }
-
-          const betterAuthMethod = deriveBetterAuthMethodFromUrl(
-            url.toString()
-          );
-          if (betterAuthMethod) {
-            const response = await BETTER_AUTH_METHODS_HOOKS[
-              betterAuthMethod
-            ].beforeFetch?.(url, init);
-            if (response) {
-              return response;
-            }
-          }
-
-          // Create body-aware deduplication key
-          const method = init?.method || 'GET';
-          const body = init?.body || '';
-          const key = `${method}:${url}:${body}`;
-
-          const response =
-            await BETTER_AUTH_METHODS_IN_FLIGHT_REQUESTS.deduplicate(key, () =>
-              fetch(url, { ...init, headers })
-            );
-
-          // Check for HTTP errors before returning. Route through
-          // normalizeBetterAuthError so consumers always get a typed
-          // AuthApiError with `.status` + `.code`.
-          if (!response.ok) {
-            const errorBody = await response
-              .clone()
-              .json()
-              .catch(() => ({}));
-            throw normalizeBetterAuthError({
-              status: response.status,
-              statusText: response.statusText,
-              message:
-                errorBody.message ||
-                `HTTP ${response.status} ${response.statusText}`,
-              code: errorBody.code,
-              body: errorBody,
-            });
-          }
-
-          // Clone the response so each caller gets a fresh body stream
-          // (Response bodies can only be read once, but deduplication shares the same Response)
-          return response.clone();
-        },
-        onSuccess: async (ctx) => {
-          // Capture JWT from any request that includes it
-          const jwt = ctx.response.headers.get('set-auth-jwt');
-          if (jwt) {
-            // Inject JWT into response data BEFORE Better Auth processes it.
-            // Better Auth will then update its internal state, triggering useSession.subscribe()
-            // which will cache the session with JWT included (single cache-setting point).
-            if (ctx.data?.session) {
-              ctx.data.session.token = jwt;
-            } else {
-              console.warn(
-                '[onSuccess] JWT found but no session data to inject into!'
-              );
-            }
-          }
-
-          const url = ctx.request.url.toString();
-          const responseData = ctx.data;
-
-          // Detect sign-in/sign-up
-          const method = deriveBetterAuthMethodFromUrl(url);
-          if (method) {
-            BETTER_AUTH_METHODS_HOOKS[method].onSuccess(responseData);
-          }
-
-          // Call user's onSuccess callback if they provided one
-          await userOnSuccess?.(ctx);
-        },
+        // Preserve any caller-supplied customFetchImpl by falling through to
+        // ours only when they did not provide one. (In practice nobody does
+        // — the wrapper is the only caller — but better safe than surprised.)
+        customFetchImpl:
+          userFetchOptions.customFetchImpl ?? createNeonCustomFetchImpl(),
       },
     };
-
-    initBroadcastChannel();
   }
 
   abstract getBetterAuthInstance(): BetterAuthInstance;
@@ -207,3 +107,5 @@ export abstract class NeonAuthAdapterCore {
     return null;
   }
 }
+
+export {FORCE_FETCH_HEADER} from '../client-plugin/custom-fetch';
