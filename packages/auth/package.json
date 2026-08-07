@@ -16,7 +16,8 @@
     "better-auth",
     "supabase",
     "react",
-    "nextjs"
+    "nextjs",
+    "hono"
   ],
   "homepage": "https://github.com/neondatabase/neon-js/tree/main/packages/auth#readme",
   "bugs": {
@@ -78,6 +79,10 @@
       "types": "./dist/next/server/index.d.mts",
       "default": "./dist/next/server/index.mjs"
     },
+    "./hono/server": {
+      "types": "./dist/hono/server/index.d.mts",
+      "default": "./dist/hono/server/index.mjs"
+    },
     "./server": {
       "types": "./dist/server/index.d.mts",
       "default": "./dist/server/index.mjs"
@@ -115,6 +120,7 @@
   },
   "devDependencies": {
     "@neondatabase/internal": "workspace:*",
+    "hono": "4.12.9",
     "msw": "2.6.8",
     "next": "16.2.11"
   },
@@ -129,7 +135,8 @@
   "peerDependencies": {
     "react": ">=18.0.0",
     "react-dom": ">=18.0.0",
-    "next": ">=16.0.0"
+    "next": ">=16.0.0",
+    "hono": ">=4.0.0"
   },
   "peerDependenciesMeta": {
     "react": {
@@ -139,6 +146,9 @@
       "optional": true
     },
     "next": {
+      "optional": true
+    },
+    "hono": {
       "optional": true
     }
   }

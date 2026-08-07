@@ -21,8 +21,11 @@ export default defineConfig(
       'src/next/index.ts',
       'src/next/server/index.ts',
 
+      // First-party Hono adapter — sibling of `src/next/`. Server-only.
+      'src/hono/server/index.ts',
+
       // Public framework-agnostic toolkit. Consumers: framework adapter
-      // authors (Hono, Remix, SolidStart, Express, …). See BUILDING-AN-ADAPTER.md.
+      // authors (Remix, SolidStart, Express, …). See BUILDING-AN-ADAPTER.md.
       'src/server/index.ts',
     ],
     skipNodeModulesBundle: true,
