@@ -433,10 +433,12 @@ describe('processAuthMiddleware', () => {
       }
     });
 
-    test('appends colliding request query parameters after login URL parameters', async () => {
+    test('keeps configured login parameters and appends only non-colliding request parameters', async () => {
       const config = createTestConfig({
-        loginUrl: '/auth/sign-in?source=configured&tag=configured',
-        request: new Request('https://app.com/dashboard?source=request&tag=a&tag=b'),
+        loginUrl: '/auth/sign-in?source=configured&campaign=configured',
+        request: new Request(
+          'https://app.com/dashboard?tag=a&source=request&tag=b&next=%2Faccount'
+        ),
       });
 
       const result = await processAuthMiddleware(config);
@@ -445,11 +447,29 @@ describe('processAuthMiddleware', () => {
       if (result.action === 'redirect_login') {
         expect([...result.redirectUrl.searchParams.entries()]).toEqual([
           ['source', 'configured'],
-          ['tag', 'configured'],
-          ['source', 'request'],
+          ['campaign', 'configured'],
           ['tag', 'a'],
           ['tag', 'b'],
+          ['next', '/account'],
         ]);
+      }
+    });
+
+    test('does not copy request query parameters to an external login URL', async () => {
+      const config = createTestConfig({
+        loginUrl: 'https://identity.example.com/sign-in?source=configured',
+        request: new Request(
+          'https://app.com/dashboard?neon_auth_session_verifier=secret&source=request&tag=a'
+        ),
+      });
+
+      const result = await processAuthMiddleware(config);
+
+      expect(result.action).toBe('redirect_login');
+      if (result.action === 'redirect_login') {
+        expect(result.redirectUrl.href).toBe(
+          'https://identity.example.com/sign-in?source=configured'
+        );
       }
     });
 
@@ -488,6 +508,50 @@ describe('processAuthMiddleware', () => {
       const result = await processAuthMiddleware(config);
 
       expect(result.action).toBe('allow');
+    });
+
+    test('does not skip sibling paths that share a skip route prefix', async () => {
+      const config = createTestConfig({
+        skipRoutes: ['/auth'],
+        request: new Request('https://app.com/auth-admin'),
+        pathname: '/auth-admin',
+      });
+
+      const result = await processAuthMiddleware(config);
+
+      expect(result.action).toBe('redirect_login');
+    });
+
+    test.each([
+      ['/auth', '/auth'],
+      ['/auth/', '/auth'],
+      ['/auth/profile', '/auth'],
+      ['/auth', '/auth/'],
+      ['/auth/', '/auth/'],
+      ['/auth/profile', '/auth/'],
+      ['/', '/'],
+    ])('allows pathname %s for skip route %s', async (pathname, skipRoute) => {
+      const config = createTestConfig({
+        skipRoutes: [skipRoute],
+        request: new Request(`https://app.com${pathname}`),
+        pathname,
+      });
+
+      const result = await processAuthMiddleware(config);
+
+      expect(result.action).toBe('allow');
+    });
+
+    test('does not treat root skip route as matching every path', async () => {
+      const config = createTestConfig({
+        skipRoutes: ['/'],
+        request: new Request('https://app.com/dashboard'),
+        pathname: '/dashboard',
+      });
+
+      const result = await processAuthMiddleware(config);
+
+      expect(result.action).toBe('redirect_login');
     });
   });
 });

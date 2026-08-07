@@ -216,8 +216,13 @@ export async function processAuthMiddleware(
 		}));
 	}
 
-	for (const [name, value] of requestUrl.searchParams) {
-		resolvedLoginUrl.searchParams.append(name, value);
+	if (resolvedLoginUrl.origin === requestUrl.origin) {
+		const configuredLoginParamNames = new Set(resolvedLoginUrl.searchParams.keys());
+		for (const [name, value] of requestUrl.searchParams) {
+			if (!configuredLoginParamNames.has(name)) {
+				resolvedLoginUrl.searchParams.append(name, value);
+			}
+		}
 	}
 
 	return {
