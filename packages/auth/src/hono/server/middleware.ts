@@ -35,7 +35,9 @@ import { validateCookieConfig } from '@/server/config';
  *
  * const app = new Hono();
  * app.use(contextStorage());
- * app.use('*', neonAuthHonoMiddleware({
+ *
+ * // Scope to just the paths that need protection — public routes stay public.
+ * app.use('/dashboard', neonAuthHonoMiddleware({
  *   baseUrl: process.env.NEON_AUTH_BASE_URL!,
  *   cookies: { secret: process.env.NEON_AUTH_COOKIE_SECRET! },
  *   loginUrl: '/sign-in',

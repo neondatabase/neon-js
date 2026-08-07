@@ -5,30 +5,16 @@ import { auth } from './auth.js';
 
 const app = new Hono();
 
-// REQUIRED: `contextStorage()` must be registered so `auth.getSession()`
-// (and every other server method) can resolve the in-flight request from
-// within downstream handlers.
+// REQUIRED: `contextStorage()` must be registered before anything that
+// calls `auth.*` methods, so `auth.getSession()` can resolve the in-flight
+// request from downstream handlers.
 app.use(contextStorage());
 
-// Mount the auth proxy at /api/auth/*.
+// Auth proxy endpoints — always public.
 app.on(['GET', 'POST'], '/api/auth/*', auth.handler());
 
-// Protect everything else. `/sign-in` (loginUrl) and paths listed in
-// DEFAULT_AUTH_SKIP_ROUTES are automatically excluded from protection.
-app.use('*', auth.middleware({ loginUrl: '/sign-in' }));
-
-app.get('/sign-in', (c) =>
-  c.html(
-    `<!doctype html>
-     <html><head><title>Sign in</title></head><body>
-       <h1>Sign in</h1>
-       <p>Public sign-in page (skipped by <code>auth.middleware</code>).</p>
-       <p>Wire your Neon Auth sign-in form here.</p>
-       <p><a href="/">Home</a></p>
-     </body></html>`
-  )
-);
-
+// Public routes — no `auth.middleware()`, but `auth.getSession()` still
+// works here because `contextStorage()` (above) is active on every path.
 app.get('/', async (c) => {
   const { data: session } = await auth.getSession();
   const who = session?.user ? session.user.name ?? session.user.email : null;
@@ -43,14 +29,34 @@ app.get('/', async (c) => {
   );
 });
 
+app.get('/sign-in', (c) =>
+  c.html(
+    `<!doctype html>
+     <html><head><title>Sign in</title></head><body>
+       <h1>Sign in</h1>
+       <p>Public sign-in page. Wire your Neon Auth sign-in form here.</p>
+       <p><a href="/">Home</a></p>
+     </body></html>`
+  )
+);
+
+// Protected routes — scope `auth.middleware()` to just the paths that
+// require authentication. Requests hitting `/dashboard` without a valid
+// session are 302-redirected to `loginUrl`; anything else falls through
+// to the route handler with `auth.getSession()` guaranteed to return a
+// user. For a subtree (`/dashboard`, `/dashboard/settings`, ...) also
+// register `app.use('/dashboard/*', ...)`.
+app.use('/dashboard', auth.middleware({ loginUrl: '/sign-in' }));
+
 app.get('/dashboard', async (c) => {
   const { data: session } = await auth.getSession();
   return c.json({
     protected: true,
     user: session?.user ?? null,
     hint:
-      'If you can read this you are authenticated. The `auth.middleware()` ' +
-      'redirects unauthenticated requests to /sign-in before they get here.',
+      'If you can read this you are authenticated. `auth.middleware()` on ' +
+      '/dashboard redirected unauthenticated requests to /sign-in before ' +
+      'reaching this handler.',
   });
 });
 

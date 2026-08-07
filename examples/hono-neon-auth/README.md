@@ -24,8 +24,8 @@ The server listens on `http://localhost:3000` by default (override with `PORT`).
 
 - **`src/auth.ts`** — the `createNeonAuth({ baseUrl, cookies })` singleton.
 - **`src/index.ts`** — the Hono app, showing the three mandatory wires:
-  1. `app.use(contextStorage())` — required by the Hono adapter so `auth.getSession()` can resolve the in-flight request.
+  1. `app.use(contextStorage())` — required by the Hono adapter so `auth.getSession()` can resolve the in-flight request (needed **on every path** that calls `auth.*`).
   2. `app.on(['GET','POST'], '/api/auth/*', auth.handler())` — the proxy mount.
-  3. `app.use('*', auth.middleware({ loginUrl: '/sign-in' }))` — route protection.
+  3. `app.use('/dashboard', auth.middleware({ loginUrl: '/sign-in' }))` — route protection **scoped to just the paths that need it**. Idiomatic Hono: register `auth.middleware()` only on protected paths (or on a `Hono` subrouter mounted with `app.route()`). Public routes like `/` never see the redirect.
 
 For the full Hono adapter walkthrough see [`packages/auth/BUILDING-AN-ADAPTER.md`](../../packages/auth/BUILDING-AN-ADAPTER.md).

@@ -83,12 +83,17 @@ export { createHonoRequestContext } from './adapter';
  * const app = new Hono();
  * app.use(contextStorage());
  * app.on(['GET', 'POST'], '/api/auth/*', auth.handler());
- * app.use('*', auth.middleware({ loginUrl: '/sign-in' }));
  *
+ * // Public route — `auth.getSession()` works everywhere because
+ * // `contextStorage()` above is active on every path.
  * app.get('/', async (c) => {
  *   const { data: session } = await auth.getSession();
  *   return c.text(session?.user ? `Hello ${session.user.name}` : 'Please sign in');
  * });
+ *
+ * // Scope `auth.middleware()` to just the paths that need protection.
+ * app.use('/dashboard', auth.middleware({ loginUrl: '/sign-in' }));
+ * app.get('/dashboard', (c) => c.text('Protected'));
  *
  * serve({ fetch: app.fetch, port: 3000 });
  * ```

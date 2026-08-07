@@ -28,7 +28,8 @@ import type { RequestContext } from '../../server';
  * });
  *
  * app.on(['GET', 'POST'], '/api/auth/*', auth.handler());
- * app.use('*', auth.middleware({ loginUrl: '/sign-in' }));
+ * // Scope `auth.middleware()` to just the paths that need protection.
+ * app.use('/dashboard', auth.middleware({ loginUrl: '/sign-in' }));
  * ```
  */
 export function createHonoRequestContext(): RequestContext {
