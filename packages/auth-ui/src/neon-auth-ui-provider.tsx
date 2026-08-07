@@ -49,10 +49,12 @@ export function NeonAuthUIProvider<T extends NeonAuthAdapter>({
     <div className={cn('neon-auth-ui', className)}>
       <ThemeProvider attribute="class" defaultTheme={defaultTheme} enableSystem>
         {/*
-          Single cast is enough when better-auth versions are unified via
-          pnpm.overrides (better-auth 1.6.23 + @daveyplate/better-auth-ui 3.4.0).
-          History: first cast 9b02f94, widened to `as unknown as` at d6317e5,
-          simplified again for the 1.6.x alignment.
+          Explicit compatibility assertion: pnpm still resolves `better-auth` to
+          separate virtual-store instances for @neondatabase/auth and this
+          package, so the structurally-identical client types are not the same
+          TS instance. pnpm.overrides keeps both on one version, which is enough
+          for a single `as` here instead of `as unknown as`.
+          History: first cast 9b02f94, widened at d6317e5, narrowed on 1.6.x.
         */}
         <AuthUIProvider
           authClient={reactClient as AuthUIProviderProps['authClient']}
