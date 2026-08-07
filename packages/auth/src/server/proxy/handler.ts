@@ -19,7 +19,7 @@ export interface AuthProxyConfig {
 	sessionDataTtl?: number;
 	/** Cookie domain for session data cookie */
 	domain?: string;
-	/** SameSite for proxied and minted cookies (default: strict) */
+	/** SameSite for proxied and minted cookies (default: lax) */
 	sameSite?: SessionCookieSameSite;
 	/**
 	 * Logging sink. Accepts either a pre-resolved sink (from

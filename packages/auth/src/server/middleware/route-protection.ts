@@ -31,27 +31,24 @@ export const DEFAULT_AUTH_SKIP_ROUTES = [
  * Checks if a given pathname should be protected (require authentication)
  *
  * @param pathname - URL pathname to check
- * @param skipRoutes - Array of route prefixes to skip protection
+ * @param skipRoutes - Exact routes and their slash-delimited subpaths to skip protection
  * @returns true if route should be protected, false if it should be skipped
  */
 export function shouldProtectRoute(pathname: string, skipRoutes: readonly string[]): boolean {
-  // Segment-aware match: a skip route matches the pathname when the
-  // pathname is exactly equal to it OR is a descendant (route + '/...').
-  //
-  // Bare `pathname.startsWith(route)` causes prefix bleed — e.g. with
-  // `route = '/auth/sign-in'` it would also skip `/auth/sign-internal`,
-  // and `/api/auth` would skip `/api/authz`. Since `DEFAULT_AUTH_SKIP_ROUTES`
-  // is now an exported public toolkit contract, the bug would silently
-  // expose adapter authors. See #161 review feedback (Andras).
-  //
-  // Trailing slashes on route definitions are normalized so that
-  // `['/api/auth/']` behaves the same as `['/api/auth']`.
-  return !skipRoutes.some((rawRoute) => {
-    const route = rawRoute.endsWith('/') && rawRoute.length > 1
-      ? rawRoute.slice(0, -1)
-      : rawRoute;
-    return pathname === route || pathname.startsWith(`${route}/`);
-  });
+  return !skipRoutes.some((route) => isSamePathOrSubpath(pathname, route));
+}
+
+export function isSamePathOrSubpath(pathname: string, routePathname: string): boolean {
+  const normalizedRoutePathname =
+    routePathname === '/' ? routePathname : routePathname.replace(/\/+$/, '');
+
+  if (pathname === normalizedRoutePathname) {
+    return true;
+  }
+
+  return (
+    normalizedRoutePathname !== '/' && pathname.startsWith(`${normalizedRoutePathname}/`)
+  );
 }
 
 /**
@@ -72,18 +69,18 @@ export interface SessionCheckResult {
  *
  * @param pathname - URL pathname being accessed
  * @param skipRoutes - Routes that don't require authentication
- * @param loginUrl - URL to redirect to for login (if applicable)
+ * @param loginPathname - Same-origin login pathname, or null for an external login URL
  * @param session - Current session data (null if not authenticated)
  * @returns Session check result
  */
 export function checkSessionRequired(
   pathname: string,
   skipRoutes: readonly string[],
-  loginUrl: string,
+  loginPathname: string | null,
   session: SessionData | null
 ): SessionCheckResult {
   // Always allow access to login URL to prevent infinite redirect
-  if (pathname.startsWith(loginUrl)) {
+  if (loginPathname !== null && isSamePathOrSubpath(pathname, loginPathname)) {
     return { allowed: true, requiresRedirect: false };
   }
 

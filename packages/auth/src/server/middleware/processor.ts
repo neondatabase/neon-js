@@ -1,7 +1,6 @@
 import { needsSessionVerification, exchangeOAuthToken } from './oauth';
-import { checkSessionRequired } from './route-protection';
-import { NEON_AUTH_HEADER_MIDDLEWARE_NAME } from '../proxy';
-import { handleAuthProxyRequest } from '../proxy';
+import { checkSessionRequired, isSamePathOrSubpath } from './route-protection';
+import { handleAuthProxyRequest, NEON_AUTH_HEADER_MIDDLEWARE_NAME } from '../proxy';
 import { NEON_AUTH_SESSION_COOKIE_NAME, NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../constants';
 import type { SessionData } from '../types';
 import { parseCookies } from 'better-auth/cookies';
@@ -35,7 +34,7 @@ export type AuthMiddlewareConfig = {
 	sessionDataTtl?: number;
 	/** Cookie domain for session data cookie */
 	domain?: string;
-	/** SameSite for cookies set by middleware (default: strict) */
+	/** SameSite for cookies set by middleware (default: lax) */
 	sameSite?: SessionCookieSameSite;
 	/** Pre-resolved sink; preferred over resolving from logger/logLevel */
 	log?: ResolvedNeonAuthLogging;
@@ -94,10 +93,17 @@ export async function processAuthMiddleware(
 		sameSite,
 	} = config;
 
-	const effectiveSameSite = sameSite ?? 'strict';
+	const effectiveSameSite = sameSite ?? 'lax';
+	const requestUrl = new URL(request.url);
+	const resolvedLoginUrl = new URL(loginUrl, requestUrl);
+	const sameOriginLoginPathname =
+		resolvedLoginUrl.origin === requestUrl.origin ? resolvedLoginUrl.pathname : null;
 
 	// Always skip session check for login URL to prevent infinite redirect loop
-	if (pathname.startsWith(loginUrl)) {
+	if (
+		sameOriginLoginPathname !== null &&
+		isSamePathOrSubpath(pathname, sameOriginLoginPathname)
+	) {
 		return { action: 'allow' };
 	}
 
@@ -176,7 +182,12 @@ export async function processAuthMiddleware(
 	}
 
 	// Check if session is required for this route
-	const checkResult = checkSessionRequired(pathname, skipRoutes, loginUrl, sessionData);
+	const checkResult = checkSessionRequired(
+		pathname,
+		skipRoutes,
+		sameOriginLoginPathname,
+		sessionData
+	);
 
 	// Session valid or route doesn't require authentication
 	if (checkResult.allowed) {
@@ -205,9 +216,18 @@ export async function processAuthMiddleware(
 		}));
 	}
 
+	if (resolvedLoginUrl.origin === requestUrl.origin) {
+		const configuredLoginParamNames = new Set(resolvedLoginUrl.searchParams.keys());
+		for (const [name, value] of requestUrl.searchParams) {
+			if (!configuredLoginParamNames.has(name)) {
+				resolvedLoginUrl.searchParams.append(name, value);
+			}
+		}
+	}
+
 	return {
 		action: 'redirect_login',
-		redirectUrl: new URL(loginUrl, request.url),
+		redirectUrl: resolvedLoginUrl,
 		cookies: cookies.length > 0 ? cookies : undefined,
 	};
 }

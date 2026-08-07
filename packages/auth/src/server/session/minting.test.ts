@@ -83,6 +83,7 @@ describe('mintSessionDataFromResponse', () => {
     expect(result).toContain('__Secure-neon-auth.local.session_data=');
     expect(result).toContain('HttpOnly');
     expect(result).toContain('Secure');
+    expect(result).toContain('SameSite=Lax');
   });
 
   test('includes domain in cookie when domain is specified', async () => {
@@ -104,6 +105,26 @@ describe('mintSessionDataFromResponse', () => {
 
     expect(result).not.toBe(null);
     expect(result).toContain('Domain=.example.com');
+  });
+
+  test('uses SameSite=Strict when explicitly configured', async () => {
+    const sessionData = createTestSessionData();
+
+    server.use(
+      http.get(`${TEST_BASE_URL}/get-session`, () => {
+        return HttpResponse.json(sessionData);
+      })
+    );
+
+    const sessionTokenCookie = '__Secure-neon-auth.session_token=valid-token; Path=/; HttpOnly';
+
+    const result = await mintSessionDataFromToken(sessionTokenCookie, TEST_BASE_URL, {
+      ...TEST_COOKIE_CONFIG,
+      sameSite: 'strict',
+    });
+
+    expect(result).not.toBe(null);
+    expect(result).toContain('SameSite=Strict');
   });
 
   test('returns null when upstream fetch fails', async () => {

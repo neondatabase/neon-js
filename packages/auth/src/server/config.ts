@@ -51,11 +51,11 @@ export interface SessionCookieConfig {
 	/**
 	 * `SameSite` for cookies set or rewritten by the server proxy (API route, middleware, RSC).
 	 *
-	 * - **`strict` (default)** — cookies are not sent on cross-site requests (strongest default).
-	 * - **`lax`** — previous hard-coded behavior; cookies sent on top-level cross-site navigations.
+	 * - **`lax` (default)** — cookies are sent on top-level cross-site navigations, including OAuth callbacks.
+	 * - **`strict`** — cookies are not sent on cross-site requests; opt in when cross-site navigation support is not needed.
 	 * - **`none`** — use for third-party contexts (for example your app embedded in another site’s iframe); requires `Secure` (always applied for these cookies).
 	 *
-	 * @default 'strict'
+	 * @default 'lax'
 	 */
 	sameSite?: SessionCookieSameSite;
 }
