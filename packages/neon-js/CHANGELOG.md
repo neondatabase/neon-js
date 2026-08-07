@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Better Auth alignment**: Transitive via `@neondatabase/auth` — Better Auth client stack is now **`1.6.23`** (matched to neon-auth server).
 - **CLI internals**: Vendored `@supabase/postgres-meta` @ v0.93.1 (Apache-2.0)
   into `src/vendor/postgres-meta/` and removed it from runtime `dependencies`.
   Drops the upstream Fastify HTTP server, `@sentry/node`, `pgsql-parser`,
