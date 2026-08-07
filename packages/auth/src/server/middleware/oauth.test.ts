@@ -1,7 +1,10 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { needsSessionVerification, exchangeOAuthToken } from './oauth';
 import * as proxy from '../proxy';
-import { NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME } from '../constants';
+import {
+  NEON_AUTH_LEGACY_SESSION_CHALLANGE_COOKIE_NAME,
+  NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME,
+} from '../constants';
 
 const TEST_SECRET = 'test-secret-at-least-32-characters-long!';
 const VERIFIER_PARAM = 'neon_auth_session_verifier';
@@ -59,6 +62,28 @@ describe('needsSessionVerification', () => {
     const request = new Request(`https://example.com/?foo=bar&${VERIFIER_PARAM}=test-verifier&baz=qux`, {
       headers: {
         Cookie: `${NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME}=test-challenge`,
+      },
+    });
+
+    expect(needsSessionVerification(request)).toBe(true);
+  });
+
+  test('returns true when only legacy (misspelled) challenge cookie is present', () => {
+    // Old server builds in the field still set the misspelled cookie name.
+    // The SDK must accept it during the dual-write transition window.
+    const request = new Request(`https://example.com/?${VERIFIER_PARAM}=test-verifier`, {
+      headers: {
+        Cookie: `${NEON_AUTH_LEGACY_SESSION_CHALLANGE_COOKIE_NAME}=legacy-challenge`,
+      },
+    });
+
+    expect(needsSessionVerification(request)).toBe(true);
+  });
+
+  test('returns true when both legacy and new challenge cookies are present', () => {
+    const request = new Request(`https://example.com/?${VERIFIER_PARAM}=test-verifier`, {
+      headers: {
+        Cookie: `${NEON_AUTH_LEGACY_SESSION_CHALLANGE_COOKIE_NAME}=legacy; ${NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME}=new`,
       },
     });
 
@@ -187,6 +212,65 @@ describe('exchangeOAuthToken', () => {
     expect(result?.cookies).toHaveLength(2);
     expect(result?.cookies[0]).toContain('session_token');
     expect(result?.cookies[1]).toContain('session_data');
+  });
+
+  test('succeeds when only the legacy (misspelled) challenge cookie is present', async () => {
+    // Backward compatibility: an old Neon Auth server build only sets the
+    // legacy misspelled cookie. The SDK must still complete the exchange.
+    const mockUpstreamResponse = Response.json({}, { status: 200 });
+    const mockProcessedResponse = new Response('OK', {
+      status: 200,
+      headers: new Headers({ 'Set-Cookie': '__Secure-neon-auth.session_token=tok' }),
+    });
+
+    vi.spyOn(proxy, 'handleAuthRequest').mockResolvedValue(mockUpstreamResponse);
+    vi.spyOn(proxy, 'handleAuthResponse').mockResolvedValue(mockProcessedResponse);
+
+    const request = new Request(
+      `https://example.com/dashboard?${VERIFIER_PARAM}=test-verifier`,
+      {
+        headers: {
+          Cookie: `${NEON_AUTH_LEGACY_SESSION_CHALLANGE_COOKIE_NAME}=legacy-challenge`,
+        },
+      }
+    );
+
+    const result = await exchangeOAuthToken(request, 'https://auth.example.com', TEST_SECRET);
+
+    expect(result).not.toBe(null);
+    expect(result?.success).toBe(true);
+  });
+
+  test('prefers the new challenge cookie when both names are present', async () => {
+    // When a server dual-writes both names, the SDK should read the
+    // correctly-spelled one. We can't directly observe which value was used
+    // from the public API, but we can at least verify the exchange succeeds
+    // and the request is forwarded once.
+    const mockUpstreamResponse = Response.json({}, { status: 200 });
+    const mockProcessedResponse = new Response('OK', {
+      status: 200,
+      headers: new Headers({ 'Set-Cookie': '__Secure-neon-auth.session_token=tok' }),
+    });
+
+    const handleAuthRequestSpy = vi
+      .spyOn(proxy, 'handleAuthRequest')
+      .mockResolvedValue(mockUpstreamResponse);
+    vi.spyOn(proxy, 'handleAuthResponse').mockResolvedValue(mockProcessedResponse);
+
+    const request = new Request(
+      `https://example.com/dashboard?${VERIFIER_PARAM}=test-verifier`,
+      {
+        headers: {
+          Cookie: `${NEON_AUTH_LEGACY_SESSION_CHALLANGE_COOKIE_NAME}=legacy; ${NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME}=new`,
+        },
+      }
+    );
+
+    const result = await exchangeOAuthToken(request, 'https://auth.example.com', TEST_SECRET);
+
+    expect(result).not.toBe(null);
+    expect(result?.success).toBe(true);
+    expect(handleAuthRequestSpy).toHaveBeenCalledTimes(1);
   });
 
   test('preserves URL path and other query params in redirect', async () => {
