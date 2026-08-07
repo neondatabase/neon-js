@@ -140,6 +140,92 @@ describe('mintSessionDataFromResponse', () => {
     expect(result).not.toBe(null);
     expect(result).toContain('__Secure-neon-auth.local.session_data=');
   });
+
+  // Andras FIX 2 (correctness): the legacy substring scans false-matched any
+  // cookie whose name *contained* `session_token` or any cookie whose VALUE
+  // contained `max-age=0`. Exact-name + parsed `maxAge`/`expires` matching is
+  // mandatory. The tests below cover both classes of regression.
+  test('ignores unrelated cookies that contain the substring `session_token` in their name', async () => {
+    const headers = new Headers();
+    headers.append(
+      'Set-Cookie',
+      'analytics_session_token_ref=abc; Path=/; HttpOnly; Max-Age=3600'
+    );
+
+    const result = await mintSessionDataFromResponse(
+      headers,
+      TEST_BASE_URL,
+      TEST_COOKIE_CONFIG
+    );
+
+    expect(result).toBe(null);
+  });
+
+  test('does NOT treat a live session_token as deletion when value contains `max-age=0`', async () => {
+    const sessionData = createTestSessionData();
+
+    server.use(
+      http.get(`${TEST_BASE_URL}/get-session`, () => {
+        return HttpResponse.json(sessionData);
+      })
+    );
+
+    const headers = new Headers();
+    // Value literally contains `max-age=0` (e.g. as part of an encoded
+    // payload) but the real attribute is `Max-Age=3600` — must mint, not delete.
+    headers.append(
+      'Set-Cookie',
+      '__Secure-neon-auth.session_token=encoded%3Bmax-age%3D0%3Bstuff; Path=/; HttpOnly; Secure; Max-Age=3600'
+    );
+
+    const result = await mintSessionDataFromResponse(
+      headers,
+      TEST_BASE_URL,
+      TEST_COOKIE_CONFIG
+    );
+
+    expect(result).not.toBe(null);
+    expect(result).toContain('__Secure-neon-auth.local.session_data=');
+    // A deletion cookie is empty (`name=`) — make sure we did not emit that.
+    expect(result).not.toMatch(/__Secure-neon-auth\.local\.session_data=;/);
+    expect(result).not.toMatch(/__Secure-neon-auth\.local\.session_data=\s*;/);
+  });
+
+  test('emits deletion cookie when session_token has Max-Age=0 (real sign-out)', async () => {
+    const headers = new Headers();
+    headers.append(
+      'Set-Cookie',
+      '__Secure-neon-auth.session_token=; Path=/; HttpOnly; Secure; Max-Age=0'
+    );
+
+    const result = await mintSessionDataFromResponse(
+      headers,
+      TEST_BASE_URL,
+      TEST_COOKIE_CONFIG
+    );
+
+    expect(result).not.toBe(null);
+    expect(result).toContain('__Secure-neon-auth.local.session_data=');
+    expect(result).toContain('Max-Age=0');
+  });
+
+  test('emits deletion cookie when session_token has past Expires', async () => {
+    const headers = new Headers();
+    headers.append(
+      'Set-Cookie',
+      '__Secure-neon-auth.session_token=; Path=/; HttpOnly; Secure; Expires=Thu, 01 Jan 1970 00:00:00 GMT'
+    );
+
+    const result = await mintSessionDataFromResponse(
+      headers,
+      TEST_BASE_URL,
+      TEST_COOKIE_CONFIG
+    );
+
+    expect(result).not.toBe(null);
+    expect(result).toContain('__Secure-neon-auth.local.session_data=');
+    expect(result).toContain('Max-Age=0');
+  });
 });
 
 describe('mintSessionDataFromToken', () => {

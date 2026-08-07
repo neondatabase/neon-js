@@ -3,7 +3,8 @@ import { handleAuthRequest } from './request';
 import { handleAuthResponse } from './response';
 import { API_ENDPOINTS } from '../endpoints';
 import type { SessionCookieSameSite } from '../config';
-import type { ResolvedNeonAuthLogging } from '../logger';
+import type { NeonAuthLogger, ResolvedNeonAuthLogging } from '../logger';
+import { resolveLog } from '../logger';
 
 export interface AuthProxyConfig {
 	/** Standard Web API Request object */
@@ -20,8 +21,14 @@ export interface AuthProxyConfig {
 	domain?: string;
 	/** SameSite for proxied and minted cookies (default: strict) */
 	sameSite?: SessionCookieSameSite;
-	/** Resolved logging sink (from {@link resolveNeonAuthLogging}) */
-	log?: ResolvedNeonAuthLogging;
+	/**
+	 * Logging sink. Accepts either a pre-resolved sink (from
+	 * {@link resolveNeonAuthLogging}) or a partial {@link NeonAuthLogger} (e.g.
+	 * forwarded from your adapter's public `log` config). A partial logger is
+	 * normalized internally at the default `'warn'` level. Omit for downstream
+	 * silence.
+	 */
+	log?: ResolvedNeonAuthLogging | NeonAuthLogger;
 }
 
 /**
@@ -39,20 +46,30 @@ export interface AuthProxyConfig {
  * @returns Standard Web API Response
  */
 export async function handleAuthProxyRequest(config: AuthProxyConfig): Promise<Response> {
-	const { request, path, baseUrl, cookieSecret, sessionDataTtl, domain, sameSite, log } =
-		config;
+	const { request, path, baseUrl, cookieSecret, sessionDataTtl, domain, sameSite } = config;
+	// Normalize the optional logger once. Pre-resolved sinks pass through
+	// unchanged (preserves caller-side level gating); partial loggers (e.g.
+	// `{ warn, error }` forwarded from an adapter's public config) are merged
+	// with `console` defaults at the default `'warn'` level. `undefined` stays
+	// `undefined` so downstream `?.warn(...)` calls remain silent.
+	const log = resolveLog(config.log);
 
 	// Try cookie cache for /get-session GET requests (optimization)
 	if (
 		path === API_ENDPOINTS.getSession.path &&
 		request.method === API_ENDPOINTS.getSession.method
 	) {
-		const cachedResponse = await trySessionCache(request, baseUrl, {
-			secret: cookieSecret,
-			sessionDataTtl,
-			domain,
-			sameSite,
-		});
+		const cachedResponse = await trySessionCache(
+			request,
+			baseUrl,
+			{
+				secret: cookieSecret,
+				sessionDataTtl,
+				domain,
+				sameSite,
+			},
+			log
+		);
 		if (cachedResponse) {
 			// Cache hit - return immediately (no upstream call)
 			return cachedResponse;
@@ -61,10 +78,15 @@ export async function handleAuthProxyRequest(config: AuthProxyConfig): Promise<R
 
 	// Fallback: Call upstream API
 	const response = await handleAuthRequest(baseUrl, request, path, log);
-	return await handleAuthResponse(response, baseUrl, {
-		secret: cookieSecret,
-		sessionDataTtl,
-		domain,
-		sameSite,
-	});
+	return await handleAuthResponse(
+		response,
+		baseUrl,
+		{
+			secret: cookieSecret,
+			sessionDataTtl,
+			domain,
+			sameSite,
+		},
+		log
+	);
 }

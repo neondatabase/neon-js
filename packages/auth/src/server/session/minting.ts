@@ -1,8 +1,12 @@
 import { signSessionDataCookie } from './operations';
 import { fetchSessionWithCookie } from './operations';
-import { NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../constants';
-import { serializeSetCookie } from '../utils/cookies';
+import {
+  NEON_AUTH_SESSION_COOKIE_NAME,
+  NEON_AUTH_SESSION_DATA_COOKIE_NAME,
+} from '../constants';
+import { parseSetCookies, serializeSetCookie } from '../utils/cookies';
 import type { SessionCookieConfig } from '../config';
+import type { ResolvedNeonAuthLogging } from '../logger';
 
 /**
  * Core minting logic - creates session_data cookie from session token
@@ -10,16 +14,19 @@ import type { SessionCookieConfig } from '../config';
  * @param sessionTokenCookie - Session token cookie string (format: "name=value")
  * @param baseUrl - Auth server base URL
  * @param cookieConfig - Cookie configuration
+ * @param log - Optional pre-resolved logger (honors `logLevel: 'silent'`).
+ *              Falls back to `console.error` when omitted.
  * @returns Set-Cookie string or null on error
  */
 async function mintSessionDataCookie(
   sessionTokenCookie: string,
   baseUrl: string,
-  cookieConfig: SessionCookieConfig
+  cookieConfig: SessionCookieConfig,
+  log?: ResolvedNeonAuthLogging
 ): Promise<string | null> {
   try {
     // Fetch session data from upstream using the session token
-    const sessionData = await fetchSessionWithCookie(sessionTokenCookie, baseUrl);
+    const sessionData = await fetchSessionWithCookie(sessionTokenCookie, baseUrl, log);
 
     if (!sessionData.session) {
       return null; // No valid session
@@ -48,12 +55,18 @@ async function mintSessionDataCookie(
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error('[mintSessionDataCookie] Failed to mint session_data cookie:', {
+    const meta = {
       error: errorMessage,
       ...(process.env.NODE_ENV !== 'production' && {
         stack: error instanceof Error ? error.stack : undefined,
       }),
-    });
+    };
+    if (log) {
+      log.error('[mintSessionDataCookie] Failed to mint session_data cookie:', meta);
+    } else {
+      // Console fallback when no logger is plumbed through — matches legacy behavior.
+      console.error('[mintSessionDataCookie] Failed to mint session_data cookie:', meta);
+    }
     return null;
   }
 }
@@ -74,22 +87,38 @@ async function mintSessionDataCookie(
 export async function mintSessionDataFromResponse(
   responseHeaders: Headers,
   baseUrl: string,
-  cookieConfig: SessionCookieConfig
+  cookieConfig: SessionCookieConfig,
+  log?: ResolvedNeonAuthLogging
 ): Promise<string | null> {
-  // Check if upstream set a session_token cookie
+  // Parse upstream Set-Cookie headers and locate the session token by EXACT
+  // name. The previous substring scans (`.includes('session_token')` and
+  // `.includes('max-age=0')`) false-matched:
+  //   - an unrelated cookie named `analytics_session_token_ref` triggered minting
+  //   - a session cookie whose VALUE contained the literal `max-age=0`
+  //     (alongside a real `Max-Age=3600`) was treated as a sign-out
+  // See #161 review feedback (Andras FIX 2, correctness).
   const setCookieHeaders = responseHeaders.getSetCookie();
-  const sessionTokenCookie = setCookieHeaders.find(cookie =>
-    cookie.includes('session_token')
-  );
+  let sessionTokenCookie: string | undefined;
+  let sessionTokenIsDeletion = false;
+  for (const cookieHeader of setCookieHeaders) {
+    const parsed = parseSetCookies(cookieHeader).find(
+      cookie => cookie.name === NEON_AUTH_SESSION_COOKIE_NAME
+    );
+    if (parsed) {
+      sessionTokenCookie = cookieHeader;
+      sessionTokenIsDeletion =
+        parsed.maxAge === 0 ||
+        (parsed.expires !== undefined && parsed.expires.getTime() <= Date.now());
+      break;
+    }
+  }
 
   if (!sessionTokenCookie) {
     return null; // No session token in response, nothing to mint
   }
 
-  // Check if session_token is being deleted (sign-out scenario)
-  const sessionCookieLower = sessionTokenCookie.toLowerCase();
-  if (sessionCookieLower.includes('max-age=0')) {
-    // Return deletion cookie for session_data
+  if (sessionTokenIsDeletion) {
+    // Return deletion cookie for session_data (matches sign-out)
     return serializeSetCookie({
       name: NEON_AUTH_SESSION_DATA_COOKIE_NAME,
       value: '',
@@ -103,7 +132,7 @@ export async function mintSessionDataFromResponse(
   }
 
   // Session token was set/updated - mint new session_data cookie
-  return await mintSessionDataCookie(sessionTokenCookie, baseUrl, cookieConfig);
+  return await mintSessionDataCookie(sessionTokenCookie, baseUrl, cookieConfig, log);
 }
 
 /**
@@ -120,7 +149,8 @@ export async function mintSessionDataFromResponse(
 export async function mintSessionDataFromToken(
   sessionTokenCookie: string,
   baseUrl: string,
-  cookieConfig: SessionCookieConfig
+  cookieConfig: SessionCookieConfig,
+  log?: ResolvedNeonAuthLogging
 ): Promise<string | null> {
-  return await mintSessionDataCookie(sessionTokenCookie, baseUrl, cookieConfig);
+  return await mintSessionDataCookie(sessionTokenCookie, baseUrl, cookieConfig, log);
 }
