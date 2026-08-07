@@ -1,9 +1,19 @@
 import { NEON_AUTH_SESSION_VERIFIER_PARAM_NAME } from '@/core/constants';
-import { NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME } from '../constants';
+import {
+  NEON_AUTH_LEGACY_SESSION_CHALLENGE_COOKIE_NAME,
+  NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME,
+} from '../constants';
 import { handleAuthRequest, handleAuthResponse } from '../proxy';
 import { parseCookies } from 'better-auth/cookies';
 import type { SessionCookieSameSite } from '../config';
 import type { ResolvedNeonAuthLogging } from '../logger';
+
+function hasSessionChallengeCookie(cookies: ReturnType<typeof parseCookies>): boolean {
+  return (
+    cookies.has(NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME) ||
+    cookies.has(NEON_AUTH_LEGACY_SESSION_CHALLENGE_COOKIE_NAME)
+  );
+}
 
 /**
  * Result of OAuth token exchange
@@ -35,9 +45,8 @@ export function needsSessionVerification(request: Request): boolean {
   }
 
   const cookies = parseCookies(cookieHeader);
-  const hasChallenge = cookies.has(NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME);
 
-  return hasVerifier && hasChallenge;
+  return hasVerifier && hasSessionChallengeCookie(cookies);
 }
 
 /**
@@ -71,9 +80,8 @@ export async function exchangeOAuthToken(
   }
 
   const cookies = parseCookies(cookieHeader);
-  const challenge = cookies.get(NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME);
 
-  if (!verifier || !challenge) {
+  if (!verifier || !hasSessionChallengeCookie(cookies)) {
     return null;
   }
 

@@ -1,13 +1,16 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { needsSessionVerification, exchangeOAuthToken } from './oauth';
 import * as proxy from '../proxy';
-import { NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME } from '../constants';
+import {
+  NEON_AUTH_LEGACY_SESSION_CHALLENGE_COOKIE_NAME,
+  NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME,
+} from '../constants';
 
 const TEST_SECRET = 'test-secret-at-least-32-characters-long!';
 const VERIFIER_PARAM = 'neon_auth_session_verifier';
 
 describe('needsSessionVerification', () => {
-  test('returns true when both verifier and challenge are present', () => {
+  test('returns true with the canonical challenge cookie', () => {
     const request = new Request(`https://example.com/?${VERIFIER_PARAM}=test-verifier`, {
       headers: {
         Cookie: `${NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME}=test-challenge`,
@@ -59,6 +62,24 @@ describe('needsSessionVerification', () => {
     const request = new Request(`https://example.com/?foo=bar&${VERIFIER_PARAM}=test-verifier&baz=qux`, {
       headers: {
         Cookie: `${NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME}=test-challenge`,
+      },
+    });
+
+    expect(needsSessionVerification(request)).toBe(true);
+  });
+
+  test('returns true with only the legacy challenge cookie', () => {
+    const request = new Request(`https://example.com/?${VERIFIER_PARAM}=test-verifier`, {
+      headers: { Cookie: `${NEON_AUTH_LEGACY_SESSION_CHALLENGE_COOKIE_NAME}=legacy-challenge` },
+    });
+
+    expect(needsSessionVerification(request)).toBe(true);
+  });
+
+  test('returns true with both challenge cookie names', () => {
+    const request = new Request(`https://example.com/?${VERIFIER_PARAM}=test-verifier`, {
+      headers: {
+        Cookie: `${NEON_AUTH_LEGACY_SESSION_CHALLENGE_COOKIE_NAME}=legacy-challenge; ${NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME}=canonical-challenge`,
       },
     });
 
@@ -187,6 +208,36 @@ describe('exchangeOAuthToken', () => {
     expect(result?.cookies).toHaveLength(2);
     expect(result?.cookies[0]).toContain('session_token');
     expect(result?.cookies[1]).toContain('session_data');
+  });
+
+  test.each([
+    ['canonical-only', `${NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME}=canonical-challenge`],
+    ['legacy-only', `${NEON_AUTH_LEGACY_SESSION_CHALLENGE_COOKIE_NAME}=legacy-challenge`],
+    [
+      'both names',
+      `${NEON_AUTH_LEGACY_SESSION_CHALLENGE_COOKIE_NAME}=legacy-challenge; ${NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME}=canonical-challenge`,
+    ],
+  ])('succeeds with %s challenge cookies', async (_case, cookieHeader) => {
+    const mockUpstreamResponse = Response.json({}, { status: 200 });
+    const mockProcessedResponse = new Response('OK', {
+      status: 200,
+      headers: new Headers({ 'Set-Cookie': '__Secure-neon-auth.session_token=token-value' }),
+    });
+
+    const handleAuthRequest = vi
+      .spyOn(proxy, 'handleAuthRequest')
+      .mockResolvedValue(mockUpstreamResponse);
+    vi.spyOn(proxy, 'handleAuthResponse').mockResolvedValue(mockProcessedResponse);
+
+    const request = new Request(
+      `https://example.com/dashboard?${VERIFIER_PARAM}=test-verifier`,
+      { headers: { Cookie: cookieHeader } }
+    );
+
+    const result = await exchangeOAuthToken(request, 'https://auth.example.com', TEST_SECRET);
+
+    expect(result?.success).toBe(true);
+    expect(handleAuthRequest.mock.calls[0]?.[1].headers.get('cookie')).toBe(cookieHeader);
   });
 
   test('preserves URL path and other query params in redirect', async () => {
