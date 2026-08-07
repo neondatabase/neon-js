@@ -20,11 +20,14 @@
  *    interfaces also fail the build.
  *
  * The test bodies do no runtime work; `expectTypeOf` is a type-level
- * assertion that compiles to a no-op. Failures surface as TypeScript
- * compile errors during `pnpm typecheck` and `pnpm test:ci`.
+ * assertion that compiles to a no-op under plain `vitest run`. Failures
+ * surface as TypeScript compile errors during `pnpm typecheck` (the `ci`
+ * job's typecheck step, which runs `tsc --noEmit` over this file). Plain
+ * `pnpm test:ci` (no `--typecheck`) will NOT enforce the shape pins on its
+ * own — it only executes the `describe` bodies as smoke tests.
  */
 
-import { describe, it, expect, expectTypeOf } from 'vitest';
+import { describe, it, expectTypeOf } from 'vitest';
 import type {
   // Core factory config — required by anyone calling createAuthServer
   NeonAuthServerConfig,
@@ -69,40 +72,27 @@ import type {
   ParsedCookie,
 } from './index';
 
-describe('@neondatabase/auth/server type-only public surface', () => {
-  // The mere fact this file type-checks proves all 24 names below resolve.
-  // The runtime test below is a smoke check so the file shows up in the
-  // vitest report and a single failure surfaces clearly.
-  it('exports all 24 documented type names', () => {
-    const exportedTypeNames = [
-      'NeonAuthServerConfig',
-      'RequestContext',
-      'RequestContextFactory',
-      'CookieOptions',
-      'AuthProxyConfig',
-      'AuthMiddlewareConfig',
-      'MiddlewareResult',
-      'SessionCheckResult',
-      'NeonAuthConfig',
-      'NeonAuthMiddlewareConfig',
-      'SessionCookieConfig',
-      'SessionCookieSameSite',
-      'NeonAuthLogger',
-      'NeonAuthLogLevel',
-      'NeonAuthLoggingInput',
-      'ResolvedNeonAuthLogging',
-      'NeonAuthNetworkErrorCode',
-      'ClassifiedFetchFailure',
-      'NeonAuthServer',
-      'NeonAuthServerApiError',
-      'SessionData',
-      'SessionDataCookie',
-      'RequireSessionData',
-      'ParsedCookie',
-    ];
-    expect(exportedTypeNames).toHaveLength(24);
-  });
-});
+// ---- Existence pin -------------------------------------------------------
+//
+// The `import type {...}` block at the top of this file is itself the
+// existence pin for the 24 type-only exports. If any of them is renamed,
+// removed, or moved off the `@neondatabase/auth/server` subpath, TypeScript
+// fails to resolve the import and `pnpm typecheck` (the `ci` job) fails
+// before anything else runs.
+//
+// The `describe` blocks below add shape pins on top of that, using
+// `expectTypeOf`. `expectTypeOf` compiles to a runtime no-op, so it only
+// catches shape drift when the file is fed through `tsc` — which the
+// project-level `pnpm typecheck` already does. Running these under
+// `vitest run` alone (no `--typecheck`) executes them as smoke tests but
+// does not enforce their shape assertions; the enforcement is `tsc`.
+//
+// Do NOT re-add a runtime `expect(array).toHaveLength(24)` here — it would
+// be a tautology on a hardcoded literal and would falsely appear to guard
+// the surface. If you want to broaden coverage, either enable vitest
+// `--typecheck` for this file or import from the built `@neondatabase/auth/server`
+// specifier so the package `exports` map + `dist/*.d.mts` are verified too.
+// See #161 review feedback (Andras follow-up review).
 
 // ---- Shape pins for the highest-value contract types ---------------------
 
