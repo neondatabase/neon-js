@@ -69,7 +69,13 @@
       "vite": "7.3.5",
       "postcss": "8.5.18",
       "sharp": "0.35.3",
-      "fastify": ">=5.8.5"
+      "fastify": ">=5.8.5",
+      "brace-expansion@^1.0.0": "1.1.18",
+      "brace-expansion@^2.0.0": "2.1.4",
+      "js-yaml": "4.3.1",
+      "nanoid@^3.0.0": "3.3.17",
+      "nanoid@^5.0.0": "5.1.16",
+      "ip-address": "10.4.0"
     },
     "supportedArchitectures": {
       "os": ["linux", "darwin", "win32"],
