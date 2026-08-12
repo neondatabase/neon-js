@@ -87,6 +87,10 @@
       "types": "./dist/auth/next/server/index.d.mts",
       "default": "./dist/auth/next/server/index.mjs"
     },
+    "./auth/hono/server": {
+      "types": "./dist/auth/hono/server/index.d.mts",
+      "default": "./dist/auth/hono/server/index.mjs"
+    },
     "./auth/server": {
       "types": "./dist/auth/server/index.d.mts",
       "default": "./dist/auth/server/index.mjs"

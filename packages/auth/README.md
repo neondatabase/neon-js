@@ -267,15 +267,67 @@ See the [Next.js Setup Guide](./NEXT-JS.md) for comprehensive documentation incl
 - Importing styles (with or without Tailwind CSS)
 - Using `authClient.useSession()` hook in client components
 
+## Hono Integration
+
+> **Stability: beta.** The Hono adapter surface tracks the Next.js adapter and
+> follows the same versioning contract. Pin your peer dependency accordingly.
+
+For Hono apps, this package ships a first-party adapter via
+`@neondatabase/auth/hono/server`, built on the framework-agnostic toolkit
+(below):
+
+```typescript
+// src/auth.ts
+import { createNeonAuth } from '@neondatabase/auth/hono/server';
+
+export const auth = createNeonAuth({
+  baseUrl: process.env.NEON_AUTH_BASE_URL!,
+  cookies: { secret: process.env.NEON_AUTH_COOKIE_SECRET! },
+});
+```
+
+```typescript
+// src/index.ts
+import { Hono } from 'hono';
+import { contextStorage } from 'hono/context-storage';
+import { serve } from '@hono/node-server';
+import { auth } from './auth';
+
+const app = new Hono();
+
+// REQUIRED: enables `auth.getSession()` (and every other server method) to
+// resolve the in-flight request from downstream handlers.
+app.use(contextStorage());
+
+app.on(['GET', 'POST'], '/api/auth/*', auth.handler());
+
+// Public route — no `auth.middleware()`, but `auth.getSession()` still
+// works because `contextStorage()` is active on every path.
+app.get('/', async (c) => {
+  const { data: session } = await auth.getSession();
+  return c.text(session?.user ? `Hello ${session.user.name}` : 'Please sign in');
+});
+
+// Scope `auth.middleware()` to just the paths that need protection.
+app.use('/dashboard', auth.middleware({ loginUrl: '/sign-in' }));
+app.get('/dashboard', (c) => c.text('Protected page'));
+
+serve({ fetch: app.fetch, port: 3000 });
+```
+
+`hono` is an optional peer dependency (`>=4.0.0`); install it in your app.
+See the runnable example in [`examples/hono-neon-auth/`](../../examples/hono-neon-auth/).
+
 ## Server toolkit (for framework adapter authors)
 
 > **Stability: beta.** Minor versions may include breaking changes with migration
 > notes in the package CHANGELOG. Pin your peer dependency accordingly.
 
 `@neondatabase/auth/server` exposes the framework-agnostic primitives that the
-bundled `@neondatabase/auth/next/server` adapter is built on. Use it to build
-adapters for additional server frameworks (Hono, Remix, SolidStart, Express,
-Fastify, ...) without forking the package.
+bundled `@neondatabase/auth/next/server` and `@neondatabase/auth/hono/server`
+adapters are built on. Use it to build adapters for additional server
+frameworks (Remix, SolidStart, Express, Fastify, ...) without forking the
+package.
 
 ```typescript
 import {

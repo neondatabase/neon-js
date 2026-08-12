@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Hono adapter re-export (beta)**: New subpath **`@neondatabase/neon-js/auth/hono/server`** mirrors the new first-party **`@neondatabase/auth/hono/server`** adapter. Full-SDK adopters get the Hono adapter without having to add `@neondatabase/auth` as a separate dependency. See `packages/auth/BUILDING-AN-ADAPTER.md` and `examples/hono-neon-auth/`.
 - **Server toolkit re-export (beta)**: New subpath **`@neondatabase/neon-js/auth/server`** mirrors **`@neondatabase/auth/server`** introduced in `@neondatabase/auth@0.5.0-beta`. Lets adopters of the full SDK build framework adapters (Hono, Remix, SolidStart, Express, Fastify, ...) on the framework-agnostic toolkit without adding `@neondatabase/auth` as a separate dependency. See `packages/auth/BUILDING-AN-ADAPTER.md`. Stability: **beta** — tracks the upstream toolkit.
 
 ### Changed
