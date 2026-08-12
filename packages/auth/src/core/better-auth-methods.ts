@@ -27,7 +27,14 @@ interface SocialSignInResponse {
   user?: BetterAuthUser;
 }
 
-export const CURRENT_TAB_CLIENT_ID = crypto.randomUUID();
+let _currentTabClientId: string | undefined;
+
+export function getCurrentTabClientId(): string {
+  if (!_currentTabClientId) {
+    _currentTabClientId = crypto.randomUUID();
+  }
+  return _currentTabClientId;
+}
 
 export const BETTER_AUTH_METHODS_IN_FLIGHT_REQUESTS =
   new InFlightRequestManager();
@@ -312,7 +319,7 @@ export async function emitAuthEvent(event: InternalAuthEvent): Promise<void> {
     getGlobalBroadcastChannel().post({
       event: 'session',
       data: { trigger },
-      clientId: CURRENT_TAB_CLIENT_ID,
+      clientId: getCurrentTabClientId(),
     });
   }
 
@@ -320,7 +327,7 @@ export async function emitAuthEvent(event: InternalAuthEvent): Promise<void> {
   getGlobalBroadcastChannel().post({
     event: 'session',
     data: { trigger: eventType, sessionData },
-    clientId: CURRENT_TAB_CLIENT_ID,
+    clientId: getCurrentTabClientId(),
   });
 }
 
@@ -427,7 +434,7 @@ export function initBroadcastChannel() {
   }
 
   getGlobalBroadcastChannel().subscribe((message) => {
-    if (message.clientId === CURRENT_TAB_CLIENT_ID) {
+    if (message.clientId === getCurrentTabClientId()) {
       return;
     }
 
