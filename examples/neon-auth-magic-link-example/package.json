@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@neondatabase/auth": "workspace:*",
+    "@neondatabase/auth-ui": "workspace:*",
     "@neondatabase/serverless": "^1.0.2",
     "drizzle-kit": "^0.31.7",
     "drizzle-orm": "^0.45.0",
