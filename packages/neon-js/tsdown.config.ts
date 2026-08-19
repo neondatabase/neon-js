@@ -19,6 +19,7 @@ export default defineConfig(
       'src/auth/react/ui/index.ts',
       'src/auth/react/ui/server.ts',
       'src/auth/react/adapters/index.ts',
+      'src/auth/expo/index.ts',
       'src/auth/vanilla/index.ts',
       'src/auth/vanilla/adapters/index.ts',
       'src/auth/next/index.ts',
