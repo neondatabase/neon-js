@@ -36,6 +36,7 @@ import {
   type NeonAuthAdapterCoreAuthOptions,
   type SupportedBetterAuthClientPlugins,
 } from '../../core/adapter-core';
+import { createClientId } from '../../utils/client-id';
 
 export type SupabaseAuthAdapterOptions = Omit<
   NeonAuthAdapterCoreAuthOptions,
@@ -1200,7 +1201,7 @@ class SupabaseAuthAdapterImpl
   onAuthStateChange: SupabaseAuthClientInterface['onAuthStateChange'] = (
     callback
   ) => {
-    const id = crypto.randomUUID();
+    const id = createClientId();
 
     const subscription: Subscription = {
       id,

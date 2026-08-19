@@ -18,6 +18,7 @@ import {
 } from './constants';
 import { openOAuthPopup } from './oauth-popup';
 import { isBrowser, isIframe } from '../utils/browser';
+import { createClientId } from '../utils/client-id';
 import { anonymousTokenResponseSchema } from '../plugins/anonymous-token';
 
 interface SocialSignInResponse {
@@ -27,7 +28,7 @@ interface SocialSignInResponse {
   user?: BetterAuthUser;
 }
 
-export const CURRENT_TAB_CLIENT_ID = crypto.randomUUID();
+export const CURRENT_TAB_CLIENT_ID = createClientId();
 
 export const BETTER_AUTH_METHODS_IN_FLIGHT_REQUESTS =
   new InFlightRequestManager();

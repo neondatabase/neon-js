@@ -53,14 +53,20 @@ export abstract class NeonAuthAdapterCore {
    */
 
   //#region Constructor
-  constructor(betterAuthClientOptions: NeonAuthAdapterCoreAuthOptions) {
+  constructor(
+    betterAuthClientOptions: NeonAuthAdapterCoreAuthOptions,
+    additionalPlugins: BetterAuthClientOptions['plugins'] = []
+  ) {
     // Preserve user's onSuccess callback if they provided one
     const userOnSuccess = betterAuthClientOptions.fetchOptions?.onSuccess;
     const userOnRequest = betterAuthClientOptions.fetchOptions?.onRequest;
 
     this.betterAuthOptions = {
       ...betterAuthClientOptions,
-      plugins: supportedBetterAuthClientPlugins,
+      plugins: [
+        ...supportedBetterAuthClientPlugins,
+        ...additionalPlugins,
+      ] as SupportedBetterAuthClientPlugins,
       fetchOptions: {
         ...betterAuthClientOptions.fetchOptions,
         throw: false,
