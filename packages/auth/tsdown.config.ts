@@ -21,6 +21,9 @@ export default defineConfig(
       'src/next/index.ts',
       'src/next/server/index.ts',
 
+      'src/nuxt/index.ts',
+      'src/nuxt/server/index.ts',
+
       // Public framework-agnostic toolkit. Consumers: framework adapter
       // authors (Hono, Remix, SolidStart, Express, …). See BUILDING-AN-ADAPTER.md.
       'src/server/index.ts',

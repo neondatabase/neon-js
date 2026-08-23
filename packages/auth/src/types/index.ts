@@ -9,6 +9,7 @@
 import type { SupportedBetterAuthClientPlugins } from '../core/adapter-core';
 import type { createAuthClient as createReactAuthClient } from 'better-auth/react';
 import type { createAuthClient as createVanillaAuthClient } from 'better-auth/client';
+import type { createAuthClient as createVueAuthClient } from 'better-auth/vue';
 
 // ============================================
 // Core types from better-auth/types
@@ -32,6 +33,15 @@ export type ReactBetterAuthClient = ReturnType<
  */
 export type VanillaBetterAuthClient = ReturnType<
   typeof createVanillaAuthClient<{
+    plugins: SupportedBetterAuthClientPlugins;
+  }>
+>;
+
+/**
+ * Type representing the Better Auth Vue client
+ */
+export type VueBetterAuthClient = ReturnType<
+  typeof createVueAuthClient<{
     plugins: SupportedBetterAuthClientPlugins;
   }>
 >;
@@ -86,7 +96,10 @@ export type { PhoneNumberOptions } from 'better-auth/plugins/phone-number';
 // ============================================
 // Backwards compatibility aliases
 // ============================================
-export type BetterAuthInstance = VanillaBetterAuthClient | ReactBetterAuthClient;
+export type BetterAuthInstance =
+  | VanillaBetterAuthClient
+  | ReactBetterAuthClient
+  | VueBetterAuthClient;
 
 export {
   type BetterAuthErrorResponse,

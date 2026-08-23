@@ -1,10 +1,10 @@
 # Building a Neon Auth framework adapter
 
 This guide shows how to build a `@neondatabase/auth` adapter for a server
-framework that doesn't ship with `neon-js`. The bundled `@neondatabase/auth/next`
-adapter is the reference implementation; this document walks through the parts
-of it that map directly to anything you'd do for Hono, Remix, SolidStart,
-Express, Fastify, etc.
+framework that doesn't ship with `neon-js`. The bundled
+`@neondatabase/auth/next` and `@neondatabase/auth/nuxt` adapters are reference
+implementations; this document walks through the parts that map directly to
+anything you'd do for Hono, Remix, SolidStart, Express, Fastify, etc.
 
 > **Stability: beta.** The toolkit lives at the `@neondatabase/auth/server`
 > subpath. Minor versions of `@neondatabase/auth` may include breaking changes
@@ -23,6 +23,67 @@ Express, Fastify, etc.
 Everything else — session caching, cookie minting, JWT validation, OAuth
 token exchange, network error classification — is implemented inside the
 toolkit and reused by every adapter.
+
+## Bundled Nuxt 4 adapter
+
+Nuxt 4 applications can use the bundled Vue client and H3 v1 server adapter
+without implementing the toolkit bridge themselves:
+
+```typescript
+// app/lib/auth-client.ts
+import { createAuthClient } from '@neondatabase/auth/nuxt';
+
+export const authClient = createAuthClient();
+```
+
+```typescript
+// server/utils/auth.ts
+import { createNeonAuth } from '@neondatabase/auth/nuxt/server';
+
+export const auth = createNeonAuth({
+  baseUrl: process.env.NEON_AUTH_BASE_URL!,
+  cookies: {
+    secret: process.env.NEON_AUTH_COOKIE_SECRET!,
+  },
+});
+```
+
+Mount its catch-all handler and middleware using Nitro's normal file routing:
+
+```typescript
+// server/api/auth/[...path].ts
+import { auth } from '../../utils/auth';
+
+export default auth.handler();
+```
+
+```typescript
+// server/middleware/auth.ts
+import { auth } from '../utils/auth';
+
+export default auth.middleware({
+  loginUrl: '/auth/sign-in',
+  protectedRoutes: ['/dashboard', '/settings'],
+});
+```
+
+Server methods must be explicitly bound to the current `H3Event`. This avoids
+module-global request state and prevents cookie/header leakage between
+concurrent Nitro requests:
+
+```typescript
+// server/api/me.get.ts
+import { defineEventHandler } from 'h3';
+import { auth } from '../utils/auth';
+
+export default defineEventHandler(async (event) => {
+  return auth.withEvent(event).getSession();
+});
+```
+
+The published adapter imports H3 APIs directly from `h3`; it does not rely on
+Nuxt auto-import globals. Its handler preserves the raw auth request body,
+duplicate query values, and separate `Set-Cookie` response headers.
 
 ## Architecture in one diagram
 
@@ -462,5 +523,6 @@ adapter authors actually need.
 ## Reference
 
 - Next.js adapter source: [`src/next/server/`](./src/next/server/)
+- Nuxt adapter source: [`src/nuxt/server/`](./src/nuxt/server/)
 - Toolkit entry: [`src/server/index.ts`](./src/server/index.ts)
 - TanStack Start adapter PR (in progress): <https://github.com/neondatabase/neon-js/pull/73>

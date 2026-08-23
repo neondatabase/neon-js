@@ -267,15 +267,45 @@ See the [Next.js Setup Guide](./NEXT-JS.md) for comprehensive documentation incl
 - Importing styles (with or without Tailwind CSS)
 - Using `authClient.useSession()` hook in client components
 
+## Nuxt Integration
+
+Nuxt 4 applications can use the built-in Vue client and Nitro/H3 server
+adapter:
+
+```typescript
+// app/composables/auth.ts
+import { createAuthClient } from '@neondatabase/auth/nuxt';
+
+export const authClient = createAuthClient();
+```
+
+```typescript
+// server/utils/auth.ts
+import { createNeonAuth } from '@neondatabase/auth/nuxt/server';
+
+export const auth = createNeonAuth({
+  baseUrl: process.env.NUXT_NEON_AUTH_BASE_URL!,
+  cookies: {
+    secret: process.env.NUXT_NEON_AUTH_COOKIE_SECRET!,
+  },
+});
+```
+
+Mount `auth.handler()` at `server/api/auth/[...path].ts`, use
+`auth.middleware()` from Nitro middleware, and bind server calls to the current
+request with `auth.withEvent(event)`. See
+[`examples/nuxt-neon-auth`](../../examples/nuxt-neon-auth) for a complete Nuxt
+UI example.
+
 ## Server toolkit (for framework adapter authors)
 
 > **Stability: beta.** Minor versions may include breaking changes with migration
 > notes in the package CHANGELOG. Pin your peer dependency accordingly.
 
 `@neondatabase/auth/server` exposes the framework-agnostic primitives that the
-bundled `@neondatabase/auth/next/server` adapter is built on. Use it to build
-adapters for additional server frameworks (Hono, Remix, SolidStart, Express,
-Fastify, ...) without forking the package.
+bundled Next.js and Nuxt server adapters are built on. Use it to build adapters
+for additional server frameworks (Hono, Remix, SolidStart, Express, Fastify,
+...) without forking the package.
 
 ```typescript
 import {
@@ -293,9 +323,9 @@ import {
 
 The toolkit is **Web Standards only** — it consumes `Request`/`Response` and
 exposes a small `RequestContext` interface that adapter authors implement for
-their framework's cookie/header APIs. The bundled Next.js adapter is the
-reference implementation; see [`BUILDING-AN-ADAPTER.md`](./BUILDING-AN-ADAPTER.md)
-for a walkthrough.
+their framework's cookie/header APIs. The bundled Next.js and Nuxt adapters are
+reference implementations; see
+[`BUILDING-AN-ADAPTER.md`](./BUILDING-AN-ADAPTER.md) for a walkthrough.
 
 ## UI Components
 
