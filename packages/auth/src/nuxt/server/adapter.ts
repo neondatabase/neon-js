@@ -13,7 +13,7 @@ import {
  * Creates a request context bound to one H3 event.
  *
  * The event is captured explicitly so concurrent Nitro requests never share
- * cookies, headers, or response state.
+ * cookies, headers or response state.
  */
 export function createNuxtRequestContext(event: H3Event): RequestContext {
   return {

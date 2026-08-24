@@ -291,10 +291,10 @@ export const auth = createNeonAuth({
 });
 ```
 
-Mount `auth.handler()` at `server/api/auth/[...path].ts`, use
-`auth.middleware()` from Nitro middleware, and bind server calls to the current
+Mount `auth.handler()` at `server/api/auth/[...path].ts` and use
+`auth.middleware()` from Nitro middleware. Bind server calls to the current
 request with `auth.withEvent(event)`. See
-[`examples/nuxt-neon-auth`](../../examples/nuxt-neon-auth) for a complete Nuxt
+[`examples/nuxt-neon-auth`](../../examples/nuxt-neon-auth) for a working Nuxt
 UI example.
 
 ## Server toolkit (for framework adapter authors)

@@ -160,7 +160,7 @@ describe('Nuxt request context', () => {
 });
 
 describe('Nuxt handler', () => {
-  test('forwards catch-all path, duplicate query values, and raw body', async () => {
+  test('forwards catch-all path, duplicate query values and raw body', async () => {
     let upstreamUrl: URL | undefined;
     let upstreamBody: string | undefined;
 
