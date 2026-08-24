@@ -4,7 +4,11 @@ import {
   AuthUIProvider,
   type AuthUIProviderProps,
 } from '@daveyplate/better-auth-ui';
-import type { NeonAuthAdapter, NeonAuthPublicApi } from '@neondatabase/auth';
+import type {
+  NeonAuthAdapter,
+  NeonAuthPublicApi,
+  VueBetterAuthClient,
+} from '@neondatabase/auth';
 import { getReactClient } from './react-adapter';
 import { Toaster } from 'sonner';
 import { ThemeProvider } from 'next-themes';
@@ -21,7 +25,7 @@ export type NeonAuthUIProviderProps<T extends NeonAuthAdapter> = Omit<
   AuthUIProviderProps,
   'authClient'
 > & {
-  authClient: NeonAuthPublicApi<T>;
+  authClient: Exclude<NeonAuthPublicApi<T>, VueBetterAuthClient>;
   /** Additional class names for the wrapper div */
   className?: string;
   /** Default theme for next-themes. Defaults to 'system'. */
