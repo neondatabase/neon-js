@@ -26,7 +26,7 @@ export async function registerUser(page: Page, user: TestUser): Promise<void> {
 
   await page.getByLabel(/name/i).fill(user.name);
   await page.getByLabel(/email/i).fill(user.email);
-  await page.getByLabel(/password/i).fill(user.password);
+  await page.getByLabel(/^password\*?$/i).fill(user.password);
   await page.locator('button[type="submit"]').click();
 
   await expect(page).toHaveURL('/dashboard', { timeout: 15_000 });
@@ -40,7 +40,7 @@ export async function loginUser(page: Page, user: TestUser): Promise<void> {
   await expect(page.locator('form')).toBeVisible();
 
   await page.getByLabel(/email/i).fill(user.email);
-  await page.getByLabel(/password/i).fill(user.password);
+  await page.getByLabel(/^password\*?$/i).fill(user.password);
   await page.locator('button[type="submit"]').click();
 
   await expect(page).toHaveURL('/dashboard', { timeout: 15_000 });
