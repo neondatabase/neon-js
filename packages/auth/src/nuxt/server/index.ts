@@ -17,7 +17,8 @@ import {
  * Unified Neon Auth entry point for Nuxt 4 and Nitro.
  *
  * Server methods are exposed through `withEvent(event)` so every proxy is
- * explicitly bound to one H3 request. No module-global request state is used.
+ * explicitly bound to one H3 request. The adapter cannot use Nuxt application
+ * auto-imports or Node-only request storage across every Nitro preset.
  */
 export function createNeonAuth(config: NeonAuthConfig): NeonAuth {
   const { baseUrl, cookies } = config;

@@ -36,9 +36,11 @@ function callHandler(
     method?: string;
     headers?: Record<string, string>;
     body?: string;
-  } = {}
+  } = {},
+  downstream?: EventHandler
 ) {
   const app = createApp().use(handler);
+  if (downstream) app.use(downstream);
   return toPlainHandler(app)({
     method,
     path,
@@ -50,6 +52,8 @@ function callHandler(
     body,
   });
 }
+
+const downstreamHandler = defineEventHandler(() => ({ allowed: true }));
 
 function getHeaders(response: PlainResponse, name: string) {
   return response.headers
@@ -216,6 +220,67 @@ describe('Nuxt middleware', () => {
       false
     );
     expect(matchesProtectedRoute('/anything', ['/'])).toBe(true);
+  });
+
+  test('leaves public routes alone by default', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await callHandler(
+      createNeonAuth(createConfig()).middleware(),
+      { path: '/marketing' },
+      downstreamHandler
+    );
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  test('redirects an unauthenticated protected route', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await callHandler(
+      createNeonAuth(createConfig()).middleware({
+        protectedRoutes: ['/dashboard'],
+      }),
+      { path: '/dashboard' },
+      downstreamHandler
+    );
+
+    expect(response.status).toBe(302);
+    expect(getHeaders(response, 'location')).toEqual([
+      'https://app.example.com/auth/sign-in',
+    ]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  test('allows the login route without a redirect loop', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await callHandler(
+      createNeonAuth(createConfig()).middleware({ protectedRoutes: ['/'] }),
+      { path: '/auth/sign-in' },
+      downstreamHandler
+    );
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  test('allows the auth API route', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await callHandler(
+      createNeonAuth(createConfig()).middleware({ protectedRoutes: ['/'] }),
+      { path: '/api/auth/get-session' },
+      downstreamHandler
+    );
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   test('maps allow results with request headers and multiple cookies', async () => {

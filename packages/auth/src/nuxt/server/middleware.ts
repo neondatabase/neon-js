@@ -14,7 +14,7 @@ import {
 } from '../../server';
 import { createFetchRequest } from './handler';
 
-const DEFAULT_PROTECTED_ROUTES = ['/'] as const;
+const DEFAULT_PROTECTED_ROUTES: readonly string[] = [];
 
 export interface NuxtAuthMiddlewareOptions {
   /**
@@ -24,7 +24,7 @@ export interface NuxtAuthMiddlewareOptions {
   loginUrl?: string;
   /**
    * Slash-delimited route prefixes that require authentication.
-   * @default ['/']
+   * @default []
    */
   protectedRoutes?: readonly string[];
 }

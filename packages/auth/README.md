@@ -291,9 +291,43 @@ export const auth = createNeonAuth({
 });
 ```
 
-Mount `auth.handler()` at `server/api/auth/[...path].ts` and use
-`auth.middleware()` from Nitro middleware. Bind server calls to the current
-request with `auth.withEvent(event)`. See
+```typescript
+// server/api/auth/[...path].ts
+import { auth } from '../../utils/auth';
+
+export default auth.handler();
+```
+
+```typescript
+// server/middleware/auth.ts
+import { auth } from '../utils/auth';
+
+export default auth.middleware({
+  loginUrl: '/auth/sign-in',
+  protectedRoutes: ['/account', '/dashboard', '/notes'],
+});
+```
+
+Routes are public unless they match `protectedRoutes`. OAuth verifier callbacks
+are still processed on public routes.
+
+Bind server calls to the current request:
+
+```typescript
+// server/api/session.get.ts
+import { auth } from '../utils/auth';
+
+export default defineEventHandler((event) => {
+  return auth.withEvent(event).getSession();
+});
+```
+
+`withEvent(event)` is specific to the Nuxt adapter. Nitro carries request state
+on `H3Event`, while a published adapter cannot depend on application-only Nuxt
+auto-imports or Node-only `AsyncLocalStorage`. Explicit binding works across
+Nitro presets without module-level request state.
+
+See
 [`examples/nuxt-neon-auth`](../../examples/nuxt-neon-auth) for a working Nuxt
 UI example.
 
