@@ -79,8 +79,10 @@ export async function navigateToAccountSettings(page: Page): Promise<void> {
  * Update user name in account settings
  */
 export async function updateUserName(page: Page, newName: string): Promise<void> {
-  // Both the framework-provided and custom account UIs expose this accessible label.
-  const nameInput = page.getByLabel(/^name$/i).first();
+  const nameInput = page
+    .getByLabel(/^name$/i)
+    .or(page.getByPlaceholder(/^name$/i))
+    .first();
 
   // Triple-click to select all text, then type to replace
   await nameInput.click({ clickCount: 3 });
