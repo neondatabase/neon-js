@@ -10,8 +10,10 @@
     "test:ci": "playwright test",
     "test:react": "E2E_TARGET_APP=react-neon-js playwright test",
     "test:nextjs": "E2E_TARGET_APP=nextjs-neon-auth playwright test",
+    "test:nuxt": "E2E_TARGET_APP=nuxt-neon-auth playwright test",
     "test:react:ci": "E2E_TARGET_APP=react-neon-js playwright test",
-    "test:nextjs:ci": "E2E_TARGET_APP=nextjs-neon-auth playwright test"
+    "test:nextjs:ci": "E2E_TARGET_APP=nextjs-neon-auth playwright test",
+    "test:nuxt:ci": "E2E_TARGET_APP=nuxt-neon-auth playwright test"
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0"

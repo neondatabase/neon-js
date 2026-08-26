@@ -44,7 +44,7 @@ test.describe('Account Settings', () => {
     await navigateToAccountSettings(page);
 
     // Verify that the form is pre-filled with current user data
-    const nameInput = page.locator('input[value="Test User"]').first();
+    const nameInput = page.getByLabel(/^name$/i).first();
     await expect(nameInput).toBeVisible();
     await expect(nameInput).toHaveValue(testUser.name);
   });

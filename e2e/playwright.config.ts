@@ -20,6 +20,12 @@ const APP_CONFIG = {
     devCommand: 'pnpm run dev',
     previewCommand: 'pnpm run start', // Next.js uses 'start' for production
   },
+  'nuxt-neon-auth': {
+    port: 3001,
+    dir: '../examples/nuxt-neon-auth',
+    devCommand: 'pnpm run dev',
+    previewCommand: 'pnpm run preview',
+  },
 } as const;
 
 type AppName = keyof typeof APP_CONFIG;
@@ -54,12 +60,12 @@ const localReporters = [
 
 export default defineConfig({
   testDir: './tests',
-  // Filter tests based on app - React app only runs auth-flow and neon-js tests,
-  // Next.js has additional notes/account/org tests
+  // Filter tests based on app - React runs auth-flow and neon-js tests,
+  // while Next.js and Nuxt run the shared auth/account/org/notes tests.
   testMatch:
-    targetApp === 'nextjs-neon-auth'
-      ? '**/{auth-flow,account-settings,organizations,notes}.spec.ts'
-      : '**/{auth-flow,neon-js}.spec.ts',
+    targetApp === 'react-neon-js'
+      ? '**/{auth-flow,neon-js}.spec.ts'
+      : '**/{auth-flow,account-settings,organizations,notes}.spec.ts',
 
   // Parallel execution - 2 workers balances speed and stability
   fullyParallel: true,

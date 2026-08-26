@@ -27,6 +27,7 @@ on:
           - all
           - react-neon-js
           - nextjs-neon-auth
+          - nuxt-neon-auth
 
 # SECURITY: Limit permissions to minimum required
 permissions:
@@ -40,17 +41,19 @@ jobs:
       group: neondatabase-protected-runner-group
       labels: linux-ubuntu-latest
 
-    # Matrix strategy: test both example apps in parallel
+    # Matrix strategy: test all example apps in parallel
     strategy:
       fail-fast: false
       matrix:
         app:
           - react-neon-js
           - nextjs-neon-auth
+          - nuxt-neon-auth
         exclude:
           # Exclude apps not matching the input when a specific app is requested
           - app: ${{ (github.event.inputs.app != 'all' && github.event.inputs.app != 'react-neon-js' && github.event.inputs.app != '') && 'react-neon-js' || 'never-exclude' }}
           - app: ${{ (github.event.inputs.app != 'all' && github.event.inputs.app != 'nextjs-neon-auth' && github.event.inputs.app != '') && 'nextjs-neon-auth' || 'never-exclude' }}
+          - app: ${{ (github.event.inputs.app != 'all' && github.event.inputs.app != 'nuxt-neon-auth' && github.event.inputs.app != '') && 'nuxt-neon-auth' || 'never-exclude' }}
 
     # Use GitHub Environments for environment-specific secrets/variables
     # - production: Default, uses production Neon API
@@ -141,6 +144,15 @@ jobs:
           DATABASE_URL: ${{ steps.create-branch.outputs.db_url }}
           NEON_AUTH_COOKIE_SECRET: ${{ secrets.NEON_AUTH_COOKIE_SECRET }}
 
+      # Build Nuxt example (uses NUXT_ runtime config overrides)
+      - name: Build Nuxt example app
+        if: matrix.app == 'nuxt-neon-auth'
+        run: cd examples/nuxt-neon-auth && pnpm run build
+        env:
+          NUXT_NEON_AUTH_BASE_URL: ${{ steps.create-branch.outputs.auth_url }}
+          NUXT_DATABASE_URL: ${{ steps.create-branch.outputs.db_url }}
+          NUXT_NEON_AUTH_COOKIE_SECRET: ${{ secrets.NEON_AUTH_COOKIE_SECRET }}
+
       # Get Playwright version for cache key
       - name: Get Playwright version
         id: playwright-version
@@ -170,8 +182,10 @@ jobs:
         run: |
           if [ "${{ matrix.app }}" = "react-neon-js" ]; then
             pnpm run --filter e2e test:react:ci
-          else
+          elif [ "${{ matrix.app }}" = "nextjs-neon-auth" ]; then
             pnpm run --filter e2e test:nextjs:ci
+          else
+            pnpm run --filter e2e test:nuxt:ci
           fi
         env:
           CI: true
@@ -180,6 +194,10 @@ jobs:
           NEON_AUTH_BASE_URL: ${{ steps.create-branch.outputs.auth_url }}
           DATABASE_URL: ${{ steps.create-branch.outputs.db_url }}
           NEON_AUTH_COOKIE_SECRET: ${{ secrets.NEON_AUTH_COOKIE_SECRET }}
+          # Nuxt runtime config env vars (read at preview server start)
+          NUXT_NEON_AUTH_BASE_URL: ${{ steps.create-branch.outputs.auth_url }}
+          NUXT_DATABASE_URL: ${{ steps.create-branch.outputs.db_url }}
+          NUXT_NEON_AUTH_COOKIE_SECRET: ${{ secrets.NEON_AUTH_COOKIE_SECRET }}
 
       # Clean up: Delete Neon branch (runs even if tests fail)
       - name: Delete Neon branch

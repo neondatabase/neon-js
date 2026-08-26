@@ -79,9 +79,8 @@ export async function navigateToAccountSettings(page: Page): Promise<void> {
  * Update user name in account settings
  */
 export async function updateUserName(page: Page, newName: string): Promise<void> {
-  // Better Auth UI uses heading "Name" followed by input with specific placeholder text
-  // The input field already contains "Test User" - select all and replace
-  const nameInput = page.locator('input[value="Test User"]').first();
+  // Both the framework-provided and custom account UIs expose this accessible label.
+  const nameInput = page.getByLabel(/^name$/i).first();
 
   // Triple-click to select all text, then type to replace
   await nameInput.click({ clickCount: 3 });

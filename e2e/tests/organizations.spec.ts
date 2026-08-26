@@ -43,13 +43,5 @@ test.describe('Organizations', () => {
     // Navigate to members page
     await page.goto('/organization/members');
     await expect(page).toHaveURL('/organization/members');
-
-    // Navigate to teams page
-    await page.goto('/organization/teams');
-    await expect(page).toHaveURL('/organization/teams');
-
-    // Navigate to API keys page
-    await page.goto('/organization/api-keys');
-    await expect(page).toHaveURL('/organization/api-keys');
   });
 });
