@@ -267,15 +267,79 @@ See the [Next.js Setup Guide](./NEXT-JS.md) for comprehensive documentation incl
 - Importing styles (with or without Tailwind CSS)
 - Using `authClient.useSession()` hook in client components
 
+## Nuxt Integration
+
+Nuxt 4 applications can use the built-in Vue client and Nitro/H3 server
+adapter:
+
+```typescript
+// app/composables/auth.ts
+import { createAuthClient } from '@neondatabase/auth/nuxt';
+
+export const authClient = createAuthClient();
+```
+
+```typescript
+// server/utils/auth.ts
+import { createNeonAuth } from '@neondatabase/auth/nuxt/server';
+
+export const auth = createNeonAuth({
+  baseUrl: process.env.NUXT_NEON_AUTH_BASE_URL!,
+  cookies: {
+    secret: process.env.NUXT_NEON_AUTH_COOKIE_SECRET!,
+  },
+});
+```
+
+```typescript
+// server/api/auth/[...path].ts
+import { auth } from '../../utils/auth';
+
+export default auth.handler();
+```
+
+```typescript
+// server/middleware/auth.ts
+import { auth } from '../utils/auth';
+
+export default auth.middleware({
+  loginUrl: '/auth/sign-in',
+  protectedRoutes: ['/account', '/organization', '/notes'],
+});
+```
+
+Routes are public unless they match `protectedRoutes`. OAuth verifier callbacks
+are still processed on public routes.
+
+Bind server calls to the current request:
+
+```typescript
+// server/api/session.get.ts
+import { auth } from '../utils/auth';
+
+export default defineEventHandler((event) => {
+  return auth.withEvent(event).getSession();
+});
+```
+
+`withEvent(event)` is specific to the Nuxt adapter. Nitro carries request state
+on `H3Event`, while a published adapter cannot depend on application-only Nuxt
+auto-imports or Node-only `AsyncLocalStorage`. Explicit binding works across
+Nitro presets without module-level request state.
+
+See
+[`examples/nuxt-neon-auth`](../../examples/nuxt-neon-auth) for a working Nuxt
+UI example.
+
 ## Server toolkit (for framework adapter authors)
 
 > **Stability: beta.** Minor versions may include breaking changes with migration
 > notes in the package CHANGELOG. Pin your peer dependency accordingly.
 
 `@neondatabase/auth/server` exposes the framework-agnostic primitives that the
-bundled `@neondatabase/auth/next/server` adapter is built on. Use it to build
-adapters for additional server frameworks (Hono, Remix, SolidStart, Express,
-Fastify, ...) without forking the package.
+bundled Next.js and Nuxt server adapters are built on. Use it to build adapters
+for additional server frameworks (Hono, Remix, SolidStart, Express, Fastify,
+...) without forking the package.
 
 ```typescript
 import {
@@ -293,9 +357,9 @@ import {
 
 The toolkit is **Web Standards only** — it consumes `Request`/`Response` and
 exposes a small `RequestContext` interface that adapter authors implement for
-their framework's cookie/header APIs. The bundled Next.js adapter is the
-reference implementation; see [`BUILDING-AN-ADAPTER.md`](./BUILDING-AN-ADAPTER.md)
-for a walkthrough.
+their framework's cookie/header APIs. The bundled Next.js and Nuxt adapters are
+reference implementations; see
+[`BUILDING-AN-ADAPTER.md`](./BUILDING-AN-ADAPTER.md) for a walkthrough.
 
 ## UI Components
 

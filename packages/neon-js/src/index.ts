@@ -27,6 +27,7 @@ export {
   type NeonAuthPublicApi,
   type ReactBetterAuthClient,
   type VanillaBetterAuthClient,
+  type VueBetterAuthClient,
 } from '@neondatabase/auth';
 
 // Re-export vanilla adapters (no React dependency)

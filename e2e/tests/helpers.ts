@@ -26,7 +26,7 @@ export async function registerUser(page: Page, user: TestUser): Promise<void> {
 
   await page.getByLabel(/name/i).fill(user.name);
   await page.getByLabel(/email/i).fill(user.email);
-  await page.getByLabel(/password/i).fill(user.password);
+  await page.getByLabel(/^password\*?$/i).fill(user.password);
   await page.locator('button[type="submit"]').click();
 
   await expect(page).toHaveURL('/dashboard', { timeout: 15_000 });
@@ -40,7 +40,7 @@ export async function loginUser(page: Page, user: TestUser): Promise<void> {
   await expect(page.locator('form')).toBeVisible();
 
   await page.getByLabel(/email/i).fill(user.email);
-  await page.getByLabel(/password/i).fill(user.password);
+  await page.getByLabel(/^password\*?$/i).fill(user.password);
   await page.locator('button[type="submit"]').click();
 
   await expect(page).toHaveURL('/dashboard', { timeout: 15_000 });
@@ -79,9 +79,10 @@ export async function navigateToAccountSettings(page: Page): Promise<void> {
  * Update user name in account settings
  */
 export async function updateUserName(page: Page, newName: string): Promise<void> {
-  // Better Auth UI uses heading "Name" followed by input with specific placeholder text
-  // The input field already contains "Test User" - select all and replace
-  const nameInput = page.locator('input[value="Test User"]').first();
+  const nameInput = page
+    .getByLabel(/^name$/i)
+    .or(page.getByPlaceholder(/^name$/i))
+    .first();
 
   // Triple-click to select all text, then type to replace
   await nameInput.click({ clickCount: 3 });

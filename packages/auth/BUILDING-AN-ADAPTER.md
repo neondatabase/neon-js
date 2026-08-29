@@ -1,10 +1,8 @@
 # Building a Neon Auth framework adapter
 
-This guide shows how to build a `@neondatabase/auth` adapter for a server
-framework that doesn't ship with `neon-js`. The bundled `@neondatabase/auth/next`
-adapter is the reference implementation; this document walks through the parts
-of it that map directly to anything you'd do for Hono, Remix, SolidStart,
-Express, Fastify, etc.
+This guide covers `@neondatabase/auth` adapters for server frameworks that
+don't ship with `neon-js`. The Next.js and Nuxt adapters show how the shared
+parts fit into Hono, Remix, SolidStart, Express or Fastify.
 
 > **Stability: beta.** The toolkit lives at the `@neondatabase/auth/server`
 > subpath. Minor versions of `@neondatabase/auth` may include breaking changes
@@ -462,5 +460,6 @@ adapter authors actually need.
 ## Reference
 
 - Next.js adapter source: [`src/next/server/`](./src/next/server/)
+- Nuxt adapter source: [`src/nuxt/server/`](./src/nuxt/server/)
 - Toolkit entry: [`src/server/index.ts`](./src/server/index.ts)
 - TanStack Start adapter PR (in progress): <https://github.com/neondatabase/neon-js/pull/73>

@@ -1,0 +1,52 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+:root {
+  --ui-container: 80rem;
+  --ui-radius: 0.625rem;
+  --ui-header-height: 4rem;
+  color-scheme: light;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--ui-bg);
+  color: var(--ui-text);
+}
+
+@layer base {
+  :where(
+    a[href],
+    button,
+    summary,
+    select,
+    label[for],
+    [role="button"],
+    [role="menuitem"],
+    [role="option"],
+    input[type="button"],
+    input[type="checkbox"],
+    input[type="file"],
+    input[type="radio"],
+    input[type="reset"],
+    input[type="submit"]
+  ) {
+    cursor: pointer;
+  }
+
+  :where(
+    button:disabled,
+    select:disabled,
+    [aria-disabled="true"],
+    input:disabled
+  ) {
+    cursor: not-allowed;
+  }
+}

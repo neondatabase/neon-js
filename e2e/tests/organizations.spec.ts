@@ -6,6 +6,8 @@ import {
   type TestUser,
 } from './helpers';
 
+const isNuxtTarget = process.env.E2E_TARGET_APP === 'nuxt-neon-auth';
+
 test.describe('Organizations', () => {
   let testUser: TestUser;
 
@@ -43,13 +45,17 @@ test.describe('Organizations', () => {
     // Navigate to members page
     await page.goto('/organization/members');
     await expect(page).toHaveURL('/organization/members');
+  });
 
-    // Navigate to teams page
-    await page.goto('/organization/teams');
-    await expect(page).toHaveURL('/organization/teams');
+  test.describe('Optional organization pages', () => {
+    test.skip(isNuxtTarget, 'The Nuxt example does not include these views');
 
-    // Navigate to API keys page
-    await page.goto('/organization/api-keys');
-    await expect(page).toHaveURL('/organization/api-keys');
+    test('should navigate to teams and API keys', async ({ page }) => {
+      await page.goto('/organization/teams');
+      await expect(page).toHaveURL('/organization/teams');
+
+      await page.goto('/organization/api-keys');
+      await expect(page).toHaveURL('/organization/api-keys');
+    });
   });
 });

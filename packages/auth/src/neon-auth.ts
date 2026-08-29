@@ -4,10 +4,12 @@ import {
   BetterAuthVanillaAdapter,
   type BetterAuthVanillaAdapterInstance,
 } from './adapters/better-auth-vanilla/better-auth-vanilla-adapter';
+import { type BetterAuthVueAdapterInstance } from './adapters/better-auth-vue/better-auth-vue-adapter';
 import { type SupabaseAuthAdapterInstance } from './adapters/supabase/supabase-adapter';
 import type {
   VanillaBetterAuthClient,
   ReactBetterAuthClient,
+  VueBetterAuthClient,
 } from './types';
 
 /**
@@ -16,6 +18,7 @@ import type {
 export type NeonAuthAdapter =
   | BetterAuthVanillaAdapterInstance
   | BetterAuthReactAdapterInstance
+  | BetterAuthVueAdapterInstance
   | SupabaseAuthAdapterInstance;
 
 /**
@@ -62,7 +65,9 @@ export type NeonAuthPublicApi<T extends NeonAuthAdapter> =
     ? VanillaBetterAuthClient
     : T extends BetterAuthReactAdapterInstance
       ? ReactBetterAuthClient
-      : T; // SupabaseAuthAdapter - use adapter methods directly
+      : T extends BetterAuthVueAdapterInstance
+        ? VueBetterAuthClient
+        : T; // SupabaseAuthAdapter - use adapter methods directly
 
 /**
  * NeonAuth type - combines base functionality with the appropriate public API
