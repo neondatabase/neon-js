@@ -304,7 +304,7 @@ import { auth } from '../utils/auth';
 
 export default auth.middleware({
   loginUrl: '/auth/sign-in',
-  protectedRoutes: ['/account', '/dashboard', '/notes'],
+  protectedRoutes: ['/account', '/organization', '/notes'],
 });
 ```
 
