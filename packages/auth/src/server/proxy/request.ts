@@ -34,12 +34,14 @@ export const handleAuthRequest = async (
 	log?: ResolvedNeonAuthLogging,
 ) => {
 	const headers = prepareRequestHeaders(request);
-	const body = await parseRequestBody(request);
+	const isGetSession = path === 'get-session';
+	const method = isGetSession ? 'GET' : request.method;
+	const body = isGetSession ? undefined : await parseRequestBody(request);
 
 	try {
 		const upstreamURL = getUpstreamURL(baseUrl, path, { originalUrl: new URL(request.url) });
 		const response = await fetch(upstreamURL.toString(), {
-			method: request.method,
+			method,
 			headers: headers,
 			body: body,
 		});

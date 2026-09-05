@@ -31,4 +31,23 @@ describe('handleAuthRequest cookie forwarding', () => {
     const upstreamHeaders = new Headers(requestInit?.headers);
     expect(upstreamHeaders.get('cookie')).toBe(`${legacyCookie}; ${canonicalCookie}`);
   });
+
+  test('forces GET method for get-session path even when caller request method is POST', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(null, { status: 200 }));
+    const request = new Request('https://app.example.com/api/mutate', {
+      method: 'POST',
+      body: JSON.stringify({ data: 'test' }),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    await handleAuthRequest('https://auth.example.com', request, 'get-session');
+
+    const requestInit = fetchSpy.mock.calls[0]?.[1];
+    expect(requestInit?.method).toBe('GET');
+    expect(requestInit?.body).toBeUndefined();
+  });
 });
