@@ -2,6 +2,7 @@ import type { NeonAuthServer } from './types';
 import type { SessionCookieSameSite } from './config';
 import {
   NEON_AUTH_SERVER_PROXY_HEADER,
+  type RequestContext,
   type RequestContextFactory,
 } from './request-context';
 import {
@@ -137,6 +138,15 @@ export function createAuthServer(
 
   const effectiveSameSite = sameSite ?? 'lax';
 
+  async function shouldPersistResponseCookies(
+    ctx: RequestContext
+  ): Promise<boolean> {
+    if (!ctx.canSetCookies) {
+      return true;
+    }
+    return await ctx.canSetCookies();
+  }
+
   const fetchWithAuth = async (
     path: string,
     method: 'GET' | 'POST',
@@ -236,63 +246,74 @@ export function createAuthServer(
       });
     }
 
-    // Handle response cookies 
     const setCookieHeaders = response.headers.getSetCookie();
+    const canPersistCookies = await shouldPersistResponseCookies(ctx);
     if (setCookieHeaders.length > 0) {
-      for (const setCookieHeader of setCookieHeaders) {
-        const parsedCookies = parseSetCookies(setCookieHeader);
-        for (const cookie of parsedCookies) {
-          // Mirror sanitization from prepareResponseHeaders (response.ts):
-          // strip Partitioned and apply configured SameSite (default `lax`).
-          // Always override domain: use local config if set, otherwise strip any
-          // upstream Domain attribute to avoid leaking the auth server's domain.
-          // Always force Secure to match the minting path
-          // (`session/minting.ts` hardcodes `secure: true`) and the documented
-          // "Secure is always applied" contract. With `SameSite=None`, a
-          // missing `Secure` makes the browser drop the cookie entirely.
-          // See #161 review feedback (Andras FIX 1, security).
-          const cookieOptions = {
-            ...cookie,
-            domain: domain,
-            partitioned: undefined,
-            sameSite: effectiveSameSite,
-            secure: true,
-          };
-          await ctx.setCookie(cookie.name, cookie.value, cookieOptions);
-        }
-      }
-
-      // Mint session data cookie if session_token was set
-      try {
-        const sessionDataCookie = await mintSessionDataFromResponse(
-          response.headers,
-          baseUrl,
-          {
-            secret: cookieSecret,
-            sessionDataTtl,
-            domain,
-            sameSite,
-          },
-          log
-        );
-
-        if (sessionDataCookie) {
-          // Parse the Set-Cookie string to extract cookie details
-          const [parsedSessionData] = parseSetCookies(sessionDataCookie);
-          if (parsedSessionData) {
-            await ctx.setCookie(
-              parsedSessionData.name,
-              parsedSessionData.value,
-              parsedSessionData
-            );
+      if (canPersistCookies) {
+        for (const setCookieHeader of setCookieHeaders) {
+          const parsedCookies = parseSetCookies(setCookieHeader);
+          for (const cookie of parsedCookies) {
+            // Mirror sanitization from prepareResponseHeaders (response.ts):
+            // strip Partitioned and apply configured SameSite (default `lax`).
+            // Always override domain: use local config if set, otherwise strip any
+            // upstream Domain attribute to avoid leaking the auth server's domain.
+            // Always force Secure to match the minting path
+            // (`session/minting.ts` hardcodes `secure: true`) and the documented
+            // "Secure is always applied" contract. With `SameSite=None`, a
+            // missing `Secure` makes the browser drop the cookie entirely.
+            // See #161 review feedback (Andras FIX 1, security).
+            const cookieOptions = {
+              ...cookie,
+              domain: domain,
+              partitioned: undefined,
+              sameSite: effectiveSameSite,
+              secure: true,
+            };
+            await ctx.setCookie(cookie.name, cookie.value, cookieOptions);
           }
         }
-      } catch (error) {
-        log?.warn('[neon-auth] Failed to mint session data cookie', {
-          component: 'server-api',
-          detail: error instanceof Error ? error.message : String(error),
-          err: error,
-        });
+
+        // Mint session data cookie if session_token was set
+        try {
+          const sessionDataCookie = await mintSessionDataFromResponse(
+            response.headers,
+            baseUrl,
+            {
+              secret: cookieSecret,
+              sessionDataTtl,
+              domain,
+              sameSite,
+            },
+            log
+          );
+
+          if (sessionDataCookie) {
+            // Parse the Set-Cookie string to extract cookie details
+            const [parsedSessionData] = parseSetCookies(sessionDataCookie);
+            if (parsedSessionData) {
+              await ctx.setCookie(
+                parsedSessionData.name,
+                parsedSessionData.value,
+                parsedSessionData
+              );
+            }
+          }
+        } catch (error) {
+          log?.warn('[neon-auth] Failed to mint session data cookie', {
+            component: 'server-api',
+            detail: error instanceof Error ? error.message : String(error),
+            err: error,
+          });
+        }
+      } else {
+        log?.debug(
+          '[neon-auth] Skipping upstream Set-Cookie write-back in read-only context',
+          {
+            component: 'server-api',
+            path: url.pathname,
+            cookieCount: setCookieHeaders.length,
+          }
+        );
       }
     }
 
