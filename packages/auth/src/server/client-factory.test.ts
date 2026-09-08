@@ -391,4 +391,65 @@ describe('createAuthServer cookie forwarding (Secure forcing)', () => {
     const options = setCookieSpy.mock.calls[0][2];
     expect(options).toMatchObject({ secure: true, sameSite: 'none' });
   });
+
+  test('skips setCookie when RequestContext.canSetCookies returns false', async () => {
+    const setCookieSpy = vi.fn();
+    const context: RequestContext = {
+      getCookies: () => '',
+      setCookie: setCookieSpy,
+      canSetCookies: () => false,
+      getHeader: () => null,
+      getOrigin: () => 'https://app.example.com',
+      getFramework: () => 'test',
+    };
+
+    fetchMock.mockResolvedValueOnce(
+      upstreamWithSetCookie(
+        '__Secure-neon-auth.example_cookie=abc; Path=/; HttpOnly; SameSite=Lax'
+      )
+    );
+
+    const server = createAuthServer({
+      baseUrl: TEST_BASE_URL,
+      context: () => context,
+      cookieSecret: TEST_SECRET,
+    });
+
+    const result = await (server as unknown as {
+      getSession: () => Promise<{ data: unknown; error: null }>;
+    }).getSession();
+
+    expect(result.error).toBeNull();
+    expect(setCookieSpy).not.toHaveBeenCalled();
+  });
+
+  test('still calls setCookie when RequestContext.canSetCookies returns true', async () => {
+    const setCookieSpy = vi.fn();
+    const context: RequestContext = {
+      getCookies: () => '',
+      setCookie: setCookieSpy,
+      canSetCookies: () => true,
+      getHeader: () => null,
+      getOrigin: () => 'https://app.example.com',
+      getFramework: () => 'test',
+    };
+
+    fetchMock.mockResolvedValueOnce(
+      upstreamWithSetCookie(
+        '__Secure-neon-auth.example_cookie=abc; Path=/; HttpOnly; SameSite=Lax'
+      )
+    );
+
+    const server = createAuthServer({
+      baseUrl: TEST_BASE_URL,
+      context: () => context,
+      cookieSecret: TEST_SECRET,
+    });
+
+    await (server as unknown as {
+      getSession: () => Promise<unknown>;
+    }).getSession();
+
+    expect(setCookieSpy).toHaveBeenCalled();
+  });
 });
