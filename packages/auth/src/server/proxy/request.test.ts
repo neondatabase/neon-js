@@ -32,3 +32,57 @@ describe('handleAuthRequest cookie forwarding', () => {
     expect(upstreamHeaders.get('cookie')).toBe(`${legacyCookie}; ${canonicalCookie}`);
   });
 });
+
+describe('handleAuthRequest upstream method (issue #204)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  test('proxies a POST to the get-session path upstream as GET', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(null, { status: 200 }));
+    const request = new Request('https://app.example.com/api/auth/get-session', {
+      method: 'POST',
+      body: JSON.stringify({ mutation: true }),
+      headers: { 'content-type': 'application/json' },
+    });
+
+    await handleAuthRequest('https://auth.example.com', request, 'get-session');
+
+    const requestInit = fetchSpy.mock.calls[0]?.[1];
+    expect(requestInit?.method).toBe('GET');
+    expect(requestInit?.body).toBeUndefined();
+  });
+
+  test('keeps the incoming method for POST-declared endpoints', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(null, { status: 200 }));
+    const request = new Request('https://app.example.com/api/auth/sign-in/email', {
+      method: 'POST',
+      body: JSON.stringify({ email: 'a@b.co' }),
+      headers: { 'content-type': 'application/json' },
+    });
+
+    await handleAuthRequest('https://auth.example.com', request, 'sign-in/email');
+
+    const requestInit = fetchSpy.mock.calls[0]?.[1];
+    expect(requestInit?.method).toBe('POST');
+    expect(requestInit?.body).not.toBeUndefined();
+  });
+
+  test('falls back to the incoming method for unknown paths', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(null, { status: 200 }));
+    const request = new Request('https://app.example.com/api/auth/some-extension', {
+      method: 'DELETE',
+    });
+
+    await handleAuthRequest('https://auth.example.com', request, 'some-extension');
+
+    const requestInit = fetchSpy.mock.calls[0]?.[1];
+    expect(requestInit?.method).toBe('DELETE');
+  });
+});

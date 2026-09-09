@@ -1,3 +1,5 @@
+import { API_ENDPOINTS } from '@/server/endpoints';
+import type { EndpointConfig, EndpointTree } from '@/server/endpoints';
 import { extractNeonAuthCookies } from "@/server/utils/cookies";
 import type { ResolvedNeonAuthLogging } from '@/server/logger';
 import { classifyFetchFailure } from '@/server/network-error';
@@ -27,6 +29,27 @@ function safeAuthHost(baseUrl: string): string | undefined {
  * @param log - Optional resolved logging sink
  * @returns Response from upstream server or error response
  */
+// Reverse lookup from API_ENDPOINTS: upstream path -> declared method.
+// Auth endpoints have fixed methods (e.g. get-session is GET-only upstream),
+// so the incoming request's method must not be forwarded blindly - a POST to a
+// protected route would otherwise hit get-session as POST and 404, signing the
+// user out (see issue #204).
+const METHOD_BY_PATH: Record<string, EndpointConfig['method']> = (() => {
+	const map: Record<string, EndpointConfig['method']> = {};
+	const walk = (tree: EndpointTree) => {
+		for (const value of Object.values(tree)) {
+			if (typeof (value as EndpointConfig).path === 'string') {
+				const config = value as EndpointConfig;
+				map[config.path] = config.method;
+			} else {
+				walk(value as EndpointTree);
+			}
+		}
+	};
+	walk(API_ENDPOINTS as EndpointTree);
+	return map;
+})();
+
 export const handleAuthRequest = async (
 	baseUrl: string,
 	request: Request,
@@ -34,12 +57,15 @@ export const handleAuthRequest = async (
 	log?: ResolvedNeonAuthLogging,
 ) => {
 	const headers = prepareRequestHeaders(request);
-	const body = await parseRequestBody(request);
+	const upstreamMethod = METHOD_BY_PATH[path] ?? request.method;
+	// GET/HEAD upstream calls cannot carry a body; only parse one when the
+	// upstream method allows it.
+	const body = upstreamMethod === 'GET' ? undefined : await parseRequestBody(request);
 
 	try {
 		const upstreamURL = getUpstreamURL(baseUrl, path, { originalUrl: new URL(request.url) });
 		const response = await fetch(upstreamURL.toString(), {
-			method: request.method,
+			method: upstreamMethod,
 			headers: headers,
 			body: body,
 		});
