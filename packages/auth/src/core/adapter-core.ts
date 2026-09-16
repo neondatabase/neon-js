@@ -18,6 +18,7 @@ import { anonymousTokenClient } from '../plugins/anonymous-token';
 import { injectClientInfo } from '../utils/client-info';
 import type { BetterAuthInstance } from '../types';
 import { normalizeBetterAuthError } from './better-auth-helpers';
+import { isBrowser } from '../utils/browser';
 
 export interface NeonAuthAdapterCoreAuthOptions extends Omit<
   BetterAuthClientOptions,
@@ -74,6 +75,18 @@ export abstract class NeonAuthAdapterCore {
         },
         customFetchImpl: async (url, init) => {
           const headers = injectClientInfo(init?.headers);
+          
+          if (isBrowser()) {
+            try {
+              const token = globalThis.localStorage.getItem('neon-auth-jwt-fallback');
+              if (token && !headers.has('Authorization')) {
+                headers.set('Authorization', `Bearer ${token}`);
+              }
+            } catch (error) {
+              // Ignore DOMException if localStorage is disabled or restricted
+            }
+          }
+
           // Skip deduplication if X-Force-Fetch header is present
           if (headers.has(FORCE_FETCH_HEADER)) {
             headers.delete(FORCE_FETCH_HEADER);
@@ -158,6 +171,14 @@ export abstract class NeonAuthAdapterCore {
               console.warn(
                 '[onSuccess] JWT found but no session data to inject into!'
               );
+            }
+          }
+
+          if (ctx.data?.session?.token && isBrowser()) {
+            try {
+              globalThis.localStorage.setItem('neon-auth-jwt-fallback', ctx.data.session.token);
+            } catch (error) {
+              // Ignore DOMException if localStorage is disabled or restricted
             }
           }
 
