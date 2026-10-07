@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Better Auth `1.6.23` → `1.7.6`**: Transitive via `@neondatabase/auth`, matching the Neon Auth server.
+- **`X-Neon-Client-Info` carries `betterAuthVersion`**: `createClient()` already stamps this header on both auth and Data API requests, and it now includes the Better Auth version (re-exported as **`BETTER_AUTH_VERSION`**) so Neon Auth recognizes the client as speaking the 1.7 contract.
+- **BREAKING for direct Better Auth client users**: `accountId` now means the local `account.id` on `unlink-account`, `account-info`, `get-access-token` and `refresh-token`, and `unlink-account` no longer accepts `providerId`. The `SupabaseAuthAdapter` handles this internally; see the `@neondatabase/auth` changelog for details.
 - **Better Auth alignment**: Transitive via `@neondatabase/auth` — Better Auth client stack is now **`1.6.23`** (matched to neon-auth server).
 - **CLI internals**: Vendored `@supabase/postgres-meta` @ v0.93.1 (Apache-2.0)
   into `src/vendor/postgres-meta/` and removed it from runtime `dependencies`.

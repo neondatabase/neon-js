@@ -17,3 +17,7 @@ export {
   isAuthError,
   isAuthApiError,
 } from './adapters/supabase/auth-interface';
+
+// Exact better-auth version pinned by this package; sent to the Neon Auth
+// server in X-Neon-Client-Info so it can pick the matching API shape.
+export { BETTER_AUTH_VERSION } from './utils/better-auth-version';
