@@ -39,6 +39,23 @@ export const extractNeonAuthCookies = (headers: Headers | string): string => {
 }
 
 /**
+ * Narrows a parsed `Max-Age` attribute to a finite number of seconds.
+ *
+ * The upstream parser types unrecognised attributes as
+ * `string | number | boolean | Date` and produces `NaN` for a malformed
+ * `Max-Age`, so the value must be validated before it is re-serialized.
+ */
+const toMaxAge = (value: unknown): number | undefined => {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : undefined;
+  }
+  if (typeof value === 'string' && /^-?\d+$/.test(value.trim())) {
+    return Number.parseInt(value, 10);
+  }
+  return undefined;
+};
+
+/**
  * Parses the `set-cookie` header from Neon Auth response into a list of cookies.
  *
  * @param setCookieHeader - The `set-cookie` header from Neon Auth response.
@@ -55,7 +72,7 @@ export const parseSetCookies = (setCookieHeader: string): ParsedCookie[] => {
       value: decodeURIComponent(parsedCookie.value),
       path: parsedCookie.path,
       domain: parsedCookie.domain,
-      maxAge: parsedCookie['max-age'] ?? parsedCookie.maxAge,
+      maxAge: toMaxAge(parsedCookie['max-age'] ?? parsedCookie.maxAge),
       // Surface `expires` so callers (e.g. session minting) can detect deletion
       // cookies by their past `Expires` attribute, not just `Max-Age=0`.
       // See #161 review feedback (Andras FIX 2, correctness).

@@ -392,3 +392,44 @@ describe('createAuthServer cookie forwarding (Secure forcing)', () => {
     expect(options).toMatchObject({ secure: true, sameSite: 'none' });
   });
 });
+
+describe('createAuthServer getAccessToken', () => {
+  const originalFetch = globalThis.fetch;
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  test('POSTs the accountId as a JSON body with a client-info header', async () => {
+    fetchMock.mockResolvedValueOnce(
+      Response.json({ accessToken: 'token' }, { status: 200 })
+    );
+
+    const server = createAuthServer({
+      baseUrl: TEST_BASE_URL,
+      context: makeContext,
+      cookieSecret: TEST_SECRET,
+    });
+
+    await (server as unknown as {
+      getAccessToken: (args: unknown) => Promise<unknown>;
+    }).getAccessToken({ accountId: 'acc_local_1' });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(new URL(url).pathname.endsWith('/get-access-token')).toBe(true);
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({ accountId: 'acc_local_1' });
+
+    const headers = new Headers(init.headers);
+    expect(headers.get('X-Neon-Client-Info')).toBeTruthy();
+    expect(headers.get('Content-Type')).toBe('application/json');
+    expect(headers.get('Origin')).toBe('https://app.example.com');
+  });
+});

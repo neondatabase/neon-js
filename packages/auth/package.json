@@ -119,12 +119,12 @@
     "next": "16.2.11"
   },
   "dependencies": {
-    "@better-fetch/fetch": "1.3.1",
+    "@better-fetch/fetch": "1.3.2",
     "@neondatabase/auth-ui": "workspace:*",
     "@supabase/auth-js": "2.79.0",
-    "better-auth": "1.6.23",
+    "better-auth": "1.7.6",
     "jose": "6.2.5",
-    "zod": "4.3.6"
+    "zod": "4.5.4"
   },
   "peerDependencies": {
     "react": ">=18.0.0",
