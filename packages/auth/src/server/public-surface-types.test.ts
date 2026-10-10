@@ -117,12 +117,19 @@ describe('NeonAuthServerConfig shape', () => {
 });
 
 describe('RequestContext shape', () => {
-  it('exposes the five framework-bridging methods adapters must implement', () => {
+  it('exposes the framework-bridging methods adapters must implement', () => {
     expectTypeOf<RequestContext['getCookies']>().toBeFunction();
     expectTypeOf<RequestContext['setCookie']>().toBeFunction();
     expectTypeOf<RequestContext['getHeader']>().toBeFunction();
     expectTypeOf<RequestContext['getOrigin']>().toBeFunction();
     expectTypeOf<RequestContext['getFramework']>().toBeFunction();
+  });
+
+  it('allows optional canSetCookies for read-only render contexts', () => {
+    type CanSetCookies = RequestContext['canSetCookies'];
+    expectTypeOf<CanSetCookies>().toEqualTypeOf<
+      (() => boolean | Promise<boolean>) | undefined
+    >();
   });
 
   it('setCookie requires (name, value, options) — options is not optional', () => {
