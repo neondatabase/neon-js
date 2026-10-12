@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Release audit**: bumped pinned `next` (16.3.8), `sharp` (0.35.5), `brace-expansion` (1.1.20 / 2.1.6), `js-yaml` (4.3.2), `nanoid` (3.3.18), `browserslist` (4.28.7), and `source-map-js` (1.2.2) via root `pnpm.overrides` to clear high/critical advisories that block the release pipeline. The `next` peer range (`>=16.0.0`) is unchanged.
 - **Forwarded cookies always carry `Secure`** (proxy + `createAuthServer` paths): cookies sanitized by `handleAuthResponse` and by the upstream-cookie loop in `createAuthServer` now stamp `Secure: true` regardless of whether upstream sent it. This matches the minting path (`session/minting.ts` has always hardcoded `secure: true`) and the documented "Secure is always applied" contract. Previously, when `effectiveSameSite === 'none'`, a cookie that lost upstream `Secure` would be silently dropped by the browser, breaking session continuity in third-party / iframe-embedded contexts. Closes a regression identified in #161 review (Andras FIX 1).
 
 ### Fixed
