@@ -1,14 +1,21 @@
 'use client';
 
 import {
+  AuthUIContext,
   AuthUIProvider,
+  useAuthData,
   type AuthUIProviderProps,
 } from '@daveyplate/better-auth-ui';
 import type { NeonAuthAdapter, NeonAuthPublicApi } from '@neondatabase/auth';
 import { getReactClient } from './react-adapter';
 import { Toaster } from 'sonner';
 import { ThemeProvider } from 'next-themes';
-import { useMemo } from 'react';
+import { useContext, useMemo } from 'react';
+import {
+  createUnlinkAccount,
+  resolveAccountInfoId,
+  type ListedAccount,
+} from './local-account-id';
 import { cn } from './utils';
 
 /**
@@ -45,6 +52,46 @@ export function NeonAuthUIProvider<T extends NeonAuthAdapter>({
       : getReactClient(authClient);
   }, [authClient]);
 
+  /*
+   * better-auth-ui builds its default mutators and hooks inside AuthUIProvider
+   * and does not export them, so these wrap the same authClient calls.
+   */
+  const accountOverrides = useMemo(() => {
+    const client = reactClient as AuthUIProviderProps['authClient'];
+    return {
+      mutators: {
+        unlinkAccount: createUnlinkAccount(
+          client as unknown as Parameters<typeof createUnlinkAccount>[0]
+        ),
+      },
+      // better-auth-ui types the account-info user as a full Better Auth
+      // `User`, but the endpoint returns the narrower provider `OAuth2UserInfo`.
+      hooks: {
+        useAccountInfo: (params: unknown) => {
+          const {
+            hooks: { useListAccounts },
+          } = useContext(AuthUIContext);
+          const { data: accounts } = useListAccounts();
+          const accountId = resolveAccountInfoId(
+            accounts as ListedAccount[] | null | undefined,
+            (params as { query?: { accountId?: string } }).query?.accountId
+          );
+          // null, not undefined: useAuthData refetches when cached data is undefined.
+          return useAuthData({
+            queryFn:
+              accountId === 'pending'
+                ? async () => ({ data: null, error: null })
+                : () =>
+                    client.accountInfo({
+                      query: { accountId: accountId as string },
+                    }),
+            cacheKey: `accountInfo:${accountId}`,
+          });
+        },
+      } as AuthUIProviderProps['hooks'],
+    };
+  }, [reactClient]);
+
   return (
     <div className={cn('neon-auth-ui', className)}>
       <ThemeProvider attribute="class" defaultTheme={defaultTheme} enableSystem>
@@ -60,6 +107,8 @@ export function NeonAuthUIProvider<T extends NeonAuthAdapter>({
           authClient={reactClient as AuthUIProviderProps['authClient']}
           magicLink={false}
           {...props}
+          mutators={{ ...accountOverrides.mutators, ...props.mutators }}
+          hooks={{ ...accountOverrides.hooks, ...props.hooks }}
           multiSession={false}
           apiKey={false}
           passkey={false}

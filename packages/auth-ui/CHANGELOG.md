@@ -4,6 +4,10 @@ All notable changes to `@neondatabase/auth-ui` will be documented in this file.
 
 ## Unreleased
 
+### Fixed
+
+- **Providers settings card unlink and provider email.** `NeonAuthUIProvider` now translates the provider-side account id that `@daveyplate/better-auth-ui@3.4.0` sends into the local `account.id` Better Auth 1.7 expects, fixing the `ACCOUNT_NOT_FOUND` unlink failure and the missing provider email.
+
 ## [0.4.0-beta] - 2026-10-12
 
 ### Changed
