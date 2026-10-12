@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `pg ^8.13`, `pg-format 1.0.4`, `postgres-array 3.0.4`, `prettier 3.8.1`.
   See `src/vendor/postgres-meta/README.md` for license + update procedure.
 
+### Fixed
+
+- **`X-Neon-Client-Info` no longer depends on the installed `@neondatabase/postgrest-js`**: neon-js now bundles its client-info helper, so the `betterAuthVersion` field is sent regardless of which `postgrest-js` version is installed.
+
 ### Added
 
 - **`createClient` external auth provider support**: `createClient` now accepts a

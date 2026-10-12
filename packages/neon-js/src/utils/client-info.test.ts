@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { getClientInfo } from '@neondatabase/postgrest-js';
+import { BETTER_AUTH_VERSION } from '@neondatabase/auth';
 import { buildNeonJsClientInfo } from './client-info';
 
 // Mirrors the Neon Auth server's SDK classification
@@ -19,7 +20,7 @@ describe('buildNeonJsClientInfo', () => {
     const info = JSON.parse(buildNeonJsClientInfo());
 
     expect(info.sdk).toBe('@neondatabase/neon-js');
-    expect(typeof info.betterAuthVersion).toBe('string');
+    expect(info.betterAuthVersion).toBe(BETTER_AUTH_VERSION);
     expect(info.betterAuthVersion).toMatch(/^\d+\.\d+\.\d+$/);
     expect(isModernBetterAuth(info.betterAuthVersion)).toBe(true);
   });

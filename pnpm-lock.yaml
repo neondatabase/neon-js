@@ -865,6 +865,9 @@ importers:
         specifier: 4.1.12
         version: 4.1.12
     devDependencies:
+      '@neondatabase/internal':
+        specifier: workspace:*
+        version: link:../internal
       '@types/pg':
         specifier: 8.20.0
         version: 8.20.0
