@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Middleware session checks carry `X-Neon-Client-Info`**: the protected-route session check (`processAuthMiddleware`) and the OAuth verifier exchange now send the SDK client-info header so Neon Auth can attribute middleware traffic instead of recording it as an unknown SDK; requests that already carry the header are unchanged.
 - **`getAccessToken` is issued as `POST`**: `API_ENDPOINTS.getAccessToken` declared `GET`, but the upstream endpoint is `POST`. Because `fetchWithAuth` drops the body on a `GET`, the `accountId` selector never reached the server and the call could not succeed. Pre-existing bug, unrelated to the Better Auth version.
 - **Identity profile fields are read from the `account-info` `user` object**: `mapBetterAuthIdentity` read `data.user.*`, a path the response never contained, so populating an identity for a social account threw a `TypeError` and failed the whole `getUserIdentities` call. Profile fields now come from the top-level `user` (`email`, `name`, `image`, `emailVerified`); the emitted `identity_data` keys are unchanged.
 - **Malformed `Max-Age` no longer serializes as `Max-Age=NaN`**: `parseSetCookies` passed the upstream parser's `NaN` straight through for an unparseable `Max-Age`, which `serializeSetCookie` then wrote into the outgoing cookie. Such values now yield `undefined`, so the attribute is omitted; `Max-Age=0` deletion cookies are preserved.
