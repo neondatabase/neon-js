@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0-beta] - 2026-10-12
+
 ### Added
 
 - **Server toolkit (beta)**: New public subpath **`@neondatabase/auth/server`** exposes the framework-agnostic primitives the bundled `@neondatabase/auth/next/server` adapter is built on, so the community can build adapters for additional frameworks (Hono, Remix, SolidStart, Express, Fastify, ...) without forking the package. Exports include **`createAuthServer`**, **`handleAuthProxyRequest`**, **`processAuthMiddleware`**, **`shouldProtectRoute`**, **`checkSessionRequired`**, **`DEFAULT_AUTH_SKIP_ROUTES`**, **`validateCookieConfig`**, **`resolveNeonAuthLogging`**, **`classifyFetchFailure`**, **`parseSessionData`**, **`validateSessionData`**, cookie utilities (**`parseSetCookies`**, **`serializeSetCookie`**, **`parseCookieValue`**, **`extractNeonAuthCookies`**), protocol constants (**`NEON_AUTH_COOKIE_PREFIX`**, **`NEON_AUTH_SESSION_COOKIE_NAME`**, **`NEON_AUTH_SESSION_DATA_COOKIE_NAME`**, **`NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME`**, **`NEON_AUTH_SERVER_PROXY_HEADER`**, **`NEON_AUTH_HEADER_MIDDLEWARE_NAME`**, **`NEON_AUTH_NETWORK_ERROR_CODES`**), and types (**`NeonAuthServerConfig`**, **`RequestContext`**, **`RequestContextFactory`**, **`CookieOptions`**, **`NeonAuthConfig`**, **`NeonAuthMiddlewareConfig`**, **`AuthMiddlewareConfig`**, **`AuthProxyConfig`**, **`MiddlewareResult`**, **`SessionData`**, **`SessionCookieConfig`**, **`SessionCookieSameSite`**). Stability: **beta** — minor versions may include breaking changes with migration notes. See `BUILDING-AN-ADAPTER.md` for the adapter author guide.

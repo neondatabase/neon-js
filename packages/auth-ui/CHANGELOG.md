@@ -4,6 +4,8 @@ All notable changes to `@neondatabase/auth-ui` will be documented in this file.
 
 ## Unreleased
 
+## [0.4.0-beta] - 2026-10-12
+
 ### Changed
 
 - **Better Auth `1.6.23` → `1.7.6`**, plus `@better-auth/passkey` `1.7.6` and `better-call` `1.4.0`. `@better-auth/utils` is pinned to `0.4.2` here so the Better Auth packages resolve the version they peer-require, while `better-call@1.4.0` uses its own `^0.5.0`. `zod` moves to `4.5.4`.
