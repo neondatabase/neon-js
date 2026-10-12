@@ -179,6 +179,13 @@ export const BETTER_AUTH_METHODS_HOOKS: Record<string, MethodHook> = {
     },
     onSuccess: () => {
       BETTER_AUTH_METHODS_CACHE.clearSessionCache();
+      if (isBrowser()) {
+        try {
+          globalThis.localStorage.removeItem('neon-auth-jwt-fallback');
+        } catch (error) {
+          // Ignore DOMException
+        }
+      }
       emitAuthEvent({ type: 'SIGN_OUT' });
     },
   },
