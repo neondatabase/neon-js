@@ -792,16 +792,27 @@ class SupabaseAuthAdapterImpl
             return mapBetterAuthIdentity(account, null);
           }
 
-          // account-info selects by the local account row id, not the
-          // provider-side account id.
-          const infoResult = await this._betterAuth.accountInfo({
-            query: { accountId: account.id },
-          });
-          if (infoResult?.error) {
-            throw normalizeBetterAuthError(infoResult.error);
+          // Provider enrichment is best-effort: account-info fails for valid
+          // accounts that have no stored provider access token (e.g. Google
+          // signInWithIdToken without access_token), and one such account
+          // must not hide the rest of the user's identities.
+          try {
+            // account-info selects by the local account row id, not the
+            // provider-side account id.
+            const infoResult = await this._betterAuth.accountInfo({
+              query: { accountId: account.id },
+            });
+            if (infoResult?.error) {
+              throw infoResult.error;
+            }
+            return mapBetterAuthIdentity(account, infoResult?.data ?? null);
+          } catch (error) {
+            console.warn(
+              `Failed to get account info for ${account.providerId}:`,
+              error
+            );
+            return mapBetterAuthIdentity(account, null);
           }
-
-          return mapBetterAuthIdentity(account, infoResult?.data ?? null);
         });
 
         const identities = await Promise.all(identitiesPromises);
@@ -938,9 +949,8 @@ class SupabaseAuthAdapterImpl
         );
       }
 
-      // Find the identity by internal DB ID
       const targetIdentity = identities.data.identities.find(
-        (i) => i.id === identity.identity_id
+        (i) => i.identity_id === identity.identity_id
       );
       if (!targetIdentity) {
         throw createAuthError(
@@ -951,7 +961,7 @@ class SupabaseAuthAdapterImpl
 
       // unlink-account selects by the local account row id.
       const result = await this._betterAuth.unlinkAccount({
-        accountId: targetIdentity.id,
+        accountId: targetIdentity.identity_id,
       });
 
       if (result?.error) {

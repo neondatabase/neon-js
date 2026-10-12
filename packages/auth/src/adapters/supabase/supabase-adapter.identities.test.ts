@@ -28,6 +28,7 @@ const SESSION_PAYLOAD = {
 
 const GOOGLE_ACCOUNT = {
   id: 'acc_local_1',
+  userId: 'user_1',
   accountId: 'google-sub-123',
   providerId: 'google',
   scopes: ['openid', 'email', 'profile'],
@@ -37,12 +38,31 @@ const GOOGLE_ACCOUNT = {
 
 const CREDENTIAL_ACCOUNT = {
   id: 'acc_local_2',
+  userId: 'user_1',
   accountId: 'user@example.com',
   providerId: 'credential',
   scopes: [],
   createdAt: NOW,
   updatedAt: NOW,
 };
+
+const GITHUB_ACCOUNT = {
+  id: 'acc_local_3',
+  userId: 'user_1',
+  accountId: 'github-456',
+  providerId: 'github',
+  scopes: ['read:user', 'user:email'],
+  createdAt: NOW,
+  updatedAt: NOW,
+};
+
+// better-auth account-info rejects accounts with no stored provider access
+// token, e.g. Google sign-in via signInWithIdToken without access_token.
+const ACCESS_TOKEN_NOT_FOUND_RESPONSE = () =>
+  Response.json(
+    { message: 'Access token not found', code: 'ACCESS_TOKEN_NOT_FOUND' },
+    { status: 400, statusText: 'Bad Request' }
+  );
 
 const ACCOUNT_INFO_PAYLOAD = {
   account: {
@@ -69,11 +89,14 @@ function requestUrl(input: string | URL | Request): URL {
 describe('SupabaseAuthAdapter identities', () => {
   const originalFetch = globalThis.fetch;
   let requests: RecordedRequest[];
-  let accountInfoResponse: () => Response;
+  let accountInfoResponse: (url: URL) => Response;
+  let listAccountsResponse: () => Response;
 
   beforeEach(() => {
     requests = [];
     accountInfoResponse = () => Response.json(ACCOUNT_INFO_PAYLOAD);
+    listAccountsResponse = () =>
+      Response.json([GOOGLE_ACCOUNT, CREDENTIAL_ACCOUNT]);
 
     globalThis.fetch = vi.fn(
       async (input: string | URL | Request, init?: RequestInit) => {
@@ -87,10 +110,10 @@ describe('SupabaseAuthAdapter identities', () => {
           return Response.json(SESSION_PAYLOAD);
         }
         if (url.pathname.endsWith('/list-accounts')) {
-          return Response.json([GOOGLE_ACCOUNT, CREDENTIAL_ACCOUNT]);
+          return listAccountsResponse();
         }
         if (url.pathname.endsWith('/account-info')) {
-          return accountInfoResponse();
+          return accountInfoResponse(url);
         }
         if (url.pathname.endsWith('/unlink-account')) {
           return Response.json({ status: true });
@@ -105,6 +128,7 @@ describe('SupabaseAuthAdapter identities', () => {
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
   });
 
   const accountInfoRequests = () =>
@@ -163,31 +187,115 @@ describe('SupabaseAuthAdapter identities', () => {
     });
   });
 
-  test('getUserIdentities surfaces account-info failures as an error result', async () => {
-    accountInfoResponse = () =>
+  test('getUserIdentities falls back to basic identity data when account-info has no access token', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    accountInfoResponse = ACCESS_TOKEN_NOT_FOUND_RESPONSE;
+    const adapter = SupabaseAuthAdapter()(BASE_URL);
+
+    const result = await adapter.getUserIdentities();
+
+    expect(result.error).toBeNull();
+    const google = result.data?.identities.find((i) => i.provider === 'google');
+    expect(google).toMatchObject({
+      id: 'google-sub-123',
+      identity_id: 'acc_local_1',
+      provider: 'google',
+      created_at: NOW,
+      updated_at: NOW,
+    });
+    expect(google?.identity_data).toEqual({
+      provider: 'google',
+      provider_id: 'google-sub-123',
+      scopes: ['openid', 'email', 'profile'],
+    });
+    expect(result.data?.identities).toHaveLength(2);
+    expect(warn).toHaveBeenCalled();
+  });
+
+  test('getUserIdentities falls back per account, keeping enrichment for the others', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    listAccountsResponse = () =>
+      Response.json([GOOGLE_ACCOUNT, GITHUB_ACCOUNT, CREDENTIAL_ACCOUNT]);
+    accountInfoResponse = (url) =>
+      url.searchParams.get('accountId') === 'acc_local_1'
+        ? ACCESS_TOKEN_NOT_FOUND_RESPONSE()
+        : Response.json({
+            account: {
+              id: 'acc_local_3',
+              providerId: 'github',
+              accountId: 'github-456',
+            },
+            user: {
+              email: 'dev@github.example',
+              name: 'GitHub Dev',
+              image: 'https://example.com/gh.png',
+              emailVerified: true,
+            },
+            data: { login: 'ghdev' },
+          });
+    const adapter = SupabaseAuthAdapter()(BASE_URL);
+
+    const result = await adapter.getUserIdentities();
+
+    expect(result.error).toBeNull();
+    const byProvider = Object.fromEntries(
+      (result.data?.identities ?? []).map((i) => [i.provider, i])
+    );
+    expect(Object.keys(byProvider).toSorted()).toEqual([
+      'credential',
+      'github',
+      'google',
+    ]);
+    expect(byProvider.google.identity_data).toEqual({
+      provider: 'google',
+      provider_id: 'google-sub-123',
+      scopes: ['openid', 'email', 'profile'],
+    });
+    expect(byProvider.github.identity_data).toMatchObject({
+      provider: 'github',
+      provider_id: 'github-456',
+      email: 'dev@github.example',
+      name: 'GitHub Dev',
+      login: 'ghdev',
+    });
+  });
+
+  test('getUserIdentities still surfaces list-accounts failures as an error result', async () => {
+    listAccountsResponse = () =>
       Response.json(
-        { message: 'Account not found', code: 'ACCOUNT_NOT_FOUND' },
-        { status: 400, statusText: 'Bad Request' }
+        { message: 'Internal error' },
+        { status: 500, statusText: 'Internal Server Error' }
       );
     const adapter = SupabaseAuthAdapter()(BASE_URL);
 
     const result = await adapter.getUserIdentities();
 
     expect(result.data).toBeNull();
-    expect(result.error?.code).toBe('identity_not_found');
+    expect(result.error).not.toBeNull();
+    expect(accountInfoRequests()).toHaveLength(0);
   });
 
-  test('unlinkIdentity sends only the local account id', async () => {
+  test('getUserIdentities maps ids with Supabase semantics', async () => {
+    const adapter = SupabaseAuthAdapter()(BASE_URL);
+
+    const result = await adapter.getUserIdentities();
+
+    const google = result.data?.identities.find((i) => i.provider === 'google');
+    expect(google).toMatchObject({
+      id: 'google-sub-123',
+      identity_id: 'acc_local_1',
+      user_id: 'user_1',
+    });
+  });
+
+  test('unlinkIdentity accepts an identity exactly as getUserIdentities returned it (#765)', async () => {
     const adapter = SupabaseAuthAdapter()(BASE_URL);
     const identities = await adapter.getUserIdentities();
     const google = identities.data!.identities.find(
       (i) => i.provider === 'google'
     )!;
 
-    const result = await adapter.unlinkIdentity({
-      ...google,
-      identity_id: 'acc_local_1',
-    });
+    const result = await adapter.unlinkIdentity(google);
 
     expect(result.error).toBeNull();
     const unlinkRequests = requests.filter((r) =>

@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`getUserIdentities` falls back to basic identities when `account-info` fails**: Since `0.6.0-beta`, a failed `account-info` lookup failed the whole call. Better Auth 1.7 rejects accounts with no stored provider access token with `400 ACCESS_TOKEN_NOT_FOUND`, which is the case for Google accounts created through `signInWithIdToken` without an `access_token`, so those users could not list any identities. Enrichment is now best-effort per account: a failed lookup logs a warning and returns the identity built from `list-accounts` (without `email` / `name` / `picture`), while session and `list-accounts` errors still return `{ data: null, error }`.
+- **`unlinkIdentity` accepts an identity as `getUserIdentities` returned it**: it looked the identity up by `i.id === identity.identity_id`, which never matched the returned values, so unlinking failed with `identity_not_found`. It now matches and unlinks by `identity_id`.
+
+### Changed
+
+- **BREAKING for code reading `UserIdentity` ids from `getUserIdentities`**: the id fields now follow Supabase's `UserIdentity` semantics. `identity_id` is the identity row key (the Better Auth local `account.id`; it was the provider account id), `id` is the provider-side user id (`account.accountId`; it was the local `account.id`), and `user_id` is the owning user's id (it was the local `account.id`). Pass `identity_id` to `unlinkIdentity`; code that matched on `identity.id` or `identity.user_id` must be updated. `identity_data.provider_id` is unchanged.
+
 ## [0.6.0-beta] - 2026-10-12
 
 ### Added
