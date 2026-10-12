@@ -111,8 +111,12 @@ jobs:
       - name: Get branch expiration date (2 hours from now)
         run: echo "EXPIRES_AT=$(date -u --date '+2 hours' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
 
+      # create-branch-action has no retry inputs, and the two matrix jobs (plus any
+      # other run on this project) can collide: the API answers 423 Locked while another
+      # operation is in flight. One jittered retry clears it without a third-party wrapper.
       - name: Create Neon branch
-        id: create-branch
+        id: create-branch-first
+        continue-on-error: true
         uses: neondatabase/create-branch-action@72ed4f69a12b6be9c16aebfad893f6a21e9aba8b # v6
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
@@ -123,6 +127,38 @@ jobs:
           get_auth_url: true
           get_data_api_url: true
           expires_at: ${{ env.EXPIRES_AT }}
+
+      - name: Wait before retrying Neon branch creation
+        if: steps.create-branch-first.outcome == 'failure'
+        run: sleep $((20 + RANDOM % 30))
+
+      - name: Create Neon branch (retry)
+        id: create-branch-retry
+        if: steps.create-branch-first.outcome == 'failure'
+        uses: neondatabase/create-branch-action@72ed4f69a12b6be9c16aebfad893f6a21e9aba8b # v6
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: test-${{ matrix.app }}-${{ github.run_id }}-${{ github.run_attempt }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          # api_host: Empty for production (uses default), set per-environment for staging/preview
+          api_host: ${{ vars.NEON_API_HOST }}
+          get_auth_url: true
+          get_data_api_url: true
+          expires_at: ${{ env.EXPIRES_AT }}
+
+      # Downstream steps read a single id regardless of which attempt succeeded.
+      - name: Resolve Neon branch outputs
+        id: create-branch
+        env:
+          AUTH_URL: ${{ steps.create-branch-first.outputs.auth_url || steps.create-branch-retry.outputs.auth_url }}
+          DATA_API_URL: ${{ steps.create-branch-first.outputs.data_api_url || steps.create-branch-retry.outputs.data_api_url }}
+          DB_URL: ${{ steps.create-branch-first.outputs.db_url || steps.create-branch-retry.outputs.db_url }}
+        run: |
+          {
+            echo "auth_url=$AUTH_URL"
+            echo "data_api_url=$DATA_API_URL"
+            echo "db_url=$DB_URL"
+          } >> "$GITHUB_OUTPUT"
 
       # Build React example (uses VITE_ prefix)
       - name: Build React example app
