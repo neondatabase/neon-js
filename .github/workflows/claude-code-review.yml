@@ -23,8 +23,8 @@ jobs:
        contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association))
 
     runs-on:
-      group: databricks-ghec-public-repos-runner-group-small
-      labels: linux-ubuntu-latest-public-2core-8gb
+      group: databricks-ghec-untrusted-runner-group
+      labels: linux-ubuntu-latest-untrusted-2core-8gb
     permissions:
       contents: read
       pull-requests: write
