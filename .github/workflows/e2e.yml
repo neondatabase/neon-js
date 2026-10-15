@@ -111,54 +111,88 @@ jobs:
       - name: Get branch expiration date (2 hours from now)
         run: echo "EXPIRES_AT=$(date -u --date '+2 hours' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
 
-      # create-branch-action has no retry inputs, and the two matrix jobs (plus any
-      # other run on this project) can collide: the API answers 423 Locked while another
-      # operation is in flight. One jittered retry clears it without a third-party wrapper.
-      - name: Create Neon branch
-        id: create-branch-first
-        continue-on-error: true
-        uses: neondatabase/create-branch-action@72ed4f69a12b6be9c16aebfad893f6a21e9aba8b # v6
-        with:
-          project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch_name: test-${{ matrix.app }}-${{ github.run_id }}-${{ github.run_attempt }}
-          api_key: ${{ secrets.NEON_API_KEY }}
-          # api_host: Empty for production (uses default), set per-environment for staging/preview
-          api_host: ${{ vars.NEON_API_HOST }}
-          get_auth_url: true
-          get_data_api_url: true
-          expires_at: ${{ env.EXPIRES_AT }}
-
-      - name: Wait before retrying Neon branch creation
-        if: steps.create-branch-first.outcome == 'failure'
-        run: sleep $((20 + RANDOM % 30))
-
-      - name: Create Neon branch (retry)
-        id: create-branch-retry
-        if: steps.create-branch-first.outcome == 'failure'
-        uses: neondatabase/create-branch-action@72ed4f69a12b6be9c16aebfad893f6a21e9aba8b # v6
-        with:
-          project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch_name: test-${{ matrix.app }}-${{ github.run_id }}-${{ github.run_attempt }}
-          api_key: ${{ secrets.NEON_API_KEY }}
-          # api_host: Empty for production (uses default), set per-environment for staging/preview
-          api_host: ${{ vars.NEON_API_HOST }}
-          get_auth_url: true
-          get_data_api_url: true
-          expires_at: ${{ env.EXPIRES_AT }}
-
-      # Downstream steps read a single id regardless of which attempt succeeded.
-      - name: Resolve Neon branch outputs
-        id: create-branch
+      # Branch creation is a direct API call so a 423 Locked (another operation in flight
+      # on the shared project, e.g. the sibling matrix job) can be told apart from real
+      # failures by status code: only 423 is retried, once, after a jittered wait. The
+      # action below cannot do this because it exposes no status code or retry input; it
+      # reuses an existing branch of the same name, so it only reads connection details.
+      - name: Create Neon branch (retry on 423 Locked only)
         env:
-          AUTH_URL: ${{ steps.create-branch-first.outputs.auth_url || steps.create-branch-retry.outputs.auth_url }}
-          DATA_API_URL: ${{ steps.create-branch-first.outputs.data_api_url || steps.create-branch-retry.outputs.data_api_url }}
-          DB_URL: ${{ steps.create-branch-first.outputs.db_url || steps.create-branch-retry.outputs.db_url }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          # Empty for production; same default as create-branch-action.
+          NEON_API_HOST: ${{ vars.NEON_API_HOST }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          BRANCH_NAME: test-${{ matrix.app }}-${{ github.run_id }}-${{ github.run_attempt }}
         run: |
+          api="${NEON_API_HOST:-https://console.neon.tech/api/v2}"
+          api="${api%/}"
+          payload=$(jq -n --arg name "$BRANCH_NAME" --arg exp "$EXPIRES_AT" \
+            '{branch: {name: $name, expires_at: $exp}, endpoints: [{type: "read_write", suspend_timeout_seconds: 0}]}')
+          body=$(mktemp)
+
+          create() {
+            curl -sS -o "$body" -w '%{http_code}' -X POST \
+              -H "Authorization: Bearer $NEON_API_KEY" \
+              -H 'Content-Type: application/json' \
+              -d "$payload" "$api/projects/$NEON_PROJECT_ID/branches" || true
+          }
+
+          status=$(create)
+          if [ "${status:0:1}" = "2" ]; then
+            exit 0
+          fi
+
+          if [ "$status" != "423" ]; then
+            {
+              echo "### Neon branch creation failed (\`$BRANCH_NAME\`)"
+              echo "First attempt returned HTTP $status. Not retried: only 423 Locked is retried."
+              echo '```'
+              head -c 1000 "$body"
+              echo
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::Neon branch creation failed with HTTP $status"
+            exit 1
+          fi
+
+          wait=$((10 + RANDOM % 21))
           {
-            echo "auth_url=$AUTH_URL"
-            echo "data_api_url=$DATA_API_URL"
-            echo "db_url=$DB_URL"
-          } >> "$GITHUB_OUTPUT"
+            echo "### Neon branch creation hit 423 Locked (\`$BRANCH_NAME\`)"
+            echo "First attempt: HTTP 423, project busy. Retrying once after ${wait}s."
+            echo '```'
+            head -c 1000 "$body"
+            echo
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          sleep "$wait"
+
+          status=$(create)
+          if [ "${status:0:1}" = "2" ]; then
+            echo "Retry outcome: HTTP $status, branch created." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          {
+            echo "Retry outcome: HTTP $status, giving up."
+            echo '```'
+            head -c 1000 "$body"
+            echo
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::error::Neon branch creation failed after retry with HTTP $status"
+          exit 1
+
+      - name: Get Neon branch connection details
+        id: create-branch
+        uses: neondatabase/create-branch-action@72ed4f69a12b6be9c16aebfad893f6a21e9aba8b # v6
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: test-${{ matrix.app }}-${{ github.run_id }}-${{ github.run_attempt }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          # api_host: Empty for production (uses default), set per-environment for staging/preview
+          api_host: ${{ vars.NEON_API_HOST }}
+          get_auth_url: true
+          get_data_api_url: true
+          expires_at: ${{ env.EXPIRES_AT }}
 
       # Build React example (uses VITE_ prefix)
       - name: Build React example app
