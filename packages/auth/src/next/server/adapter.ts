@@ -1,4 +1,6 @@
 import { cookies, headers } from 'next/headers';
+import { workUnitAsyncStorage } from 'next/dist/server/app-render/work-unit-async-storage.external';
+import { areCookiesMutableInCurrentPhase } from 'next/dist/server/web/spec-extension/adapters/request-cookies';
 import type { RequestContext } from '../../server';
 import { extractNeonAuthCookies } from '../../server/utils/cookies';
 
@@ -17,6 +19,14 @@ export async function createNextRequestContext(): Promise<RequestContext> {
 
     setCookie(name, value, options) {
       cookieStore.set(name, value, options);
+    },
+
+    canSetCookies() {
+      const store = workUnitAsyncStorage.getStore();
+      if (!store || store.type !== 'request') {
+        return false;
+      }
+      return areCookiesMutableInCurrentPhase(store);
     },
 
     getHeader(name) {
