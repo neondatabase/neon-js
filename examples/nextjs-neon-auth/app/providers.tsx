@@ -1,7 +1,8 @@
 "use client"
 
-import { NeonAuthUIProvider } from "@neondatabase/auth/react/ui"
+import { NeonAuthUIProvider } from "@neondatabase/auth-ui"
 import Link from "next/link"
+import { ThemeProvider } from "next-themes"
 import { useRouter } from "next/navigation"
 import type { ReactNode } from "react"
 
@@ -11,6 +12,7 @@ export function Providers({ children }: { children: ReactNode }) {
     const router = useRouter()
 
     return (
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <NeonAuthUIProvider
             authClient={authClient}
             navigate={router.push}
@@ -35,5 +37,6 @@ export function Providers({ children }: { children: ReactNode }) {
         >
             {children}
         </NeonAuthUIProvider>
+        </ThemeProvider>
     )
 }
