@@ -71,6 +71,7 @@ await auth.signIn.social({
 | Default (no adapter) | New projects, prefer Better Auth API |
 | `SupabaseAuthAdapter` | Migrating from Supabase, familiar API |
 | `BetterAuthReactAdapter` | Need React hooks (`useSession`) |
+| `BetterAuthExpoAdapter` | Expo native and web applications |
 | `BetterAuthVanillaAdapter` | Better Auth API without React |
 
 **Critical:** Adapters are factory functions - must call with `()`.
@@ -146,6 +147,29 @@ function MyComponent() {
 }
 ```
 
+### BetterAuthExpoAdapter
+
+Expo SecureStore and native OAuth support:
+
+```typescript
+import * as SecureStore from 'expo-secure-store';
+import * as WebBrowser from 'expo-web-browser';
+import { createAuthClient } from '@neondatabase/auth';
+import { BetterAuthExpoAdapter } from '@neondatabase/auth/expo';
+
+const auth = createAuthClient('https://your-auth-server.com', {
+  adapter: BetterAuthExpoAdapter({
+    scheme: 'myapp',
+    storage: SecureStore,
+    browser: WebBrowser,
+  }),
+});
+```
+
+Install `expo-secure-store` and `expo-web-browser` in a development build. iOS
+HTTPS callbacks require iOS 17.4+ and Associated Domains; older versions need a
+custom scheme.
+
 ## Anonymous Access
 
 Enable RLS-based data access for unauthenticated users:
@@ -212,7 +236,7 @@ try {
 ### createAuthClient(url, config?)
 
 - `url` - Auth service URL (required, first argument is string NOT object)
-- `config.adapter` - Optional adapter factory (`SupabaseAuthAdapter()`, `BetterAuthReactAdapter()`)
+- `config.adapter` - Optional adapter factory (`SupabaseAuthAdapter()`, `BetterAuthReactAdapter()`, `BetterAuthExpoAdapter()`)
 - `config.allowAnonymous` - Enable anonymous tokens (default: `false`)
 
 ### Default API (Better Auth)

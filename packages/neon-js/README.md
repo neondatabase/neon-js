@@ -175,6 +175,33 @@ function MyComponent() {
 }
 ```
 
+#### BetterAuthExpoAdapter (Expo)
+
+```typescript
+import * as SecureStore from 'expo-secure-store';
+import * as WebBrowser from 'expo-web-browser';
+import { createClient } from '@neondatabase/neon-js';
+import { BetterAuthExpoAdapter } from '@neondatabase/neon-js/auth/expo';
+
+const client = createClient<Database>({
+  auth: {
+    adapter: BetterAuthExpoAdapter({
+      scheme: 'myapp',
+      storage: SecureStore,
+      browser: WebBrowser,
+    }),
+    url: process.env.EXPO_PUBLIC_NEON_AUTH_URL!,
+  },
+  dataApi: {
+    url: process.env.EXPO_PUBLIC_NEON_DATA_API_URL!,
+  },
+});
+```
+
+Install `expo-secure-store` and `expo-web-browser` in a development build. On
+iOS, HTTPS callbacks require iOS 17.4 or later and an Associated Domains
+entitlement; use a custom scheme on older versions.
+
 ### Anonymous Access
 
 Enable `allowAnonymous` to let unauthenticated users query data. This uses an anonymous token for RLS-based access control:

@@ -21,9 +21,25 @@ class TestAdapter extends NeonAuthAdapterCore {
     };
     return fetchOptions.customFetchImpl;
   }
+
+  getPlugins() {
+    return this.betterAuthOptions.plugins;
+  }
 }
 
 const TEST_URL = 'https://auth.example.com/api/auth/sign-in/email';
+
+describe('NeonAuthAdapterCore plugins', () => {
+  test('appends runtime plugins after the built-in Neon plugins', () => {
+    const expoPlugin = { id: 'neon-expo' };
+    const adapter = new TestAdapter(
+      { baseURL: 'https://auth.example.com' },
+      [expoPlugin]
+    );
+
+    expect(adapter.getPlugins().at(-1)).toBe(expoPlugin);
+  });
+});
 
 describe('NeonAuthAdapterCore customFetchImpl error normalization', () => {
   const originalFetch = globalThis.fetch;

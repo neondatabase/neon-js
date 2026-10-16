@@ -62,6 +62,10 @@
       "types": "./dist/react/adapters/index.d.mts",
       "default": "./dist/react/adapters/index.mjs"
     },
+    "./expo": {
+      "types": "./dist/expo/index.d.mts",
+      "default": "./dist/expo/index.mjs"
+    },
     "./vanilla": {
       "types": "./dist/vanilla/index.d.mts",
       "default": "./dist/vanilla/index.mjs"

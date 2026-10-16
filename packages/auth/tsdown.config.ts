@@ -15,6 +15,8 @@ export default defineConfig(
       'src/react/ui/server.ts',
       'src/react/adapters/index.ts',
 
+      'src/expo/index.ts',
+
       'src/vanilla/index.ts',
       'src/vanilla/adapters/index.ts',
 

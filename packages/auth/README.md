@@ -170,6 +170,41 @@ function MyComponent() {
 }
 ```
 
+### Expo
+
+Use `BetterAuthExpoAdapter` to persist cookies in SecureStore, open native OAuth
+sessions, and exchange Neon's session verifier. The adapter is a no-op on web,
+so the same client configuration works across Expo platforms.
+
+```typescript
+import * as SecureStore from 'expo-secure-store';
+import * as WebBrowser from 'expo-web-browser';
+import { createAuthClient } from '@neondatabase/auth';
+import { BetterAuthExpoAdapter } from '@neondatabase/auth/expo';
+
+const auth = createAuthClient('https://your-auth-server.com', {
+  adapter: BetterAuthExpoAdapter({
+    scheme: 'myapp',
+    storage: SecureStore,
+    browser: WebBrowser,
+  }),
+});
+
+await auth.signIn.social({
+  provider: 'google',
+  callbackURL: '/auth/callback',
+});
+```
+
+Add the scheme to your Expo app config and add the callback origin to Neon
+Auth's trusted origins. You can use an HTTPS universal link as `callbackURL`.
+Install `expo-secure-store` and `expo-web-browser` in a development build. Expo
+Go uses a different runtime URL. Closing the browser leaves the current session
+unchanged. Native callback failures reject `signIn.social()`, so handle them
+with `try/catch`. On iOS, HTTPS callbacks require iOS 17.4 or later and an
+Associated Domains entitlement; the adapter enables `preferUniversalLinks`
+automatically. Use a custom scheme on older versions.
+
 ## Anonymous Access
 
 Enable `allowAnonymous` to let unauthenticated users access data via RLS policies:
