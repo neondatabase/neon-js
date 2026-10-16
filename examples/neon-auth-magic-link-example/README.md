@@ -42,7 +42,7 @@ bun run dev
 ## How it works
 
 - **Landing page** (`/`) — single button to sign in
-- **Auth pages** (`/auth/*`) — handled by `@neondatabase/auth` UI components with `emailOTP` enabled
+- **Auth pages** (`/auth/*`) — use `@neondatabase/auth-ui` helpers with `emailOTP` enabled
 - **Dashboard** (`/dashboard`) — shows your email and session info after sign-in
 - **API route** (`/api/auth/*`) — proxies auth requests to Neon Auth
 
