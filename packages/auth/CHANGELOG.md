@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **`/oauth2/token` is no longer answered from the session cache**: the client treated any URL containing `/token` as a `getSession` request. Requests to `/oauth2/token` (and every other `/oauth2/` path) now always reach the server.
+- **Server `revokeOtherSessions()` and `emailOtp.resetPassword()` call the right endpoints**: they requested `revoke-all-sessions` and `email-otp/passcode`, neither of which exists in Better Auth, so both always failed. They now request `revoke-other-sessions` and `email-otp/reset-password`.
 - **`getUserIdentities` falls back to basic identities when `account-info` fails**: Since `0.6.0-beta`, a failed `account-info` lookup failed the whole call. Better Auth 1.7 rejects accounts with no stored provider access token with `400 ACCESS_TOKEN_NOT_FOUND`, which is the case for Google accounts created through `signInWithIdToken` without an `access_token`, so those users could not list any identities. Enrichment is now best-effort per account: a failed lookup logs a warning and returns the identity built from `list-accounts` (without `email` / `name` / `picture`), while session and `list-accounts` errors still return `{ data: null, error }`.
 - **`unlinkIdentity` accepts an identity as `getUserIdentities` returned it**: it looked the identity up by `i.id === identity.identity_id`, which never matched the returned values, so unlinking failed with `identity_not_found`. It now matches and unlinks by `identity_id`.
 

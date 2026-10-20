@@ -539,3 +539,52 @@ describe('createAuthServer oauth2', () => {
     >();
   });
 });
+
+describe('createAuthServer endpoint paths', () => {
+  const originalFetch = globalThis.fetch;
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const makeServer = () =>
+    createAuthServer({
+      baseUrl: TEST_BASE_URL,
+      context: makeContext,
+      cookieSecret: TEST_SECRET,
+    });
+
+  test('revokeOtherSessions POSTs to /revoke-other-sessions', async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ status: true }, { status: 200 }));
+
+    await (makeServer() as unknown as {
+      revokeOtherSessions: () => Promise<unknown>;
+    }).revokeOtherSessions();
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(new URL(url).pathname.endsWith('/revoke-other-sessions')).toBe(true);
+    expect(init.method).toBe('POST');
+  });
+
+  test('emailOtp.resetPassword POSTs to /email-otp/reset-password', async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ success: true }, { status: 200 }));
+
+    await (makeServer() as unknown as {
+      emailOtp: { resetPassword: (args: unknown) => Promise<unknown> };
+    }).emailOtp.resetPassword({
+      email: 'a@b.com',
+      otp: '123456',
+      password: 'new-password',
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(new URL(url).pathname.endsWith('/email-otp/reset-password')).toBe(true);
+    expect(init.method).toBe('POST');
+  });
+});

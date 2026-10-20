@@ -48,7 +48,7 @@ export const API_ENDPOINTS = {
   listSessions: { path: 'list-sessions', method: 'GET' },
   revokeSession: { path: 'revoke-session', method: 'POST' },
   revokeSessions: { path: 'revoke-sessions', method: 'POST' },
-  revokeOtherSessions: { path: 'revoke-all-sessions', method: 'POST' },
+  revokeOtherSessions: { path: 'revoke-other-sessions', method: 'POST' },
   refreshToken: { path: 'refresh-token', method: 'POST' },
 
   // Auth
@@ -140,7 +140,7 @@ export const API_ENDPOINTS = {
     sendVerificationOtp: { path: 'email-otp/send-verification-otp', method: 'POST' },
     verifyEmail: { path: 'email-otp/verify-email', method: 'POST' },
     checkVerificationOtp: { path: 'email-otp/check-verification-otp', method: 'POST' },
-    resetPassword: { path: 'email-otp/passcode', method: 'POST' },
+    resetPassword: { path: 'email-otp/reset-password', method: 'POST' },
   },
 
   // Magic Link
