@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **OAuth provider client plugin**: every client (`createAuthClient()` and the Next.js `createAuthClient()`) now includes the Better Auth OAuth provider client (`@better-auth/oauth-provider`, pinned to `1.7.6`) for the login and consent pages of a Neon Auth project acting as an OAuth provider. The client exposes `oauth2.*`; `createNeonAuth()` and `createAuthServer()` expose the session-cookie user actions that Neon routes under `oauth2`: `consent`, `continue`, `publicClient`, `publicClientPrelogin`, `getConsent`, `getConsents`, `updateConsent` and `deleteConsent`. Client management is rejected by Neon for end users.
+- **Phone number methods on `createNeonAuth()`**: The server-side auth object now exposes **`signIn.phoneNumber()`** and **`phoneNumber.sendOtp()`**, **`phoneNumber.verify()`**, **`phoneNumber.requestPasswordReset()`** and **`phoneNumber.resetPassword()`**. `signIn.phoneNumber()` and `phoneNumber.verify()` set the session cookies the same way as `signIn.email()`. Requires the phone number plugin to be enabled on the Neon Auth project.
 
 ### Fixed
 

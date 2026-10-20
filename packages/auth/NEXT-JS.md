@@ -421,12 +421,13 @@ export async function signOut() {
 The `auth` provides access to all Neon Auth APIs:
 
 - **Session**: `getSession()`, `listSessions()`, `revokeSession()`, `revokeOtherSessions()`
-- **Auth**: `signIn.email()`, `signIn.social()`, `signIn.emailOtp()`, `signUp.email()`, `signOut()`
+- **Auth**: `signIn.email()`, `signIn.social()`, `signIn.emailOtp()`, `signIn.phoneNumber()`, `signUp.email()`, `signOut()`
 - **User**: `updateUser()`, `changePassword()`, `deleteUser()`, `sendVerificationEmail()`
 - **Organization**: `organization.create()`, `organization.list()`, `organization.inviteMember()`, `organization.removeMember()`, etc.
 - **Admin**: `admin.listUsers()`, `admin.banUser()`, `admin.setRole()`, `admin.createUser()`, etc.
 - **Email OTP**: `emailOtp.sendVerificationOtp()`, `emailOtp.verifyEmail()`
 - **OAuth provider**: `oauth2.publicClient()`, `oauth2.consent()`, `oauth2.getConsents()`, etc.
+- **Phone Number**: `phoneNumber.sendOtp()`, `phoneNumber.verify()`, `phoneNumber.requestPasswordReset()`, `phoneNumber.resetPassword()`
 
 ## OAuth provider (MCP)
 

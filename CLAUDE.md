@@ -580,7 +580,7 @@ import { createAuthClient } from '@neondatabase/auth/next';
 export const authClient = createAuthClient();
 
 // Available APIs: authClient.getSession(), signIn, signUp, signOut,
-// organization.*, admin.*, emailOtp.*, oauth2.* (OAuth provider login/consent pages), updateUser, etc.
+// organization.*, admin.*, emailOtp.*, phoneNumber.*, oauth2.* (OAuth provider login/consent pages), updateUser, etc.
 ```
 
 ### Using Auth UI Components
