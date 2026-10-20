@@ -1,6 +1,6 @@
 {
   "name": "@neondatabase/neon-js",
-  "version": "0.7.0-beta",
+  "version": "0.8.0-beta",
   "description": "TypeScript SDK for Neon Auth and Data API - authentication and PostgreSQL querying",
   "type": "module",
   "license": "Apache-2.0",
@@ -122,6 +122,7 @@
     "clean": "rm -rf node_modules dist"
   },
   "devDependencies": {
+    "@neondatabase/internal": "workspace:*",
     "@types/pg": "8.20.0",
     "@types/pg-format": "1.0.5",
     "msw": "2.6.8"

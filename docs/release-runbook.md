@@ -24,9 +24,10 @@ hardened runners and security scanning mandate lives in
 
 ## Prerequisites
 
-- **Repo access**: You need `admin` or `maintain` role on both
-  `neondatabase/neon-js` and `databricks/secure-public-registry-releases-eng`.
-  Stage 2 checks this at runtime and will reject other roles.
+- **Repo access**: Stage 2 checks the dispatching actor's role on
+  `databricks/secure-public-registry-releases-eng` at runtime and accepts
+  `admin`, `maintain`, or `write`; any other role is rejected. You also need
+  access to `neondatabase/neon-js` to run Stage 1 and merge the release PR.
 - **Main branch must be CI-green**: Do not release from a red branch. Check the
   latest CI run on `main` before starting.
 - **Supply chain freeze**: Before releasing, check
@@ -45,22 +46,28 @@ hardened runners and security scanning mandate lives in
    - Bump versions in each cascaded package
    - Push a release branch
    - Open a release PR with a title like `chore: release @neondatabase/auth@vX.Y.Z @neondatabase/neon-js@vX.Y.Z`
-4. Have an approver manually click **Squash and merge**. Do not use auto-merge.
-   The merge commit triggers `post-release.yml`, which creates the annotated tags
-   and comments with Stage 2 dispatch instructions.
+4. The release PR opens as a **draft**. Mark it ready for review, get an
+   approval, and wait for the required `ci` and `unit-tests` checks to pass.
+   Then have an approver manually click **Squash and merge**. Do not use
+   auto-merge: a push attributed to `GITHUB_TOKEN` would not trigger
+   `post-release.yml`. The merge commit triggers `post-release.yml`, which creates
+   the annotated tags and comments with Stage 2 dispatch instructions.
 5. Go to **secure-public-registry-releases-eng > Actions > neon-js** (`neon-js.yml`).
 6. Select the **same package**. For an all-packages release, select `all` and use
    the `neon-js@v...` tag from the post-release handoff as the canonical **ref**
    (all release tags point at the same merge commit).
-   Set **dry-run** to `false` for a real publish.
+   Run once with **dry-run** left at its default (`true`) to validate, then
+   re-run with **dry-run** set to `false` for the real publish.
 7. Click **Run workflow**. Stage 2 will:
    - Check actor permissions
    - Checkout neon-js source at the specified ref
-   - Install deps, audit, build
+   - Install deps, then audit (blocks on high/critical advisories, see below), build
    - Pack tarballs for all cascaded packages
    - Run security scan
    - Publish each package to npm via OIDC (skips already-published versions)
 8. Verify on npmjs.com that all packages were published at the expected versions.
+   If you check with `npm view`, run it from outside the repo: the repo `.npmrc`
+   sets `min-release-age=7`, which hides versions published in the last 7 days.
 
 ### Cascade Reference
 
@@ -88,6 +95,19 @@ Use this to validate:
 - Tarballs are correctly packed
 
 A dry run does not modify any state — no tags, no npm publishes.
+
+### Audit gate and publishing from a different ref
+
+Stage 2 runs `pnpm audit --audit-level=high` and fails if any high or critical
+advisory has a path rooted outside `examples/*` and `e2e`. This includes
+transitive dependencies of the published packages, so a dry run can fail on an
+advisory published after the release PR was cut.
+
+To recover, fix the advisory with `pnpm.overrides` in a normal PR to `main`,
+merge it, then pass that merged commit SHA as Stage 2's **ref** (re-running the
+dry run first). The git tags created by `post-release.yml` still point at the
+release commit, not at the published ref. This is acceptable; record the SHA
+you published from in the release PR.
 
 ## Failure Scenarios & Recovery
 
@@ -132,15 +152,16 @@ git push origin --delete "release/<package>-<run-id>"
 **State**: Tags and version bump commit are in git (from Stage 1). Nothing is on
 npm — no packages were published.
 
-**Recovery**: Fix the build issue (missing dep, type error, etc.), push the fix
-to `main`, and re-run Stage 2 pointing at the updated `main` or a new tag.
+**Recovery**: Fix the build issue (missing dep, type error, audit advisory,
+etc.), merge the fix to `main`, and re-run Stage 2 pointing at the updated
+`main` SHA or a new tag.
 
 If the fix requires a new version bump, you will need to either:
 - Delete the old tags and revert the version bump commit, then re-run Stage 1
 - Or accept the version gap and bump again
 
-**Verify**: `npm view @neondatabase/<pkg> versions` does not include the
-failed version.
+**Verify**: `npm view @neondatabase/<pkg> versions` (run outside the repo, see
+`min-release-age` above) does not include the failed version.
 
 ---
 
@@ -232,7 +253,7 @@ Stage 2. If it persists:
 
 ### 8. JFrog proxy issues
 
-**Symptoms**: `bun install` fails in Stage 2 because dependencies cannot be
+**Symptoms**: `pnpm install` fails in Stage 2 because dependencies cannot be
 fetched from JFrog.
 
 **State**: Nothing was built or published. Git state is fine.
@@ -242,7 +263,7 @@ fetched from JFrog.
 2. Contact Will Hess for runner/proxy access issues
 3. If JFrog is down, wait for recovery and re-run
 
-**Verify**: `bun install --frozen-lockfile` succeeds in Stage 2 re-run.
+**Verify**: `pnpm install --frozen-lockfile` succeeds in Stage 2 re-run.
 
 ## Key Contacts
 

@@ -25,8 +25,8 @@ jobs:
   tag-and-handoff:
     if: "startsWith(github.event.head_commit.message, 'chore: release @neondatabase/')"
     runs-on:
-      group: neondatabase-protected-runner-group
-      labels: linux-ubuntu-latest
+      group: databricks-ghec-untrusted-runner-group
+      labels: linux-ubuntu-latest-untrusted-2core-8gb
     timeout-minutes: 15
     permissions:
       contents: write      # push tags

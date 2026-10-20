@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { processAuthMiddleware } from './processor';
 import type { AuthMiddlewareConfig } from './processor';
 import type { ResolvedNeonAuthLogging } from '../logger';
@@ -553,5 +553,66 @@ describe('processAuthMiddleware', () => {
 
       expect(result.action).toBe('redirect_login');
     });
+  });
+});
+
+describe('processAuthMiddleware client-info header', () => {
+  const originalNextRuntime = process.env.NEXT_RUNTIME;
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.resetModules();
+    if (originalNextRuntime === undefined) delete process.env.NEXT_RUNTIME;
+    else process.env.NEXT_RUNTIME = originalNextRuntime;
+  });
+
+  // The injector caches client info at module init, so the env must be set
+  // before the module graph is (re)loaded.
+  async function captureSessionLookup(headers: Record<string, string>) {
+    process.env.NEXT_RUNTIME = 'nodejs';
+    vi.resetModules();
+    const handler = await import('../proxy/handler');
+    const { processAuthMiddleware: run } = await import('./processor');
+    const { BETTER_AUTH_VERSION } = await import('../../utils/better-auth-version');
+    const spy = vi
+      .spyOn(handler, 'handleAuthProxyRequest')
+      .mockResolvedValue(Response.json({ session: null, user: null }));
+
+    await run(
+      createTestConfig({
+        request: new Request('https://app.com/dashboard', {
+          method: 'POST',
+          headers: {
+            Cookie: '__Secure-neon-auth.session_token=token-value',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            ...headers,
+          },
+          body: 'a=b',
+        }),
+      }),
+    );
+
+    const sessionRequest = spy.mock.calls[0][0].request;
+    return { sessionRequest, BETTER_AUTH_VERSION };
+  }
+
+  test('stamps X-Neon-Client-Info on the get-session lookup', async () => {
+    const { sessionRequest, BETTER_AUTH_VERSION } = await captureSessionLookup({});
+
+    const info = JSON.parse(sessionRequest.headers.get('X-Neon-Client-Info')!);
+    expect(info.sdk).toBe('@neondatabase/auth');
+    expect(info.framework).toBe('next');
+    expect(info.betterAuthVersion).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(info.betterAuthVersion).toBe(BETTER_AUTH_VERSION);
+    const [major, minor] = info.betterAuthVersion.split('.').map(Number);
+    expect(major > 1 || (major === 1 && minor >= 7)).toBe(true);
+    expect(sessionRequest.headers.has('content-type')).toBe(false);
+  });
+
+  test('preserves an inbound X-Neon-Client-Info value', async () => {
+    const inbound = JSON.stringify({ sdk: 'custom', version: '9.9.9' });
+    const { sessionRequest } = await captureSessionLookup({ 'X-Neon-Client-Info': inbound });
+
+    expect(sessionRequest.headers.get('X-Neon-Client-Info')).toBe(inbound);
   });
 });

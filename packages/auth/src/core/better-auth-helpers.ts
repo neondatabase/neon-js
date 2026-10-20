@@ -405,12 +405,15 @@ export function mapBetterAuthIdentity(
   betterAuthUserIdentityAccount: Awaited<
     ReturnType<typeof listUserAccounts>
   >[number],
-  accountInfoData: Awaited<ReturnType<typeof accountInfo>>
+  accountInfoData: Awaited<ReturnType<typeof accountInfo>> | null
 ): UserIdentity {
+  // Supabase's UserIdentity uses `identity_id` for the identity row key and
+  // `id` for the provider-side user id, and unlinkIdentity selects by
+  // `identity_id`; the local account row id plays the row-key role here.
   return {
-    id: betterAuthUserIdentityAccount.id,
-    user_id: betterAuthUserIdentityAccount.id,
-    identity_id: betterAuthUserIdentityAccount.accountId,
+    id: betterAuthUserIdentityAccount.accountId,
+    user_id: betterAuthUserIdentityAccount.userId,
+    identity_id: betterAuthUserIdentityAccount.id,
     provider: betterAuthUserIdentityAccount.providerId,
     created_at: toISOString(betterAuthUserIdentityAccount.createdAt),
     updated_at: toISOString(betterAuthUserIdentityAccount.updatedAt),
@@ -421,10 +424,10 @@ export function mapBetterAuthIdentity(
           provider: betterAuthUserIdentityAccount.providerId,
           provider_id: betterAuthUserIdentityAccount.accountId,
           scopes: betterAuthUserIdentityAccount.scopes,
-          email: accountInfoData.data.email,
-          name: accountInfoData.data.user.name,
-          picture: accountInfoData.data.user.picture,
-          email_verified: accountInfoData.data.user.email_verified,
+          email: accountInfoData.user.email,
+          name: accountInfoData.user.name,
+          picture: accountInfoData.user.image,
+          email_verified: accountInfoData.user.emailVerified,
           ...accountInfoData.data,
         }
       : {

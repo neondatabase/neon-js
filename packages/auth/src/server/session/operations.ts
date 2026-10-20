@@ -3,6 +3,7 @@ import { validateSessionData } from './validator';
 import { parseCookies } from 'better-auth/cookies';
 import { SignJWT } from 'jose';
 import type { ResolvedNeonAuthLogging } from '@/server/logger';
+import { injectClientInfo } from '@/utils/client-info';
 
 // Default 5-minute TTL for session data cookie (in seconds)
 export const DEFAULT_SESSION_CACHE_TTL_SECONDS = 300;
@@ -266,9 +267,9 @@ export async function fetchSessionWithCookie(
   }
 
   const response = await fetch(`${baseUrl}/get-session`, {
-    headers: {
+    headers: injectClientInfo({
       Cookie: `${cookieName}=${cookieValue}`,
-    },
+    }),
     signal: AbortSignal.timeout(3000), // 3s timeout
   });
 
