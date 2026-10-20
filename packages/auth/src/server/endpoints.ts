@@ -76,13 +76,14 @@ export const API_ENDPOINTS = {
   // changeEmail: { path: 'change-email', method: 'POST' }
   changePassword: { path: 'change-password', method: 'POST' },
   sendVerificationEmail: { path: 'send-verification-email', method: 'POST' },
-  verifyEmail: { path: 'verify-email', method: 'POST' },
+  verifyEmail: { path: 'verify-email', method: 'GET' },
   resetPassword: { path: 'reset-password', method: 'POST' },
   requestPasswordReset: { path: 'request-password-reset', method: 'POST' },
 
   // JWT
   token: { path: 'token', method: 'GET' },
-  jwks: { path: 'jwt', method: 'GET' },
+  // Neon Auth serves the JWKS at this path (jwt plugin `jwksPath`), not Better Auth's default `/jwks`.
+  jwks: { path: '.well-known/jwks.json', method: 'GET' },
   getAnonymousToken: { path: 'token/anonymous', method: 'GET' },
 
   // Admin (requires admin role)
@@ -94,7 +95,7 @@ export const API_ENDPOINTS = {
     updateUser: { path: 'admin/update-user', method: 'POST' },
     banUser: { path: 'admin/ban-user', method: 'POST' },
     unbanUser: { path: 'admin/unban-user', method: 'POST' },
-    listUserSessions: { path: 'admin/list-user-sessions', method: 'GET' },
+    listUserSessions: { path: 'admin/list-user-sessions', method: 'POST' },
     revokeUserSession: { path: 'admin/revoke-user-session', method: 'POST' },
     revokeUserSessions: { path: 'admin/revoke-user-sessions', method: 'POST' },
     impersonateUser: { path: 'admin/impersonate-user', method: 'POST' },
@@ -112,7 +113,7 @@ export const API_ENDPOINTS = {
     list: { path: 'organization/list', method: 'GET' },
     getFullOrganization: { path: 'organization/get-full-organization', method: 'GET' },
     setActive: { path: 'organization/set-active', method: 'POST' },
-    checkSlug: { path: 'organization/check-slug', method: 'GET' },
+    checkSlug: { path: 'organization/check-slug', method: 'POST' },
 
     // Member management
     listMembers: { path: 'organization/list-members', method: 'GET' },
