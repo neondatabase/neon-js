@@ -29,6 +29,8 @@ type ResumeConfig = Pick<
   'request' | 'baseUrl' | 'cookieSecret' | 'sessionDataTtl' | 'domain' | 'sameSite'
 > & {
   requestUrl: URL;
+  /** Router-relative pathname the middleware gated on (excludes basePath). */
+  pathname: string;
   loginPathname: string;
   log: NonNullable<AuthMiddlewareConfig['log']>;
 };
@@ -40,7 +42,7 @@ type ResumeConfig = Pick<
 export async function resumeOAuthAuthorization(
   config: ResumeConfig
 ): Promise<MiddlewareResult | null> {
-  const { request, requestUrl, loginPathname, baseUrl, cookieSecret, log } = config;
+  const { request, requestUrl, pathname, loginPathname, baseUrl, cookieSecret, log } = config;
   const { sessionDataTtl, domain, sameSite } = config;
   // Fields are limited to a reason and status: the URL, oauth_query, sig and
   // code are bearer-grade values.
@@ -49,7 +51,7 @@ export async function resumeOAuthAuthorization(
   const trim = (path: string) => (path === '/' ? path : path.replace(/\/+$/, ''));
 
   // Exact path only: a subpath is a different page, not the provider's loginPage.
-  if (request.method !== 'GET' || trim(requestUrl.pathname) !== trim(loginPathname)) {
+  if (request.method !== 'GET' || trim(pathname) !== trim(loginPathname)) {
     return null;
   }
   const oauthQuery = buildSignedOAuthQuery(requestUrl.search);
@@ -92,8 +94,8 @@ export async function resumeOAuthAuthorization(
     request: new Request(requestUrl.origin + requestUrl.pathname, {
       method: 'POST',
       headers: injectClientInfo(headers),
-      // Neon configures no selectAccount/postLogin, so the continue flags behave
-      // alike; `selected` only strips prompt=select_account, excluded above.
+      // Assumes the provider has no selectAccount/postLogin hooks, as on Neon
+      // today; if one is added, `selected` would skip it.
       body: JSON.stringify({ selected: true, oauth_query: oauthQuery }),
     }),
     path: API_ENDPOINTS.oauth2.continue.path,
@@ -126,7 +128,8 @@ export async function resumeOAuthAuthorization(
   }
   // No scheme allowlist: native MCP clients redirect to custom schemes. The
   // target is the provider's, never the request's. A same-page target (e.g.
-  // max_age) would loop.
+  // max_age) would loop; it is compared against the full request path because
+  // the provider's absolute URL includes any basePath.
   if (target.origin === requestUrl.origin && trim(target.pathname) === trim(requestUrl.pathname)) {
     return fallback('self_redirect', 'warn');
   }

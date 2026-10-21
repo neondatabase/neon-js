@@ -61,7 +61,8 @@ function stripBodyHeaders(headers: Headers): Headers {
  * Generic authentication middleware processor (framework-agnostic)
  *
  * Handles the complete middleware flow:
- * 1. Check if login URL (skip auth)
+ * 1. Check if login URL (skip the session check; a signed OAuth-provider query
+ *    may still exchange a verifier or resume the authorization upstream)
  * 2. Check OAuth verification (exchange token)
  * 3. Get session (delegates to handleAuthProxyRequest for cookie cache + upstream fallback)
  * 4. Check if route requires protection
@@ -101,7 +102,8 @@ export async function processAuthMiddleware(
 	const sameOriginLoginPathname =
 		resolvedLoginUrl.origin === requestUrl.origin ? resolvedLoginUrl.pathname : null;
 
-	// Always skip session check for login URL to prevent infinite redirect loop
+	// The login page never runs the session check, which would redirect to itself
+	// in a loop. Only a signed OAuth query is acted on here.
 	if (
 		sameOriginLoginPathname !== null &&
 		isSamePathOrSubpath(pathname, sameOriginLoginPathname)
@@ -110,6 +112,7 @@ export async function processAuthMiddleware(
 			(await resumeOAuthAuthorization({
 				request,
 				requestUrl,
+				pathname,
 				loginPathname: sameOriginLoginPathname,
 				baseUrl,
 				cookieSecret,

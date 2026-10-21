@@ -755,6 +755,32 @@ describe('processAuthMiddleware OAuth provider resume', () => {
     expect(result).toEqual({ action: 'allow', cookies: ['a=1; Path=/'] });
   });
 
+  test('resumes when the gate pathname excludes a basePath present in request.url', async () => {
+    const spy = mockContinue(continueResponse(CONSENT_URL));
+    const result = await run(loginRequest(baseSearch(), { path: '/base/auth/sign-in' }), {
+      pathname: '/auth/sign-in',
+    });
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({ action: 'redirect_oauth' });
+  });
+
+  test('treats a self-redirect to the basePath-prefixed login page as a self-redirect', async () => {
+    mockContinue(continueResponse('https://app.com/base/auth/sign-in'));
+    const result = await run(loginRequest(baseSearch(), { path: '/base/auth/sign-in' }), {
+      pathname: '/auth/sign-in',
+    });
+    expect(result).toEqual({ action: 'allow', cookies: ['a=1; Path=/'] });
+  });
+
+  test('forwards domain and sameSite to the oauth2/continue proxy call', async () => {
+    const spy = mockContinue(continueResponse(CONSENT_URL));
+    await run(loginRequest(baseSearch()), { domain: '.app.com', sameSite: 'none' });
+    const arg = spy.mock.calls[0][0];
+    expect(arg.path).toBe('oauth2/continue');
+    expect(arg.domain).toBe('.app.com');
+    expect(arg.sameSite).toBe('none');
+  });
+
   test('does not resume for an external loginUrl', async () => {
     const spy = mockContinue(continueResponse(CONSENT_URL));
     await run(loginRequest(baseSearch()), { loginUrl: 'https://identity.example.com/auth/sign-in' });
