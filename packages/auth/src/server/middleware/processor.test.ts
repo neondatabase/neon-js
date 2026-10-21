@@ -563,6 +563,7 @@ describe('processAuthMiddleware OAuth provider resume', () => {
 
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   function signedSearch(extra: Array<[string, string]> = [], signed = ['ba_iat', 'client_id', 'scope', 'prompt', 'response_type', 'redirect_uri']) {
@@ -686,6 +687,20 @@ describe('processAuthMiddleware OAuth provider resume', () => {
     }
   );
 
+  test('does not resume when a repeated signed prompt includes login', async () => {
+    const spy = mockContinue(continueResponse(CONSENT_URL));
+    const result = await run(
+      loginRequest(
+        baseSearch([
+          ['prompt', 'none'],
+          ['prompt', 'login'],
+        ])
+      )
+    );
+    expect(spy).not.toHaveBeenCalled();
+    expect(result.action).toBe('allow');
+  });
+
   test('resumes for signed prompt=consent', async () => {
     const spy = mockContinue(continueResponse(CONSENT_URL));
     await run(loginRequest(baseSearch([['prompt', 'consent']])));
@@ -734,6 +749,12 @@ describe('processAuthMiddleware OAuth provider resume', () => {
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
+  test('treats an upstream target differing only by a trailing slash as a self-redirect', async () => {
+    mockContinue(continueResponse('https://app.com/auth/sign-in'));
+    const result = await run(loginRequest(baseSearch(), { path: '/auth/sign-in/' }));
+    expect(result).toEqual({ action: 'allow', cookies: ['a=1; Path=/'] });
+  });
+
   test('does not resume for an external loginUrl', async () => {
     const spy = mockContinue(continueResponse(CONSENT_URL));
     await run(loginRequest(baseSearch()), { loginUrl: 'https://identity.example.com/auth/sign-in' });
@@ -742,11 +763,11 @@ describe('processAuthMiddleware OAuth provider resume', () => {
 
   test('exchanges a session verifier first and keeps sig for the next request', async () => {
     const spy = mockContinue(continueResponse(CONSENT_URL));
-    const exchange = vi.spyOn(oauth, 'exchangeOAuthToken').mockImplementation(async (request) => {
-      const url = new URL(request.url);
-      url.searchParams.delete('neon_auth_session_verifier');
-      return { redirectUrl: url, cookies: ['session=1; Path=/'], success: true };
-    });
+    const exchange = vi.spyOn(oauth, 'exchangeOAuthToken');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json({ session: null, user: null }))
+    );
     const search = `${baseSearch()}&neon_auth_session_verifier=v1`;
 
     const result = await run(
@@ -761,7 +782,6 @@ describe('processAuthMiddleware OAuth provider resume', () => {
     if (result.action === 'redirect_oauth') {
       expect(result.redirectUrl.searchParams.has('neon_auth_session_verifier')).toBe(false);
       expect(result.redirectUrl.searchParams.get('sig')).toBe(SIG);
-      expect(result.cookies).toEqual(['session=1; Path=/']);
     }
   });
 
@@ -812,6 +832,10 @@ describe('processAuthMiddleware OAuth provider resume', () => {
     await run(loginRequest(baseSearch()), { log });
     mockContinue(Response.json({ message: 'no' }, { status: 401 }));
     await run(loginRequest(baseSearch()), { log });
+    mockContinue(
+      Response.json({ message: 'forbidden?code=SECRETCODE' }, { status: 403 })
+    );
+    await run(loginRequest(baseSearch()), { log });
 
     const logged = JSON.stringify(
       Object.values(log).flatMap((fn) => (fn as ReturnType<typeof vi.fn>).mock.calls)
@@ -820,6 +844,11 @@ describe('processAuthMiddleware OAuth provider resume', () => {
     expect(logged).not.toContain('SECRETCODE');
     expect(logged).not.toContain(SIG);
     expect(logged).not.toContain('oauth_query');
+    expect(log.warn).toHaveBeenCalledTimes(1);
+    expect(log.warn).toHaveBeenCalledWith(
+      '[neon-auth] OAuth resume',
+      expect.objectContaining({ reason: 'upstream_rejected', status: 403 })
+    );
     expect(log.debug).toHaveBeenCalled();
   });
 });

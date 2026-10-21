@@ -42,8 +42,10 @@ export async function resumeOAuthAuthorization(
 ): Promise<MiddlewareResult | null> {
   const { request, requestUrl, loginPathname, baseUrl, cookieSecret, log } = config;
   const { sessionDataTtl, domain, sameSite } = config;
-  const note = (reason: string) =>
-    log.debug('[neon-auth] OAuth resume', { component: 'middleware', reason });
+  // Fields are limited to a reason and status: the URL, oauth_query, sig and
+  // code are bearer-grade values.
+  const note = (reason: string, status?: number, level: 'debug' | 'warn' = 'debug') =>
+    log[level]('[neon-auth] OAuth resume', { component: 'middleware', reason, status });
   const trim = (path: string) => (path === '/' ? path : path.replace(/\/+$/, ''));
 
   // Exact path only: a subpath is a different page, not the provider's loginPage.
@@ -70,7 +72,7 @@ export async function resumeOAuthAuthorization(
     note('no_session_cookie');
     return null;
   }
-  const prompts = new URLSearchParams(oauthQuery).get('prompt')?.split(/\s+/) ?? [];
+  const prompts = new URLSearchParams(oauthQuery).getAll('prompt').flatMap((v) => v.split(/\s+/));
   if (prompts.some((prompt) => REAUTH_PROMPTS.has(prompt))) {
     note('reauth_prompt');
     return null;
@@ -90,20 +92,29 @@ export async function resumeOAuthAuthorization(
     request: new Request(requestUrl.origin + requestUrl.pathname, {
       method: 'POST',
       headers: injectClientInfo(headers),
+      // Neon configures no selectAccount/postLogin, so the continue flags behave
+      // alike; `selected` only strips prompt=select_account, excluded above.
       body: JSON.stringify({ selected: true, oauth_query: oauthQuery }),
     }),
     path: API_ENDPOINTS.oauth2.continue.path,
     baseUrl, cookieSecret, sessionDataTtl, domain, sameSite, log,
   });
   const cookies = response.headers.getSetCookie();
-  const fallback = (reason: string): MiddlewareResult => {
-    note(reason);
+  const fallback = (reason: string, level: 'debug' | 'warn' = 'debug'): MiddlewareResult => {
+    note(reason, response.status, level);
     return { action: 'allow', cookies };
   };
 
-  const body = response.ok
-    ? ((await response.json().catch(() => null)) as { redirect?: unknown; url?: unknown } | null)
-    : null;
+  if (!response.ok) {
+    // 401 is no session; 400 is an expired or invalid signature. Anything else
+    // points at a misconfigured or unhealthy upstream.
+    const expected = response.status === 401 || response.status === 400;
+    return fallback('upstream_rejected', expected ? 'debug' : 'warn');
+  }
+  const body = (await response.json().catch(() => null)) as {
+    redirect?: unknown;
+    url?: unknown;
+  } | null;
   if (!body || body.redirect !== true || typeof body.url !== 'string') {
     return fallback('upstream_no_redirect');
   }
@@ -111,13 +122,13 @@ export async function resumeOAuthAuthorization(
   try {
     target = new URL(body.url);
   } catch {
-    return fallback('invalid_target');
+    return fallback('invalid_target', 'warn');
   }
   // No scheme allowlist: native MCP clients redirect to custom schemes. The
   // target is the provider's, never the request's. A same-page target (e.g.
   // max_age) would loop.
-  if (target.origin === requestUrl.origin && target.pathname === requestUrl.pathname) {
-    return fallback('self_redirect');
+  if (target.origin === requestUrl.origin && trim(target.pathname) === trim(requestUrl.pathname)) {
+    return fallback('self_redirect', 'warn');
   }
   note('redirecting');
   return { action: 'redirect_oauth', redirectUrl: target, cookies };
