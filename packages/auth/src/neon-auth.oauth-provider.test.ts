@@ -56,17 +56,32 @@ describe('oauth2 client runtime', () => {
     expect(JSON.parse(init.body as string)).toMatchObject({ accept: true });
   });
 
+  const SIGNED_SEARCH =
+    '?client_id=abc&scope=openid%20profile&exp=4102444800&utm=1&sig=s1' +
+    '&ba_param=client_id&ba_param=scope&ba_param=exp&ba_param=ba_param';
+  // Mirrors the plugin's buildSignedOAuthQuery: signed names plus `sig`, in
+  // URL order, with unsigned params (utm) dropped.
+  const EXPECTED_OAUTH_QUERY =
+    'client_id=abc&scope=openid+profile&exp=4102444800&sig=s1' +
+    '&ba_param=client_id&ba_param=scope&ba_param=exp&ba_param=ba_param';
+
   test('consent carries the signed query of the page as oauth_query', async () => {
-    const search =
-      '?client_id=abc&scope=openid&exp=4102444800&utm=1&sig=s1&ba_param=client_id&ba_param=scope&ba_param=exp&ba_param=ba_param';
-    vi.stubGlobal('window', { location: { search } });
+    vi.stubGlobal('window', { location: { search: SIGNED_SEARCH } });
     const auth = createAuthClient('https://auth.example.com');
     await auth.oauth2.consent({ accept: true });
     const body = JSON.parse(lastCall().init.body as string);
-    const signed = new URLSearchParams(body.oauth_query);
-    expect(signed.get('sig')).toBe('s1');
-    expect(signed.get('client_id')).toBe('abc');
-    expect(signed.has('utm')).toBe(false);
+    expect(body.oauth_query).toBe(EXPECTED_OAUTH_QUERY);
+  });
+
+  test('sign-in carries the signed query of the page as oauth_query', async () => {
+    vi.stubGlobal('window', { location: { search: SIGNED_SEARCH } });
+    const auth = createAuthClient('https://auth.example.com');
+    await auth.signIn.email({ email: 'a@b.com', password: 'secret-password' });
+    const { url, init } = lastCall();
+    expect(url).toBe('https://auth.example.com/api/auth/sign-in/email');
+    const body = JSON.parse(init.body as string);
+    expect(body).toMatchObject({ email: 'a@b.com' });
+    expect(body.oauth_query).toBe(EXPECTED_OAUTH_QUERY);
   });
 
   test('sign-in without a signed query carries no oauth_query', async () => {
@@ -120,5 +135,13 @@ describe('oauth2 client runtime', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(lastCall().url).toBe('https://auth.example.com/api/auth/oauth2/token');
     expect(result.data).toEqual({ redirect_uri: 'https://rp.example.com/cb' });
+  });
+
+  test('a host containing "oauth2" does not bypass the session cache', async () => {
+    const auth = createAuthClient('https://oauth2.example.com');
+    await auth.signIn.email({ email: 'a@b.com', password: 'secret-password' });
+    expect(lastCall().url).toBe(
+      'https://oauth2.example.com/api/auth/sign-in/email'
+    );
   });
 });

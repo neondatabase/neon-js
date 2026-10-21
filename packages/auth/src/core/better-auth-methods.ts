@@ -384,7 +384,7 @@ export function deriveBetterAuthMethodFromUrl(
 ): keyof typeof BETTER_AUTH_METHODS_HOOKS | undefined {
   // The OAuth provider's `/oauth2/token` would otherwise match the `/token`
   // session check below and be answered from the session cache.
-  if (url.includes('/oauth2/')) {
+  if (new URL(url, 'http://localhost').pathname.includes('/oauth2/')) {
     return undefined;
   }
   if (url.includes('/sign-in/anonymous')) {

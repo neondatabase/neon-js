@@ -35,7 +35,7 @@ const coreBetterAuthClientPlugins = [
   magicLinkClient(),
   phoneNumberClient(),
   anonymousTokenClient(),
-];
+] satisfies BetterAuthClientOptions['plugins'];
 
 // The OAuth provider plugin's inferred type embeds the whole server plugin and
 // cannot be serialized into a declaration file, so the list is annotated to

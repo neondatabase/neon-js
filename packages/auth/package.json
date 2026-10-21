@@ -107,7 +107,7 @@
     "test": "vitest",
     "test:node": "node --run test",
     "test:ci": "vitest run --passWithNoTests",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p dist-check/tsconfig.json",
     "test:types": "tsc --noEmit",
     "lint": "eslint .",
     "clean": "rm -rf node_modules dist",

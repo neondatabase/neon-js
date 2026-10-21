@@ -27,4 +27,18 @@ describe('deriveBetterAuthMethodFromUrl', () => {
       deriveBetterAuthMethodFromUrl(`https://a.example.com/api/auth/oauth2/${name}`)
     ).toBeUndefined();
   });
+
+  test('a host named oauth2 does not suppress classification', () => {
+    expect(
+      deriveBetterAuthMethodFromUrl('https://oauth2.example.com/api/auth/token')
+    ).toBe('getSession');
+  });
+
+  test('/oauth2/ in the query string does not suppress classification', () => {
+    expect(
+      deriveBetterAuthMethodFromUrl(
+        'https://a.example.com/api/auth/token?next=/oauth2/x'
+      )
+    ).toBe('getSession');
+  });
 });
