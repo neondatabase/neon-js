@@ -713,7 +713,7 @@ describe('createAuthServer phone number', () => {
     );
   }
 
-  function lastCall(): { path: string; init: RequestInit } {
+  function firstCall(): { path: string; init: RequestInit } {
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     return { path: new URL(url).pathname, init };
   }
@@ -765,8 +765,9 @@ describe('createAuthServer phone number', () => {
 
     await call(makeServer());
 
-    const { path, init } = lastCall();
-    expect(path.endsWith(suffix)).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const { path, init } = firstCall();
+    expect(path).toBe(suffix);
     expect(init.method).toBe('POST');
     expect(JSON.parse(init.body as string)).toEqual(body);
   });
@@ -803,7 +804,7 @@ describe('createAuthServer phone number', () => {
     expect(names).toContain(NEON_AUTH_SESSION_DATA_COOKIE_NAME);
   });
 
-  test('phoneNumber.verify mints no session_data when upstream sets no cookie (disableSession)', async () => {
+  test('phoneNumber.verify forwards disableSession and mints no session_data when upstream sets no cookie', async () => {
     fetchMock.mockResolvedValueOnce(
       Response.json({ status: true, token: null, user: { id: 'u1' } }, { status: 200 })
     );
@@ -811,9 +812,15 @@ describe('createAuthServer phone number', () => {
     await makeServer().phoneNumber.verify({
       phoneNumber: '+15555550100',
       code: '123456',
+      disableSession: true,
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(firstCall().init.body as string)).toEqual({
+      phoneNumber: '+15555550100',
+      code: '123456',
+      disableSession: true,
+    });
     expect(setCookieSpy).not.toHaveBeenCalled();
   });
 });
