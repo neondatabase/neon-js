@@ -426,6 +426,63 @@ The `auth` provides access to all Neon Auth APIs:
 - **Organization**: `organization.create()`, `organization.list()`, `organization.inviteMember()`, `organization.removeMember()`, etc.
 - **Admin**: `admin.listUsers()`, `admin.banUser()`, `admin.setRole()`, `admin.createUser()`, etc.
 - **Email OTP**: `emailOtp.sendVerificationOtp()`, `emailOtp.verifyEmail()`
+- **OAuth provider**: `oauth2.publicClient()`, `oauth2.consent()`, `oauth2.getConsents()`, etc.
+
+## OAuth provider (MCP)
+
+A Neon Auth project can act as an OAuth 2.1 provider, for example to let MCP clients sign in your users. The provider's login and consent pages are pages of your app, and the client exposes the `oauth2` namespace for them; no configuration is needed:
+
+```typescript
+// lib/auth/client.ts
+"use client"
+
+import { createAuthClient } from '@neondatabase/auth/next';
+
+export const authClient = createAuthClient();
+```
+
+When the page URL carries the signed `sig` and `ba_param` query parameters that the provider appended on redirect, the client adds them as `oauth_query` to every non-GET request, so a sign-in on the login page resumes the authorization. Without those parameters requests are unchanged.
+
+A consent page reads the client from the URL and answers with `oauth2.consent`:
+
+```tsx
+'use client';
+import { useEffect, useState } from 'react';
+import { authClient } from '@/lib/auth/client';
+
+export default function ConsentPage() {
+  const [scope, setScope] = useState<string | null>(null);
+  const [client, setClient] = useState<{ client_name?: string; logo_uri?: string } | null>(null);
+
+  // Read the query in an effect: the page also renders on the server, where `window` is undefined.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setScope(params.get('scope'));
+    authClient.oauth2
+      .publicClient({ query: { client_id: params.get('client_id') ?? '' } })
+      .then(({ data }) => setClient(data));
+  }, []);
+
+  // The client follows the redirect in the response, back to the relying party.
+  const answer = (accept: boolean) => authClient.oauth2.consent({ accept });
+
+  return (
+    <div>
+      <p>{client?.client_name ?? 'An application'} wants to access: {scope}</p>
+      <button onClick={() => answer(true)}>Allow</button>
+      <button onClick={() => answer(false)}>Deny</button>
+    </div>
+  );
+}
+```
+
+Available under `oauth2`: `consent`, `continue`, `publicClient`, `publicClientPrelogin`, `getConsent`, `getConsents`, `updateConsent` and `deleteConsent` (the first four drive the login and consent pages; the last four let a signed-in user review and revoke what they granted).
+
+Notes:
+
+- Client management (creating, updating or deleting OAuth clients) is not available to end users on Neon; those calls are rejected with 401. The client type still lists them because it mirrors the plugin.
+- Relying parties and MCP servers that consume tokens should use `@neon/oauth`, not this package. The `token`, `introspect`, `revoke`, `register`, `userinfo` and `authorize` endpoints are for them.
+- The server-side `createNeonAuth()` and `createAuthServer()` expose only the eight user actions above under `oauth2`. A server-side consent example is not documented, because `oauth_query` has to be the signed query the provider redirected with and is only built automatically in the browser.
 
 ## Project Structure
 

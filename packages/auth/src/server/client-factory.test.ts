@@ -1,6 +1,15 @@
-import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
+import {
+  describe,
+  test,
+  expect,
+  expectTypeOf,
+  beforeEach,
+  afterEach,
+  vi,
+} from 'vitest';
 import { createAuthServer } from './client-factory';
 import type { RequestContext } from './request-context';
+import type { NeonAuthServer } from './types';
 
 const TEST_SECRET = 'test-secret-at-least-32-characters-long!';
 const TEST_BASE_URL = 'https://auth.example.com';
@@ -431,5 +440,102 @@ describe('createAuthServer getAccessToken', () => {
     expect(headers.get('X-Neon-Client-Info')).toBeTruthy();
     expect(headers.get('Content-Type')).toBe('application/json');
     expect(headers.get('Origin')).toBe('https://app.example.com');
+  });
+});
+
+describe('createAuthServer oauth2', () => {
+  const originalFetch = globalThis.fetch;
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn(async () => Response.json({ ok: true }));
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const make = () =>
+    createAuthServer({
+      baseUrl: TEST_BASE_URL,
+      context: makeContext,
+      cookieSecret: TEST_SECRET,
+    });
+
+  const lastCall = () => {
+    const [url, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
+    return { url: new URL(url), init };
+  };
+
+  const postCases = [
+    ['consent', 'consent', { accept: true, scope: 'openid' }],
+    ['continue', 'continue', { selected: true }],
+    ['publicClientPrelogin', 'public-client-prelogin', { client_id: 'c1', oauth_query: 'sig=s' }],
+    ['updateConsent', 'update-consent', { id: 'k1', update: { scopes: ['openid'] } }],
+    ['deleteConsent', 'delete-consent', { id: 'k1' }],
+  ] as const;
+
+  test.each(postCases)('oauth2.%s POSTs JSON to /oauth2/%s', async (name, path, body) => {
+    await (make().oauth2[name] as (b: unknown) => Promise<unknown>)(body);
+    const { url, init } = lastCall();
+    expect(url.pathname.endsWith(`/oauth2/${path}`)).toBe(true);
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual(body);
+  });
+
+  test('oauth2.publicClient GETs /oauth2/public-client with client_id', async () => {
+    await make().oauth2.publicClient({ query: { client_id: 'c1' } });
+    const { url, init } = lastCall();
+    expect(url.pathname.endsWith('/oauth2/public-client')).toBe(true);
+    expect(url.searchParams.get('client_id')).toBe('c1');
+    expect(init.method).toBe('GET');
+  });
+
+  test('oauth2.getConsent GETs /oauth2/get-consent with id', async () => {
+    await make().oauth2.getConsent({ query: { id: 'k1' } });
+    const { url, init } = lastCall();
+    expect(url.pathname.endsWith('/oauth2/get-consent')).toBe(true);
+    expect(url.searchParams.get('id')).toBe('k1');
+    expect(init.method).toBe('GET');
+  });
+
+  test('oauth2.getConsents GETs /oauth2/get-consents', async () => {
+    await make().oauth2.getConsents();
+    const { url, init } = lastCall();
+    expect(url.pathname.endsWith('/oauth2/get-consents')).toBe(true);
+    expect(init.method).toBe('GET');
+  });
+
+  test('oauth2 exposes only the user actions Neon routes', () => {
+    const oauth2 = make().oauth2 as Record<string, unknown>;
+    for (const included of [
+      'consent',
+      'continue',
+      'deleteConsent',
+      'getConsent',
+      'getConsents',
+      'publicClient',
+      'publicClientPrelogin',
+      'updateConsent',
+    ]) {
+      expect(typeof oauth2[included]).toBe('function');
+    }
+    for (const excluded of ['token', 'introspect', 'revoke', 'register', 'createClient', 'getClients']) {
+      expect(oauth2[excluded]).toBeUndefined();
+    }
+  });
+
+  test('the server type has only the routed oauth2 methods', () => {
+    expectTypeOf<keyof NeonAuthServer['oauth2']>().toEqualTypeOf<
+      | 'consent'
+      | 'continue'
+      | 'publicClientPrelogin'
+      | 'updateConsent'
+      | 'deleteConsent'
+      | 'publicClient'
+      | 'getConsent'
+      | 'getConsents'
+    >();
   });
 });

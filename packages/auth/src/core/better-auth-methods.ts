@@ -382,6 +382,11 @@ function isSessionResponseData(
 export function deriveBetterAuthMethodFromUrl(
   url: string
 ): keyof typeof BETTER_AUTH_METHODS_HOOKS | undefined {
+  // The OAuth provider's `/oauth2/token` would otherwise match the `/token`
+  // session check below and be answered from the session cache.
+  if (url.includes('/oauth2/')) {
+    return undefined;
+  }
   if (url.includes('/sign-in/anonymous')) {
     return 'anonymousSignIn';
   }

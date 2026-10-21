@@ -1,0 +1,124 @@
+import {
+  describe,
+  test,
+  expect,
+  expectTypeOf,
+  vi,
+  beforeEach,
+  afterEach,
+} from 'vitest';
+import { createAuthClient } from './neon-auth';
+import { BETTER_AUTH_METHODS_CACHE } from './core/better-auth-methods';
+
+describe('oauth2 client types', () => {
+  test('the default client exposes oauth2', () => {
+    const auth = createAuthClient('https://auth.example.com');
+    expectTypeOf(auth).toHaveProperty('oauth2');
+    expectTypeOf(auth.oauth2).toHaveProperty('consent');
+    expectTypeOf(auth.oauth2).toHaveProperty('publicClient');
+  });
+});
+
+describe('oauth2 client runtime', () => {
+  const originalFetch = globalThis.fetch;
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn(async () =>
+      Response.json({ redirect_uri: 'https://rp.example.com/cb' })
+    );
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.unstubAllGlobals();
+    BETTER_AUTH_METHODS_CACHE.clearSessionCache();
+  });
+
+  const lastCall = () => {
+    const [url, init] = fetchMock.mock.calls.at(-1) as [unknown, RequestInit];
+    return { url: String(url), init };
+  };
+
+  test('oauth2 is present by default', () => {
+    const auth = createAuthClient('https://auth.example.com');
+    expect(typeof auth.oauth2.consent).toBe('function');
+    expect(typeof auth.oauth2.publicClient).toBe('function');
+  });
+
+  test('consent POSTs to /oauth2/consent', async () => {
+    const auth = createAuthClient('https://auth.example.com');
+    await auth.oauth2.consent({ accept: true });
+    const { url, init } = lastCall();
+    expect(url).toBe('https://auth.example.com/api/auth/oauth2/consent');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toMatchObject({ accept: true });
+  });
+
+  test('consent carries the signed query of the page as oauth_query', async () => {
+    const search =
+      '?client_id=abc&scope=openid&exp=4102444800&utm=1&sig=s1&ba_param=client_id&ba_param=scope&ba_param=exp&ba_param=ba_param';
+    vi.stubGlobal('window', { location: { search } });
+    const auth = createAuthClient('https://auth.example.com');
+    await auth.oauth2.consent({ accept: true });
+    const body = JSON.parse(lastCall().init.body as string);
+    const signed = new URLSearchParams(body.oauth_query);
+    expect(signed.get('sig')).toBe('s1');
+    expect(signed.get('client_id')).toBe('abc');
+    expect(signed.has('utm')).toBe(false);
+  });
+
+  test('sign-in without a signed query carries no oauth_query', async () => {
+    vi.stubGlobal('window', { location: { search: '?utm=1' } });
+    const auth = createAuthClient('https://auth.example.com');
+    await auth.signIn.email({ email: 'a@b.com', password: 'secret-password' });
+    const { url, init } = lastCall();
+    expect(url).toBe('https://auth.example.com/api/auth/sign-in/email');
+    const body = JSON.parse(init.body as string);
+    expect(body).not.toHaveProperty('oauth_query');
+    expect(body).toMatchObject({ email: 'a@b.com' });
+  });
+
+  test('publicClient GETs /oauth2/public-client with client_id', async () => {
+    const auth = createAuthClient('https://auth.example.com');
+    await auth.oauth2.publicClient({ query: { client_id: 'abc' } });
+    const { url, init } = lastCall();
+    expect(url).toBe(
+      'https://auth.example.com/api/auth/oauth2/public-client?client_id=abc'
+    );
+    expect(init.method).toBe('GET');
+  });
+
+  test('a cached session does not short-circuit /oauth2/token', async () => {
+    const now = new Date();
+    BETTER_AUTH_METHODS_CACHE.setCachedSession({
+      session: {
+        id: 's1',
+        userId: 'u1',
+        token: 'tok',
+        expiresAt: new Date(Date.now() + 3_600_000),
+        createdAt: now,
+        updatedAt: now,
+      },
+      user: {
+        id: 'u1',
+        email: 'a@b.com',
+        name: 'A',
+        emailVerified: true,
+        createdAt: now,
+        updatedAt: now,
+      },
+    } as never);
+    expect(BETTER_AUTH_METHODS_CACHE.getCachedSession()).not.toBeNull();
+
+    const auth = createAuthClient('https://auth.example.com');
+    const result = await (auth as any).$fetch('/oauth2/token', {
+      method: 'POST',
+      body: { grant_type: 'authorization_code' },
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(lastCall().url).toBe('https://auth.example.com/api/auth/oauth2/token');
+    expect(result.data).toEqual({ redirect_uri: 'https://rp.example.com/cb' });
+  });
+});

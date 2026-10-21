@@ -147,6 +147,21 @@ export const API_ENDPOINTS = {
   magicLink: {
     verify: { path: 'magic-link/verify', method: 'GET' },
   },
+
+  // OAuth provider: the session-cookie user actions Neon routes. Client
+  // management is rejected by Neon for end users, and the protocol endpoints
+  // (token, introspect, revoke, register, userinfo, authorize, endSession) are
+  // for relying parties that authenticate with client credentials.
+  oauth2: {
+    consent: { path: 'oauth2/consent', method: 'POST' },
+    continue: { path: 'oauth2/continue', method: 'POST' },
+    publicClientPrelogin: { path: 'oauth2/public-client-prelogin', method: 'POST' },
+    updateConsent: { path: 'oauth2/update-consent', method: 'POST' },
+    deleteConsent: { path: 'oauth2/delete-consent', method: 'POST' },
+    publicClient: { path: 'oauth2/public-client', method: 'GET' },
+    getConsent: { path: 'oauth2/get-consent', method: 'GET' },
+    getConsents: { path: 'oauth2/get-consents', method: 'GET' },
+  },
 } as const satisfies ValidEndpointTree<VanillaBetterAuthClient>;
 
 export type ApiEndpoints = typeof API_ENDPOINTS;
