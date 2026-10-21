@@ -202,7 +202,6 @@ export default function ConsentPage() {
       .then(({ data }) => setClient(data));
   }, []);
 
-  // The client follows the redirect in the response, back to the relying party.
   const answer = (accept: boolean) => auth.oauth2.consent({ accept });
 
   return (
@@ -214,6 +213,8 @@ export default function ConsentPage() {
   );
 }
 ```
+
+`oauth2.consent()` navigates the browser itself: it returns `{ redirect: true, url }`, and better-auth's default redirect fetch plugin sets `window.location.href`, so the page does not need to follow it.
 
 The browser client's `oauth2.*` mirrors the full plugin. Neon mounts these endpoints:
 

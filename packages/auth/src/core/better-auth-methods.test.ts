@@ -63,4 +63,19 @@ describe('deriveBetterAuthMethodFromUrl', () => {
       deriveBetterAuthMethodFromUrl('https://ep.example.com/oauth2/auth/token')
     ).toBe('getSession');
   });
+
+  test.each([
+    ['https://x.example.com/oauth2/sign-out', 'signOut'],
+    ['https://x.example.com/oauth2/get-session', 'getSession'],
+  ])('a base URL ending in /oauth2: %s -> %s', (url, expected) => {
+    expect(deriveBetterAuthMethodFromUrl(url)).toBe(expected);
+  });
+
+  test('a trailing slash on an oauth2 endpoint is still not a session method', () => {
+    expect(
+      deriveBetterAuthMethodFromUrl(
+        'https://a.example.com/api/auth/oauth2/token/'
+      )
+    ).toBeUndefined();
+  });
 });

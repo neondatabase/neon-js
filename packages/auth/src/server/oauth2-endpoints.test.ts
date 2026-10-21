@@ -3,6 +3,7 @@ import { memoryAdapter } from 'better-auth/adapters/memory';
 import { jwt } from 'better-auth/plugins/jwt';
 import { oauthProvider } from '@better-auth/oauth-provider';
 import { describe, expect, test } from 'vitest';
+import { OAUTH2_ENDPOINTS } from '../core/better-auth-methods';
 import { API_ENDPOINTS } from './endpoints';
 
 const auth = betterAuth({
@@ -42,5 +43,15 @@ describe('API_ENDPOINTS.oauth2 matches the oauthProvider plugin routes', () => {
     expect([...(methods ?? [])], `/${path} does not accept ${method}`).toContain(
       method
     );
+  });
+});
+
+describe('OAUTH2_ENDPOINTS matches the oauthProvider plugin routes', () => {
+  test('lists exactly the plugin /oauth2/ routes', () => {
+    const pluginNames = [...routes.keys()]
+      .map((path) => path.slice('/oauth2/'.length))
+      .toSorted();
+    expect(pluginNames.filter((n) => n.includes(':'))).toEqual([]);
+    expect(OAUTH2_ENDPOINTS.toSorted()).toEqual(pluginNames);
   });
 });
