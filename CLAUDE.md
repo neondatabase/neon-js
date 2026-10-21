@@ -638,6 +638,7 @@ export default function AuthPage() {
 - `oauthProviderClient()` is always part of the client plugin list (`src/core/adapter-core.ts`), exposing `oauth2.*` for login and consent pages
 - Adds the signed `sig`/`ba_param` page query as `oauth_query` to non-GET requests; `/oauth2/` URLs are never classified as session methods, so `/oauth2/token` bypasses the session cache
 - Server `createNeonAuth()` exposes only the 8 session-cookie user actions under `oauth2` (`src/server/endpoints.ts`); client management is rejected by Neon
+- `src/server/middleware/oauth-resume.ts` resumes a pending authorization for signed-in users on the login path (`GET`, exact `loginUrl` pathname, signed `sig`/`ba_param` query) via `oauth2/continue`; the target comes only from the upstream response
 
 ### Session Caching
 - In-memory cache with 60s TTL (or until JWT expires)

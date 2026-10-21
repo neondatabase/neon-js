@@ -1,4 +1,5 @@
 import { needsSessionVerification, exchangeOAuthToken } from './oauth';
+import { resumeOAuthAuthorization } from './oauth-resume';
 import { checkSessionRequired, isSamePathOrSubpath } from './route-protection';
 import { handleAuthProxyRequest, NEON_AUTH_HEADER_MIDDLEWARE_NAME } from '../proxy';
 import { NEON_AUTH_SESSION_COOKIE_NAME, NEON_AUTH_SESSION_DATA_COOKIE_NAME } from '../constants';
@@ -105,7 +106,19 @@ export async function processAuthMiddleware(
 		sameOriginLoginPathname !== null &&
 		isSamePathOrSubpath(pathname, sameOriginLoginPathname)
 	) {
-		return { action: 'allow' };
+		return (
+			(await resumeOAuthAuthorization({
+				request,
+				requestUrl,
+				loginPathname: sameOriginLoginPathname,
+				baseUrl,
+				cookieSecret,
+				sessionDataTtl,
+				domain,
+				sameSite,
+				log,
+			})) ?? { action: 'allow' }
+		);
 	}
 
 	// For OAuth flow, the callback from Neon Auth will include a session verifier token in the query params

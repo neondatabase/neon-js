@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **OAuth provider client plugin**: every client (`createAuthClient()` and the Next.js `createAuthClient()`) now includes the Better Auth OAuth provider client (`@better-auth/oauth-provider`, pinned to `1.7.6`) for the login and consent pages of a Neon Auth project acting as an OAuth provider. The client exposes `oauth2.*`; `createNeonAuth()` and `createAuthServer()` expose the session-cookie user actions that Neon routes under `oauth2`: `consent`, `continue`, `publicClient`, `publicClientPrelogin`, `getConsent`, `getConsents`, `updateConsent` and `deleteConsent`. Client management is rejected by Neon for end users.
+- **Middleware resumes OAuth provider authorization for signed-in users**: when a user who already has a session lands on the provider's login page with the signed `sig` and `ba_param` query, `auth.middleware()` calls `oauth2/continue` and redirects to the consent page or back to the client. Add the login path to the middleware `matcher`; `loginUrl` must match the provider's `loginPage`. Requests with `prompt=login`, `create` or `select_account` still show the login page.
 
 ### Fixed
 

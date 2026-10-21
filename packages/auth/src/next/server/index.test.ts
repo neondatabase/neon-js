@@ -1,4 +1,5 @@
-import { describe, test, expect } from 'vitest';
+import { describe, test, expect, vi, afterEach } from 'vitest';
+import { NextRequest } from 'next/server';
 import { createNeonAuth } from './index';
 import type { NeonAuthConfig } from '@/server/config';
 import { ERRORS } from '@/server/errors';
@@ -115,3 +116,30 @@ describe('return value structure', () => {
   });
 });
 
+
+describe('middleware OAuth provider resume', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  test('redirects a signed-in user on the login page to the upstream target with Set-Cookie', async () => {
+    const upstream = Response.json({ redirect: true, url: 'https://app.com/consent?client_id=c1' });
+    upstream.headers.append('Set-Cookie', 'oauth_state=1; Path=/; HttpOnly');
+    const fetchMock = vi.fn().mockResolvedValue(upstream);
+    vi.stubGlobal('fetch', fetchMock);
+
+    const middleware = createNeonAuth(createAuthConfig()).middleware({ loginUrl: '/auth/sign-in' });
+    const response = await middleware(
+      new NextRequest(
+        'https://app.com/auth/sign-in?client_id=c1&sig=s&ba_param=client_id&ba_param=ba_param',
+        { headers: { cookie: '__Secure-neon-auth.session_token=token-value' } }
+      )
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe('https://auth.example.com/oauth2/continue');
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('https://app.com/consent?client_id=c1');
+    expect(response.headers.getSetCookie()).toEqual(['oauth_state=1; Path=/; HttpOnly; Secure; SameSite=Lax']);
+  });
+});

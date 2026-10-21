@@ -228,6 +228,26 @@ The browser client's `oauth2.*` mirrors the full plugin. Neon mounts these endpo
 
 `createNeonAuth()` and `createAuthServer()` expose only the first two groups. A server-side consent example is not documented, because `oauth_query` has to be the signed query the provider redirected with and is only built automatically in the browser.
 
+### Signed-in users on the login page
+
+A user who already has a session can be sent to your login page by the provider, for example when they authorize a second client. `auth.middleware()` resumes that authorization for them, so they land on the consent page or back at the client without seeing the login form:
+
+```ts
+// proxy.ts
+export default auth.middleware({ loginUrl: '/auth/sign-in' });
+
+export const config = {
+  matcher: ['/account/:path*', '/auth/sign-in'],
+};
+```
+
+- Add the login path to the middleware `matcher`; the middleware only sees the paths it matches.
+- The pathname of `loginUrl` must equal the provider's `loginPage`, and the login route must not be protected. Subpaths of the login route are not resumed.
+- Only a `GET` of the login page that still carries the signed `sig` and `ba_param` query is resumed. Anything else renders the login page as before.
+- If the authorization asks for `prompt=login`, `create` or `select_account`, the login page is shown so the user can act on it.
+- A fresh sign-in on the login page already resumes on its own through the client; this covers users who arrive already signed in.
+- Do not rebuild consent URLs yourself; the redirect target comes from the provider and is never taken from the request.
+
 ## Anonymous Access
 
 Enable `allowAnonymous` to let unauthenticated users access data via RLS policies:

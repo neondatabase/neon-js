@@ -556,6 +556,274 @@ describe('processAuthMiddleware', () => {
   });
 });
 
+describe('processAuthMiddleware OAuth provider resume', () => {
+  const SESSION_COOKIE = '__Secure-neon-auth.session_token=token-value';
+  const SIG = 'sig-secret-value';
+  const CONSENT_URL = 'https://app.com/consent?client_id=c1&scope=openid';
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function signedSearch(extra: Array<[string, string]> = [], signed = ['ba_iat', 'client_id', 'scope', 'prompt', 'response_type', 'redirect_uri']) {
+    const params = new URLSearchParams();
+    for (const [k, v] of extra) params.append(k, v);
+    params.append('ba_iat', '1700000000');
+    params.append('sig', SIG);
+    for (const name of [...new Set([...signed, 'ba_param'])].toSorted()) params.append('ba_param', name);
+    return params.toString();
+  }
+
+  function baseSearch(extra: Array<[string, string]> = []) {
+    return signedSearch([
+      ['response_type', 'code'],
+      ['client_id', 'c1'],
+      ['scope', 'openid profile'],
+      ['redirect_uri', 'https://rp.example/cb'],
+      ...extra,
+    ]);
+  }
+
+  function loginRequest(search: string, init: { method?: string; cookie?: string | null; headers?: Record<string, string>; path?: string } = {}) {
+    const headers: Record<string, string> = { ...init.headers };
+    const cookie = init.cookie === undefined ? SESSION_COOKIE : init.cookie;
+    if (cookie) headers.Cookie = cookie;
+    const path = init.path ?? '/auth/sign-in';
+    return new Request(`https://app.com${path}?${search}`, { method: init.method ?? 'GET', headers });
+  }
+
+  function run(request: Request, overrides?: Partial<AuthMiddlewareConfig>) {
+    return processAuthMiddleware(
+      createTestConfig({ request, pathname: new URL(request.url).pathname, ...overrides })
+    );
+  }
+
+  function mockContinue(response: Response) {
+    return vi.spyOn(proxyHandler, 'handleAuthProxyRequest').mockImplementation(async () => response);
+  }
+
+  function continueResponse(url: string, cookies: string[] = ['a=1; Path=/']) {
+    const res = Response.json({ redirect: true, url });
+    for (const c of cookies) res.headers.append('Set-Cookie', c);
+    return res;
+  }
+
+  test('resumes a signed request for a signed-in user', async () => {
+    const spy = mockContinue(continueResponse(CONSENT_URL, ['a=1; Path=/', 'b=2; Path=/']));
+    const search = baseSearch();
+
+    const result = await run(
+      loginRequest(search, { headers: { Referer: 'https://rp.example/start' } })
+    );
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    const arg = spy.mock.calls[0][0];
+    expect(arg.path).toBe('oauth2/continue');
+    expect(arg.request.method).toBe('POST');
+    expect(arg.request.url).toBe('https://app.com/auth/sign-in');
+    expect(arg.request.headers.get('origin')).toBe('https://app.com');
+    expect(arg.request.headers.get('content-type')).toBe('application/json');
+    expect(arg.request.headers.get('cookie')).toContain(SESSION_COOKIE);
+    expect(arg.request.headers.has('x-neon-client-info')).toBe(true);
+    expect(await arg.request.json()).toEqual({
+      selected: true,
+      oauth_query: new URLSearchParams(search).toString(),
+    });
+    expect(result).toEqual({
+      action: 'redirect_oauth',
+      redirectUrl: new URL(CONSENT_URL),
+      cookies: ['a=1; Path=/', 'b=2; Path=/'],
+    });
+  });
+
+  test('keeps only signed parameters in oauth_query', async () => {
+    const spy = mockContinue(continueResponse(CONSENT_URL));
+    const search = baseSearch([['utm_source', 'x']]);
+
+    await run(loginRequest(search));
+
+    const body = await spy.mock.calls[0][0].request.json();
+    const sent = new URLSearchParams(body.oauth_query);
+    expect(sent.has('utm_source')).toBe(false);
+    expect(sent.get('sig')).toBe(SIG);
+    expect(sent.get('client_id')).toBe('c1');
+  });
+
+  test.each([
+    ['401', () => Response.json({ message: 'no session' }, { status: 401 })],
+    ['400', () => Response.json({ message: 'bad' }, { status: 400 })],
+    ['502 transport', () => Response.json({ error: 'x', code: 'ECONNREFUSED' }, { status: 502 })],
+    ['non-JSON 200', () => new Response('<html>', { status: 200 })],
+    ['malformed url', () => Response.json({ redirect: true, url: 'not a url' })],
+    ['relative url', () => Response.json({ redirect: true, url: '/consent?x=1' })],
+    ['redirect false', () => Response.json({ redirect: false, url: CONSENT_URL })],
+    ['url not a string', () => Response.json({ redirect: true, url: 5 })],
+    ['login page again', () => Response.json({ redirect: true, url: 'https://app.com/auth/sign-in?foo=bar' })],
+  ])('falls back to allow on %s and forwards cookies', async (_name, make) => {
+    const res = make();
+    res.headers.append('Set-Cookie', 'c=3; Path=/');
+    mockContinue(res);
+
+    const result = await run(loginRequest(baseSearch()));
+
+    expect(result).toEqual({ action: 'allow', cookies: ['c=3; Path=/'] });
+  });
+
+  test('does not call upstream without a session cookie', async () => {
+    const spy = mockContinue(continueResponse(CONSENT_URL));
+    const result = await run(loginRequest(baseSearch(), { cookie: null }));
+    expect(spy).not.toHaveBeenCalled();
+    expect(result.action).toBe('allow');
+  });
+
+  test.each(['login', 'create', 'select_account', 'consent login'])(
+    'does not resume for signed prompt=%s',
+    async (prompt) => {
+      const spy = mockContinue(continueResponse(CONSENT_URL));
+      const result = await run(loginRequest(baseSearch([['prompt', prompt]])));
+      expect(spy).not.toHaveBeenCalled();
+      expect(result.action).toBe('allow');
+    }
+  );
+
+  test('resumes for signed prompt=consent', async () => {
+    const spy = mockContinue(continueResponse(CONSENT_URL));
+    await run(loginRequest(baseSearch([['prompt', 'consent']])));
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  test('ignores an unsigned prompt=login', async () => {
+    const spy = mockContinue(continueResponse(CONSENT_URL));
+    const search = signedSearch(
+      [
+        ['client_id', 'c1'],
+        ['prompt', 'login'],
+      ],
+      ['client_id']
+    );
+    await run(loginRequest(search));
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([
+    ['no sig', 'client_id=c1&ba_param=client_id&ba_param=ba_param'],
+    ['no ba_param', `client_id=c1&sig=${SIG}`],
+    ['no query', ''],
+  ])('does not resume with %s', async (_name, search) => {
+    const spy = mockContinue(continueResponse(CONSENT_URL));
+    const result = await run(loginRequest(search));
+    expect(spy).not.toHaveBeenCalled();
+    expect(result).toEqual({ action: 'allow' });
+  });
+
+  test('does not resume for a POST (Server Action)', async () => {
+    const spy = mockContinue(continueResponse(CONSENT_URL));
+    await run(loginRequest(baseSearch(), { method: 'POST' }));
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  test('does not resume on a subpath of the login path', async () => {
+    const spy = mockContinue(continueResponse(CONSENT_URL));
+    await run(loginRequest(baseSearch(), { path: '/auth/sign-in/email' }));
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  test('resumes when the login path has a trailing slash', async () => {
+    const spy = mockContinue(continueResponse(CONSENT_URL));
+    await run(loginRequest(baseSearch(), { path: '/auth/sign-in/' }));
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not resume for an external loginUrl', async () => {
+    const spy = mockContinue(continueResponse(CONSENT_URL));
+    await run(loginRequest(baseSearch()), { loginUrl: 'https://identity.example.com/auth/sign-in' });
+    expect(spy.mock.calls.map(([arg]) => arg.path)).not.toContain('oauth2/continue');
+  });
+
+  test('exchanges a session verifier first and keeps sig for the next request', async () => {
+    const spy = mockContinue(continueResponse(CONSENT_URL));
+    const exchange = vi.spyOn(oauth, 'exchangeOAuthToken').mockImplementation(async (request) => {
+      const url = new URL(request.url);
+      url.searchParams.delete('neon_auth_session_verifier');
+      return { redirectUrl: url, cookies: ['session=1; Path=/'], success: true };
+    });
+    const search = `${baseSearch()}&neon_auth_session_verifier=v1`;
+
+    const result = await run(
+      loginRequest(search, {
+        cookie: `${SESSION_COOKIE}; __Secure-neon-auth.session_challange=ch`,
+      })
+    );
+
+    expect(exchange).toHaveBeenCalledTimes(1);
+    expect(spy).not.toHaveBeenCalled();
+    expect(result.action).toBe('redirect_oauth');
+    if (result.action === 'redirect_oauth') {
+      expect(result.redirectUrl.searchParams.has('neon_auth_session_verifier')).toBe(false);
+      expect(result.redirectUrl.searchParams.get('sig')).toBe(SIG);
+      expect(result.cookies).toEqual(['session=1; Path=/']);
+    }
+  });
+
+  test('falls through to resume when the verifier exchange fails', async () => {
+    const spy = mockContinue(continueResponse(CONSENT_URL));
+    vi.spyOn(oauth, 'exchangeOAuthToken').mockResolvedValue(null);
+    const search = `${baseSearch()}&neon_auth_session_verifier=v1`;
+
+    await run(
+      loginRequest(search, {
+        cookie: `${SESSION_COOKIE}; __Secure-neon-auth.session_challange=ch`,
+      })
+    );
+
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  test('never takes the redirect target from the request', async () => {
+    mockContinue(continueResponse(CONSENT_URL));
+    const search = baseSearch([
+      ['url', 'https://evil.example/steal'],
+      ['redirect', 'https://evil.example/x'],
+    ]);
+
+    const result = await run(loginRequest(search));
+
+    expect(result.action).toBe('redirect_oauth');
+    if (result.action === 'redirect_oauth') {
+      expect(result.redirectUrl.href).toBe(CONSENT_URL);
+    }
+  });
+
+  test('allows custom-scheme redirect targets returned by upstream', async () => {
+    mockContinue(continueResponse('cursor://oauth/cb?code=abc'));
+    const result = await run(loginRequest(baseSearch()));
+    expect(result.action).toBe('redirect_oauth');
+  });
+
+  test('never logs the target URL, oauth_query, sig or code', async () => {
+    mockContinue(continueResponse('https://rp.example/cb?code=SECRETCODE&state=s'));
+    const log: ResolvedNeonAuthLogging = {
+      error: vi.fn(),
+      warn: vi.fn(),
+      info: vi.fn(),
+      debug: vi.fn(),
+    };
+
+    await run(loginRequest(baseSearch()), { log });
+    mockContinue(Response.json({ message: 'no' }, { status: 401 }));
+    await run(loginRequest(baseSearch()), { log });
+
+    const logged = JSON.stringify(
+      Object.values(log).flatMap((fn) => (fn as ReturnType<typeof vi.fn>).mock.calls)
+    );
+    expect(logged).not.toContain('code=');
+    expect(logged).not.toContain('SECRETCODE');
+    expect(logged).not.toContain(SIG);
+    expect(logged).not.toContain('oauth_query');
+    expect(log.debug).toHaveBeenCalled();
+  });
+});
+
 describe('processAuthMiddleware client-info header', () => {
   const originalNextRuntime = process.env.NEXT_RUNTIME;
 

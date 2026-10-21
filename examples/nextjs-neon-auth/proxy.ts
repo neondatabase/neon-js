@@ -10,6 +10,8 @@ export const config = {
     // Protected routes requiring authentication
     "/account/:path*",
     "/organization/:path*",
-    "/notes"
+    "/notes",
+    // Login page: resumes a pending OAuth provider authorization for signed-in users
+    "/auth/sign-in",
   ],
 };
