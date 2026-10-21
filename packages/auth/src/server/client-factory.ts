@@ -19,6 +19,11 @@ import { resolveLog } from './logger';
 import { classifyFetchFailure } from './network-error';
 import { validateCookieConfig } from './config';
 import { injectClientInfo } from '@/utils/client-info';
+import {
+  mapOAuth2ResumeResponse,
+  prepareOAuth2Resume,
+  type OAuth2ContinueResponse,
+} from '@/core/oauth2-resume';
 
 /**
  * Configuration for {@link createAuthServer}.
@@ -331,6 +336,21 @@ export function createAuthServer(
   };
 
   const baseServer = createApiProxy(API_ENDPOINTS, fetchWithAuth);
+
+  // `resume` is composite (guards plus `oauth2.continue`), not a route, so it
+  // is attached to the oauth2 proxy rather than listed in API_ENDPOINTS.
+  const oauth2 = baseServer.oauth2 as NeonAuthServer['oauth2'];
+  oauth2.resume = async ({ query }) => {
+    const prepared = prepareOAuth2Resume(query);
+    if ('result' in prepared) return prepared.result;
+    return mapOAuth2ResumeResponse(
+      (await oauth2.continue({
+        selected: true,
+        oauth_query: prepared.oauthQuery,
+      })) as OAuth2ContinueResponse
+    );
+  };
+  baseServer.oauth2 = oauth2;
 
   // Store original getSession for fallback
   const originalGetSession = baseServer.getSession;

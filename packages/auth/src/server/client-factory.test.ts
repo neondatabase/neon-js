@@ -10,6 +10,10 @@ import {
 import { createAuthServer } from './client-factory';
 import type { RequestContext } from './request-context';
 import type { NeonAuthServer } from './types';
+import type {
+  OAuth2ResumeQuery,
+  OAuth2ResumeResult,
+} from '@/core/oauth2-resume';
 
 const TEST_SECRET = 'test-secret-at-least-32-characters-long!';
 const TEST_BASE_URL = 'https://auth.example.com';
@@ -536,6 +540,131 @@ describe('createAuthServer oauth2', () => {
       | 'publicClient'
       | 'getConsent'
       | 'getConsents'
+      | 'resume'
     >();
+  });
+});
+
+describe('createAuthServer oauth2.resume', () => {
+  const originalFetch = globalThis.fetch;
+  let fetchMock: ReturnType<typeof vi.fn>;
+  let respond: () => Response;
+
+  const SEARCH =
+    'client_id=abc&scope=openid&exp=4102444800&utm=1&sig=s1' +
+    '&ba_param=client_id&ba_param=scope&ba_param=exp&ba_param=sig&ba_param=ba_param';
+  const EXPECTED_OAUTH_QUERY =
+    'client_id=abc&scope=openid&exp=4102444800&sig=s1' +
+    '&ba_param=client_id&ba_param=scope&ba_param=exp&ba_param=sig&ba_param=ba_param';
+
+  beforeEach(() => {
+    respond = () =>
+      Response.json({ redirect: true, url: 'https://app.example.com/consent?x=1' });
+    fetchMock = vi.fn(async () => respond());
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const make = () =>
+    createAuthServer({
+      baseUrl: TEST_BASE_URL,
+      context: makeContext,
+      cookieSecret: TEST_SECRET,
+    });
+
+  test('posts the signed query from a Next-style searchParams object', async () => {
+    const searchParams: Record<string, string | string[]> = {
+      client_id: 'abc',
+      scope: 'openid',
+      exp: '4102444800',
+      utm: '1',
+      sig: 's1',
+      ba_param: ['client_id', 'scope', 'exp', 'sig', 'ba_param'],
+    };
+    const result = await make().oauth2.resume({ query: searchParams });
+    expect(result).toEqual({
+      status: 'redirect',
+      url: 'https://app.example.com/consent?x=1',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(new URL(url).pathname.endsWith('/oauth2/continue')).toBe(true);
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({
+      selected: true,
+      oauth_query: EXPECTED_OAUTH_QUERY,
+    });
+  });
+
+  test.each([
+    ['a string', SEARCH],
+    ['a string with a leading ?', `?${SEARCH}`],
+    ['URLSearchParams', new URLSearchParams(SEARCH)],
+  ])('accepts %s', async (_name, query) => {
+    await make().oauth2.resume({ query });
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string).oauth_query).toBe(EXPECTED_OAUTH_QUERY);
+  });
+
+  test('401 is no_session', async () => {
+    respond = () =>
+      Response.json({ code: 'UNAUTHORIZED' }, { status: 401, statusText: 'Unauthorized' });
+    expect(await make().oauth2.resume({ query: SEARCH })).toEqual({
+      status: 'no_session',
+    });
+  });
+
+  test('400 invalid_signature is expired', async () => {
+    respond = () =>
+      Response.json({ error: 'invalid_signature' }, { status: 400, statusText: 'Bad Request' });
+    expect(await make().oauth2.resume({ query: SEARCH })).toEqual({
+      status: 'expired',
+    });
+  });
+
+  test('404 is not_oauth', async () => {
+    respond = () => new Response('', { status: 404, statusText: 'Not Found' });
+    expect(await make().oauth2.resume({ query: SEARCH })).toEqual({
+      status: 'not_oauth',
+    });
+  });
+
+  test('other failures are reported as error', async () => {
+    respond = () =>
+      Response.json({ message: 'boom' }, { status: 500, statusText: 'Server Error' });
+    expect(await make().oauth2.resume({ query: SEARCH })).toMatchObject({
+      status: 'error',
+      error: { status: 500, message: 'boom' },
+    });
+  });
+
+  test.each(['login', 'create', 'consent login'])(
+    'prompt=%s is login_required and makes no request',
+    async (prompt) => {
+      const query = `${SEARCH}&prompt=${encodeURIComponent(prompt)}&ba_param=prompt`;
+      expect(await make().oauth2.resume({ query })).toEqual({
+        status: 'login_required',
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    }
+  );
+
+  test('a query without a signature is not_oauth and makes no request', async () => {
+    expect(await make().oauth2.resume({ query: { client_id: 'abc' } })).toEqual({
+      status: 'not_oauth',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  test('takes no redirect target, only the page query', () => {
+    expectTypeOf<
+      Parameters<NeonAuthServer['oauth2']['resume']>[0]
+    >().toEqualTypeOf<{ query: OAuth2ResumeQuery }>();
+    expectTypeOf<
+      ReturnType<NeonAuthServer['oauth2']['resume']>
+    >().toEqualTypeOf<Promise<OAuth2ResumeResult>>();
   });
 });

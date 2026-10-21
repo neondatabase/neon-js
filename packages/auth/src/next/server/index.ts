@@ -32,6 +32,10 @@ export {
 	type ClassifiedFetchFailure,
 } from '@/server/network-error';
 export type { NeonAuthServerApiError } from '@/server/types';
+export type {
+	OAuth2ResumeResult,
+	OAuth2ResumeQuery,
+} from '@/core/oauth2-resume';
 
 /**
  * Unified entry point for Neon Auth in Next.js

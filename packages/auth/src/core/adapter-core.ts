@@ -16,6 +16,7 @@ import {
   initBroadcastChannel,
 } from './better-auth-methods';
 import { anonymousTokenClient } from '../plugins/anonymous-token';
+import { oauth2ResumeClient } from '../plugins/oauth2-resume';
 import { injectClientInfo } from '../utils/client-info';
 import type { BetterAuthInstance } from '../types';
 import { normalizeBetterAuthError } from './better-auth-helpers';
@@ -43,7 +44,12 @@ const coreBetterAuthClientPlugins = [
 const supportedBetterAuthClientPlugins: (
   | (typeof coreBetterAuthClientPlugins)[number]
   | ReturnType<typeof oauthProviderClient>
-)[] = [...coreBetterAuthClientPlugins, oauthProviderClient()];
+  | ReturnType<typeof oauth2ResumeClient>
+)[] = [
+  ...coreBetterAuthClientPlugins,
+  oauthProviderClient(),
+  oauth2ResumeClient(),
+];
 
 export type SupportedBetterAuthClientPlugins =
   typeof supportedBetterAuthClientPlugins;

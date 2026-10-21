@@ -9,7 +9,9 @@ import {
 } from 'vitest';
 import { createAuthClient } from './neon-auth';
 import { BetterAuthVanillaAdapter } from './adapters/better-auth-vanilla/better-auth-vanilla-adapter';
+import { BetterAuthReactAdapter } from './adapters/better-auth-react/better-auth-react-adapter';
 import { BETTER_AUTH_METHODS_CACHE } from './core/better-auth-methods';
+import type { OAuth2ResumeResult } from './core/oauth2-resume';
 
 describe('oauth2 client types', () => {
   test('the default client exposes oauth2', () => {
@@ -170,5 +172,144 @@ describe('oauth2 client runtime', () => {
     const result = await auth.getSession();
     expect(fetchMock).not.toHaveBeenCalled();
     expect(result.data?.user.id).toBe('u1');
+  });
+});
+
+describe('oauth2.resume', () => {
+  const originalFetch = globalThis.fetch;
+  let fetchMock: ReturnType<typeof vi.fn>;
+  let respond: () => Response;
+
+  const SIGNED_SEARCH =
+    '?client_id=abc&scope=openid&exp=4102444800&utm=1&sig=s1' +
+    '&ba_param=client_id&ba_param=scope&ba_param=exp&ba_param=sig&ba_param=ba_param';
+  const EXPECTED_OAUTH_QUERY =
+    'client_id=abc&scope=openid&exp=4102444800&sig=s1' +
+    '&ba_param=client_id&ba_param=scope&ba_param=exp&ba_param=sig&ba_param=ba_param';
+
+  beforeEach(() => {
+    respond = () =>
+      Response.json({ redirect: true, url: 'https://app.example.com/consent?x=1' });
+    fetchMock = vi.fn(async () => respond());
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.unstubAllGlobals();
+    BETTER_AUTH_METHODS_CACHE.clearSessionCache();
+  });
+
+  const stubSearch = (search: string) => {
+    const location = { search, href: 'https://app.example.com/sign-in' };
+    vi.stubGlobal('window', { location });
+    return location;
+  };
+
+  test('is typed on the vanilla and react clients', () => {
+    const vanilla = createAuthClient('https://auth.example.com');
+    expectTypeOf(vanilla.oauth2.resume).returns.resolves.toEqualTypeOf<OAuth2ResumeResult>();
+    expectTypeOf(vanilla.oauth2).toHaveProperty('consent');
+    const react = createAuthClient('https://auth.example.com', {
+      adapter: BetterAuthReactAdapter(),
+    });
+    expectTypeOf(react.oauth2.resume).returns.resolves.toEqualTypeOf<OAuth2ResumeResult>();
+    expectTypeOf(react.oauth2).toHaveProperty('consent');
+  });
+
+  test('continues with the signed query and reports the redirect', async () => {
+    stubSearch(SIGNED_SEARCH);
+    const auth = createAuthClient('https://auth.example.com');
+    const result = await auth.oauth2.resume();
+    expect(result).toEqual({
+      status: 'redirect',
+      url: 'https://app.example.com/consent?x=1',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [unknown, RequestInit];
+    expect(String(url)).toBe('https://auth.example.com/api/auth/oauth2/continue');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({
+      selected: true,
+      oauth_query: EXPECTED_OAUTH_QUERY,
+    });
+  });
+
+  test('the default redirect plugin navigates the browser', async () => {
+    const location = stubSearch(SIGNED_SEARCH);
+    const auth = createAuthClient('https://auth.example.com');
+    await auth.oauth2.resume();
+    expect(location.href).toBe('https://app.example.com/consent?x=1');
+  });
+
+  test('works on the react client', async () => {
+    stubSearch(SIGNED_SEARCH);
+    const auth = createAuthClient('https://auth.example.com', {
+      adapter: BetterAuthReactAdapter(),
+    });
+    const result = await auth.oauth2.resume();
+    expect(result.status).toBe('redirect');
+  });
+
+  test('401 is no_session', async () => {
+    respond = () =>
+      Response.json({ code: 'UNAUTHORIZED' }, { status: 401, statusText: 'Unauthorized' });
+    stubSearch(SIGNED_SEARCH);
+    const auth = createAuthClient('https://auth.example.com');
+    expect(await auth.oauth2.resume()).toEqual({ status: 'no_session' });
+  });
+
+  test('400 invalid_signature is expired', async () => {
+    respond = () =>
+      Response.json({ error: 'invalid_signature' }, { status: 400, statusText: 'Bad Request' });
+    stubSearch(SIGNED_SEARCH);
+    const auth = createAuthClient('https://auth.example.com');
+    expect(await auth.oauth2.resume()).toEqual({ status: 'expired' });
+  });
+
+  test('404 is not_oauth', async () => {
+    respond = () => new Response('', { status: 404, statusText: 'Not Found' });
+    stubSearch(SIGNED_SEARCH);
+    const auth = createAuthClient('https://auth.example.com');
+    expect(await auth.oauth2.resume()).toEqual({ status: 'not_oauth' });
+  });
+
+  test('other failures are reported as error', async () => {
+    respond = () =>
+      Response.json({ message: 'boom' }, { status: 500, statusText: 'Server Error' });
+    stubSearch(SIGNED_SEARCH);
+    const auth = createAuthClient('https://auth.example.com');
+    const result = await auth.oauth2.resume();
+    expect(result).toMatchObject({ status: 'error', error: { status: 500 } });
+  });
+
+  test.each(['login', 'create'])(
+    'prompt=%s is login_required and makes no request',
+    async (prompt) => {
+      stubSearch(
+        `${SIGNED_SEARCH}&prompt=${prompt}&ba_param=prompt`
+      );
+      const auth = createAuthClient('https://auth.example.com');
+      expect(await auth.oauth2.resume()).toEqual({ status: 'login_required' });
+      expect(fetchMock).not.toHaveBeenCalled();
+    }
+  );
+
+  test('a page without a signed query is not_oauth and makes no request', async () => {
+    stubSearch('?utm=1');
+    const auth = createAuthClient('https://auth.example.com');
+    expect(await auth.oauth2.resume()).toEqual({ status: 'not_oauth' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  test('without a window it is not_oauth and makes no request', async () => {
+    const auth = createAuthClient('https://auth.example.com');
+    expect(await auth.oauth2.resume()).toEqual({ status: 'not_oauth' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  test('accepts no arguments', () => {
+    const auth = createAuthClient('https://auth.example.com');
+    expectTypeOf(auth.oauth2.resume).parameters.toEqualTypeOf<[]>();
   });
 });

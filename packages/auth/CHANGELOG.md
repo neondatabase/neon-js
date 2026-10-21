@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **OAuth provider client plugin**: every client (`createAuthClient()` and the Next.js `createAuthClient()`) now includes the Better Auth OAuth provider client (`@better-auth/oauth-provider`, pinned to `1.7.6`) for the login and consent pages of a Neon Auth project acting as an OAuth provider. The client exposes `oauth2.*`; `createNeonAuth()` and `createAuthServer()` expose the session-cookie user actions that Neon routes under `oauth2`: `consent`, `continue`, `publicClient`, `publicClientPrelogin`, `getConsent`, `getConsents`, `updateConsent` and `deleteConsent`. Client management is rejected by Neon for end users.
+- **`oauth2.resume()` for OAuth provider login pages**: when the user already has an app session, `authClient.oauth2.resume()` (vanilla and React clients) and `auth.oauth2.resume({ query })` (`createNeonAuth()` / `createAuthServer()`, `query` being `searchParams`, a string or `URLSearchParams`) continue the pending authorization from the page's signed query. They resolve to `OAuth2ResumeResult`: `redirect` (with `url`), `login_required` (`prompt=login` or `prompt=create`, which would otherwise loop), `no_session`, `expired`, `not_oauth` or `error`. The helper accepts no URL argument, so it cannot be used as an open redirect.
 
 ### Fixed
 

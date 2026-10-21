@@ -477,6 +477,49 @@ export default function ConsentPage() {
 
 `oauth2.consent()` navigates the browser itself: it returns `{ redirect: true, url }`, and better-auth's default redirect fetch plugin sets `window.location.href`, so the page does not need to follow it.
 
+### Resuming an existing session
+
+A user who already has an app session can open the login page with a pending authorization. Call `oauth2.resume()` instead of rebuilding `/consent` URLs yourself: it continues the pending `/oauth2/authorize` using the signed query of the page. A fresh `signIn.email` with that query already returns `{ redirect, url }`, and `resume` covers the existing-session case.
+
+```tsx
+'use client';
+import { useEffect, useState } from 'react';
+import { authClient } from '@/lib/auth/client';
+
+export default function SignInPage() {
+  const [showForm, setShowForm] = useState(false);
+
+  useEffect(() => {
+    authClient.oauth2.resume().then((r) => {
+      if (r.status === 'login_required' || r.status === 'no_session') setShowForm(true);
+    });
+  }, []);
+
+  return showForm ? <SignInForm /> : null;
+}
+```
+
+`resume()` returns `redirect` (the browser is already navigating; better-auth's redirect fetch plugin follows `url`), `login_required`, `no_session`, `expired`, `not_oauth`, or `error`. A page opened without the signed query, or on the server, gets `not_oauth` without a request. `login_required` means the signed query asks for `prompt=login` or `prompt=create`: the provider would send the user straight back to the login page, so show the form and let the user sign in. A signed query is valid for 10 minutes; after that `resume()` returns `expired` and the user has to restart from the relying party. `resume()` takes no arguments and never accepts a URL, so it cannot be used as an open redirect.
+
+In a server component, pass the page's `searchParams` to `auth.oauth2.resume()` and redirect to the returned `url`:
+
+```tsx
+import { redirect } from 'next/navigation';
+import { auth } from '@/lib/auth/server';
+
+export const dynamic = 'force-dynamic';
+
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const result = await auth.oauth2.resume({ query: await searchParams });
+  if (result.status === 'redirect') redirect(result.url);
+  return <SignInForm />;
+}
+```
+
 The browser client's `oauth2.*` mirrors the full plugin. Neon mounts these endpoints:
 
 | Group | Endpoints | In `createNeonAuth()` | Notes |
@@ -487,7 +530,7 @@ The browser client's `oauth2.*` mirrors the full plugin. Neon mounts these endpo
 | OAuth protocol | `authorize`, `token`, `introspect`, `revoke`, `userinfo`, `register` | No | Use client credentials or bearer tokens with form bodies or redirects. Relying parties and MCP servers should use `@neon/oauth`. |
 | RP-initiated logout | `end-session`, `end-session/confirm` | No | Browser redirect flow. |
 
-`createNeonAuth()` and `createAuthServer()` expose only the first two groups. A server-side consent example is not documented, because `oauth_query` has to be the signed query the provider redirected with and is only built automatically in the browser.
+`createNeonAuth()` and `createAuthServer()` expose only the first two groups. A server-side consent example is not documented, because `oauth_query` has to be the signed query the provider redirected with and is only built automatically in the browser. `oauth2.resume({ query })` is the exception: it builds `oauth_query` from the query you pass.
 
 ## Project Structure
 

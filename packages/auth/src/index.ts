@@ -8,6 +8,10 @@ export type {
 } from './neon-auth';
 
 export { type VanillaBetterAuthClient, type ReactBetterAuthClient } from './types';
+export type {
+  OAuth2ResumeResult,
+  OAuth2ResumeQuery,
+} from './core/oauth2-resume';
 
 // Auth error classes + type guards. Documented in llms.txt as the public
 // surface for `instanceof AuthApiError` / `instanceof AuthError` narrowing.

@@ -5,6 +5,10 @@ import type {
   BetterAuthUser as User,
 } from '@/core/better-auth-types';
 import type { NeonAuthNetworkErrorCode } from './network-error';
+import type {
+  OAuth2ResumeQuery,
+  OAuth2ResumeResult,
+} from '@/core/oauth2-resume';
 
 export type RequireSessionData = {
   session: Session;
@@ -52,6 +56,15 @@ type PickEndpoints<T, E> = {
 };
 
 /**
+ * `oauth2.resume()` continues the pending authorization of the login page the
+ * user is on, from that page's query. It takes no URL: the caller redirects to
+ * the returned `url`.
+ */
+export type NeonAuthServerOAuth2Resume = {
+  resume: (args: { query: OAuth2ResumeQuery }) => Promise<OAuth2ResumeResult>;
+};
+
+/**
  * `oauth2` is narrowed to the endpoints the server mounts: the client type
  * also carries client management and protocol calls that Neon rejects or that
  * belong to relying parties.
@@ -63,5 +76,6 @@ export type NeonAuthServer = Pick<
   oauth2: PickEndpoints<
     VanillaBetterAuthClient['oauth2'],
     (typeof API_ENDPOINTS)['oauth2']
-  >;
+  > &
+    NeonAuthServerOAuth2Resume;
 };

@@ -90,6 +90,11 @@ export { parseSessionData, validateSessionData } from './session';
 // --- Server types --------------------------------------------------------
 
 export type {
+	OAuth2ResumeResult,
+	OAuth2ResumeQuery,
+} from '@/core/oauth2-resume';
+
+export type {
 	NeonAuthServer,
 	NeonAuthServerApiError,
 	SessionData,
