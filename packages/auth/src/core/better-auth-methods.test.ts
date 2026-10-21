@@ -24,7 +24,9 @@ describe('deriveBetterAuthMethodFromUrl', () => {
     'introspect',
   ])('/oauth2/%s is not a session method', (name) => {
     expect(
-      deriveBetterAuthMethodFromUrl(`https://a.example.com/api/auth/oauth2/${name}`)
+      deriveBetterAuthMethodFromUrl(
+        `https://a.example.com/api/auth/oauth2/${name}`
+      )
     ).toBeUndefined();
   });
 
@@ -39,6 +41,26 @@ describe('deriveBetterAuthMethodFromUrl', () => {
       deriveBetterAuthMethodFromUrl(
         'https://a.example.com/api/auth/token?next=/oauth2/x'
       )
+    ).toBe('getSession');
+  });
+
+  test.each([
+    'https://a.example.com/api/auth/oauth2/token',
+    'https://ep.example.com/oauth2/auth/oauth2/token',
+    'https://a.example.com/api/auth/oauth2/client/rotate-secret',
+    'https://a.example.com/api/auth/oauth2/end-session/confirm',
+  ])('%s is not a session method', (url) => {
+    expect(deriveBetterAuthMethodFromUrl(url)).toBeUndefined();
+  });
+
+  test('a database named oauth2 does not suppress classification', () => {
+    expect(
+      deriveBetterAuthMethodFromUrl(
+        'https://ep.example.com/oauth2/auth/get-session'
+      )
+    ).toBe('getSession');
+    expect(
+      deriveBetterAuthMethodFromUrl('https://ep.example.com/oauth2/auth/token')
     ).toBe('getSession');
   });
 });

@@ -150,6 +150,9 @@ pnpm test:ci           # CI mode (no watch)
 
 # Type checking
 pnpm typecheck
+
+# Type-check the built @neondatabase/auth declarations (requires a prior build)
+pnpm --filter @neondatabase/auth run typecheck:dist
 ```
 
 > **Note:** Local releases are disabled. Use the two-stage pipeline

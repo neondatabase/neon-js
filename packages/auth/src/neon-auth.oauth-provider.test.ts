@@ -8,6 +8,7 @@ import {
   afterEach,
 } from 'vitest';
 import { createAuthClient } from './neon-auth';
+import { BetterAuthVanillaAdapter } from './adapters/better-auth-vanilla/better-auth-vanilla-adapter';
 import { BETTER_AUTH_METHODS_CACHE } from './core/better-auth-methods';
 
 describe('oauth2 client types', () => {
@@ -41,10 +42,14 @@ describe('oauth2 client runtime', () => {
     return { url: String(url), init };
   };
 
-  test('oauth2 is present by default', () => {
-    const auth = createAuthClient('https://auth.example.com');
-    expect(typeof auth.oauth2.consent).toBe('function');
-    expect(typeof auth.oauth2.publicClient).toBe('function');
+  test('the oauth-provider client plugin is configured by default', () => {
+    const adapter = BetterAuthVanillaAdapter()(
+      'https://auth.example.com'
+    ) as any;
+    const ids = adapter.betterAuthOptions.plugins.map(
+      (plugin: { id: string }) => plugin.id
+    );
+    expect(ids).toContain('oauth-provider-client');
   });
 
   test('consent POSTs to /oauth2/consent', async () => {
@@ -133,15 +138,37 @@ describe('oauth2 client runtime', () => {
       body: { grant_type: 'authorization_code' },
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(lastCall().url).toBe('https://auth.example.com/api/auth/oauth2/token');
+    expect(lastCall().url).toBe(
+      'https://auth.example.com/api/auth/oauth2/token'
+    );
     expect(result.data).toEqual({ redirect_uri: 'https://rp.example.com/cb' });
   });
 
-  test('a host containing "oauth2" does not bypass the session cache', async () => {
-    const auth = createAuthClient('https://oauth2.example.com');
-    await auth.signIn.email({ email: 'a@b.com', password: 'secret-password' });
-    expect(lastCall().url).toBe(
-      'https://oauth2.example.com/api/auth/sign-in/email'
-    );
+  test('a database named oauth2 still serves getSession from the cache', async () => {
+    const now = new Date();
+    const cached = {
+      session: {
+        id: 's1',
+        userId: 'u1',
+        token: 'tok',
+        expiresAt: new Date(Date.now() + 3_600_000),
+        createdAt: now,
+        updatedAt: now,
+      },
+      user: {
+        id: 'u1',
+        email: 'a@b.com',
+        name: 'A',
+        emailVerified: true,
+        createdAt: now,
+        updatedAt: now,
+      },
+    };
+    BETTER_AUTH_METHODS_CACHE.setCachedSession(cached as never);
+
+    const auth = createAuthClient('https://ep.example.com/oauth2/auth');
+    const result = await auth.getSession();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result.data?.user.id).toBe('u1');
   });
 });

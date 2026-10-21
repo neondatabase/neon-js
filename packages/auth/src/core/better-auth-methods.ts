@@ -379,12 +379,17 @@ function isSessionResponseData(
   );
 }
 
+const OAUTH2_ENDPOINT_TAIL =
+  /\/oauth2\/(?:[^/]+|client\/[^/]+|end-session\/confirm)$/;
+
 export function deriveBetterAuthMethodFromUrl(
   url: string
 ): keyof typeof BETTER_AUTH_METHODS_HOOKS | undefined {
   // The OAuth provider's `/oauth2/token` would otherwise match the `/token`
-  // session check below and be answered from the session cache.
-  if (new URL(url, 'http://localhost').pathname.includes('/oauth2/')) {
+  // session check below and be answered from the session cache. Only the path
+  // tail is matched: Neon base URLs are `/<dbname>/auth`, so a database named
+  // `oauth2` yields `/oauth2/auth/get-session`, which is not an OAuth endpoint.
+  if (OAUTH2_ENDPOINT_TAIL.test(new URL(url, 'http://localhost').pathname)) {
     return undefined;
   }
   if (url.includes('/sign-in/anonymous')) {

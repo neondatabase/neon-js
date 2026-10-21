@@ -476,13 +476,17 @@ export default function ConsentPage() {
 }
 ```
 
-Available under `oauth2`: `consent`, `continue`, `publicClient`, `publicClientPrelogin`, `getConsent`, `getConsents`, `updateConsent` and `deleteConsent` (the first four drive the login and consent pages; the last four let a signed-in user review and revoke what they granted).
+The browser client's `oauth2.*` mirrors the full plugin. Neon mounts these endpoints:
 
-Notes:
+| Group | Endpoints | In `createNeonAuth()` | Notes |
+| --- | --- | --- | --- |
+| Login and consent actions | `consent`, `continue`, `publicClient`, `publicClientPrelogin` | Yes | Drive your login and consent pages. |
+| The user's own grants | `getConsent`, `getConsents`, `updateConsent`, `deleteConsent` | Yes | Let a signed-in user review and revoke what they granted. |
+| Client management | `create-client`, `get-client`, `get-clients`, `update-client`, `delete-client`, `client/rotate-secret` | No | Neon rejects these for end users with 401; manage clients through the Neon Console or API. |
+| OAuth protocol | `authorize`, `token`, `introspect`, `revoke`, `userinfo`, `register` | No | Use client credentials or bearer tokens with form bodies or redirects. Relying parties and MCP servers should use `@neon/oauth`. |
+| RP-initiated logout | `end-session`, `end-session/confirm` | No | Browser redirect flow. |
 
-- Client management (creating, updating or deleting OAuth clients) is not available to end users on Neon; those calls are rejected with 401. The client type still lists them because it mirrors the plugin.
-- Relying parties and MCP servers that consume tokens should use `@neon/oauth`, not this package. The `token`, `introspect`, `revoke`, `register`, `userinfo` and `authorize` endpoints are for them.
-- The server-side `createNeonAuth()` and `createAuthServer()` expose only the eight user actions above under `oauth2`. A server-side consent example is not documented, because `oauth_query` has to be the signed query the provider redirected with and is only built automatically in the browser.
+`createNeonAuth()` and `createAuthServer()` expose only the first two groups. A server-side consent example is not documented, because `oauth_query` has to be the signed query the provider redirected with and is only built automatically in the browser.
 
 ## Project Structure
 

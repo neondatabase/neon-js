@@ -62,3 +62,6 @@ jobs:
 
       - name: Typecheck
         run: pnpm run typecheck
+
+      - name: Typecheck built declarations
+        run: pnpm --filter @neondatabase/auth run typecheck:dist
