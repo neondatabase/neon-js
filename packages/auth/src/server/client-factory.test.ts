@@ -611,6 +611,20 @@ describe('createAuthServer endpoint paths', () => {
     expect(init.body).toBeUndefined();
   });
 
+  test('jwks GETs /.well-known/jwks.json with no body', async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ keys: [] }, { status: 200 }));
+
+    await (makeServer() as unknown as {
+      jwks: () => Promise<unknown>;
+    }).jwks();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(new URL(url).pathname).toBe('/.well-known/jwks.json');
+    expect(init.method).toBe('GET');
+    expect(init.body).toBeUndefined();
+  });
+
   test('admin.listUserSessions POSTs to /admin/list-user-sessions', async () => {
     fetchMock.mockResolvedValueOnce(Response.json({ sessions: [] }, { status: 200 }));
 

@@ -7,7 +7,7 @@ import { phoneNumber } from 'better-auth/plugins/phone-number';
 import { betterAuth } from 'better-auth';
 import { memoryAdapter } from 'better-auth/adapters/memory';
 import { describe, expect, test } from 'vitest';
-import { API_ENDPOINTS, type EndpointConfig } from './endpoints';
+import { API_ENDPOINTS, NEON_AUTH_JWKS_PATH, type EndpointConfig } from './endpoints';
 
 type Method = string | readonly string[] | undefined;
 interface RouteLike {
@@ -39,9 +39,6 @@ function collectRoutes(
   }
 }
 
-// Neon Auth configures the jwt plugin with this jwksPath.
-const NEON_JWKS_PATH = '/.well-known/jwks.json';
-
 const noop = async () => {};
 const auth = betterAuth({
   baseURL: 'http://localhost',
@@ -54,7 +51,7 @@ const auth = betterAuth({
     emailOTP({ sendVerificationOTP: noop }),
     magicLink({ sendMagicLink: noop }),
     phoneNumber(),
-    jwt({ jwks: { jwksPath: NEON_JWKS_PATH } }),
+    jwt({ jwks: { jwksPath: NEON_AUTH_JWKS_PATH } }),
   ],
 });
 
@@ -87,12 +84,23 @@ function leaves(
   });
 }
 
+// Sanity floors, not exact counts: they make the test fail loudly if Better Auth's
+// endpoint shape changes and nothing is collected.
+const MIN_EXPECTED_SDK_ENDPOINTS = 30;
+const MIN_EXPECTED_BETTER_AUTH_ROUTES = 80;
+
+const LABELS: Record<string, string> = {
+  jwks: 'jwks matches the jwt plugin configured as Neon Auth configures it',
+};
+
 describe('API_ENDPOINTS matches Better Auth routes', () => {
-  const entries = leaves(API_ENDPOINTS as unknown as Record<string, unknown>);
+  const entries = leaves(API_ENDPOINTS as unknown as Record<string, unknown>).map(
+    ([name, config]) => [LABELS[name] ?? name, config] as [string, EndpointConfig]
+  );
 
   test('collects a non-trivial set of routes', () => {
-    expect(entries.length).toBeGreaterThan(30);
-    expect(betterAuthRoutes.size).toBeGreaterThan(80);
+    expect(entries.length).toBeGreaterThan(MIN_EXPECTED_SDK_ENDPOINTS);
+    expect(betterAuthRoutes.size).toBeGreaterThan(MIN_EXPECTED_BETTER_AUTH_ROUTES);
   });
 
   test.each(entries)('%s', (_name, { path, method }) => {

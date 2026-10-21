@@ -41,6 +41,12 @@ type ValidEndpointTree<T> = {
       : never;
 };
 
+/**
+ * The SDK's assumption about the Neon Auth server: its jwt plugin is configured with this
+ * `jwksPath` (neon-auth `src/auth/config/jwt.ts`), so the JWKS is not at Better Auth's default.
+ */
+export const NEON_AUTH_JWKS_PATH = '/.well-known/jwks.json';
+
 export const API_ENDPOINTS = {
   // Session & token
   getSession: { path: 'get-session', method: 'GET' },
@@ -82,8 +88,7 @@ export const API_ENDPOINTS = {
 
   // JWT
   token: { path: 'token', method: 'GET' },
-  // Neon Auth serves the JWKS at this path (jwt plugin `jwksPath`), not Better Auth's default `/jwks`.
-  jwks: { path: '.well-known/jwks.json', method: 'GET' },
+  jwks: { path: NEON_AUTH_JWKS_PATH.slice(1), method: 'GET' },
   getAnonymousToken: { path: 'token/anonymous', method: 'GET' },
 
   // Admin (requires admin role)
