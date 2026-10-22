@@ -500,7 +500,7 @@ export default function LoginPage() {
       <button
         type="button"
         onClick={() =>
-          authClient.signIn.social({ provider: 'google', callbackURL: window.location.href })
+          authClient.signIn.social({ provider: 'google', callbackURL: '/' })
         }
       >
         Continue with Google

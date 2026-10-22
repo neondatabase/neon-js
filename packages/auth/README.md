@@ -182,73 +182,7 @@ export const auth = createAuthClient('https://your-auth-server.com');
 
 When the page URL carries the signed `sig` and `ba_param` query parameters that the provider appended on redirect, the client adds them as `oauth_query` to every non-GET request, so a sign-in on the login page resumes the authorization. Without those parameters requests are unchanged.
 
-A login page resumes the authorization in two cases: the user signs in on it, or the user is already signed in and `oauth2.continue` is called. The page below handles both, and also the return from Google, which comes back with `neon_auth_session_verifier` in the URL:
-
-```tsx
-'use client';
-import { useEffect, useState, type FormEvent } from 'react';
-import { auth } from '@/lib/auth/client';
-
-export default function LoginPage() {
-  const [checking, setChecking] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const isOAuthVisit = params.has('sig');
-    // `login` and `create` send a signed-in user back to this page, so continuing would loop.
-    const prompts = (params.get('prompt') ?? '').split(' ');
-    const mustSignInAgain = prompts.includes('login') || prompts.includes('create');
-
-    (async () => {
-      // getSession() exchanges neon_auth_session_verifier after a social sign-in.
-      const { data: session } = await auth.getSession();
-      if (session && !mustSignInAgain) {
-        if (isOAuthVisit) {
-          const { error } = await auth.oauth2.continue({ selected: true });
-          if (!error) return; // the SDK navigates to the consent page or back to the client
-        }
-        window.location.replace('/');
-        return;
-      }
-      setChecking(false);
-    })();
-  }, []);
-
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const { data, error } = await auth.signIn.email({
-      email: String(form.get('email')),
-      password: String(form.get('password')),
-    });
-    if (error) return setError(error.message ?? 'Sign-in failed');
-    // On an OAuth visit the response is { redirect: true, url } and the SDK is already navigating.
-    if (!data.redirect) window.location.assign('/');
-  }
-
-  if (checking) return <p>Loading...</p>;
-
-  return (
-    <form onSubmit={onSubmit}>
-      <input name="email" type="email" required />
-      <input name="password" type="password" required />
-      <button type="submit">Sign in</button>
-      <button
-        type="button"
-        onClick={() =>
-          auth.signIn.social({ provider: 'google', callbackURL: window.location.href })
-        }
-      >
-        Continue with Google
-      </button>
-      {error && <p role="alert">{error}</p>}
-    </form>
-  );
-}
-```
-
-`oauth2.continue({ selected: true })` needs a session and the signed query: without a session it fails with 401, and on a page that was not reached through the provider's redirect it fails with 400 `missing oauth query`. It returns `{ redirect: true, url }` and the redirect plugin navigates, like `oauth2.consent()` below. The same component works in Next.js with `createAuthClient()` from `@neondatabase/auth/next`; use your router's navigate function instead of `window.location`.
+A login page resumes the authorization in two cases: the user signs in on it, or the user is already signed in and `oauth2.continue({ selected: true })` is called. On load, call `getSession()` first (it exchanges `neon_auth_session_verifier` after a social sign-in), then call `oauth2.continue` only when the page has the signed query and its `prompt` contains neither `login` nor `create`; those prompts send a signed-in user back to the login page, so continuing would loop. After `signIn.email`, skip your own redirect when `data.redirect` is true: the SDK is already navigating. See the [login page example](./NEXT-JS.md#oauth-provider-mcp) in the Next.js guide; the same component works in a Vite SPA.
 
 A consent page reads the client from the URL and answers with `oauth2.consent`:
 
