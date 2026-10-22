@@ -460,20 +460,19 @@ export default function LoginPage() {
     const params = new URLSearchParams(window.location.search);
     const isOAuthVisit = params.has('sig');
     // `login` and `create` send a signed-in user back to this page, so continuing would loop.
-    const prompts = (params.get('prompt') ?? '').split(' ');
+    const prompts = isOAuthVisit ? (params.get('prompt') ?? '').split(' ') : [];
     const mustSignInAgain = prompts.includes('login') || prompts.includes('create');
 
     (async () => {
       // getSession() exchanges neon_auth_session_verifier after a social sign-in.
       const { data: session } = await authClient.getSession();
-      if (session && !mustSignInAgain) {
-        if (isOAuthVisit) {
-          const { error } = await authClient.oauth2.continue({ selected: true });
-          if (!error) return; // the SDK navigates to the consent page or back to the client
-        }
-        router.replace('/');
-        return;
-      }
+      if (!session || mustSignInAgain) return setChecking(false);
+      if (!isOAuthVisit) return router.replace('/');
+
+      const { error } = await authClient.oauth2.continue({ selected: true });
+      if (!error) return; // the SDK navigates to the consent page or back to the client
+      // Usually an expired link: only the client app can start a new authorization.
+      setError('This sign-in link has expired. Go back to the app and try again.');
       setChecking(false);
     })();
   }, [router]);
@@ -500,7 +499,9 @@ export default function LoginPage() {
       <button
         type="button"
         onClick={() =>
-          authClient.signIn.social({ provider: 'google', callbackURL: '/' })
+          // Keeps the signed query when sign-in runs in a popup (inside an iframe),
+          // where the SDK returns to callbackURL with the verifier.
+          authClient.signIn.social({ provider: 'google', callbackURL: window.location.href })
         }
       >
         Continue with Google
@@ -511,7 +512,7 @@ export default function LoginPage() {
 }
 ```
 
-`oauth2.continue({ selected: true })` needs a session and the signed query: without a session it fails with 401, and on a page that was not reached through the provider's redirect it fails with 400 `missing oauth query`. It returns `{ redirect: true, url }` and the redirect plugin navigates, like `oauth2.consent()` below. The same component works in a Vite SPA with `createAuthClient()` from `@neondatabase/auth` and your router's navigate function in place of `useRouter`.
+`oauth2.continue({ selected: true })` needs a session and the signed query. As of `@better-auth/oauth-provider` 1.7 it fails with 401 without a session, and with 400 when the signed query is missing or has expired (10 minutes by default); in both cases show the error, because only the client app can start a new authorization. On success it returns `{ redirect: true, url }` and the redirect plugin navigates, like `oauth2.consent()` below. The same component works in a Vite SPA with `createAuthClient()` from `@neondatabase/auth` and your router's navigate function in place of `useRouter`.
 
 A consent page reads the client from the URL and answers with `oauth2.consent`:
 
