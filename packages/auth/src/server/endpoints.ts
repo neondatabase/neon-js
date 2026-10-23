@@ -41,6 +41,12 @@ type ValidEndpointTree<T> = {
       : never;
 };
 
+/**
+ * The SDK's assumption about the Neon Auth server: its jwt plugin is configured with this
+ * `jwksPath` (neon-auth `src/auth/config/jwt.ts`), so the JWKS is not at Better Auth's default.
+ */
+export const NEON_AUTH_JWKS_PATH = '/.well-known/jwks.json';
+
 export const API_ENDPOINTS = {
   // Session & token
   getSession: { path: 'get-session', method: 'GET' },
@@ -48,7 +54,7 @@ export const API_ENDPOINTS = {
   listSessions: { path: 'list-sessions', method: 'GET' },
   revokeSession: { path: 'revoke-session', method: 'POST' },
   revokeSessions: { path: 'revoke-sessions', method: 'POST' },
-  revokeOtherSessions: { path: 'revoke-all-sessions', method: 'POST' },
+  revokeOtherSessions: { path: 'revoke-other-sessions', method: 'POST' },
   refreshToken: { path: 'refresh-token', method: 'POST' },
 
   // Auth
@@ -76,13 +82,13 @@ export const API_ENDPOINTS = {
   // changeEmail: { path: 'change-email', method: 'POST' }
   changePassword: { path: 'change-password', method: 'POST' },
   sendVerificationEmail: { path: 'send-verification-email', method: 'POST' },
-  verifyEmail: { path: 'verify-email', method: 'POST' },
+  verifyEmail: { path: 'verify-email', method: 'GET' },
   resetPassword: { path: 'reset-password', method: 'POST' },
   requestPasswordReset: { path: 'request-password-reset', method: 'POST' },
 
   // JWT
   token: { path: 'token', method: 'GET' },
-  jwks: { path: 'jwt', method: 'GET' },
+  jwks: { path: NEON_AUTH_JWKS_PATH.replace(/^\//, ''), method: 'GET' },
   getAnonymousToken: { path: 'token/anonymous', method: 'GET' },
 
   // Admin (requires admin role)
@@ -94,7 +100,7 @@ export const API_ENDPOINTS = {
     updateUser: { path: 'admin/update-user', method: 'POST' },
     banUser: { path: 'admin/ban-user', method: 'POST' },
     unbanUser: { path: 'admin/unban-user', method: 'POST' },
-    listUserSessions: { path: 'admin/list-user-sessions', method: 'GET' },
+    listUserSessions: { path: 'admin/list-user-sessions', method: 'POST' },
     revokeUserSession: { path: 'admin/revoke-user-session', method: 'POST' },
     revokeUserSessions: { path: 'admin/revoke-user-sessions', method: 'POST' },
     impersonateUser: { path: 'admin/impersonate-user', method: 'POST' },
@@ -112,7 +118,7 @@ export const API_ENDPOINTS = {
     list: { path: 'organization/list', method: 'GET' },
     getFullOrganization: { path: 'organization/get-full-organization', method: 'GET' },
     setActive: { path: 'organization/set-active', method: 'POST' },
-    checkSlug: { path: 'organization/check-slug', method: 'GET' },
+    checkSlug: { path: 'organization/check-slug', method: 'POST' },
 
     // Member management
     listMembers: { path: 'organization/list-members', method: 'GET' },
@@ -140,7 +146,7 @@ export const API_ENDPOINTS = {
     sendVerificationOtp: { path: 'email-otp/send-verification-otp', method: 'POST' },
     verifyEmail: { path: 'email-otp/verify-email', method: 'POST' },
     checkVerificationOtp: { path: 'email-otp/check-verification-otp', method: 'POST' },
-    resetPassword: { path: 'email-otp/passcode', method: 'POST' },
+    resetPassword: { path: 'email-otp/reset-password', method: 'POST' },
   },
 
   // Magic Link

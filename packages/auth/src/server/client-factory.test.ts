@@ -539,3 +539,116 @@ describe('createAuthServer oauth2', () => {
     >();
   });
 });
+
+describe('createAuthServer endpoint paths', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const makeServer = () =>
+    createAuthServer({
+      baseUrl: TEST_BASE_URL,
+      context: makeContext,
+      cookieSecret: TEST_SECRET,
+    });
+
+  test('revokeOtherSessions POSTs to /revoke-other-sessions', async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ status: true }, { status: 200 }));
+
+    await (makeServer() as unknown as {
+      revokeOtherSessions: () => Promise<unknown>;
+    }).revokeOtherSessions();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(new URL(url).pathname).toBe('/revoke-other-sessions');
+    expect(init.method).toBe('POST');
+  });
+
+  test('emailOtp.resetPassword POSTs to /email-otp/reset-password', async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ success: true }, { status: 200 }));
+
+    await (makeServer() as unknown as {
+      emailOtp: { resetPassword: (args: unknown) => Promise<unknown> };
+    }).emailOtp.resetPassword({
+      email: 'a@b.com',
+      otp: '123456',
+      password: 'new-password',
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(new URL(url).pathname).toBe('/email-otp/reset-password');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({
+      email: 'a@b.com',
+      otp: '123456',
+      password: 'new-password',
+    });
+  });
+
+  test('verifyEmail GETs /verify-email with the token in the query string', async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ status: true }, { status: 200 }));
+
+    await (makeServer() as unknown as {
+      verifyEmail: (args: unknown) => Promise<unknown>;
+    }).verifyEmail({ query: { token: 'tok-123' } });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const parsed = new URL(url);
+    expect(parsed.pathname).toBe('/verify-email');
+    expect(parsed.searchParams.get('token')).toBe('tok-123');
+    expect(init.method).toBe('GET');
+    expect(init.body).toBeUndefined();
+  });
+
+  test('jwks GETs /.well-known/jwks.json with no body', async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ keys: [] }, { status: 200 }));
+
+    await (makeServer() as unknown as {
+      jwks: () => Promise<unknown>;
+    }).jwks();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(new URL(url).pathname).toBe('/.well-known/jwks.json');
+    expect(init.method).toBe('GET');
+    expect(init.body).toBeUndefined();
+  });
+
+  test('admin.listUserSessions POSTs to /admin/list-user-sessions', async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ sessions: [] }, { status: 200 }));
+
+    await (makeServer() as unknown as {
+      admin: { listUserSessions: (args: unknown) => Promise<unknown> };
+    }).admin.listUserSessions({ userId: 'user-1' });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(new URL(url).pathname).toBe('/admin/list-user-sessions');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({ userId: 'user-1' });
+  });
+
+  test('organization.checkSlug POSTs to /organization/check-slug', async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ status: true }, { status: 200 }));
+
+    await (makeServer() as unknown as {
+      organization: { checkSlug: (args: unknown) => Promise<unknown> };
+    }).organization.checkSlug({ slug: 'acme' });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(new URL(url).pathname).toBe('/organization/check-slug');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({ slug: 'acme' });
+  });
+});
