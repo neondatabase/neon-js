@@ -4,6 +4,7 @@ import { jwt } from 'better-auth/plugins/jwt';
 import { magicLink } from 'better-auth/plugins/magic-link';
 import { organization } from 'better-auth/plugins/organization';
 import { phoneNumber } from 'better-auth/plugins/phone-number';
+import { oauthProvider } from '@better-auth/oauth-provider';
 import { betterAuth } from 'better-auth';
 import { memoryAdapter } from 'better-auth/adapters/memory';
 import { describe, expect, test } from 'vitest';
@@ -19,7 +20,8 @@ function isRoute(value: unknown): value is RouteLike & { path: string } {
   return (
     typeof value === 'function' &&
     typeof (value as RouteLike).path === 'string' &&
-    typeof (value as RouteLike).options === 'object'
+    typeof (value as RouteLike).options === 'object' &&
+    (value as RouteLike).options !== null
   );
 }
 
@@ -52,6 +54,7 @@ const auth = betterAuth({
     magicLink({ sendMagicLink: noop }),
     phoneNumber(),
     jwt({ jwks: { jwksPath: NEON_AUTH_JWKS_PATH } }),
+    oauthProvider({ loginPage: '/login', consentPage: '/consent' }),
   ],
 });
 
@@ -101,6 +104,13 @@ describe('API_ENDPOINTS matches Better Auth routes', () => {
   test('collects a non-trivial set of routes', () => {
     expect(entries.length).toBeGreaterThan(MIN_EXPECTED_SDK_ENDPOINTS);
     expect(betterAuthRoutes.size).toBeGreaterThan(MIN_EXPECTED_BETTER_AUTH_ROUTES);
+  });
+
+  test('jwks is served at the path Neon Auth configures', () => {
+    expect(API_ENDPOINTS.jwks).toEqual({
+      path: '.well-known/jwks.json',
+      method: 'GET',
+    });
   });
 
   test.each(entries)('%s', (_name, { path, method }) => {

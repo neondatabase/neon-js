@@ -88,7 +88,7 @@ export const API_ENDPOINTS = {
 
   // JWT
   token: { path: 'token', method: 'GET' },
-  jwks: { path: NEON_AUTH_JWKS_PATH.slice(1), method: 'GET' },
+  jwks: { path: NEON_AUTH_JWKS_PATH.replace(/^\//, ''), method: 'GET' },
   getAnonymousToken: { path: 'token/anonymous', method: 'GET' },
 
   // Admin (requires admin role)

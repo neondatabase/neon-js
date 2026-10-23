@@ -541,16 +541,15 @@ describe('createAuthServer oauth2', () => {
 });
 
 describe('createAuthServer endpoint paths', () => {
-  const originalFetch = globalThis.fetch;
   let fetchMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     fetchMock = vi.fn();
-    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+    vi.stubGlobal('fetch', fetchMock);
   });
 
   afterEach(() => {
-    globalThis.fetch = originalFetch;
+    vi.unstubAllGlobals();
   });
 
   const makeServer = () =>
