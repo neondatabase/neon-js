@@ -455,6 +455,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expired, setExpired] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -468,7 +469,7 @@ export default function LoginPage() {
       if (!isOAuthVisit) return router.replace('/');
 
       const { error } = await authClient.oauth2.continue({ selected: true });
-      if (error) setError('This sign-in link has expired. Go back to the app and try again.');
+      if (error) setExpired(true);
       setChecking(false);
     })();
   }, [router]);
@@ -495,6 +496,8 @@ export default function LoginPage() {
   }
 
   if (checking) return <p>Loading...</p>;
+  // Signing in again can't help: only the client app can start a new authorization.
+  if (expired) return <p role="alert">This sign-in link has expired. Go back to the app and try again.</p>;
 
   return (
     <form onSubmit={onSubmit}>
@@ -510,7 +513,7 @@ export default function LoginPage() {
 }
 ```
 
-On success `oauth2.continue()` navigates to the consent page or back to the client app, like `oauth2.consent()` below. If it fails, the link has usually expired (after 10 minutes by default); only the client app can start a new authorization, so show the error rather than redirecting. The same component works in a Vite SPA with `createAuthClient()` from `@neondatabase/auth` and your router's navigate function in place of `useRouter`.
+On success `oauth2.continue()` navigates to the consent page or back to the client app, like `oauth2.consent()` below. If it fails, the link has usually expired (after 10 minutes by default); only the client app can start a new authorization, so show a message instead of the form or a redirect. The same component works in a Vite SPA with `createAuthClient()` from `@neondatabase/auth` and your router's navigate function in place of `useRouter`.
 
 A consent page reads the client from the URL and answers with `oauth2.consent`:
 
