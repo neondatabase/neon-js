@@ -129,8 +129,8 @@ describe('API_ENDPOINTS matches Better Auth routes', () => {
 });
 
 // Server methods forward the caller's body as-is, so a wrong field name only
-// surfaces as an upstream 400. Parse the bodies the SDK tests send against the
-// plugin's own schemas.
+// surfaces as an upstream 400. Pin the documented field names to the plugin's
+// own schemas so an upstream rename fails here.
 describe('phone number request bodies match Better Auth schemas', () => {
   type Parseable = { options: { body: { safeParse: (v: unknown) => { success: boolean } } } };
   const api = auth.api as unknown as Record<string, Parseable>;
