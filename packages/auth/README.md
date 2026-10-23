@@ -182,6 +182,8 @@ export const auth = createAuthClient('https://your-auth-server.com');
 
 When the page URL carries the signed `sig` and `ba_param` query parameters that the provider appended on redirect, the client adds them as `oauth_query` to every non-GET request, so a sign-in on the login page resumes the authorization. Without those parameters requests are unchanged.
 
+A login page resumes the authorization in two cases: the user signs in on it, or the user is already signed in. On every load, including the redirect back from a social sign-in, call `getSession()` to check the sign-in and then `oauth2.continue({ selected: true })` (use the same path for the login page URL configured for the OAuth provider in Neon Auth and the middleware's `loginUrl`), which navigates to the consent page or back to the client app. Skip it when `prompt` contains `login` or `create`, which ask the user to sign in again. A 400 from `continue` means the link has expired; show a message instead of the form. After `signIn.email`, skip your own redirect when `data.redirect` is true: the SDK is already navigating. See the [login page example](./NEXT-JS.md#oauth-provider-mcp) in the Next.js guide; the same component works in a Vite SPA.
+
 A consent page reads the client from the URL and answers with `oauth2.consent`:
 
 ```tsx
@@ -192,6 +194,7 @@ import { auth } from '@/lib/auth/client';
 export default function ConsentPage() {
   const [scope, setScope] = useState<string | null>(null);
   const [client, setClient] = useState<{ client_name?: string; logo_uri?: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Read the query in an effect: the page also renders on the server, where `window` is undefined.
   useEffect(() => {
@@ -199,10 +202,16 @@ export default function ConsentPage() {
     setScope(params.get('scope'));
     auth.oauth2
       .publicClient({ query: { client_id: params.get('client_id') ?? '' } })
-      .then(({ data }) => setClient(data));
+      .then(({ data }) => setClient(data))
+      .catch(() => setError('This request could not be completed. Go back to the app and try again.'));
   }, []);
 
-  const answer = (accept: boolean) => auth.oauth2.consent({ accept });
+  const answer = (accept: boolean) =>
+    auth.oauth2
+      .consent({ accept })
+      .catch(() => setError('This request could not be completed. Go back to the app and try again.'));
+
+  if (error) return <p role="alert">{error}</p>;
 
   return (
     <div>
@@ -214,7 +223,9 @@ export default function ConsentPage() {
 }
 ```
 
-`oauth2.consent()` navigates the browser itself: it returns `{ redirect: true, url }`, and better-auth's default redirect fetch plugin sets `window.location.href`, so the page does not need to follow it.
+`oauth2.consent()` navigates the browser itself: it returns `{ redirect: true, url }`, and better-auth's default redirect fetch plugin sets `window.location.href`, so the page does not need to follow it. Pass `scope` (a space-separated subset of the requested scopes) to grant less than was requested; without it every requested scope is granted. Both `publicClient` and `consent` need a signed-in user.
+
+Send `Content-Security-Policy: frame-ancestors 'none'` as a response header on the login and consent pages so they cannot be framed (browsers ignore `frame-ancestors` in a `<meta>` tag), and never build consent URLs yourself: the provider redirects with a signed query that `oauth2.consent()` forwards as it is.
 
 The browser client's `oauth2.*` mirrors the full plugin. Neon mounts these endpoints:
 
