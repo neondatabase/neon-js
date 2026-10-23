@@ -63,6 +63,7 @@ export const API_ENDPOINTS = {
     social: { path: 'sign-in/social', method: 'POST' },
     emailOtp: { path: 'sign-in/email-otp', method: 'POST' },
     magicLink: { path: 'sign-in/magic-link', method: 'POST' },
+    phoneNumber: { path: 'sign-in/phone-number', method: 'POST' },
   },
   signUp: {
     email: { path: 'sign-up/email', method: 'POST' },
@@ -147,6 +148,14 @@ export const API_ENDPOINTS = {
     verifyEmail: { path: 'email-otp/verify-email', method: 'POST' },
     checkVerificationOtp: { path: 'email-otp/check-verification-otp', method: 'POST' },
     resetPassword: { path: 'email-otp/reset-password', method: 'POST' },
+  },
+
+  // Phone Number
+  phoneNumber: {
+    sendOtp: { path: 'phone-number/send-otp', method: 'POST' },
+    verify: { path: 'phone-number/verify', method: 'POST' },
+    requestPasswordReset: { path: 'phone-number/request-password-reset', method: 'POST' },
+    resetPassword: { path: 'phone-number/reset-password', method: 'POST' },
   },
 
   // Magic Link

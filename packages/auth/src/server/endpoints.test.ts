@@ -127,3 +127,37 @@ describe('API_ENDPOINTS matches Better Auth routes', () => {
     ).toContain(method);
   });
 });
+
+// Server methods forward the caller's body as-is, so a wrong field name only
+// surfaces as an upstream 400. Pin the documented field names to the plugin's
+// own schemas so an upstream rename fails here.
+describe('phone number request bodies match Better Auth schemas', () => {
+  type Parseable = {
+    options: { body: { safeParse: (v: unknown) => { success: boolean; data?: unknown } } };
+  };
+  const api = auth.api as unknown as Record<string, Parseable>;
+  const phone = '+15555550100';
+
+  test.each([
+    ['signInPhoneNumber', { phoneNumber: phone, password: 'pw-12345678' }],
+    ['sendPhoneNumberOTP', { phoneNumber: phone }],
+    ['verifyPhoneNumber', { phoneNumber: phone, code: '123456' }],
+    ['verifyPhoneNumber', { phoneNumber: phone, code: '123456', disableSession: true }],
+    ['requestPasswordResetPhoneNumber', { phoneNumber: phone }],
+    ['resetPasswordPhoneNumber', { phoneNumber: phone, otp: '123456', newPassword: 'pw-12345678' }],
+  ])('%s accepts %j', (endpoint, body) => {
+    expect(api[endpoint], `no Better Auth endpoint ${endpoint}`).toBeDefined();
+    const result = api[endpoint].options.body.safeParse(body);
+    expect(result.success).toBe(true);
+    // Zod strips unknown keys, so success alone would not catch a dropped field.
+    expect(result.data).toMatchObject(body);
+  });
+
+  test.each([
+    ['verifyPhoneNumber', { phoneNumber: phone, otp: '123456' }],
+    ['resetPasswordPhoneNumber', { phoneNumber: phone, code: '123456', password: 'pw-12345678' }],
+  ])('%s rejects %j', (endpoint, body) => {
+    expect(api[endpoint], `no Better Auth endpoint ${endpoint}`).toBeDefined();
+    expect(api[endpoint].options.body.safeParse(body).success).toBe(false);
+  });
+});
