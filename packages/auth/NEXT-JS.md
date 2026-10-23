@@ -475,7 +475,7 @@ export default function LoginPage() {
         await authClient.oauth2.continue({ selected: true });
       } catch (err) {
         // 400: the link expired, and only the client app can start a new authorization.
-        if (isOAuthVisit && (err as { status?: number }).status === 400) setExpired(true);
+        if (isOAuthVisit && (err as { status?: number } | undefined)?.status === 400) setExpired(true);
         else setError(message(err));
         setChecking(false);
       }
@@ -535,6 +535,7 @@ import { authClient } from '@/lib/auth/client';
 export default function ConsentPage() {
   const [scope, setScope] = useState<string | null>(null);
   const [client, setClient] = useState<{ client_name?: string; logo_uri?: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Read the query in an effect: the page also renders on the server, where `window` is undefined.
   useEffect(() => {
@@ -542,10 +543,16 @@ export default function ConsentPage() {
     setScope(params.get('scope'));
     authClient.oauth2
       .publicClient({ query: { client_id: params.get('client_id') ?? '' } })
-      .then(({ data }) => setClient(data));
+      .then(({ data }) => setClient(data))
+      .catch(() => setError('This request could not be completed. Go back to the app and try again.'));
   }, []);
 
-  const answer = (accept: boolean) => authClient.oauth2.consent({ accept });
+  const answer = (accept: boolean) =>
+    authClient.oauth2
+      .consent({ accept })
+      .catch(() => setError('This request could not be completed. Go back to the app and try again.'));
+
+  if (error) return <p role="alert">{error}</p>;
 
   return (
     <div>

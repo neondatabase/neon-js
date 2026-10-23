@@ -194,6 +194,7 @@ import { auth } from '@/lib/auth/client';
 export default function ConsentPage() {
   const [scope, setScope] = useState<string | null>(null);
   const [client, setClient] = useState<{ client_name?: string; logo_uri?: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Read the query in an effect: the page also renders on the server, where `window` is undefined.
   useEffect(() => {
@@ -201,10 +202,16 @@ export default function ConsentPage() {
     setScope(params.get('scope'));
     auth.oauth2
       .publicClient({ query: { client_id: params.get('client_id') ?? '' } })
-      .then(({ data }) => setClient(data));
+      .then(({ data }) => setClient(data))
+      .catch(() => setError('This request could not be completed. Go back to the app and try again.'));
   }, []);
 
-  const answer = (accept: boolean) => auth.oauth2.consent({ accept });
+  const answer = (accept: boolean) =>
+    auth.oauth2
+      .consent({ accept })
+      .catch(() => setError('This request could not be completed. Go back to the app and try again.'));
+
+  if (error) return <p role="alert">{error}</p>;
 
   return (
     <div>
