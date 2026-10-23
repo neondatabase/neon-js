@@ -443,13 +443,15 @@ export const authClient = createAuthClient();
 
 When the page URL carries the signed `sig` and `ba_param` query parameters that the provider appended on redirect, the client adds them as `oauth_query` to every non-GET request, so a sign-in on the login page resumes the authorization. Without those parameters requests are unchanged.
 
-A login page resumes the authorization in two cases: the user signs in on it, or the user is already signed in. On every load, including the redirect back from a social sign-in, call `getSession()` to check the sign-in and then `oauth2.continue({ selected: true })`:
+A login page resumes the authorization in two cases: the user signs in on it, or the user is already signed in. On every load, including the redirect back from a social sign-in, call `getSession()` to check the sign-in and then `oauth2.continue({ selected: true })`. Use the same path for the provider's `loginPage` and the middleware's `loginUrl`, so the middleware never redirects away from it. Failed requests reject with an error that has a `status`:
 
 ```tsx
 'use client';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { authClient } from '@/lib/auth/client';
+
+const message = (err: unknown) => (err instanceof Error ? err.message : 'Sign-in failed');
 
 export default function LoginPage() {
   const router = useRouter();
@@ -461,42 +463,50 @@ export default function LoginPage() {
     const params = new URLSearchParams(window.location.search);
     const isOAuthVisit = params.has('client_id');
     // `login` and `create` ask the user to sign in again, so continuing would come back here.
-    const mustSignInAgain = /\b(login|create)\b/.test(params.get('prompt') ?? '');
+    const mustSignInAgain =
+      isOAuthVisit && /\b(login|create)\b/.test(params.get('prompt') ?? '');
 
     (async () => {
-      const { data: session } = await authClient.getSession();
-      if (!session || mustSignInAgain) return setChecking(false);
-      if (!isOAuthVisit) return router.replace('/');
-
-      const { error } = await authClient.oauth2.continue({ selected: true });
-      if (error) setExpired(true);
-      setChecking(false);
+      try {
+        const { data: session } = await authClient.getSession();
+        if (!session || mustSignInAgain) return setChecking(false);
+        if (!isOAuthVisit) return router.replace('/');
+        // Keeps the loading state: the SDK navigates to the consent page or back to the client.
+        await authClient.oauth2.continue({ selected: true });
+      } catch (err) {
+        // 400: the link expired, and only the client app can start a new authorization.
+        if ((err as { status?: number }).status === 400) setExpired(true);
+        else setError(message(err));
+        setChecking(false);
+      }
     })();
   }, [router]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const { data, error } = await authClient.signIn.email({
-      email: String(form.get('email')),
-      password: String(form.get('password')),
-    });
-    if (error) return setError(error.message ?? 'Sign-in failed');
-    // On an OAuth visit the SDK is already navigating to the consent page or back to the client.
-    if (!data.redirect) router.push('/');
+    try {
+      const { data } = await authClient.signIn.email({
+        email: String(form.get('email')),
+        password: String(form.get('password')),
+      });
+      // On an OAuth visit the SDK is already navigating to the consent page or back to the client.
+      if (!data?.redirect) router.push('/');
+    } catch (err) {
+      setError(message(err));
+    }
   }
 
   async function signInWithGoogle() {
-    // Come back to this page so the check above can continue the authorization.
-    const { error } = await authClient.signIn.social({
-      provider: 'google',
-      callbackURL: window.location.href,
-    });
-    if (error) setError(error.message ?? 'Sign-in failed');
+    try {
+      // Come back to this page so the check above can continue the authorization.
+      await authClient.signIn.social({ provider: 'google', callbackURL: window.location.href });
+    } catch (err) {
+      setError(message(err));
+    }
   }
 
   if (checking) return <p>Loading...</p>;
-  // Signing in again can't help: only the client app can start a new authorization.
   if (expired) return <p role="alert">This sign-in link has expired. Go back to the app and try again.</p>;
 
   return (
@@ -513,7 +523,7 @@ export default function LoginPage() {
 }
 ```
 
-On success `oauth2.continue()` navigates to the consent page or back to the client app, like `oauth2.consent()` below. If it fails, the link has usually expired (after 10 minutes by default); only the client app can start a new authorization, so show a message instead of the form or a redirect. The same component works in a Vite SPA with `createAuthClient()` from `@neondatabase/auth` and your router's navigate function in place of `useRouter`.
+On success `oauth2.continue()` navigates to the consent page or back to the client app, like `oauth2.consent()` below. A 400 means the link has expired; show a message rather than the form, because signing in again can't resume it. Other errors, such as a network failure, leave the form available to retry. The same component works in a Vite SPA with `createAuthClient()` from `@neondatabase/auth` and your router's navigate function in place of `useRouter`.
 
 A consent page reads the client from the URL and answers with `oauth2.consent`:
 
@@ -549,7 +559,7 @@ export default function ConsentPage() {
 
 `oauth2.consent()` navigates the browser itself: it returns `{ redirect: true, url }`, and better-auth's default redirect fetch plugin sets `window.location.href`, so the page does not need to follow it. Pass `scope` (a space-separated subset of the requested scopes) to grant less than was requested; without it every requested scope is granted. Both `publicClient` and `consent` need a signed-in user.
 
-Send `Content-Security-Policy: frame-ancestors 'none'` on the consent page so it cannot be framed, and never build consent URLs yourself: the provider redirects with a signed query that `oauth2.consent()` forwards as it is.
+Send `Content-Security-Policy: frame-ancestors 'none'` on the login and consent pages so they cannot be framed, and never build consent URLs yourself: the provider redirects with a signed query that `oauth2.consent()` forwards as it is.
 
 The browser client's `oauth2.*` mirrors the full plugin. Neon mounts these endpoints:
 
