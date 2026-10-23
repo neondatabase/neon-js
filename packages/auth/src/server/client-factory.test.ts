@@ -707,7 +707,14 @@ describe('createAuthServer phone number', () => {
           createdAt: now,
           updatedAt: now,
         },
-        user: { id: 'u1', email: 'a@b.com', createdAt: now, updatedAt: now },
+        user: {
+          id: 'u1',
+          email: 'a@b.com',
+          phoneNumber: '+15555550100',
+          phoneNumberVerified: true,
+          createdAt: now,
+          updatedAt: now,
+        },
       },
       { status: 200 }
     );
@@ -785,6 +792,20 @@ describe('createAuthServer phone number', () => {
     const names = setCookieSpy.mock.calls.map(c => c[0]);
     expect(names).toContain(NEON_AUTH_SESSION_COOKIE_NAME);
     expect(names).toContain(NEON_AUTH_SESSION_DATA_COOKIE_NAME);
+  });
+
+  test('signIn.phoneNumber sets no cookies when upstream requires two-factor', async () => {
+    fetchMock.mockResolvedValueOnce(
+      Response.json({ twoFactorRedirect: true }, { status: 200 })
+    );
+
+    await makeServer().signIn.phoneNumber({
+      phoneNumber: '+15555550100',
+      password: 'pw-12345678',
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(setCookieSpy).not.toHaveBeenCalled();
   });
 
   test('phoneNumber.verify sets the session and session_data cookies', async () => {
