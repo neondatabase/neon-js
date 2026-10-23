@@ -443,7 +443,7 @@ export const authClient = createAuthClient();
 
 When the page URL carries the signed `sig` and `ba_param` query parameters that the provider appended on redirect, the client adds them as `oauth_query` to every non-GET request, so a sign-in on the login page resumes the authorization. Without those parameters requests are unchanged.
 
-A login page resumes the authorization in two cases: the user signs in on it, or the user is already signed in. On every load, including the redirect back from a social sign-in, call `getSession()` to check the sign-in and then `oauth2.continue({ selected: true })`. Use the same path for the provider's `loginPage` and the middleware's `loginUrl`, so the middleware never redirects away from it. Failed requests reject with an error that has a `status`:
+A login page resumes the authorization in two cases: the user signs in on it, or the user is already signed in. On every load, including the redirect back from a social sign-in, call `getSession()` to check the sign-in and then `oauth2.continue({ selected: true })`. Use the same path for the login page URL configured for the OAuth provider in Neon Auth and the middleware's `loginUrl`, so the middleware never redirects away from it. Failed requests reject with an error that has a `status`:
 
 ```tsx
 'use client';
@@ -475,7 +475,7 @@ export default function LoginPage() {
         await authClient.oauth2.continue({ selected: true });
       } catch (err) {
         // 400: the link expired, and only the client app can start a new authorization.
-        if ((err as { status?: number }).status === 400) setExpired(true);
+        if (isOAuthVisit && (err as { status?: number }).status === 400) setExpired(true);
         else setError(message(err));
         setChecking(false);
       }
@@ -559,7 +559,7 @@ export default function ConsentPage() {
 
 `oauth2.consent()` navigates the browser itself: it returns `{ redirect: true, url }`, and better-auth's default redirect fetch plugin sets `window.location.href`, so the page does not need to follow it. Pass `scope` (a space-separated subset of the requested scopes) to grant less than was requested; without it every requested scope is granted. Both `publicClient` and `consent` need a signed-in user.
 
-Send `Content-Security-Policy: frame-ancestors 'none'` on the login and consent pages so they cannot be framed, and never build consent URLs yourself: the provider redirects with a signed query that `oauth2.consent()` forwards as it is.
+Send `Content-Security-Policy: frame-ancestors 'none'` as a response header on the login and consent pages so they cannot be framed (browsers ignore `frame-ancestors` in a `<meta>` tag), and never build consent URLs yourself: the provider redirects with a signed query that `oauth2.consent()` forwards as it is.
 
 The browser client's `oauth2.*` mirrors the full plugin. Neon mounts these endpoints:
 
