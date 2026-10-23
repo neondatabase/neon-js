@@ -447,6 +447,55 @@ describe('trySessionCache', () => {
       expect(response).toBe(null);
     });
 
+    test('forwards the renewed session_token cookie from upstream when minting', async () => {
+      const sessionData = createTestSessionData();
+      let upstreamCalls = 0;
+
+      // Upstream extends the session on this call and reissues session_token
+      server.use(
+        http.get(`${TEST_BASE_URL}/get-session`, () => {
+          upstreamCalls++;
+          const response = HttpResponse.json(sessionData);
+          response.headers.append(
+            'Set-Cookie',
+            '__Secure-neon-auth.session_token=renewed-token; Max-Age=604800; Path=/; HttpOnly; Secure; SameSite=None; Partitioned'
+          );
+          return response;
+        })
+      );
+
+      const request = new Request('https://example.com/api/auth/get-session', {
+        headers: {
+          Cookie: '__Secure-neon-auth.session_token=valid-token',
+        },
+      });
+
+      const response = await trySessionCache(request, TEST_BASE_URL, {
+        ...TEST_COOKIE_CONFIG,
+        domain: '.example.com',
+      });
+
+      expect(response).not.toBe(null);
+      expect(upstreamCalls).toBe(1);
+
+      const setCookies = response!.headers.getSetCookie();
+      expect(setCookies).toHaveLength(2);
+
+      const sessionTokenCookie = setCookies.find((c) =>
+        c.startsWith('__Secure-neon-auth.session_token=')
+      );
+      expect(sessionTokenCookie).toBeDefined();
+      expect(sessionTokenCookie).toContain('__Secure-neon-auth.session_token=renewed-token');
+      expect(sessionTokenCookie).toContain('Max-Age=604800');
+      expect(sessionTokenCookie).toContain('Domain=.example.com');
+      expect(sessionTokenCookie).toContain('SameSite=Lax');
+      expect(sessionTokenCookie).not.toContain('Partitioned');
+
+      expect(
+        setCookies.some((c) => c.startsWith('__Secure-neon-auth.local.session_data='))
+      ).toBe(true);
+    });
+
     test('mints cookie with correct Max-Age based on sessionDataTtl', async () => {
       const sessionData = createTestSessionData();
       const customTtl = 600; // 10 minutes

@@ -248,6 +248,22 @@ export async function fetchSessionWithCookie(
   baseUrl: string,
   log?: ResolvedNeonAuthLogging
 ): Promise<SessionData> {
+  const { sessionData } = await fetchSessionWithCookieResponse(sessionTokenCookie, baseUrl, log);
+  return sessionData;
+}
+
+/**
+ * Same as {@link fetchSessionWithCookie}, but also returns the upstream
+ * response headers. When upstream extends the session, it sends the renewed
+ * `session_token` in `Set-Cookie`, which the caller has to forward to the browser.
+ *
+ * @internal
+ */
+export async function fetchSessionWithCookieResponse(
+  sessionTokenCookie: string,
+  baseUrl: string,
+  log?: ResolvedNeonAuthLogging
+): Promise<{ sessionData: SessionData; headers: Headers }> {
   // Parse cookie value - handle both Set-Cookie header format and simple "name=value" format
   let cookieName: string;
   let cookieValue: string;
@@ -284,5 +300,5 @@ export async function fetchSessionWithCookie(
     throw new Error(`Failed to parse /get-session response as JSON: ${error instanceof Error ? error.message : String(error)}`);
   }
 
-  return parseSessionData(body, log);
+  return { sessionData: parseSessionData(body, log), headers: response.headers };
 }
