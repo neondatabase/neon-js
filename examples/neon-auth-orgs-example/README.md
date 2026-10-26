@@ -479,12 +479,18 @@ export function toNeonAuthError(err: unknown): NeonAuthError | null {
 }
 ```
 
-Failed client calls reject instead of returning `{ error }`, so read the error in a `catch` block with the type guard:
+This gives you two patterns — one for the happy-path `result.error` (already typed by the SDK) and one for `catch` blocks:
 
 ```ts
-try {
-  await authClient.organization.create({ name, slug });
-} catch (err: unknown) {
+// Pattern 1: SDK result — result.error is already typed
+const result = await authClient.organization.create({ name, slug });
+if (result?.error) {
+  const { code, message } = result.error;
+  // code and message are both typed as string | undefined
+}
+
+// Pattern 2: catch block — use the type guard
+try { ... } catch (err: unknown) {
   const authErr = toNeonAuthError(err);
   authErr?.code   // string | undefined
   authErr?.message // string | undefined
@@ -496,21 +502,33 @@ try {
 Neon Auth enforces a configurable maximum number of organizations per user. When the limit is hit, the SDK returns a `403` with error code `YOU_HAVE_REACHED_THE_MAXIMUM_NUMBER_OF_ORGANIZATIONS`:
 
 ```ts
+if (result?.error) {
+  const { code, message } = result.error;
+  const msg = code === "YOU_HAVE_REACHED_THE_MAXIMUM_NUMBER_OF_ORGANIZATIONS"
+    ? "Organization limit reached. Increase the limit in the Neon console."
+    : message || "Failed to create organization";
+}
+```
+
+In catch blocks:
+
+```ts
 const authErr = toNeonAuthError(err);
-const msg = authErr?.code === "YOU_HAVE_REACHED_THE_MAXIMUM_NUMBER_OF_ORGANIZATIONS"
-  ? "Organization limit reached. Increase the limit in the Neon console."
-  : authErr?.message || "Failed to create organization";
+if (authErr?.code === "YOU_HAVE_REACHED_THE_MAXIMUM_NUMBER_OF_ORGANIZATIONS") {
+  // handle limit reached
+}
 ```
 
 This is handled in both the `OrgSwitcher` and the `CommandMenu` create-org flows.
 
 ### Only Owner Constraint
 
-When removing a member, if they are the **last owner** of the organization, the SDK returns error code `YOU_CANNOT_LEAVE_THE_ORGANIZATION_AS_THE_ONLY_OWNER`. The mutation lets the rejected SDK error propagate (no `new Error(...)` wrapper) to preserve the code, then the `onError` handler extracts it:
+When removing a member, if they are the **last owner** of the organization, the SDK returns error code `YOU_CANNOT_LEAVE_THE_ORGANIZATION_AS_THE_ONLY_OWNER`. The mutation throws the SDK error directly (`throw error` instead of `throw new Error(...)`) to preserve the code, then the `onError` handler extracts it:
 
 ```ts
-// In the mutationFn — the call rejects on failure, so the error keeps its code
-await authClient.organization.removeMember({ memberIdOrEmail: memberId });
+// In the mutationFn — throw the SDK error to preserve the code
+const { error } = await authClient.organization.removeMember({ memberIdOrEmail: memberId });
+if (error) throw error;
 
 // In onError — use the type guard
 const authErr = toNeonAuthError(err);

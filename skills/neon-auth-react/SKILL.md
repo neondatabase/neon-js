@@ -695,7 +695,6 @@ export function AccountPage() {
 
 ### Error Response Shape
 
-```typescript
 Failed requests reject instead of returning `{ error }`, so wrap calls in `try/catch`:
 
 ```typescript

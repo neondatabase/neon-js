@@ -180,7 +180,7 @@ import { createAuthClient } from '@neondatabase/auth';
 export const auth = createAuthClient('https://your-auth-server.com');
 ```
 
-On the login page the client keeps the provider's signed request with every sign-in, so signing in resumes the authorization automatically.
+When a page is reached through the provider's redirect, the client sends the provider's signed request along with sign-in and consent calls, so signing in on that page resumes the authorization.
 
 A login page resumes the authorization in two cases: the user signs in on it, or the user is already signed in. On every load, including the redirect back from a social sign-in, call `getSession()` to check the sign-in and then `oauth2.continue({ selected: true })` (use the same path for the login page URL configured for the OAuth provider in Neon Auth and the middleware's `loginUrl`), which navigates to the consent page or back to the client app. Skip it when `prompt` contains `login` or `create`, which ask the user to sign in again. A 400 from `continue` means the link has expired; show a message instead of the form. After `signIn.email`, skip your own redirect when `data.redirect` is true: the SDK is already navigating. See the [login page example](./NEXT-JS.md#oauth-provider-mcp) in the Next.js guide; the same component works in a Vite SPA.
 

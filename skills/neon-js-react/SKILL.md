@@ -707,10 +707,11 @@ console.log(data);
 ### Auth Errors
 
 ```typescript
-const { error } = await neonClient.auth.signIn.email({ email, password });
-
-if (error) {
-  toast.error(error.message);
+try {
+  await neonClient.auth.signIn.email({ email, password });
+} catch (err) {
+  // Auth errors and network failures both reject
+  toast.error(err instanceof Error ? err.message : 'Something went wrong');
   return;
 }
 ```

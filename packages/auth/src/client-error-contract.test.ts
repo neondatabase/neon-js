@@ -3,6 +3,7 @@ import { createAuthClient } from "./neon-auth";
 import { createAuthClient as createNextAuthClient } from "./next";
 import { SupabaseAuthAdapter } from "./adapters/supabase/supabase-adapter";
 import { BETTER_AUTH_METHODS_CACHE } from "./core/better-auth-methods";
+import { AuthApiError } from "./adapters/supabase/auth-interface";
 
 const URL_ = "https://auth.example.com";
 
@@ -28,18 +29,32 @@ describe("client error contract", () => {
 
   const credentials = { email: "a@b.c", password: "wrong-password" };
 
-  test("vanilla client signIn.email rejects with a status", async () => {
-    const auth = createAuthClient(URL_);
-    await expect(auth.signIn.email(credentials)).rejects.toMatchObject({
+  // INVALID_EMAIL_OR_PASSWORD maps to InvalidCredentials in BETTER_AUTH_ERROR_MAP,
+  // so the rejection carries the normalized snake_case code, not the raw server code.
+  async function expectInvalidCredentialsRejection(call: Promise<unknown>) {
+    const err = await call.then(
+      () => {
+        throw new Error("expected the call to reject");
+      },
+      (error: unknown) => error,
+    );
+    expect(err).toBeInstanceOf(AuthApiError);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toBeTruthy();
+    expect(err).toMatchObject({
       status: 401,
+      code: "invalid_credentials",
     });
+  }
+
+  test("vanilla client signIn.email rejects with a normalized AuthApiError", async () => {
+    const auth = createAuthClient(URL_);
+    await expectInvalidCredentialsRejection(auth.signIn.email(credentials));
   });
 
-  test("Next.js (React adapter) client signIn.email rejects with a status", async () => {
+  test("Next.js (React adapter) client signIn.email rejects with a normalized AuthApiError", async () => {
     const auth = createNextAuthClient();
-    await expect(auth.signIn.email(credentials)).rejects.toMatchObject({
-      status: 401,
-    });
+    await expectInvalidCredentialsRejection(auth.signIn.email(credentials));
   });
 
   test("Supabase adapter signInWithPassword resolves with { error }", async () => {

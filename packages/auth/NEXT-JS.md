@@ -442,7 +442,7 @@ import { createAuthClient } from '@neondatabase/auth/next';
 export const authClient = createAuthClient();
 ```
 
-On the login page the client keeps the provider's signed request with every sign-in, so signing in resumes the authorization automatically.
+When a page is reached through the provider's redirect, the client sends the provider's signed request along with sign-in and consent calls, so signing in on that page resumes the authorization.
 
 A login page resumes the authorization in two cases: the user signs in on it, or the user is already signed in. On every load, including the redirect back from a social sign-in, call `getSession()` to check the sign-in and then `oauth2.continue({ selected: true })`. Use the same path for the login page URL configured for the OAuth provider in Neon Auth and the middleware's `loginUrl`, so the middleware never redirects away from it. Failed requests reject with an error that has a `status`:
 
