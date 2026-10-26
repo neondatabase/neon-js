@@ -10,6 +10,10 @@ import {
 import { createAuthServer } from './client-factory';
 import type { RequestContext } from './request-context';
 import type { NeonAuthServer } from './types';
+import {
+  NEON_AUTH_SESSION_COOKIE_NAME,
+  NEON_AUTH_SESSION_DATA_COOKIE_NAME,
+} from './constants';
 
 const TEST_SECRET = 'test-secret-at-least-32-characters-long!';
 const TEST_BASE_URL = 'https://auth.example.com';
@@ -650,5 +654,194 @@ describe('createAuthServer endpoint paths', () => {
     expect(new URL(url).pathname).toBe('/organization/check-slug');
     expect(init.method).toBe('POST');
     expect(JSON.parse(init.body as string)).toEqual({ slug: 'acme' });
+  });
+});
+
+describe('createAuthServer phone number', () => {
+  const originalFetch = globalThis.fetch;
+  let fetchMock: ReturnType<typeof vi.fn>;
+  let setCookieSpy: ReturnType<typeof vi.fn<RequestContext['setCookie']>>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+    setCookieSpy = vi.fn<RequestContext['setCookie']>();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  function makeServer() {
+    return createAuthServer({
+      baseUrl: TEST_BASE_URL,
+      context: () => ({
+        getCookies: () => '',
+        setCookie: setCookieSpy,
+        getHeader: () => null,
+        getOrigin: () => 'https://app.example.com',
+        getFramework: () => 'test',
+      }),
+      cookieSecret: TEST_SECRET,
+    });
+  }
+
+  function upstreamWithSessionCookie(body: unknown): Response {
+    const headers = new Headers({ 'Content-Type': 'application/json' });
+    headers.append(
+      'Set-Cookie',
+      `${NEON_AUTH_SESSION_COOKIE_NAME}=tok; Path=/; HttpOnly; Max-Age=3600`
+    );
+    return Response.json(body, { status: 200, headers });
+  }
+
+  function sessionResponse(): Response {
+    const now = new Date().toISOString();
+    return Response.json(
+      {
+        session: {
+          id: 's1',
+          userId: 'u1',
+          token: 'tok',
+          expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+          createdAt: now,
+          updatedAt: now,
+        },
+        user: {
+          id: 'u1',
+          email: 'a@b.com',
+          phoneNumber: '+15555550100',
+          phoneNumberVerified: true,
+          createdAt: now,
+          updatedAt: now,
+        },
+      },
+      { status: 200 }
+    );
+  }
+
+  function firstCall(): { path: string; init: RequestInit } {
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    return { path: new URL(url).pathname, init };
+  }
+
+  const cases = [
+    {
+      name: 'phoneNumber.sendOtp',
+      suffix: '/phone-number/send-otp',
+      body: { phoneNumber: '+15555550100' },
+      call: (s: ReturnType<typeof makeServer>) =>
+        s.phoneNumber.sendOtp({ phoneNumber: '+15555550100' }),
+    },
+    {
+      name: 'phoneNumber.requestPasswordReset',
+      suffix: '/phone-number/request-password-reset',
+      body: { phoneNumber: '+15555550100' },
+      call: (s: ReturnType<typeof makeServer>) =>
+        s.phoneNumber.requestPasswordReset({ phoneNumber: '+15555550100' }),
+    },
+    {
+      name: 'phoneNumber.resetPassword',
+      suffix: '/phone-number/reset-password',
+      body: { phoneNumber: '+15555550100', otp: '123456', newPassword: 'pw-12345678' },
+      call: (s: ReturnType<typeof makeServer>) =>
+        s.phoneNumber.resetPassword({
+          phoneNumber: '+15555550100',
+          otp: '123456',
+          newPassword: 'pw-12345678',
+        }),
+    },
+    {
+      name: 'signIn.phoneNumber',
+      suffix: '/sign-in/phone-number',
+      body: { phoneNumber: '+15555550100', password: 'pw-12345678' },
+      call: (s: ReturnType<typeof makeServer>) =>
+        s.signIn.phoneNumber({ phoneNumber: '+15555550100', password: 'pw-12345678' }),
+    },
+    {
+      name: 'phoneNumber.verify',
+      suffix: '/phone-number/verify',
+      body: { phoneNumber: '+15555550100', code: '123456' },
+      call: (s: ReturnType<typeof makeServer>) =>
+        s.phoneNumber.verify({ phoneNumber: '+15555550100', code: '123456' }),
+    },
+  ];
+
+  test.each(cases)('$name POSTs JSON to $suffix', async ({ suffix, body, call }) => {
+    fetchMock.mockResolvedValueOnce(Response.json({ status: true }, { status: 200 }));
+
+    await call(makeServer());
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const { path, init } = firstCall();
+    expect(path).toBe(suffix);
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual(body);
+  });
+
+  test('signIn.phoneNumber sets the session and session_data cookies', async () => {
+    fetchMock
+      .mockResolvedValueOnce(upstreamWithSessionCookie({ token: 'tok', user: { id: 'u1' } }))
+      .mockResolvedValueOnce(sessionResponse());
+
+    await makeServer().signIn.phoneNumber({
+      phoneNumber: '+15555550100',
+      password: 'pw-12345678',
+    });
+
+    const names = setCookieSpy.mock.calls.map(c => c[0]);
+    expect(names).toContain(NEON_AUTH_SESSION_COOKIE_NAME);
+    expect(names).toContain(NEON_AUTH_SESSION_DATA_COOKIE_NAME);
+  });
+
+  test('signIn.phoneNumber sets no cookies when upstream requires two-factor', async () => {
+    fetchMock.mockResolvedValueOnce(
+      Response.json({ twoFactorRedirect: true }, { status: 200 })
+    );
+
+    await makeServer().signIn.phoneNumber({
+      phoneNumber: '+15555550100',
+      password: 'pw-12345678',
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(setCookieSpy).not.toHaveBeenCalled();
+  });
+
+  test('phoneNumber.verify sets the session and session_data cookies', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        upstreamWithSessionCookie({ status: true, token: 'tok', user: { id: 'u1' } })
+      )
+      .mockResolvedValueOnce(sessionResponse());
+
+    await makeServer().phoneNumber.verify({
+      phoneNumber: '+15555550100',
+      code: '123456',
+    });
+
+    const names = setCookieSpy.mock.calls.map(c => c[0]);
+    expect(names).toContain(NEON_AUTH_SESSION_COOKIE_NAME);
+    expect(names).toContain(NEON_AUTH_SESSION_DATA_COOKIE_NAME);
+  });
+
+  test('phoneNumber.verify forwards disableSession and mints no session_data when upstream sets no cookie', async () => {
+    fetchMock.mockResolvedValueOnce(
+      Response.json({ status: true, token: null, user: { id: 'u1' } }, { status: 200 })
+    );
+
+    await makeServer().phoneNumber.verify({
+      phoneNumber: '+15555550100',
+      code: '123456',
+      disableSession: true,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(firstCall().init.body as string)).toEqual({
+      phoneNumber: '+15555550100',
+      code: '123456',
+      disableSession: true,
+    });
+    expect(setCookieSpy).not.toHaveBeenCalled();
   });
 });
