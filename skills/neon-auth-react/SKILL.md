@@ -695,12 +695,15 @@ export function AccountPage() {
 
 ### Error Response Shape
 
-```typescript
-const result = await authClient.signIn.email({ email, password });
+Failed requests reject instead of returning `{ error }`, so wrap calls in `try/catch`:
 
-if (result.error) {
-  console.error(result.error.message);  // Human-readable message
-  console.error(result.error.status);   // HTTP status code
+```typescript
+try {
+  await authClient.signIn.email({ email, password });
+} catch (err) {
+  const { message, status } = err as { message: string; status?: number };
+  console.error(message);  // Human-readable message
+  console.error(status);   // HTTP status code
 }
 ```
 
@@ -718,19 +721,13 @@ if (result.error) {
 
 ```typescript
 try {
-  const { error } = await authClient.signIn.email({ email, password });
-
-  if (error) {
-    // Handle auth-specific errors
-    toast.error(error.message);
-    return;
-  }
+  await authClient.signIn.email({ email, password });
 
   // Success - redirect
   navigate('/dashboard');
 } catch (err) {
-  // Handle network/unexpected errors
-  toast.error('Something went wrong');
+  // Auth errors (wrong password, rate limit, ...) and network failures both land here
+  toast.error(err instanceof Error ? err.message : 'Something went wrong');
 }
 ```
 
