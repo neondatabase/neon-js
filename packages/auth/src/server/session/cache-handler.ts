@@ -1,6 +1,7 @@
-import { getSessionDataFromCookie, fetchSessionWithCookie } from './operations';
+import { getSessionDataFromCookie, fetchSessionWithCookieResponse } from './operations';
 import { NEON_AUTH_SESSION_DATA_COOKIE_NAME, NEON_AUTH_SESSION_COOKIE_NAME } from '@/server/constants';
-import { mintSessionDataFromToken } from './minting';
+import { createSessionDataCookie } from './minting';
+import { sanitizeUpstreamSetCookies } from '../proxy/response';
 import { parseCookies } from 'better-auth/cookies';
 import type { SessionCookieConfig } from '../config';
 import type { ResolvedNeonAuthLogging } from '../logger';
@@ -72,33 +73,36 @@ export async function trySessionCache(
       return null;
     }
 
-    const sessionDataCookieString = await mintSessionDataFromToken(
-      sessionTokenCookie,
-      baseUrl,
-      cookieConfig,
-      log
-    );
-
-    if (!sessionDataCookieString) {
-      return null; // Minting failed, fall through to upstream
-    }
-
-    // Fetch session data to return in response body
     try {
-      const sessionData = await fetchSessionWithCookie(sessionTokenCookie, baseUrl, log);
+      // A single upstream call provides the response body, the data for the
+      // minted session_data cookie, and the upstream Set-Cookie headers. When
+      // upstream extends the session, it sends the renewed session_token here
+      // (and only on this call), so it must be forwarded to the browser.
+      // Otherwise the cookie keeps its sign-in Max-Age and the user is signed
+      // out when it runs out, even though the session is still valid.
+      const { sessionData, headers: upstreamHeaders } = await fetchSessionWithCookieResponse(
+        sessionTokenCookie,
+        baseUrl,
+        log
+      );
       if (!sessionData.session) {
-        return null;
+        return null; // No valid session, fall through to upstream
       }
 
-      // Create response with session data and Set-Cookie header
+      const sessionDataCookieString = await createSessionDataCookie(sessionData, cookieConfig);
+
+      // Create response with session data and Set-Cookie headers
       const response = Response.json(sessionData);
-      response.headers.set('Set-Cookie', sessionDataCookieString);
+      for (const cookie of sanitizeUpstreamSetCookies(upstreamHeaders, cookieConfig)) {
+        response.headers.append('Set-Cookie', cookie);
+      }
+      response.headers.append('Set-Cookie', sessionDataCookieString);
       return response;
     } catch (error) {
-      emit(log, 'error', '[trySessionCache] Failed to fetch session after minting cookie:', {
+      emit(log, 'error', '[trySessionCache] Failed to mint session_data cookie:', {
         error: error instanceof Error ? error.message : String(error),
       });
-      return null;
+      return null; // Minting failed, fall through to upstream
     }
   };
 

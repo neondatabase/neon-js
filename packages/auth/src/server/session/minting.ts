@@ -6,7 +6,43 @@ import {
 } from '../constants';
 import { parseSetCookies, serializeSetCookie } from '../utils/cookies';
 import type { SessionCookieConfig } from '../config';
+import type { RequireSessionData } from '../types';
 import type { ResolvedNeonAuthLogging } from '../logger';
+
+/**
+ * Signs session data into a session_data Set-Cookie string
+ *
+ * @param sessionData - Session data with a non-null session
+ * @param cookieConfig - Cookie configuration
+ * @returns Set-Cookie string for session_data
+ * @internal
+ */
+export async function createSessionDataCookie(
+  sessionData: RequireSessionData,
+  cookieConfig: SessionCookieConfig
+): Promise<string> {
+  // Sign the session data into a JWT cookie
+  const { value: signedData, expiresAt } = await signSessionDataCookie(
+    sessionData,
+    cookieConfig.secret,
+    cookieConfig.sessionDataTtl
+  );
+
+  // Calculate Max-Age in seconds (relative time, immune to clock skew)
+  const maxAge = Math.floor((expiresAt.getTime() - Date.now()) / 1000);
+
+  // Serialize to Set-Cookie string
+  return serializeSetCookie({
+    name: NEON_AUTH_SESSION_DATA_COOKIE_NAME,
+    value: signedData,
+    path: '/',
+    domain: cookieConfig.domain,
+    httpOnly: true,
+    secure: true,
+    sameSite: cookieConfig.sameSite ?? 'lax',
+    maxAge,
+  });
+}
 
 /**
  * Core minting logic - creates session_data cookie from session token
@@ -32,27 +68,7 @@ async function mintSessionDataCookie(
       return null; // No valid session
     }
 
-    // Sign the session data into a JWT cookie
-    const { value: signedData, expiresAt } = await signSessionDataCookie(
-      sessionData,
-      cookieConfig.secret,
-      cookieConfig.sessionDataTtl
-    );
-
-    // Calculate Max-Age in seconds (relative time, immune to clock skew)
-    const maxAge = Math.floor((expiresAt.getTime() - Date.now()) / 1000);
-
-    // Serialize to Set-Cookie string
-    return serializeSetCookie({
-      name: NEON_AUTH_SESSION_DATA_COOKIE_NAME,
-      value: signedData,
-      path: '/',
-      domain: cookieConfig.domain,
-      httpOnly: true,
-      secure: true,
-      sameSite: cookieConfig.sameSite ?? 'lax',
-      maxAge,
-    });
+    return await createSessionDataCookie(sessionData, cookieConfig);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const meta = {

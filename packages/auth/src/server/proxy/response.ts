@@ -44,34 +44,11 @@ export const handleAuthResponse = async (
 
 const prepareResponseHeaders = (response: Response, cookieConfig: SessionCookieConfig) => {
   const headers = new Headers();
-  const effectiveSameSite = cookieConfig.sameSite ?? 'lax';
-  const { domain } = cookieConfig;
   for (const header of RESPONSE_HEADERS_ALLOWLIST) {
     // Special handling for set-cookie: HTTP allows multiple Set-Cookie headers
     if (header === 'set-cookie') {
-      const cookies = response.headers.getSetCookie();
-      for (const cookieHeader of cookies) {
-        // Always sanitize upstream cookie flags before forwarding to the browser:
-        // - Strip Partitioned: Safari does not send Partitioned cookies on top-level navigations,
-        //   which breaks the OAuth challenge exchange when the callback hits a middleware route.
-        //   The flag is also only meaningful for third-party contexts; proxied cookies are first-party.
-        // - Apply configured SameSite (default lax): upstream may send SameSite=None with Partitioned.
-        // Domain assignment is the only other conditional step.
-        const parsedCookies = parseSetCookies(cookieHeader);
-        for (const parsedCookie of parsedCookies) {
-          parsedCookie.partitioned = undefined;
-          parsedCookie.sameSite = effectiveSameSite;
-          // Always force Secure on forwarded cookies, matching the minting
-          // path (`session/minting.ts` hardcodes `secure: true`) and the
-          // documented "Secure is always applied" contract. With
-          // `SameSite=None`, a missing `Secure` makes the browser drop the
-          // cookie entirely. See #161 review feedback (Andras FIX 1, security).
-          parsedCookie.secure = true;
-          if (domain) {
-            parsedCookie.domain = domain;
-          }
-          headers.append('Set-Cookie', serializeSetCookie(parsedCookie));
-        }
+      for (const cookie of sanitizeUpstreamSetCookies(response.headers, cookieConfig)) {
+        headers.append('Set-Cookie', cookie);
       }
     } else {
       const value = response.headers.get(header);
@@ -81,4 +58,45 @@ const prepareResponseHeaders = (response: Response, cookieConfig: SessionCookieC
     }
   }
   return headers;
+}
+
+/**
+ * Rewrites upstream Set-Cookie headers so they are safe to forward to the browser.
+ *
+ * @param upstreamHeaders - Response headers from upstream Neon Auth server
+ * @param cookieConfig - Session cookie configuration
+ * @returns Serialized Set-Cookie strings
+ * @internal
+ */
+export const sanitizeUpstreamSetCookies = (
+  upstreamHeaders: Headers,
+  cookieConfig: SessionCookieConfig
+): string[] => {
+  const effectiveSameSite = cookieConfig.sameSite ?? 'lax';
+  const { domain } = cookieConfig;
+  const sanitized: string[] = [];
+  for (const cookieHeader of upstreamHeaders.getSetCookie()) {
+    // Always sanitize upstream cookie flags before forwarding to the browser:
+    // - Strip Partitioned: Safari does not send Partitioned cookies on top-level navigations,
+    //   which breaks the OAuth challenge exchange when the callback hits a middleware route.
+    //   The flag is also only meaningful for third-party contexts; proxied cookies are first-party.
+    // - Apply configured SameSite (default lax): upstream may send SameSite=None with Partitioned.
+    // Domain assignment is the only other conditional step.
+    const parsedCookies = parseSetCookies(cookieHeader);
+    for (const parsedCookie of parsedCookies) {
+      parsedCookie.partitioned = undefined;
+      parsedCookie.sameSite = effectiveSameSite;
+      // Always force Secure on forwarded cookies, matching the minting
+      // path (`session/minting.ts` hardcodes `secure: true`) and the
+      // documented "Secure is always applied" contract. With
+      // `SameSite=None`, a missing `Secure` makes the browser drop the
+      // cookie entirely. See #161 review feedback (Andras FIX 1, security).
+      parsedCookie.secure = true;
+      if (domain) {
+        parsedCookie.domain = domain;
+      }
+      sanitized.push(serializeSetCookie(parsedCookie));
+    }
+  }
+  return sanitized;
 }
