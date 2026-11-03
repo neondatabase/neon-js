@@ -1,5 +1,5 @@
 import type { BetterAuthClientPlugin } from 'better-auth/client';
-import z from 'zod';
+import { z } from 'zod/mini';
 
 const ANONYMOUS_TOKEN_ENDPOINT = '/token/anonymous';
 
