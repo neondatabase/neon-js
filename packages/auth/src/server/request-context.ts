@@ -87,6 +87,21 @@ export interface RequestContext {
   ): Promise<void> | void;
 
   /**
+   * Whether the current execution context allows persisting upstream
+   * `Set-Cookie` headers via {@link setCookie}.
+   *
+   * When this returns `false`, the toolkit still returns upstream response
+   * data (e.g. a refreshed session payload from `getSession()`) but skips
+   * cookie write-back. Adapters for frameworks that forbid cookie mutation
+   * during certain phases (e.g. Next.js React Server Component render)
+   * should implement this explicitly.
+   *
+   * When omitted, the toolkit assumes cookie writes are always permitted
+   * (backward-compatible default for adapters that can mutate on every call).
+   */
+  canSetCookies?(): Promise<boolean> | boolean;
+
+  /**
    * Read a single request header by name. Names are case-insensitive per
    * the HTTP spec; implementations MUST normalize lookups (or rely on
    * a framework API that already does).
