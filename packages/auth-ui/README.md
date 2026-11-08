@@ -53,6 +53,7 @@ The `NeonAuthUIProvider` accepts all props from `@daveyplate/better-auth-ui`'s `
 | `authClient` | `NeonAuthPublicApi` | required | Auth client from `@neondatabase/auth` |
 | `className` | `string` | - | Additional classes for the wrapper div |
 | `defaultTheme` | `'light' \| 'dark' \| 'system'` | `'system'` | Default theme for next-themes |
+| `themeScriptProps` | `ScriptProps` | - | Props for next-themes' inline theme script. In a client-only app, pass `{ type: 'application/json' }` to stop React's script-tag warning |
 
 #### With Next.js (Recommended)
 

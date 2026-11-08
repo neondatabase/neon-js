@@ -4,6 +4,10 @@ All notable changes to `@neondatabase/auth-ui` will be documented in this file.
 
 ## Unreleased
 
+### Added
+
+- **`themeScriptProps` on `NeonAuthUIProvider`.** It is forwarded to next-themes' `scriptProps`. In a client-only app (for example a Vite SPA), React 19 logs "Encountered a script tag while rendering React component" for next-themes' inline theme script, which never runs on the client. Pass `themeScriptProps={{ type: 'application/json' }}` to render it as a data block. Server-rendered apps leave it unset.
+
 ### Fixed
 
 - **Providers settings card unlink and provider email.** `NeonAuthUIProvider` now translates the provider-side account id that `@daveyplate/better-auth-ui@3.4.0` sends into the local `account.id` Better Auth 1.7 expects, fixing the `ACCOUNT_NOT_FOUND` unlink failure and the missing provider email.

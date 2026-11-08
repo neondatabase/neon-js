@@ -1,0 +1,7 @@
+/* Pre-built CSS for consumers WITHOUT Tailwind */
+@import 'tailwindcss';
+@import './theme.css';
+
+
+/* Auto-generated: Scan better-auth-ui source files */
+@source "/tmp/claude-1000/-home-spenc-orca-workspaces-fixo-UX/d684c596-b10a-404a-a967-7655bb580af1/scratchpad/upstream/neon-js/node_modules/@daveyplate/better-auth-ui/src/**/*.{ts,tsx}";
