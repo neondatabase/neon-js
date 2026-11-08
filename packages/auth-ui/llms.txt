@@ -70,6 +70,7 @@ import { NeonAuthUIProvider } from "@neondatabase/auth-ui";
 | `authClient` | `NeonAuthPublicApi` | Required | Your auth client from `createAuthClient()` |
 | `className` | `string` | - | Additional CSS classes for the wrapper div |
 | `defaultTheme` | `'light' \| 'dark' \| 'system'` | `'system'` | Initial theme for next-themes |
+| `themeScriptProps` | `ScriptProps` | - | Props for next-themes' inline theme script; `{ type: 'application/json' }` in a client-only app |
 | `redirectTo` | `string` | - | URL to redirect after successful auth |
 
 ## CSS Layer Architecture

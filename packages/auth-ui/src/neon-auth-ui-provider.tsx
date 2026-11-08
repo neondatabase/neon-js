@@ -9,7 +9,7 @@ import {
 import type { NeonAuthAdapter, NeonAuthPublicApi } from '@neondatabase/auth';
 import { getReactClient } from './react-adapter';
 import { Toaster } from 'sonner';
-import { ThemeProvider } from 'next-themes';
+import { ThemeProvider, type ThemeProviderProps } from 'next-themes';
 import { useContext, useMemo } from 'react';
 import {
   createUnlinkAccount,
@@ -33,6 +33,14 @@ export type NeonAuthUIProviderProps<T extends NeonAuthAdapter> = Omit<
   className?: string;
   /** Default theme for next-themes. Defaults to 'system'. */
   defaultTheme?: 'light' | 'dark' | 'system';
+  /**
+   * Props for the inline script next-themes renders to set the theme before
+   * the first paint. In a client-only app (a Vite SPA) the script never runs,
+   * and React 19 warns "Encountered a script tag while rendering React
+   * component". Pass `{ type: 'application/json' }` there to render it as a
+   * data block. Leave it unset when you server-render, so the script runs.
+   */
+  themeScriptProps?: ThemeProviderProps['scriptProps'];
 };
 
 export function NeonAuthUIProvider<T extends NeonAuthAdapter>({
@@ -40,6 +48,7 @@ export function NeonAuthUIProvider<T extends NeonAuthAdapter>({
   children,
   className,
   defaultTheme = 'system',
+  themeScriptProps,
   ...props
 }: NeonAuthUIProviderProps<T>) {
   /*
@@ -94,7 +103,12 @@ export function NeonAuthUIProvider<T extends NeonAuthAdapter>({
 
   return (
     <div className={cn('neon-auth-ui', className)}>
-      <ThemeProvider attribute="class" defaultTheme={defaultTheme} enableSystem>
+      <ThemeProvider
+        attribute="class"
+        defaultTheme={defaultTheme}
+        enableSystem
+        scriptProps={themeScriptProps}
+      >
         {/*
           Explicit compatibility assertion: pnpm still resolves `better-auth` to
           separate virtual-store instances for @neondatabase/auth and this
