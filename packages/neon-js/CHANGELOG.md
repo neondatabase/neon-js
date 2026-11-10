@@ -8,12 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0-beta] - 2026-10-12
+
 ### Added
 
 - **Server toolkit re-export (beta)**: New subpath **`@neondatabase/neon-js/auth/server`** mirrors **`@neondatabase/auth/server`** introduced in `@neondatabase/auth@0.5.0-beta`. Lets adopters of the full SDK build framework adapters (Hono, Remix, SolidStart, Express, Fastify, ...) on the framework-agnostic toolkit without adding `@neondatabase/auth` as a separate dependency. See `packages/auth/BUILDING-AN-ADAPTER.md`. Stability: **beta** — tracks the upstream toolkit.
 
 ### Changed
 
+- **Better Auth `1.6.23` → `1.7.6`**: Transitive via `@neondatabase/auth`, matching the Neon Auth server.
+- **`X-Neon-Client-Info` carries `betterAuthVersion`**: `createClient()` already stamps this header on both auth and Data API requests, and it now includes the Better Auth version (re-exported as **`BETTER_AUTH_VERSION`**) so Neon Auth recognizes the client as speaking the 1.7 contract.
+- **BREAKING for direct Better Auth client users**: `accountId` now means the local `account.id` on `unlink-account`, `account-info`, `get-access-token` and `refresh-token`, and `unlink-account` no longer accepts `providerId`. The `SupabaseAuthAdapter` handles this internally; see the `@neondatabase/auth` changelog for details.
 - **Better Auth alignment**: Transitive via `@neondatabase/auth` — Better Auth client stack is now **`1.6.23`** (matched to neon-auth server).
 - **CLI internals**: Vendored `@supabase/postgres-meta` @ v0.93.1 (Apache-2.0)
   into `src/vendor/postgres-meta/` and removed it from runtime `dependencies`.
@@ -23,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `neon-js gen-types` CLI behaviour is unchanged. Direct runtime deps gained:
   `pg ^8.13`, `pg-format 1.0.4`, `postgres-array 3.0.4`, `prettier 3.8.1`.
   See `src/vendor/postgres-meta/README.md` for license + update procedure.
+
+### Fixed
+
+- **`X-Neon-Client-Info` no longer depends on the installed `@neondatabase/postgrest-js`**: neon-js now bundles its client-info helper, so the `betterAuthVersion` field is sent regardless of which `postgrest-js` version is installed.
 
 ### Added
 

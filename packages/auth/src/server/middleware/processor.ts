@@ -8,6 +8,7 @@ import { serializeSetCookie } from '../utils/cookies';
 import type { SessionCookieSameSite } from '../config';
 import type { NeonAuthLoggingInput, ResolvedNeonAuthLogging } from '../logger';
 import { resolveNeonAuthLogging } from '../logger';
+import { injectClientInfo } from '@/utils/client-info';
 
 /**
  * Result of middleware processing (framework-agnostic decision)
@@ -149,7 +150,7 @@ export async function processAuthMiddleware(
 		// GET-only upstream, spuriously logging the user out.
 		const sessionRequest = new Request(request.url, {
 			method: 'GET',
-			headers: stripBodyHeaders(request.headers),
+			headers: injectClientInfo(stripBodyHeaders(request.headers)),
 		});
 
 		const sessionResponse = await handleAuthProxyRequest({

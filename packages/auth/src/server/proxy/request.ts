@@ -2,7 +2,13 @@ import { extractNeonAuthCookies } from "@/server/utils/cookies";
 import type { ResolvedNeonAuthLogging } from '@/server/logger';
 import { classifyFetchFailure } from '@/server/network-error';
 
-const PROXY_HEADERS = ['user-agent', 'authorization', 'referer', 'content-type'];
+const PROXY_HEADERS = [
+	'user-agent',
+	'authorization',
+	'referer',
+	'content-type',
+	'x-neon-client-info',
+];
 
 /**
  * Proxy header constant - indicates request went through Neon Auth middleware/handler

@@ -16,8 +16,8 @@ jobs:
   unit-tests:
     timeout-minutes: 15
     runs-on:
-      group: neondatabase-protected-runner-group
-      labels: linux-ubuntu-latest
+      group: databricks-ghec-untrusted-runner-group
+      labels: linux-ubuntu-latest-untrusted-2core-8gb
 
     steps:
       - name: Harden the runner

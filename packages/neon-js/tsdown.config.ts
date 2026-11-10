@@ -30,6 +30,7 @@ export default defineConfig(
       'src/auth/server/index.ts',
     ],
     external: ['@neondatabase/auth', '@neondatabase/postgrest-js'],
+    noExternal: ['@neondatabase/internal'],
     plugins: [
       preserveDirectives({
         clientPackages: ['@neondatabase/auth/react/ui'],

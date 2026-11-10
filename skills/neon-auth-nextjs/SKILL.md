@@ -690,10 +690,11 @@ export async function signIn(formData: FormData) {
 ```typescript
 'use client';
 
-const { error } = await authClient.signIn.email({ email, password });
-
-if (error) {
-  toast.error(error.message);
+// Failed requests reject (with `status` and `message`) instead of returning `{ error }`
+try {
+  await authClient.signIn.email({ email, password });
+} catch (err) {
+  toast.error(err instanceof Error ? err.message : 'Sign-in failed');
 }
 ```
 

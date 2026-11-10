@@ -18,6 +18,7 @@ import type { NeonAuthLogger, ResolvedNeonAuthLogging } from './logger';
 import { resolveLog } from './logger';
 import { classifyFetchFailure } from './network-error';
 import { validateCookieConfig } from './config';
+import { injectClientInfo } from '@/utils/client-info';
 
 /**
  * Configuration for {@link createAuthServer}.
@@ -176,7 +177,7 @@ export function createAuthServer(
     try {
       response = await fetch(url.toString(), {
         method,
-        headers,
+        headers: injectClientInfo(headers),
         body: requestBody,
       });
     } catch (error) {

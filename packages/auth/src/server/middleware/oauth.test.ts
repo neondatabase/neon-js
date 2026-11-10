@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { needsSessionVerification, exchangeOAuthToken } from './oauth';
 import * as proxy from '../proxy';
 import {
@@ -265,5 +265,59 @@ describe('exchangeOAuthToken', () => {
     expect(result?.redirectUrl.searchParams.get('foo')).toBe('bar');
     expect(result?.redirectUrl.searchParams.get('baz')).toBe('qux');
     expect(result?.redirectUrl.searchParams.has(VERIFIER_PARAM)).toBe(false);
+  });
+});
+
+describe('exchangeOAuthToken client-info header', () => {
+  const originalNextRuntime = process.env.NEXT_RUNTIME;
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.resetModules();
+    if (originalNextRuntime === undefined) delete process.env.NEXT_RUNTIME;
+    else process.env.NEXT_RUNTIME = originalNextRuntime;
+  });
+
+  // The injector caches client info at module init, so the env must be set
+  // before the module graph is (re)loaded.
+  async function captureUpstream(headers: Record<string, string>) {
+    process.env.NEXT_RUNTIME = 'nodejs';
+    vi.resetModules();
+    const freshProxy = await import('../proxy');
+    const { exchangeOAuthToken: run } = await import('./oauth');
+    const { BETTER_AUTH_VERSION } = await import('../../utils/better-auth-version');
+    const upstream = vi
+      .spyOn(freshProxy, 'handleAuthRequest')
+      .mockResolvedValue(Response.json({}, { status: 401 }));
+    vi.spyOn(freshProxy, 'handleAuthResponse').mockResolvedValue(new Response('no', { status: 401 }));
+
+    await run(
+      new Request(`https://example.com/dashboard?${VERIFIER_PARAM}=v`, {
+        headers: { Cookie: `${NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME}=c`, ...headers },
+      }),
+      'https://auth.example.com',
+      TEST_SECRET,
+    );
+
+    return { upstreamRequest: upstream.mock.calls[0][1] as Request, BETTER_AUTH_VERSION };
+  }
+
+  test('stamps X-Neon-Client-Info on the verifier exchange', async () => {
+    const { upstreamRequest, BETTER_AUTH_VERSION } = await captureUpstream({});
+
+    const info = JSON.parse(upstreamRequest.headers.get('X-Neon-Client-Info')!);
+    expect(info.sdk).toBe('@neondatabase/auth');
+    expect(info.framework).toBe('next');
+    expect(info.betterAuthVersion).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(info.betterAuthVersion).toBe(BETTER_AUTH_VERSION);
+    const [major, minor] = info.betterAuthVersion.split('.').map(Number);
+    expect(major > 1 || (major === 1 && minor >= 7)).toBe(true);
+  });
+
+  test('preserves an inbound X-Neon-Client-Info value', async () => {
+    const inbound = JSON.stringify({ sdk: 'custom', version: '9.9.9' });
+    const { upstreamRequest } = await captureUpstream({ 'X-Neon-Client-Info': inbound });
+
+    expect(upstreamRequest.headers.get('X-Neon-Client-Info')).toBe(inbound);
   });
 });

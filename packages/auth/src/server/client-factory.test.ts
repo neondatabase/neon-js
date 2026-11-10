@@ -1,6 +1,19 @@
-import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
+import {
+  describe,
+  test,
+  expect,
+  expectTypeOf,
+  beforeEach,
+  afterEach,
+  vi,
+} from 'vitest';
 import { createAuthServer } from './client-factory';
 import type { RequestContext } from './request-context';
+import type { NeonAuthServer } from './types';
+import {
+  NEON_AUTH_SESSION_COOKIE_NAME,
+  NEON_AUTH_SESSION_DATA_COOKIE_NAME,
+} from './constants';
 
 const TEST_SECRET = 'test-secret-at-least-32-characters-long!';
 const TEST_BASE_URL = 'https://auth.example.com';
@@ -390,5 +403,445 @@ describe('createAuthServer cookie forwarding (Secure forcing)', () => {
     expect(setCookieSpy).toHaveBeenCalled();
     const options = setCookieSpy.mock.calls[0][2];
     expect(options).toMatchObject({ secure: true, sameSite: 'none' });
+  });
+});
+
+describe('createAuthServer getAccessToken', () => {
+  const originalFetch = globalThis.fetch;
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  test('POSTs the accountId as a JSON body with a client-info header', async () => {
+    fetchMock.mockResolvedValueOnce(
+      Response.json({ accessToken: 'token' }, { status: 200 })
+    );
+
+    const server = createAuthServer({
+      baseUrl: TEST_BASE_URL,
+      context: makeContext,
+      cookieSecret: TEST_SECRET,
+    });
+
+    await (server as unknown as {
+      getAccessToken: (args: unknown) => Promise<unknown>;
+    }).getAccessToken({ accountId: 'acc_local_1' });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(new URL(url).pathname.endsWith('/get-access-token')).toBe(true);
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({ accountId: 'acc_local_1' });
+
+    const headers = new Headers(init.headers);
+    expect(headers.get('X-Neon-Client-Info')).toBeTruthy();
+    expect(headers.get('Content-Type')).toBe('application/json');
+    expect(headers.get('Origin')).toBe('https://app.example.com');
+  });
+});
+
+describe('createAuthServer oauth2', () => {
+  const originalFetch = globalThis.fetch;
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn(async () => Response.json({ ok: true }));
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const make = () =>
+    createAuthServer({
+      baseUrl: TEST_BASE_URL,
+      context: makeContext,
+      cookieSecret: TEST_SECRET,
+    });
+
+  const lastCall = () => {
+    const [url, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
+    return { url: new URL(url), init };
+  };
+
+  const postCases = [
+    ['consent', 'consent', { accept: true, scope: 'openid' }],
+    ['continue', 'continue', { selected: true }],
+    ['publicClientPrelogin', 'public-client-prelogin', { client_id: 'c1', oauth_query: 'sig=s' }],
+    ['updateConsent', 'update-consent', { id: 'k1', update: { scopes: ['openid'] } }],
+    ['deleteConsent', 'delete-consent', { id: 'k1' }],
+  ] as const;
+
+  test.each(postCases)('oauth2.%s POSTs JSON to /oauth2/%s', async (name, path, body) => {
+    await (make().oauth2[name] as (b: unknown) => Promise<unknown>)(body);
+    const { url, init } = lastCall();
+    expect(url.pathname.endsWith(`/oauth2/${path}`)).toBe(true);
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual(body);
+  });
+
+  test('oauth2.publicClient GETs /oauth2/public-client with client_id', async () => {
+    await make().oauth2.publicClient({ query: { client_id: 'c1' } });
+    const { url, init } = lastCall();
+    expect(url.pathname.endsWith('/oauth2/public-client')).toBe(true);
+    expect(url.searchParams.get('client_id')).toBe('c1');
+    expect(init.method).toBe('GET');
+  });
+
+  test('oauth2.getConsent GETs /oauth2/get-consent with id', async () => {
+    await make().oauth2.getConsent({ query: { id: 'k1' } });
+    const { url, init } = lastCall();
+    expect(url.pathname.endsWith('/oauth2/get-consent')).toBe(true);
+    expect(url.searchParams.get('id')).toBe('k1');
+    expect(init.method).toBe('GET');
+  });
+
+  test('oauth2.getConsents GETs /oauth2/get-consents', async () => {
+    await make().oauth2.getConsents();
+    const { url, init } = lastCall();
+    expect(url.pathname.endsWith('/oauth2/get-consents')).toBe(true);
+    expect(init.method).toBe('GET');
+  });
+
+  test('oauth2 exposes only the user actions Neon routes', () => {
+    const oauth2 = make().oauth2 as Record<string, unknown>;
+    for (const included of [
+      'consent',
+      'continue',
+      'deleteConsent',
+      'getConsent',
+      'getConsents',
+      'publicClient',
+      'publicClientPrelogin',
+      'updateConsent',
+    ]) {
+      expect(typeof oauth2[included]).toBe('function');
+    }
+    for (const excluded of ['token', 'introspect', 'revoke', 'register', 'createClient', 'getClients']) {
+      expect(oauth2[excluded]).toBeUndefined();
+    }
+  });
+
+  test('the server type has only the routed oauth2 methods', () => {
+    expectTypeOf<keyof NeonAuthServer['oauth2']>().toEqualTypeOf<
+      | 'consent'
+      | 'continue'
+      | 'publicClientPrelogin'
+      | 'updateConsent'
+      | 'deleteConsent'
+      | 'publicClient'
+      | 'getConsent'
+      | 'getConsents'
+    >();
+  });
+});
+
+describe('createAuthServer endpoint paths', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const makeServer = () =>
+    createAuthServer({
+      baseUrl: TEST_BASE_URL,
+      context: makeContext,
+      cookieSecret: TEST_SECRET,
+    });
+
+  test('revokeOtherSessions POSTs to /revoke-other-sessions', async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ status: true }, { status: 200 }));
+
+    await (makeServer() as unknown as {
+      revokeOtherSessions: () => Promise<unknown>;
+    }).revokeOtherSessions();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(new URL(url).pathname).toBe('/revoke-other-sessions');
+    expect(init.method).toBe('POST');
+  });
+
+  test('emailOtp.resetPassword POSTs to /email-otp/reset-password', async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ success: true }, { status: 200 }));
+
+    await (makeServer() as unknown as {
+      emailOtp: { resetPassword: (args: unknown) => Promise<unknown> };
+    }).emailOtp.resetPassword({
+      email: 'a@b.com',
+      otp: '123456',
+      password: 'new-password',
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(new URL(url).pathname).toBe('/email-otp/reset-password');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({
+      email: 'a@b.com',
+      otp: '123456',
+      password: 'new-password',
+    });
+  });
+
+  test('verifyEmail GETs /verify-email with the token in the query string', async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ status: true }, { status: 200 }));
+
+    await (makeServer() as unknown as {
+      verifyEmail: (args: unknown) => Promise<unknown>;
+    }).verifyEmail({ query: { token: 'tok-123' } });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const parsed = new URL(url);
+    expect(parsed.pathname).toBe('/verify-email');
+    expect(parsed.searchParams.get('token')).toBe('tok-123');
+    expect(init.method).toBe('GET');
+    expect(init.body).toBeUndefined();
+  });
+
+  test('jwks GETs /.well-known/jwks.json with no body', async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ keys: [] }, { status: 200 }));
+
+    await (makeServer() as unknown as {
+      jwks: () => Promise<unknown>;
+    }).jwks();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(new URL(url).pathname).toBe('/.well-known/jwks.json');
+    expect(init.method).toBe('GET');
+    expect(init.body).toBeUndefined();
+  });
+
+  test('admin.listUserSessions POSTs to /admin/list-user-sessions', async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ sessions: [] }, { status: 200 }));
+
+    await (makeServer() as unknown as {
+      admin: { listUserSessions: (args: unknown) => Promise<unknown> };
+    }).admin.listUserSessions({ userId: 'user-1' });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(new URL(url).pathname).toBe('/admin/list-user-sessions');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({ userId: 'user-1' });
+  });
+
+  test('organization.checkSlug POSTs to /organization/check-slug', async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ status: true }, { status: 200 }));
+
+    await (makeServer() as unknown as {
+      organization: { checkSlug: (args: unknown) => Promise<unknown> };
+    }).organization.checkSlug({ slug: 'acme' });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(new URL(url).pathname).toBe('/organization/check-slug');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({ slug: 'acme' });
+  });
+});
+
+describe('createAuthServer phone number', () => {
+  const originalFetch = globalThis.fetch;
+  let fetchMock: ReturnType<typeof vi.fn>;
+  let setCookieSpy: ReturnType<typeof vi.fn<RequestContext['setCookie']>>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+    setCookieSpy = vi.fn<RequestContext['setCookie']>();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  function makeServer() {
+    return createAuthServer({
+      baseUrl: TEST_BASE_URL,
+      context: () => ({
+        getCookies: () => '',
+        setCookie: setCookieSpy,
+        getHeader: () => null,
+        getOrigin: () => 'https://app.example.com',
+        getFramework: () => 'test',
+      }),
+      cookieSecret: TEST_SECRET,
+    });
+  }
+
+  function upstreamWithSessionCookie(body: unknown): Response {
+    const headers = new Headers({ 'Content-Type': 'application/json' });
+    headers.append(
+      'Set-Cookie',
+      `${NEON_AUTH_SESSION_COOKIE_NAME}=tok; Path=/; HttpOnly; Max-Age=3600`
+    );
+    return Response.json(body, { status: 200, headers });
+  }
+
+  function sessionResponse(): Response {
+    const now = new Date().toISOString();
+    return Response.json(
+      {
+        session: {
+          id: 's1',
+          userId: 'u1',
+          token: 'tok',
+          expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+          createdAt: now,
+          updatedAt: now,
+        },
+        user: {
+          id: 'u1',
+          email: 'a@b.com',
+          phoneNumber: '+15555550100',
+          phoneNumberVerified: true,
+          createdAt: now,
+          updatedAt: now,
+        },
+      },
+      { status: 200 }
+    );
+  }
+
+  function firstCall(): { path: string; init: RequestInit } {
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    return { path: new URL(url).pathname, init };
+  }
+
+  const cases = [
+    {
+      name: 'phoneNumber.sendOtp',
+      suffix: '/phone-number/send-otp',
+      body: { phoneNumber: '+15555550100' },
+      call: (s: ReturnType<typeof makeServer>) =>
+        s.phoneNumber.sendOtp({ phoneNumber: '+15555550100' }),
+    },
+    {
+      name: 'phoneNumber.requestPasswordReset',
+      suffix: '/phone-number/request-password-reset',
+      body: { phoneNumber: '+15555550100' },
+      call: (s: ReturnType<typeof makeServer>) =>
+        s.phoneNumber.requestPasswordReset({ phoneNumber: '+15555550100' }),
+    },
+    {
+      name: 'phoneNumber.resetPassword',
+      suffix: '/phone-number/reset-password',
+      body: { phoneNumber: '+15555550100', otp: '123456', newPassword: 'pw-12345678' },
+      call: (s: ReturnType<typeof makeServer>) =>
+        s.phoneNumber.resetPassword({
+          phoneNumber: '+15555550100',
+          otp: '123456',
+          newPassword: 'pw-12345678',
+        }),
+    },
+    {
+      name: 'signIn.phoneNumber',
+      suffix: '/sign-in/phone-number',
+      body: { phoneNumber: '+15555550100', password: 'pw-12345678' },
+      call: (s: ReturnType<typeof makeServer>) =>
+        s.signIn.phoneNumber({ phoneNumber: '+15555550100', password: 'pw-12345678' }),
+    },
+    {
+      name: 'phoneNumber.verify',
+      suffix: '/phone-number/verify',
+      body: { phoneNumber: '+15555550100', code: '123456' },
+      call: (s: ReturnType<typeof makeServer>) =>
+        s.phoneNumber.verify({ phoneNumber: '+15555550100', code: '123456' }),
+    },
+  ];
+
+  test.each(cases)('$name POSTs JSON to $suffix', async ({ suffix, body, call }) => {
+    fetchMock.mockResolvedValueOnce(Response.json({ status: true }, { status: 200 }));
+
+    await call(makeServer());
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const { path, init } = firstCall();
+    expect(path).toBe(suffix);
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual(body);
+  });
+
+  test('signIn.phoneNumber sets the session and session_data cookies', async () => {
+    fetchMock
+      .mockResolvedValueOnce(upstreamWithSessionCookie({ token: 'tok', user: { id: 'u1' } }))
+      .mockResolvedValueOnce(sessionResponse());
+
+    await makeServer().signIn.phoneNumber({
+      phoneNumber: '+15555550100',
+      password: 'pw-12345678',
+    });
+
+    const names = setCookieSpy.mock.calls.map(c => c[0]);
+    expect(names).toContain(NEON_AUTH_SESSION_COOKIE_NAME);
+    expect(names).toContain(NEON_AUTH_SESSION_DATA_COOKIE_NAME);
+  });
+
+  test('signIn.phoneNumber sets no cookies when upstream requires two-factor', async () => {
+    fetchMock.mockResolvedValueOnce(
+      Response.json({ twoFactorRedirect: true }, { status: 200 })
+    );
+
+    await makeServer().signIn.phoneNumber({
+      phoneNumber: '+15555550100',
+      password: 'pw-12345678',
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(setCookieSpy).not.toHaveBeenCalled();
+  });
+
+  test('phoneNumber.verify sets the session and session_data cookies', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        upstreamWithSessionCookie({ status: true, token: 'tok', user: { id: 'u1' } })
+      )
+      .mockResolvedValueOnce(sessionResponse());
+
+    await makeServer().phoneNumber.verify({
+      phoneNumber: '+15555550100',
+      code: '123456',
+    });
+
+    const names = setCookieSpy.mock.calls.map(c => c[0]);
+    expect(names).toContain(NEON_AUTH_SESSION_COOKIE_NAME);
+    expect(names).toContain(NEON_AUTH_SESSION_DATA_COOKIE_NAME);
+  });
+
+  test('phoneNumber.verify forwards disableSession and mints no session_data when upstream sets no cookie', async () => {
+    fetchMock.mockResolvedValueOnce(
+      Response.json({ status: true, token: null, user: { id: 'u1' } }, { status: 200 })
+    );
+
+    await makeServer().phoneNumber.verify({
+      phoneNumber: '+15555550100',
+      code: '123456',
+      disableSession: true,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(firstCall().init.body as string)).toEqual({
+      phoneNumber: '+15555550100',
+      code: '123456',
+      disableSession: true,
+    });
+    expect(setCookieSpy).not.toHaveBeenCalled();
   });
 });
