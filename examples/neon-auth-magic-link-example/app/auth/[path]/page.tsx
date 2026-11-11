@@ -1,5 +1,5 @@
 import { MagicLinkForm } from "@/components/magic-link-form";
-import { authViewPaths } from "@neondatabase/auth/react/ui/server";
+import { authViewPaths } from "@neondatabase/auth-ui/server";
 
 export const dynamicParams = false;
 

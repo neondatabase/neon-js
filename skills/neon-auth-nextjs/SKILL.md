@@ -19,7 +19,7 @@ Use this skill when:
 
 1. **Server vs Client imports**: Use correct import paths
 2. **`'use client'` directive**: Required for client components using hooks
-3. **CSS Import**: Choose ONE - either `/ui/css` OR `/ui/tailwind`, never both
+3. **CSS Import**: Choose ONE - either `@neondatabase/auth-ui/css` OR `@neondatabase/auth-ui/tailwind`, never both
 4. **onSessionChange**: Always call `router.refresh()` to update Server Components
 
 ## Critical Imports
@@ -28,8 +28,8 @@ Use this skill when:
 |---------|-------------|
 | Unified Server (`createNeonAuth`) | `@neondatabase/auth/next/server` |
 | Client Auth | `@neondatabase/auth/next` |
-| UI Components | `@neondatabase/auth/react/ui` |
-| View Paths (static params) | `@neondatabase/auth/react/ui/server` |
+| UI Components | `@neondatabase/auth-ui` |
+| View Paths (static params) | `@neondatabase/auth-ui/server` |
 
 **Note**: Use `createNeonAuth()` from `@neondatabase/auth/next/server` to get a unified `auth` instance that provides:
 - `.handler()` - API route handler
@@ -42,7 +42,7 @@ Use this skill when:
 
 ### 1. Install
 ```bash
-npm install @neondatabase/auth
+npm install @neondatabase/auth @neondatabase/auth-ui
 ```
 
 ### 2. Environment (`.env.local`)
@@ -104,7 +104,7 @@ export const authClient = createAuthClient();
 ### 7. Provider (`app/providers.tsx`)
 ```typescript
 'use client';
-import { NeonAuthUIProvider } from '@neondatabase/auth/react/ui';
+import { NeonAuthUIProvider } from '@neondatabase/auth-ui';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { authClient } from '@/lib/auth/client';
@@ -130,7 +130,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
 ### 8. Layout (`app/layout.tsx`)
 ```typescript
 import { Providers } from './providers';
-import '@neondatabase/auth/ui/css';
+import '@neondatabase/auth-ui/css';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -145,8 +145,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
 ### 9. Auth Pages (`app/auth/[path]/page.tsx`)
 ```typescript
-import { AuthView } from '@neondatabase/auth/react/ui';
-import { authViewPaths } from '@neondatabase/auth/react/ui/server';
+import { AuthView } from '@neondatabase/auth-ui';
+import { authViewPaths } from '@neondatabase/auth-ui/server';
 
 export function generateStaticParams() {
   return Object.values(authViewPaths).map((path) => ({ path }));
@@ -167,13 +167,13 @@ export default async function AuthPage({ params }: { params: Promise<{ path: str
 **Without Tailwind** (pre-built CSS bundle ~47KB):
 ```typescript
 // app/layout.tsx
-import '@neondatabase/auth/ui/css';
+import '@neondatabase/auth-ui/css';
 ```
 
 **With Tailwind CSS v4** (`app/globals.css`):
 ```css
 @import 'tailwindcss';
-@import '@neondatabase/auth/ui/tailwind';
+@import '@neondatabase/auth-ui/tailwind';
 ```
 
 **IMPORTANT**: Never import both - causes duplicate styles.
@@ -443,7 +443,7 @@ const session = await authClient.getSession();
 ### AuthView - Main Auth Interface
 
 ```typescript
-import { AuthView } from '@neondatabase/auth/react/ui';
+import { AuthView } from '@neondatabase/auth-ui';
 
 // Handles: sign-in, sign-up, forgot-password, reset-password, callback, sign-out
 <AuthView pathname={path} />
@@ -457,7 +457,7 @@ import {
   SignedOut,
   AuthLoading,
   RedirectToSignIn,
-} from '@neondatabase/auth/react/ui';
+} from '@neondatabase/auth-ui';
 
 function MyPage() {
   return (
@@ -484,7 +484,7 @@ function MyPage() {
 ### UserButton
 
 ```typescript
-import { UserButton } from '@neondatabase/auth/react/ui';
+import { UserButton } from '@neondatabase/auth-ui';
 
 function Header() {
   return (
@@ -507,7 +507,7 @@ import {
   ChangeEmailCard,
   DeleteAccountCard,
   ProvidersCard,
-} from '@neondatabase/auth/react/ui';
+} from '@neondatabase/auth-ui';
 ```
 
 ### Organization Components
@@ -518,7 +518,7 @@ import {
   OrganizationSettingsCards,
   OrganizationMembersCard,
   AcceptInvitationCard,
-} from '@neondatabase/auth/react/ui';
+} from '@neondatabase/auth-ui';
 ```
 
 ---
@@ -592,7 +592,7 @@ import {
   SecuritySettingsCards,
   SessionsCard,
   ChangePasswordCard,
-} from '@neondatabase/auth/react/ui';
+} from '@neondatabase/auth-ui';
 
 export default async function AccountPage({ params }: { params: Promise<{ path: string }> }) {
   const { path = 'settings' } = await params;

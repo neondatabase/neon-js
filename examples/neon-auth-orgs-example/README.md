@@ -80,10 +80,10 @@ This is useful for **programmatic org provisioning** scenarios — for example, 
 ### Dependencies
 
 ```bash
-bun add @neondatabase/auth @neondatabase/serverless
+bun add @neondatabase/auth @neondatabase/auth-ui @neondatabase/serverless
 ```
 
-The auth package is `@neondatabase/auth` (used as a workspace dependency). The serverless driver (`@neondatabase/serverless`) is used for database access over HTTP.
+The auth package is `@neondatabase/auth` (used as a workspace dependency), UI components come from `@neondatabase/auth-ui`, and the serverless driver (`@neondatabase/serverless`) is used for database access over HTTP.
 
 ### Environment Variables
 
@@ -155,7 +155,7 @@ Unauthenticated users hitting `/dashboard/*` or `/account/*` are redirected to t
 In the root layout (`src/app/layout.tsx`), wrap the app with `NeonAuthUIProvider`:
 
 ```tsx
-import { NeonAuthUIProvider, UserButton } from "@neondatabase/auth/react";
+import { NeonAuthUIProvider, UserButton } from "@neondatabase/auth-ui";
 import { authClient } from "@/lib/auth/client";
 
 <NeonAuthUIProvider authClient={authClient} redirectTo="/dashboard" emailOTP>

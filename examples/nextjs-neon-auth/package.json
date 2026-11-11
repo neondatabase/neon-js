@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@neondatabase/auth": "workspace:*",
+    "@neondatabase/auth-ui": "workspace:*",
     "@neondatabase/serverless": "1.0.2",
     "@radix-ui/react-dropdown-menu": "2.1.16",
     "@radix-ui/react-slot": "1.2.3",
