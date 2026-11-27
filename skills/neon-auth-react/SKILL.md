@@ -349,7 +349,7 @@ await authClient.signIn.email({ email, password });
 await authClient.signUp.email({ email, password, name });
 await authClient.signIn.social({ provider: 'google', callbackURL: '/dashboard' });
 await authClient.signOut();
-const session = await authClient.getSession();
+const { data: session } = await authClient.getSession();
 
 // React Hook
 const { data, isPending, error } = authClient.useSession();
