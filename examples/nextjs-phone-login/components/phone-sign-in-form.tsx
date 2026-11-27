@@ -103,10 +103,10 @@ export function PhoneSignInForm() {
           {(state === 'idle' || state === 'error') && (
             <button
               onClick={sendOTP}
-              disabled={state === 'sending' || !phoneNumber.trim()}
+              disabled={!phoneNumber.trim()}
               className="px-4 py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-sm disabled:opacity-50"
             >
-              {state === 'sending' ? 'Sending...' : 'Send OTP'}
+              Send OTP
             </button>
           )}
         </div>

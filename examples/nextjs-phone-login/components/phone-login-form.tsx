@@ -22,7 +22,7 @@ export function AddPhoneForm() {
   // (Better Auth phone-number plugin, `returned: true`), but the generated
   // TypeScript types don't include them — cast once here.
   const sessionUser = session?.user as
-    | (typeof session extends { user: infer U } ? U : never) & {
+    | NonNullable<typeof session>['user'] & {
         phoneNumber?: string;
         phoneNumberVerified?: boolean;
       }
@@ -197,10 +197,10 @@ export function AddPhoneForm() {
           {(state === 'idle' || state === 'error') && (
             <button
               onClick={sendOTP}
-              disabled={state === 'sending' || !phoneNumber.trim()}
+              disabled={!phoneNumber.trim()}
               className="px-4 py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-sm disabled:opacity-50"
             >
-              {state === 'sending' ? 'Sending...' : 'Send OTP'}
+              Send OTP
             </button>
           )}
         </div>

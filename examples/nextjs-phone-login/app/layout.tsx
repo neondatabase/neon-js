@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import Link from 'next/link';
 import './globals.css';
 import { Providers } from './providers';
 
@@ -18,12 +19,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Providers>
           <nav className="border-b border-border px-6 py-4">
             <div className="max-w-4xl mx-auto flex items-center justify-between">
-              <a href="/" className="text-lg font-semibold text-foreground">
+              <Link href="/" className="text-lg font-semibold text-foreground">
                 Phone Login Demo
-              </a>
+              </Link>
               <div className="flex gap-4 text-sm">
-                <a href="/dashboard" className="text-muted-foreground hover:text-foreground transition-colors">Dashboard</a>
-                <a href="/webhooks" className="text-muted-foreground hover:text-foreground transition-colors">Webhooks</a>
+                <Link href="/dashboard" className="text-muted-foreground hover:text-foreground transition-colors">Dashboard</Link>
+                <Link href="/webhooks" className="text-muted-foreground hover:text-foreground transition-colors">Webhooks</Link>
               </div>
             </div>
           </nav>

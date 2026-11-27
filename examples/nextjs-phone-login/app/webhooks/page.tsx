@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 
 interface WebhookEvent {
   id: string;
@@ -41,23 +41,28 @@ export default function WebhooksPage() {
   const [isPolling, setIsPolling] = useState(true);
   const [lastSeenId, setLastSeenId] = useState<string | null>(null);
 
-  const fetchEvents = useCallback(async () => {
-    try {
-      const res = await fetch('/api/webhooks/events');
-      const data = await res.json();
-      setEvents(data.events || []);
-    } catch (err) {
-      console.error('Failed to fetch events:', err);
-    }
-  }, []);
-
   useEffect(() => {
+    let cancelled = false;
+
+    async function fetchEvents() {
+      try {
+        const res = await fetch('/api/webhooks/events');
+        const data = await res.json();
+        if (!cancelled) setEvents(data.events || []);
+      } catch (err) {
+        console.error('Failed to fetch events:', err);
+      }
+    }
+
     fetchEvents();
-    if (!isPolling) return;
+    if (!isPolling) return () => { cancelled = true; };
 
     const interval = setInterval(fetchEvents, 2500);
-    return () => clearInterval(interval);
-  }, [fetchEvents, isPolling]);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [isPolling]);
 
   useEffect(() => {
     if (events.length > 0 && lastSeenId !== events[0].id) {
