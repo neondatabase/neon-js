@@ -81,7 +81,7 @@ await auth.signIn.email({
 });
 
 // Get session
-const session = await auth.getSession();
+const { data: session } = await auth.getSession();
 
 // Sign out
 await auth.signOut();

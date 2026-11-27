@@ -51,7 +51,9 @@ NEON_AUTH_BASE_URL=https://your-auth.neon.tech
 NEON_AUTH_COOKIE_SECRET=your-secret-at-least-32-characters-long
 ```
 
-**Important**: Generate a secure secret (32+ characters) for production:
+**Important**: Set all required env vars, including `NEON_AUTH_COOKIE_SECRET`, at build time too (`next build`), not only at runtime. The auth server module is evaluated during build, so a missing secret fails it with `Missing required config: cookies.secret. You must provide the cookie secret in the config object.`
+
+Generate a secure secret (32+ characters) for production:
 ```bash
 openssl rand -base64 32
 ```
@@ -433,7 +435,7 @@ await authClient.signIn.social({
 await authClient.signOut();
 
 // Get session
-const session = await authClient.getSession();
+const { data: session } = await authClient.getSession();
 ```
 
 ---
@@ -766,7 +768,7 @@ export const { GET, POST } = auth.handler();
 
 1. Check cookies are enabled
 2. Verify `NEON_AUTH_BASE_URL` is correct in `.env.local`
-3. Verify `NEON_AUTH_COOKIE_SECRET` is set and at least 32 characters
+3. Verify `NEON_AUTH_COOKIE_SECRET` is set and at least 32 characters (it must also be present during `next build`; otherwise the build fails with `Missing required config: cookies.secret. ...`)
 4. Make sure you're not in incognito with cookies blocked
 
 ### Session data cache not working?

@@ -38,7 +38,9 @@ NEON_AUTH_BASE_URL=https://your-neon-auth-url.neon.tech
 NEON_AUTH_COOKIE_SECRET=your-secret-at-least-32-characters-long
 ```
 
-**Important**: The `NEON_AUTH_COOKIE_SECRET` must be at least 32 characters long. Generate a secure random string for production:
+**Important**: All required Neon Auth variables, including `NEON_AUTH_COOKIE_SECRET`, must also be set when you run `next build`, not only at runtime. The auth server module is evaluated while Next.js collects page data, so a missing secret fails the build with `Missing required config: cookies.secret. You must provide the cookie secret in the config object.`
+
+The `NEON_AUTH_COOKIE_SECRET` must be at least 32 characters long. Generate a secure random string for production:
 
 ```bash
 # Generate a secure secret
@@ -335,17 +337,17 @@ export default async function OrganizationPage({
 
 ### React Server Components
 
-Use the `auth.getSession()` function to access session and user data in React Server Components:
+Use the `auth.getSession()` function to access session and user data in React Server Components. It resolves to `{ data, error }`; `data` holds the session and its `user`:
 
 ```typescript
 // app/components/session-card.tsx
 import { auth } from "@/lib/auth/server"
 
 export async function SessionCard() {
-  const { session, user } = await auth.getSession()
-  const isLoggedIn = !!session && !!user
+  const { data: session } = await auth.getSession()
+  const user = session?.user
 
-  if (!isLoggedIn) {
+  if (!session || !user) {
     return <div>Not logged in</div>
   }
 

@@ -373,7 +373,7 @@ await neonClient.auth.signIn.social({
 });
 
 // Get session
-const session = await neonClient.auth.getSession();
+const { data: session } = await neonClient.auth.getSession();
 
 // Sign out
 await neonClient.auth.signOut();
