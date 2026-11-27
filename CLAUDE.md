@@ -470,7 +470,7 @@ const client = createClient<Database>({
 
 // Direct Better Auth API
 await client.auth.signIn.email({ email, password });
-const session = await client.auth.getSession();
+const { data: session } = await client.auth.getSession();
 await client.auth.signOut();
 
 // Database queries (automatic token injection)

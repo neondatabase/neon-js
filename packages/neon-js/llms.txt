@@ -82,7 +82,7 @@ await client.auth.signIn.social({
 });
 
 // Get session
-const session = await client.auth.getSession();
+const { data: session } = await client.auth.getSession();
 
 // Sign out
 await client.auth.signOut();
@@ -125,7 +125,7 @@ const client = createClient<Database>({
 });
 
 await client.auth.signIn.email({ email, password });
-const session = await client.auth.getSession();
+const { data: session } = await client.auth.getSession();
 ```
 
 ```typescript

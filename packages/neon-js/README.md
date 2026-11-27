@@ -250,7 +250,7 @@ await client.auth.signIn.social({
 
 ```typescript
 // Get current session
-const session = await client.auth.getSession();
+const { data: session } = await client.auth.getSession();
 
 // Sign out
 await client.auth.signOut();
