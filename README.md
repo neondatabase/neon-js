@@ -2,25 +2,22 @@
 
 [![License](https://img.shields.io/npm/l/@neondatabase/neon-js.svg)](LICENSE)
 
-> The official Neon SDK for building applications - integrates Neon Auth and Neon Data API.
+> The official Neon SDK for building applications on serverless Postgres with Neon Auth and Neon Data API.
 
-## Packages
-
-| Package                                                 | Use Case                       | npm                                                                                                                         |
-| ------------------------------------------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| [`@neondatabase/neon-js`](./packages/neon-js)           | Full SDK: Auth + Database + UI | [![npm](https://img.shields.io/npm/v/@neondatabase/neon-js)](https://www.npmjs.com/package/@neondatabase/neon-js)           |
-| [`@neondatabase/auth`](./packages/auth)                 | Authentication + UI only       | [![npm](https://img.shields.io/npm/v/@neondatabase/auth)](https://www.npmjs.com/package/@neondatabase/auth)                 |
-| [`@neondatabase/postgrest-js`](./packages/postgrest-js) | Database queries (no auth)     | [![npm](https://img.shields.io/npm/v/@neondatabase/postgrest-js)](https://www.npmjs.com/package/@neondatabase/postgrest-js) |
+| You need | With `@neondatabase/neon-js`           |
+| -------- | ---------------------------------------|
+| Database | [Neon Serverless Postgres](https://neon.com) |
+| Auth     | `client.auth` — Neon Auth, JWT + RLS |
+| Data API | `client.from('table').select()` — Data API |
+| Vectors  | [pgvector](https://neon.com/docs/extensions/pgvector) in the same database |
 
 ## Which Package Should I Use?
 
-```
-Do you need authentication?
-├── Yes → Do you also need database queries?
-│   ├── Yes → @neondatabase/neon-js (full SDK)
-│   └── No  → @neondatabase/auth
-└── No  → @neondatabase/postgrest-js
-```
+| If you need | Install | npm |
+| ----------- | ------- | ------- |
+| Neon Auth + Data API + UI | [`@neondatabase/neon-js`](./packages/neon-js) | [![npm](https://img.shields.io/npm/v/@neondatabase/neon-js)](https://www.npmjs.com/package/@neondatabase/neon-js)           |
+| Neon Auth only (query Postgres with Drizzle, Prisma, or the serverless driver) + UI | [`@neondatabase/auth`](./packages/auth) | [![npm](https://img.shields.io/npm/v/@neondatabase/auth)](https://www.npmjs.com/package/@neondatabase/auth)                 |
+| Data API only (no Neon Auth, or you bring your own JWT) | [`@neondatabase/postgrest-js`](./packages/postgrest-js) | [![npm](https://img.shields.io/npm/v/@neondatabase/postgrest-js)](https://www.npmjs.com/package/@neondatabase/postgrest-js) |
 
 Pre-built login forms and auth pages are included in both `neon-js` and `auth` packages.
 
